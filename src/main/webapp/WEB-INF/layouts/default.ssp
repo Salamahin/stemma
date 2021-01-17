@@ -1,0 +1,115 @@
+<%@ val body: String %>
+<html lang="en">
+<head>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link rel="stylesheet" href="/webjars/bootstrap/5.0.0-beta1/css/bootstrap.min.css"/>
+<link rel="stylesheet" href="css/style.css">
+    <title>Project Stemma</title>
+
+</head>
+<body>
+
+    <!-- Vertical navbar -->
+    <div class="vertical-nav bg-dark" id="sidebar">
+        <p class="text-gray font-weight-bold text-uppercase px-4 small py-4 mb-0">Kinsman</p>
+
+        <form>
+            <div class="form-group px-4 mb-1">
+                <label for="name" class="text-gray">name</label>
+                <input id="name" type="text" class="form-control" placeholder="John Doe">
+            </div>
+            <div class="form-group px-4 mb-1">
+                <label for="birthDate" class="text-gray">birth date</label>
+                <input id="birthDate" type="date" class="form-control" placeholder="birth date">
+            </div>
+            <div class="form-group px-4 mb-1">
+                <label for="deathDate" class="text-gray">death date</label>
+                <input id="deathDate" type="date" class="form-control" placeholder="death date">
+            </div>
+
+            <button type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>
+        </form>
+
+        <p class="text-gray font-weight-bold text-uppercase px-4 small py-4 mb-0">Family</p>
+
+        <form>
+            <div class="form-group px-4 mb-1">
+                <label for="parent1" class="text-gray form-label">first parent</label>
+                <input id="parent1" type="text" class="form-control" placeholder="John Doe">
+            </div>
+            <div class="form-group px-4 mb-1">
+                <label for="parent2" class="text-gray form-label">second parent</label>
+                <input id="parent2" type="text" class="form-control" placeholder="Jane Doe">
+            </div>
+            <div class="form-group px-4 mb-1">
+                <label for="children" class="text-gray form-label">children, comma separated</label>
+                <textarea id="children" class="form-control" rows="5" placeholder="Joshua Doe, Jacob Doe"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>
+        </form>
+    </div>
+    <!-- End vertical navbar -->
+
+
+    <!-- Page content holder -->
+    <div class="page-content p-5" id="content">
+    <!-- Toggle button -->
+    <button id="sidebarCollapse" type="button" class="btn btn-light bg-white rounded-pill shadow-sm px-4 mb-4"><i class="fa fa-bars mr-2"></i><small class="text-uppercase font-weight-bold">Toggle</small></button>
+
+    <!-- Demo content -->
+    <h2 class="display-4 text-white">Bootstrap vertical nav</h2>
+    <p class="lead text-white mb-0">Build a fixed sidebar using Bootstrap 4 vertical navigation and media objects.</p>
+    <p class="lead text-white">Snippet by <a href="https://bootstrapious.com/snippets" class="text-white">
+        <u>Bootstrapious</u></a>
+    </p>
+    <div class="separator"></div>
+    <div class="row text-white">
+        <div class="col-lg-7">
+            <p class="lead">Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure
+                dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+            <p class="lead">Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure
+                dolor.
+            </p>
+            <div class="bg-white p-5 rounded my-5 shadow-sm">
+                <p class="lead font-italic mb-0 text-muted">"Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute
+                    irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."</p>
+            </div>
+            <p class="lead">Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure
+                dolor.
+            </p>
+            <p class="lead">Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure
+                dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+            <p class="lead">Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure
+                dolor.
+            </p>
+        </div>
+        <div class="col-lg-5">
+            <p class="lead">Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure
+                dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+            <p class="lead">Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure
+                dolor.
+            </p>
+            <p class="lead">Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure
+                dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+            <p class="lead">Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure
+                dolor.
+            </p>
+        </div>
+    </div>
+
+    </div>
+    <!-- End demo content -->
+
+    <script src="/webjars/bootstrap/5.0.0-beta1/js/bootstrap.bundle.min.js"></script>
+    <script src="/webjars/jquery/3.5.1/jquery.min.js"></script>
+
+    <script type="text/javascript">
+    $("#sidebarCollapse").click(function(e) {
+    e.preventDefault();
+    $('#sidebar, #content').toggleClass("active");
+    });
+    </script>
+</body>
+</html>
