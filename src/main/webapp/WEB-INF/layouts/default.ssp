@@ -13,38 +13,38 @@
 
     <!-- Vertical navbar -->
     <div class="vertical-nav bg-dark" id="sidebar">
-        <p class="text-gray font-weight-bold text-uppercase px-4 small py-4 mb-0">Kinsman</p>
+        <p class="text-light font-weight-bold text-uppercase px-4 small py-4 mb-0">Kinsman</p>
 
         <form>
             <div class="form-group px-4 mb-1">
-                <label for="name" class="text-gray">name</label>
+                <label for="name" class="text-secondary">name</label>
                 <input id="name" type="text" class="form-control" placeholder="John Doe">
             </div>
             <div class="form-group px-4 mb-1">
-                <label for="birthDate" class="text-gray">birth date</label>
+                <label for="birthDate" class="text-secondary">birth date</label>
                 <input id="birthDate" type="date" class="form-control" placeholder="birth date">
             </div>
             <div class="form-group px-4 mb-1">
-                <label for="deathDate" class="text-gray">death date</label>
+                <label for="deathDate" class="text-secondary">death date</label>
                 <input id="deathDate" type="date" class="form-control" placeholder="death date">
             </div>
 
             <button type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>
         </form>
 
-        <p class="text-gray font-weight-bold text-uppercase px-4 small py-4 mb-0">Family</p>
+        <p class="text-light font-weight-bold text-uppercase px-4 small py-4 mb-0">Family</p>
 
         <form>
             <div class="form-group px-4 mb-1">
-                <label for="parent1" class="text-gray form-label">first parent</label>
+                <label for="parent1" class="text-secondary form-label">first parent</label>
                 <input id="parent1" type="text" class="form-control" placeholder="John Doe">
             </div>
             <div class="form-group px-4 mb-1">
-                <label for="parent2" class="text-gray form-label">second parent</label>
+                <label for="parent2" class="text-secondary form-label">second parent</label>
                 <input id="parent2" type="text" class="form-control" placeholder="Jane Doe">
             </div>
             <div class="form-group px-4 mb-1">
-                <label for="children" class="text-gray form-label">children, comma separated</label>
+                <label for="children" class="text-secondary form-label">children, comma separated</label>
                 <textarea id="children" class="form-control" rows="5" placeholder="Joshua Doe, Jacob Doe"></textarea>
             </div>
             <button type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>
