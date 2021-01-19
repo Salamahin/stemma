@@ -1,0 +1,75 @@
+<html lang="en">
+<head>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="bootstrap/5.0.0-beta1/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="style.css">
+    <title>Project Stemma</title>
+
+</head>
+<body>
+
+<!-- Vertical navbar -->
+<div class="vertical-nav bg-dark active" id="sidebar">
+    <form>
+        <p class="text-light font-weight-bold text-uppercase px-4 small pt-4 pb-2">Kinsman</p>
+
+        <div class="form-floating mb-3 mx-4">
+            <input id="name" type="text" class="form-control" placeholder="John Doe">
+            <label for="name" class="col-form-label">name</label>
+        </div>
+        <div class="form-floating mb-3 mx-4">
+            <input id="birthDate" type="date" class="form-control" placeholder="birth date">
+            <label for="birthDate" class="col-form-label">birth date</label>
+        </div>
+        <div class="form-floating mb-3 mx-4">
+            <input id="deathDate" type="date" class="form-control" placeholder="death date">
+            <label for="deathDate" class="col-form-label">death date</label>
+        </div>
+
+        <button type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>
+    </form>
+
+    <form>
+        <p class="text-light font-weight-bold text-uppercase px-4 small py-2">Family</p>
+
+        <div class="form-floating mb-3 mx-4">
+            <input id="parent1" type="text" class="form-control" placeholder="John Doe">
+            <label for="parent1" class="col-form-label">first parent</label>
+        </div>
+        <div class="form-floating mb-3 mx-4">
+            <input id="parent2" type="text" class="form-control" placeholder="Jane Doe">
+            <label for="parent2" class="col-form-label">second parent</label>
+        </div>
+        <div class="form-floating mb-3 mx-4">
+            <textarea id="children" class="form-control" rows="5" placeholder="Joshua Doe, Jacob Doe"></textarea>
+            <label for="children" class="col-form-label">children, comma separated</label>
+        </div>
+        <button type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>
+    </form>
+</div>
+<!-- End vertical navbar -->
+
+
+<!-- Page content holder -->
+<div class="page-content pb-5 active" id="content">
+    <!-- Toggle button -->
+    <button id="sidebarCollapse" type="button" class="btn m-3">
+        <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+    </button>
+</div>
+
+<script src="bootstrap/5.0.0-beta1/js/bootstrap.bundle.min.js"></script>
+<script src="jquery/3.5.1/jquery.min.js"></script>
+
+<script type="text/javascript">
+    $("#sidebarCollapse").click(function(e) {
+    e.preventDefault();
+    $('#sidebar, #content').toggleClass("active");
+    });
+
+</script>
+</body>
+</html>

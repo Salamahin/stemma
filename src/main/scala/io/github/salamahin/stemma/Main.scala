@@ -1,23 +1,30 @@
 package io.github.salamahin.stemma
 
 import cats.data.Validated
-import io.circe.generic.auto._
+import cats.effect.Blocker
 import io.circe.{Decoder, Encoder}
 import io.github.salamahin.stemma.repository.{Repository, Stemma}
-import org.http4s._
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.dsl.Http4sDsl
-import org.http4s.implicits._
+import org.http4s.server.Router
 import org.http4s.server.blaze.BlazeServerBuilder
-import zio._
+import org.http4s.server.staticcontent.webjarServiceBuilder
+import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes, QueryParamCodec, StaticFile}
 import zio.clock.Clock
 import zio.console.putStrLn
-import zio.interop.catz._
+import zio.{RIO, URIO, ZEnv, ZIO}
 
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import scala.concurrent.ExecutionContext
 
-object Main extends App {
+object Main extends zio.App {
+  import cats.implicits._
+  import io.circe.generic.auto._
+  import org.http4s.implicits._
+  import zio.interop.catz._
+  import org.http4s.twirl._
+
   type StemmaTask[A] = RIO[Repository with Clock, A]
 
   val localDatePattern = DateTimeFormatter.ISO_DATE
@@ -29,36 +36,49 @@ object Main extends App {
   implicit def circeJsonEncoder[A](implicit decoder: Encoder[A]): EntityEncoder[StemmaTask, A] = jsonEncoderOf[StemmaTask, A]
 
   implicit val localDateDecoder = QueryParamCodec.localDateQueryParamCodec(localDatePattern)
-  object kinsmanName    extends QueryParamDecoderMatcher[String]("name")
-  object optKinsmanName extends OptionalQueryParamDecoderMatcher[String]("name")
-  object optBirthDate   extends OptionalQueryParamDecoderMatcher[LocalDate]("birthDate")
-  object optDeathDate   extends OptionalQueryParamDecoderMatcher[LocalDate]("deathDate")
-  object parent1Id      extends QueryParamDecoderMatcher[Int]("parent1Id")
-  object optParent1Id   extends OptionalQueryParamDecoderMatcher[Int]("parent1Id")
-  object optParent2Id   extends OptionalQueryParamDecoderMatcher[Int]("parent2Id")
-  object childrenIds    extends OptionalMultiQueryParamDecoderMatcher[Int]("childrenId")
+  object name         extends QueryParamDecoderMatcher[String]("name")
+  object optName      extends OptionalQueryParamDecoderMatcher[String]("name")
+  object optBirthDate extends OptionalQueryParamDecoderMatcher[LocalDate]("birthDate")
+  object optDeathDate extends OptionalQueryParamDecoderMatcher[LocalDate]("deathDate")
+  object parent1Id    extends QueryParamDecoderMatcher[Int]("parent1Id")
+  object optParent1Id extends OptionalQueryParamDecoderMatcher[Int]("parent1Id")
+  object optParent2Id extends OptionalQueryParamDecoderMatcher[Int]("parent2Id")
+  object childrenIds  extends OptionalMultiQueryParamDecoderMatcher[Int]("childrenId")
 
-  private val httpApp =
-    HttpRoutes
-      .of[StemmaTask] {
-        case GET -> Root / "kinsman"                                                                              => Ok(repo(_.get.kinsmen))
-        case POST -> Root / "kinsman" :? kinsmanName(name) +& optBirthDate(bd) +& optDeathDate(dd)                => Ok(repo(_.get.newKinsman(name, bd, dd)))
-        case PUT -> Root / "kinsman" / IntVar(id) :? optKinsmanName(name) +& optBirthDate(bd) +& optDeathDate(dd) => Ok(repo(_.get.updateKinsman(id, name, bd, dd)))
+  private val api = HttpRoutes.of[StemmaTask] {
+    case GET -> Root / "kinsman"                                                                                                         => Ok(repo(_.get.kinsmen))
+    case POST -> Root / "kinsman" :? name(name) +& optBirthDate(bd) +& optDeathDate(dd)                                                  => Ok(repo(_.get.newKinsman(name, bd, dd)))
+    case PUT -> Root / "kinsman" / IntVar(id) :? optName(name) +& optBirthDate(bd) +& optDeathDate(dd)                                   => Ok(repo(_.get.updateKinsman(id, name, bd, dd)))
+    case GET -> Root / "family"                                                                                                          => Ok(repo(_.get.families))
+    case POST -> Root / "family" :? parent1Id(parent1) +& optParent2Id(parent2) +& childrenIds(Validated.Valid(children))                => Ok(repo(_.get.newFamily(parent1, parent2, children)))
+    case PUT -> Root / "family" / IntVar(id) :? optParent1Id(parent1) +& optParent2Id(parent2) +& childrenIds(Validated.Valid(children)) => Ok(repo(_.get.updateFamily(id, parent1, parent2, children)))
+  }
 
-        case GET -> Root / "family"                                                                                           => Ok(repo(_.get.families))
-        case POST -> Root / "family" :? parent1Id(parent1) +& optParent2Id(parent2) +& childrenIds(Validated.Valid(children)) => Ok(repo(_.get.newFamily(parent1, parent2, children)))
-        case PUT -> Root / "family" / IntVar(id) :? optParent1Id(parent1) +& optParent2Id(parent2) +& childrenIds(Validated.Valid(children)) =>
-          Ok(repo(_.get.updateFamily(id, parent1, parent2, children)))
-      }
-      .orNotFound
+  private def static(ec: ExecutionContext) = HttpRoutes.of[StemmaTask] {
+    case GET -> Root => Ok(html.index())
 
-  override def run(args: List[String]): zio.URIO[zio.ZEnv, zio.ExitCode] = {
+    case request @ GET -> Root / "style.css" =>
+      StaticFile
+        .fromResource("/static/style.css", Blocker.liftExecutionContext(ec), Some(request))
+        .getOrElseF(NotFound())
+  }
+
+  private def webJars(ec: ExecutionContext) = webjarServiceBuilder[StemmaTask](Blocker.liftExecutionContext(ec)).toRoutes
+
+  override def run(args: List[String]): URIO[ZEnv, zio.ExitCode] = {
     ZIO
       .runtime[ZEnv with Repository]
       .flatMap { implicit runtime =>
-        BlazeServerBuilder[StemmaTask](runtime.platform.executor.asEC)
+        val executor = runtime.platform.executor.asEC
+
+        BlazeServerBuilder[StemmaTask](executor)
           .bindHttp(8080, "localhost")
-          .withHttpApp(httpApp)
+          .withHttpApp(
+            Router(
+              "/"    -> (static(executor) <+> webJars(executor)),
+              "/api" -> api
+            ).orNotFound
+          )
           .resource
           .toManagedZIO
           .useForever
