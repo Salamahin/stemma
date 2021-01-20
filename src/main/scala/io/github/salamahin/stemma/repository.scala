@@ -24,6 +24,8 @@ object repository {
       .make(init)
       .map(repository =>
         new Service {
+          override def kinsmen: UIO[Map[Int, Kinsman]] = repository.get.map(_.kinsmen)
+          override def families: UIO[Map[Int, Family]] = repository.get.map(_.families)
 
           override def newKinsman(kinsman: Kinsman): UIO[Int] =
             repository
@@ -33,9 +35,6 @@ object repository {
               }
               .map(newStemma => newStemma.kinsmenId)
 
-          override def kinsmen: UIO[Map[Int, Kinsman]] =
-            repository.get.map(_.kinsmen)
-
           override def newFamily(family: Family): UIO[Int] =
             repository
               .updateAndGet { stemma =>
@@ -43,9 +42,6 @@ object repository {
                 stemma.copy(families = stemma.families + (newFamilyId -> family), familyId = newFamilyId)
               }
               .map(newStemma => newStemma.familyId)
-
-          override def families: UIO[Map[Int, Family]] =
-            repository.get.map(_.families)
         }
       )
   }
