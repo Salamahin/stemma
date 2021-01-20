@@ -12,11 +12,10 @@ object repository {
   type Repository = Has[Service]
 
   trait Service {
-    def newKinsman(kinsman: Kinsman): Task[Int]
     def kinsmen: Task[Map[Int, Kinsman]]
-
-    def newFamily(family: Family): Task[Int]
     def families: Task[Map[Int, Family]]
+    def newKinsman(kinsman: Kinsman): Task[Int]
+    def newFamily(family: Family): Task[Int]
   }
 
   def inMemory(init: Stemma): ZLayer[Any, Nothing, Has[Service]] = ZLayer.fromEffect {
@@ -38,7 +37,7 @@ object repository {
           override def newFamily(family: Family): UIO[Int] =
             repository
               .updateAndGet { stemma =>
-                val newFamilyId = stemma.familyId
+                val newFamilyId = stemma.familyId + 1
                 stemma.copy(families = stemma.families + (newFamilyId -> family), familyId = newFamilyId)
               }
               .map(newStemma => newStemma.familyId)
