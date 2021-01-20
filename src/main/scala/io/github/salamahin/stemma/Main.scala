@@ -1,7 +1,7 @@
 package io.github.salamahin.stemma
 
 import cats.effect.Blocker
-import io.circe.{Decoder, Encoder}
+import io.circe.{Decoder, Encoder, Json}
 import io.github.salamahin.stemma.repository.Repository
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.dsl.Http4sDsl
@@ -40,7 +40,7 @@ object Main extends zio.App {
     case req @ POST -> Root / "family"  => req.as[Family].flatMap(family => Ok(repo(_.get newFamily family)))
   }
 
-  private def static(ec: ExecutionContext) = HttpRoutes.of[StemmaTask] {
+  private def statinc(ec: ExecutionContext) = HttpRoutes.of[StemmaTask] {
     case request @ GET -> Root =>
       StaticFile
         .fromResource(s"/static/index.html", Blocker.liftExecutionContext(ec), Some(request))
@@ -64,7 +64,7 @@ object Main extends zio.App {
           .bindHttp(8080, "localhost")
           .withHttpApp(
             Router(
-              "/"    -> (static(executor) <+> webJars(executor)),
+              "/"    -> (statinc(executor) <+> webJars(executor)),
               "/api" -> api
             ).orNotFound
           )
@@ -76,6 +76,6 @@ object Main extends zio.App {
             _ => ZIO.succeed(zio.ExitCode.success)
           )
       }
-      .provideCustomLayer(repository.live(Stemma(0, 0, Map.empty, Map.empty)))
+      .provideCustomLayer(repository.inMemory(Stemma(0, 0, Map.empty, Map.empty)))
   }
 }
