@@ -1,20 +1,18 @@
 package io.github.salamahin.stemma
 
-import cats.data.Validated
 import cats.effect.Blocker
 import io.circe.{Decoder, Encoder}
-import io.github.salamahin.stemma.repository.{Repository, Stemma}
+import io.github.salamahin.stemma.repository.Repository
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.Router
 import org.http4s.server.blaze.BlazeServerBuilder
 import org.http4s.server.staticcontent.webjarServiceBuilder
-import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes, QueryParamCodec, StaticFile}
+import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes, StaticFile}
 import zio.clock.Clock
 import zio.console.putStrLn
-import zio.{IO, RIO, URIO, ZEnv, ZIO}
+import zio.{RIO, URIO, ZEnv, ZIO}
 
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import scala.concurrent.ExecutionContext
 
@@ -34,23 +32,12 @@ object Main extends zio.App {
   implicit def circeJsonDecoder[A](implicit decoder: Decoder[A]): EntityDecoder[StemmaTask, A] = jsonOf[StemmaTask, A]
   implicit def circeJsonEncoder[A](implicit decoder: Encoder[A]): EntityEncoder[StemmaTask, A] = jsonEncoderOf[StemmaTask, A]
 
-  implicit val localDateDecoder = QueryParamCodec.localDateQueryParamCodec(localDatePattern)
-  object name         extends QueryParamDecoderMatcher[String]("name")
-  object optName      extends OptionalQueryParamDecoderMatcher[String]("name")
-  object optBirthDate extends OptionalQueryParamDecoderMatcher[LocalDate]("birthDate")
-  object optDeathDate extends OptionalQueryParamDecoderMatcher[LocalDate]("deathDate")
-  object parent1Id    extends QueryParamDecoderMatcher[Int]("parent1Id")
-  object optParent1Id extends OptionalQueryParamDecoderMatcher[Int]("parent1Id")
-  object optParent2Id extends OptionalQueryParamDecoderMatcher[Int]("parent2Id")
-  object childrenIds  extends OptionalMultiQueryParamDecoderMatcher[Int]("childrenId")
-
   private val api = HttpRoutes.of[StemmaTask] {
-    case GET -> Root / "kinsman"                                                                                                         => Ok(repo(_.get.kinsmen))
-    case POST -> Root / "kinsman" :? name(name) +& optBirthDate(bd) +& optDeathDate(dd)                                                  => Ok(repo(_.get.newKinsman(name, bd, dd)))
-    case PUT -> Root / "kinsman" / IntVar(id) :? optName(name) +& optBirthDate(bd) +& optDeathDate(dd)                                   => Ok(repo(_.get.updateKinsman(id, name, bd, dd)))
-    case GET -> Root / "family"                                                                                                          => Ok(repo(_.get.families))
-    case POST -> Root / "family" :? parent1Id(parent1) +& optParent2Id(parent2) +& childrenIds(Validated.Valid(children))                => Ok(repo(_.get.newFamily(parent1, parent2, children)))
-    case PUT -> Root / "family" / IntVar(id) :? optParent1Id(parent1) +& optParent2Id(parent2) +& childrenIds(Validated.Valid(children)) => Ok(repo(_.get.updateFamily(id, parent1, parent2, children)))
+    case GET -> Root / "kinsman" => Ok(repo(_.get.kinsmen))
+    case GET -> Root / "family"  => Ok(repo(_.get.families))
+
+    case req @ POST -> Root / "kinsman" => req.as[Kinsman].flatMap(kinsman => Ok(repo(_.get newKinsman kinsman)))
+    case req @ POST -> Root / "family"  => req.as[Family].flatMap(family => Ok(repo(_.get newFamily family)))
   }
 
   private def static(ec: ExecutionContext) = HttpRoutes.of[StemmaTask] {
@@ -89,7 +76,6 @@ object Main extends zio.App {
             _ => ZIO.succeed(zio.ExitCode.success)
           )
       }
-      .provideCustomLayer(repository.live(Stemma(0, 0, Map(1 -> Kinsman(1, "soso", None, None)), Map.empty)))
-
+      .provideCustomLayer(repository.live(Stemma(0, 0, Map.empty, Map.empty)))
   }
 }
