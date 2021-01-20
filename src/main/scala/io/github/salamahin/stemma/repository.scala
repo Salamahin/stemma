@@ -38,7 +38,7 @@ object repository {
           override def newFamily(family: Family): UIO[Int] =
             repository
               .updateAndGet { stemma =>
-                val newFamilyId = stemma.familyId
+                val newFamilyId = stemma.familyId + 1
                 stemma.copy(families = stemma.families + (newFamilyId -> family), familyId = newFamilyId)
               }
               .map(newStemma => newStemma.familyId)
