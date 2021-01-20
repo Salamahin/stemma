@@ -12,7 +12,7 @@ import org.http4s.server.staticcontent.webjarServiceBuilder
 import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes, QueryParamCodec, StaticFile}
 import zio.clock.Clock
 import zio.console.putStrLn
-import zio.{RIO, URIO, ZEnv, ZIO}
+import zio.{IO, RIO, URIO, ZEnv, ZIO}
 
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -23,7 +23,6 @@ object Main extends zio.App {
   import io.circe.generic.auto._
   import org.http4s.implicits._
   import zio.interop.catz._
-  import org.http4s.twirl._
 
   type StemmaTask[A] = RIO[Repository with Clock, A]
 
@@ -55,11 +54,14 @@ object Main extends zio.App {
   }
 
   private def static(ec: ExecutionContext) = HttpRoutes.of[StemmaTask] {
-    case GET -> Root => Ok(html.index())
-
-    case request @ GET -> Root / "style.css" =>
+    case request @ GET -> Root =>
       StaticFile
-        .fromResource("/static/style.css", Blocker.liftExecutionContext(ec), Some(request))
+        .fromResource(s"/static/index.html", Blocker.liftExecutionContext(ec), Some(request))
+        .getOrElseF(NotFound())
+
+    case request @ GET -> Root / resource =>
+      StaticFile
+        .fromResource(s"/static/$resource", Blocker.liftExecutionContext(ec), Some(request))
         .getOrElseF(NotFound())
   }
 
@@ -87,7 +89,7 @@ object Main extends zio.App {
             _ => ZIO.succeed(zio.ExitCode.success)
           )
       }
-      .provideCustomLayer(repository.live(Stemma(0, 0, Map.empty, Map.empty)))
+      .provideCustomLayer(repository.live(Stemma(0, 0, Map(1 -> Kinsman(1, "soso", None, None)), Map.empty)))
 
   }
 }

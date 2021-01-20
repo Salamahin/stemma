@@ -17,19 +17,19 @@
         <p class="text-light font-weight-bold text-uppercase px-4 small pt-4 pb-2">Kinsman</p>
 
         <div class="form-floating mb-3 mx-4">
-            <input id="name" type="text" class="form-control" placeholder="John Doe">
-            <label for="name" class="col-form-label">name</label>
+            <input id="name" type="text" class="form-control" placeholder="John Doe" required>
+            <label for="name" class="form-label">name</label>
         </div>
         <div class="form-floating mb-3 mx-4">
             <input id="birthDate" type="date" class="form-control" placeholder="birth date">
-            <label for="birthDate" class="col-form-label">birth date</label>
+            <label for="birthDate" class="form-label">birth date</label>
         </div>
         <div class="form-floating mb-3 mx-4">
             <input id="deathDate" type="date" class="form-control" placeholder="death date">
-            <label for="deathDate" class="col-form-label">death date</label>
+            <label for="deathDate" class="form-label">death date</label>
         </div>
 
-        <button type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>
+        <button id="submitKinsman" type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>
     </form>
 
     <form>
@@ -47,7 +47,7 @@
             <textarea id="children" class="form-control" rows="5" placeholder="Joshua Doe, Jacob Doe"></textarea>
             <label for="children" class="col-form-label">children, comma separated</label>
         </div>
-        <button type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>
+        <button id="submitFamily" type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>
     </form>
 </div>
 <!-- End vertical navbar -->
@@ -63,13 +63,7 @@
 
 <script src="bootstrap/5.0.0-beta1/js/bootstrap.bundle.min.js"></script>
 <script src="jquery/3.5.1/jquery.min.js"></script>
+<script src="client.js"></script>
 
-<script type="text/javascript">
-    $("#sidebarCollapse").click(function(e) {
-    e.preventDefault();
-    $('#sidebar, #content').toggleClass("active");
-    });
-
-</script>
 </body>
 </html>
