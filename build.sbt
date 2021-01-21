@@ -6,12 +6,15 @@ version := "0.1.0-SNAPSHOT"
 
 lazy val versions = new {
   val http4sV = "1.0.0-M10"
+  val circeV  = "0.14.0-M3"
 }
+
 libraryDependencies ++= Seq(
   "org.http4s"     %% "http4s-blaze-server" % versions.http4sV,
   "org.http4s"     %% "http4s-dsl"          % versions.http4sV,
   "org.http4s"     %% "http4s-circe"        % versions.http4sV,
-  "io.circe"       %% "circe-generic"       % "0.14.0-M3",
+  "io.circe"       %% "circe-generic"       % versions.circeV,
+  "io.circe"       %% "circe-parser"        % versions.circeV,
   "dev.zio"        %% "zio"                 % "1.0.3",
   "dev.zio"        %% "zio-interop-cats"    % "2.2.0.1",
   "org.slf4j"      % "slf4j-api"            % "2.0.0-alpha1",

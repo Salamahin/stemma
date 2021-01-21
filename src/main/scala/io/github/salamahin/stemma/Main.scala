@@ -1,8 +1,9 @@
 package io.github.salamahin.stemma
 
 import cats.effect.Blocker
-import io.circe.{Decoder, Encoder, Json}
+import io.circe.{Decoder, Encoder}
 import io.github.salamahin.stemma.repository.Repository
+import io.github.salamahin.stemma.storage.Storage
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.Router
@@ -13,6 +14,7 @@ import zio.clock.Clock
 import zio.console.putStrLn
 import zio.{RIO, URIO, ZEnv, ZIO}
 
+import java.nio.file.Paths
 import java.time.format.DateTimeFormatter
 import scala.concurrent.ExecutionContext
 
@@ -71,11 +73,11 @@ object Main extends zio.App {
           .resource
           .toManagedZIO
           .useForever
-          .foldCauseM(
-            err => putStrLn(err.prettyPrint).as(zio.ExitCode.failure),
-            _ => ZIO.succeed(zio.ExitCode.success)
-          )
       }
-      .provideCustomLayer(repository.inMemory(Stemma(0, 0, Map.empty, Map.empty)))
+      .provideCustomLayer(storage.fileBased(Paths.get("state.json")) >>> repository.inMemory)
+      .foldCauseM(
+        err => putStrLn(err.prettyPrint).as(zio.ExitCode.failure),
+        _ => ZIO.succeed(zio.ExitCode.success)
+      )
   }
 }
