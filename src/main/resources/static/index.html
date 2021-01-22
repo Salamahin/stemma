@@ -11,59 +11,64 @@
 </head>
 <body>
 
-<!-- Vertical navbar -->
-<div class="vertical-nav bg-dark active" id="sidebar">
-    <form>
-        <p class="text-light font-weight-bold text-uppercase px-4 small pt-4 pb-2">Kinsman</p>
+<!--&lt;!&ndash; Vertical navbar &ndash;&gt;-->
+<!--<div class="vertical-nav bg-dark active" id="sidebar">-->
+<!--    <form>-->
+<!--        <p class="text-light font-weight-bold text-uppercase px-4 small pt-4 pb-2">Kinsman</p>-->
 
-        <div class="form-floating mb-3 mx-4">
-            <input id="name" type="text" class="form-control">
-            <label for="name" class="form-label">name</label>
-        </div>
-        <div class="form-floating mb-3 mx-4">
-            <input id="birthDate" type="date" class="form-control">
-            <label for="birthDate" class="form-label">birth date</label>
-        </div>
-        <div class="form-floating mb-3 mx-4">
-            <input id="deathDate" type="date" class="form-control">
-            <label for="deathDate" class="form-label">death date</label>
-        </div>
+<!--        <div class="form-floating mb-3 mx-4">-->
+<!--            <input id="name" type="text" class="form-control">-->
+<!--            <label for="name" class="form-label">name</label>-->
+<!--        </div>-->
+<!--        <div class="form-floating mb-3 mx-4">-->
+<!--            <input id="birthDate" type="date" class="form-control">-->
+<!--            <label for="birthDate" class="form-label">birth date</label>-->
+<!--        </div>-->
+<!--        <div class="form-floating mb-3 mx-4">-->
+<!--            <input id="deathDate" type="date" class="form-control">-->
+<!--            <label for="deathDate" class="form-label">death date</label>-->
+<!--        </div>-->
 
-        <button id="submitKinsman" type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>
-    </form>
+<!--        <button id="submitKinsman" type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>-->
+<!--    </form>-->
 
-    <form>
-        <p class="text-light font-weight-bold text-uppercase px-4 small py-2">Family</p>
+<!--    <form>-->
+<!--        <p class="text-light font-weight-bold text-uppercase px-4 small py-2">Family</p>-->
 
-        <div class="form-floating mb-3 mx-4">
-            <input id="parent1" type="text" class="form-control">
-            <label for="parent1" class="col-form-label">first parent</label>
-        </div>
-        <div class="form-floating mb-3 mx-4">
-            <input id="parent2" type="text" class="form-control">
-            <label for="parent2" class="col-form-label">second parent</label>
-        </div>
-        <div class="form-floating mb-3 mx-4">
-            <textarea id="children" class="form-control" rows="5"></textarea>
-            <label for="children" class="col-form-label">children, comma separated</label>
-        </div>
-        <button id="submitFamily" type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>
-    </form>
-</div>
-<!-- End vertical navbar -->
+<!--        <div class="form-floating mb-3 mx-4">-->
+<!--            <input id="parent1" type="text" class="form-control">-->
+<!--            <label for="parent1" class="col-form-label">first parent</label>-->
+<!--        </div>-->
+<!--        <div class="form-floating mb-3 mx-4">-->
+<!--            <input id="parent2" type="text" class="form-control">-->
+<!--            <label for="parent2" class="col-form-label">second parent</label>-->
+<!--        </div>-->
+<!--        <div class="form-floating mb-3 mx-4">-->
+<!--            <textarea id="children" class="form-control" rows="5"></textarea>-->
+<!--            <label for="children" class="col-form-label">children, comma separated</label>-->
+<!--        </div>-->
+<!--        <button id="submitFamily" type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>-->
+<!--    </form>-->
+<!--</div>-->
+<!--&lt;!&ndash; End vertical navbar &ndash;&gt;-->
 
 
-<!-- Page content holder -->
-<div class="page-content pb-5 active" id="content">
-    <!-- Toggle button -->
-    <button id="sidebarCollapse" type="button" class="btn m-3">
-        <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
-    </button>
-</div>
+<!--&lt;!&ndash; Page content holder &ndash;&gt;-->
+<!--<div class="page-content pb-5 active" id="content">-->
+<!--    &lt;!&ndash; Toggle button &ndash;&gt;-->
+<!--    <button id="sidebarCollapse" type="button" class="btn m-3">-->
+<!--        <i class="fa fa-ellipsis-v" aria-hidden="true"></i>-->
+<!--    </button>-->
+
+    <div id="data_viz" class="w-75 h-75"></div>
+<!--</div>-->
+
 
 <script src="bootstrap/5.0.0-beta1/js/bootstrap.bundle.min.js"></script>
 <script src="jquery/3.5.1/jquery.min.js"></script>
+<script src="d3js/6.2.0/d3.min.js"></script>
 <script src="client.js"></script>
+<script src="family.js"></script>
 
 </body>
 </html>
