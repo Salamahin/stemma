@@ -71,15 +71,25 @@ const link = svg
     .enter()
     .append("line")
     .attr("stroke-width", d => (d.type == "spouse"? "4px" : "0.5px"))
-    .attr("stroke", d => (d.type == "spouse"? "gold" : "grey"));
+    .attr("stroke", d => (d.type == "spouse"? "#69b3a2" : "grey"));
 
 const node = svg
-    .selectAll(".node")
+    .selectAll("node")
     .data(dataVertexes)
     .enter()
-        .append("circle")
-        .attr("fill", "#69b3a2")
-        .attr("r", d => { return (d.type == "family"? 10 : 40) });
+    .append("g")
+
+node
+    .append("text")
+    .text(d => d.name)
+    .style("font-size", "11px")
+    .style("text-anchor", "middle")
+    .attr("dy", "25");
+
+node
+    .append("circle")
+    .attr("fill", "#69b3a2")
+    .attr("r", d => d.type == "family"? 5 : 10);
 
 simulation.nodes(dataVertexes);
 simulation.force("link").links(dataEdges);
