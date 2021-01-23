@@ -4,9 +4,19 @@ const dataVertexes = [
     { id: "k3", name: "Абрамова Светлана Ивановна", type: "person"},
     { id: "k4", name: "Голощапов Сергей Георгиевич", type: "person"},
     { id: "k5", name: "Голощапов Евгения Анатольевна", type: "person"},
+    { id: "k6", name: "Голощапов Егор Сергеевич", type: "person"},
+    { id: "k7", name: "Голощапов Федор Сергеевич", type: "person"},
+    { id: "k8", name: "Голощапова Ольга Сергеевна", type: "person"},
+    { id: "k9", name: "Стихова Мария", type: "person"},
+    { id: "k10", name: "Зайнулина Мария", type: "person"},
+    { id: "k11", name: "Голощапова Ульяна Егоровна", type: "person"},
+    { id: "k12", name: "Иван Шмидт", type: "person"},
     { id: "f1", type: "family" },
     { id: "f2", type: "family" },
-    { id: "f3", type: "family" }
+    { id: "f3", type: "family" },
+    { id: "f4", type: "family" },
+    { id: "f5", type: "family" },
+    { id: "f6", type: "family" }
 ];
 
 
@@ -16,8 +26,18 @@ const dataEdges = [
     { id: "3", source: "k3", target: "f2", type: "spouse" },
     { id: "4", source: "k4", target: "f3", type: "spouse" },
     { id: "5", source: "k5", target: "f3", type: "spouse" },
-    { id: "6", source: "k2", target: "f2", type: "child" },
-    { id: "7", source: "k1", target: "f3", type: "child" }
+    { id: "6", source: "f2", target: "k2", type: "child" },
+    { id: "7", source: "f3", target: "k1", type: "child" },
+    { id: "8", source: "f3", target: "k6", type: "child" },
+    { id: "9", source: "f3", target: "k7", type: "child" },
+    { id: "10", source: "f3", target: "k8", type: "child" },
+    { id: "15", source: "f5", target: "k11", type: "child" },
+    { id: "11", source: "k9", target: "f4", type: "spouse" },
+    { id: "12", source: "k7", target: "f4", type: "spouse" },
+    { id: "14", source: "k10", target: "f5", type: "spouse" },
+    { id: "16", source: "k6", target: "f5", type: "spouse" },
+    { id: "17", source: "k12", target: "f6", type: "spouse" },
+    { id: "18", source: "k8", target: "f6", type: "spouse" }
 ];
 
 function dragstarted(event) {
@@ -38,6 +58,7 @@ function dragended(event) {
 }
 
 const width = window.innerWidth, height = window.innerHeight;
+const R = 10
 
 const simulation = d3.forceSimulation(dataVertexes)
     .force("link", d3.forceLink()
@@ -56,6 +77,19 @@ const svg = d3.select("#data_viz")
     .attr("height", height)
     .append("g");
 
+ svg.append('defs').append('marker')
+      .attr('id', 'arrow')
+      .attr('viewBox', '0 0 10 6')
+      .attr('refX', 2*R)
+      .attr('refY', 3)
+      .attr('markerWidth', 10)
+      .attr('markerHeight', 6)
+      .attr('markerUnits', 'userSpaceOnUse')
+      .attr('orient', 'auto')
+      .style('fill', 'grey')
+      .append('path')
+      .attr('d', 'M 0 0 L 10 3 L 0 6 Z');
+
 svg.call(d3
     .drag()
     .container(svg.node())
@@ -70,8 +104,17 @@ const link = svg
     .data(dataEdges)
     .enter()
     .append("line")
-    .attr("stroke-width", d => (d.type == "spouse"? "4px" : "0.5px"))
-    .attr("stroke", d => (d.type == "spouse"? "#69b3a2" : "grey"));
+
+
+link.attr("stroke-width", d => (d.type == "spouse"? "4px" : "0.5px"))
+    .attr("stroke", d => (d.type == "spouse"? "#69b3a2" : "grey"))
+
+
+link
+    .filter(d => d.type == "child")
+    .attr('marker-end', 'url(#arrow)')
+    .style('fill', 'none');
+
 
 const node = svg
     .selectAll("node")
@@ -89,7 +132,7 @@ node
 node
     .append("circle")
     .attr("fill", "#69b3a2")
-    .attr("r", d => d.type == "family"? 5 : 10);
+    .attr("r", d => d.type == "family"? 5 : R);
 
 simulation.nodes(dataVertexes);
 simulation.force("link").links(dataEdges);
