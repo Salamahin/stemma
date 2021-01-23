@@ -58,7 +58,12 @@ function dragended(event) {
 }
 
 const width = window.innerWidth, height = window.innerHeight;
-const R = 10
+const childCircleR = 10;
+const spouseCircleR = 5;
+const childRelationColor = "grey";
+const spouseRelationColor = '#69b3a2';
+const childRelationWidth = 0.5;
+const spouseRelationWidth = 2;
 
 const simulation = d3.forceSimulation(dataVertexes)
     .force("link", d3.forceLink()
@@ -77,18 +82,34 @@ const svg = d3.select("#data_viz")
     .attr("height", height)
     .append("g");
 
- svg.append('defs').append('marker')
-      .attr('id', 'arrow')
-      .attr('viewBox', '0 0 10 6')
-      .attr('refX', 2*R)
-      .attr('refY', 3)
-      .attr('markerWidth', 10)
-      .attr('markerHeight', 6)
-      .attr('markerUnits', 'userSpaceOnUse')
-      .attr('orient', 'auto')
-      .style('fill', 'grey')
-      .append('path')
-      .attr('d', 'M 0 0 L 10 3 L 0 6 Z');
+const defs = svg.append('defs')
+
+defs.append('marker')
+    .attr('id', 'child-arrow')
+    .attr('viewBox', '0 0 10 6')
+    .attr('refX', 2 * childCircleR + childRelationWidth * 2)
+    .attr('refY', 3)
+    .attr('markerWidth', 10)
+    .attr('markerHeight', 6)
+    .attr('markerUnits', 'userSpaceOnUse')
+    .attr('orient', 'auto')
+    .style('fill', childRelationColor)
+    .append('path')
+    .attr('d', 'M 0 0 L 10 3 L 0 6 Z');
+
+defs.append('marker')
+    .attr('id', 'spouse-arrow')
+    .attr('viewBox', '0 0 10 6')
+    .attr('refX', 2 * spouseCircleR + spouseRelationWidth * 2)
+    .attr('refY', 3)
+    .attr('markerWidth', 12)
+    .attr('markerHeight', 8)
+    .attr('markerUnits', 'userSpaceOnUse')
+    .attr('orient', 'auto')
+    .style('fill', spouseRelationColor)
+    .append('path')
+    .attr('d', 'M 0 0 L 10 3 L 0 6 Z');
+
 
 svg.call(d3
     .drag()
@@ -105,14 +126,18 @@ const link = svg
     .enter()
     .append("line")
 
-
-link.attr("stroke-width", d => (d.type == "spouse"? "4px" : "0.5px"))
-    .attr("stroke", d => (d.type == "spouse"? "#69b3a2" : "grey"))
-
-
 link
     .filter(d => d.type == "child")
-    .attr('marker-end', 'url(#arrow)')
+    .attr("stroke-width", childRelationWidth + "px")
+    .attr("stroke", childRelationColor)
+    .attr('marker-end', 'url(#child-arrow)')
+    .style('fill', 'none');
+
+link
+    .filter(d => d.type == "spouse")
+    .attr("stroke-width", spouseRelationWidth + "px")
+    .attr("stroke", spouseRelationColor)
+    .attr('marker-end', 'url(#spouse-arrow)')
     .style('fill', 'none');
 
 
@@ -131,8 +156,8 @@ node
 
 node
     .append("circle")
-    .attr("fill", "#69b3a2")
-    .attr("r", d => d.type == "family"? 5 : R);
+    .attr("fill", spouseRelationColor)
+    .attr("r", d => d.type == "family"? spouseCircleR : childCircleR);
 
 simulation.nodes(dataVertexes);
 simulation.force("link").links(dataEdges);
