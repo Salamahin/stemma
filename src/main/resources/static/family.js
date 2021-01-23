@@ -60,6 +60,7 @@ function dragended(event) {
 const width = window.innerWidth, height = window.innerHeight;
 const childCircleR = 10;
 const spouseCircleR = 5;
+const nodeColor = '#69b3a2';
 const childRelationColor = "grey";
 const spouseRelationColor = '#69b3a2';
 const childRelationWidth = 0.5;
@@ -156,7 +157,7 @@ node
 
 node
     .append("circle")
-    .attr("fill", spouseRelationColor)
+    .attr("fill", nodeColor)
     .attr("r", d => d.type == "family"? spouseCircleR : childCircleR);
 
 simulation.nodes(dataVertexes);
