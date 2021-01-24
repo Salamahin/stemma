@@ -28,12 +28,22 @@
             <div class="modal-body">
                 <form>
                     <div class="form-group">
-                        <label for="kinsmanSelector">Kinsman</label>
+                        <label for="kinsmanSelector">From</label>
                         <select id="kinsmanSelector" class="form-control" required></select>
                     </div>
                     <div class="form-group mt-2">
-                        <label for="newKinsmanName">New kinsman</label>
+                        <label for="newKinsmanName">To a new kinsman</label>
                         <input id="newKinsmanName" type="text" class="form-control" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="birthDate">Birth date</label>
+                            <input type="date" class="form-control" id="birthDate" placeholder="Birth date">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="deathDate">Death date</label>
+                            <input type="date" class="form-control" id="deathDate" placeholder="Death date">
+                        </div>
                     </div>
                 </form>
             </div>
