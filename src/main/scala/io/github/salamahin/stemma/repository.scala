@@ -59,7 +59,6 @@ object repository {
       for {
         stemma <- updatedStemma.get
         json   = stemma.asJson.toString()
-        _      <- putStrLn("save state")
       } yield Files.write(path, json.getBytes())
     }
 
@@ -72,7 +71,7 @@ object repository {
       .make(readFile)(saveState)
       .flatMap { stemma =>
         val saveInBackground = periodicalFlush(stemma).forkDaemon
-        val createService = UIO(inMemoryService(stemma))
+        val createService    = UIO(inMemoryService(stemma))
 
         (saveInBackground *> createService).toManaged_
       }

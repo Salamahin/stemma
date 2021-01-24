@@ -1,74 +1,69 @@
 <html lang="en">
 <head>
-
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <link rel="stylesheet" href="bootstrap/5.0.0-beta1/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="bootstrap/4.6.0/css/bootstrap.min.css"/>
     <link rel="stylesheet" href="font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="select2/4.0.13/css/select2.min.css">
+    <link rel="stylesheet" href="ttskch__select2-bootstrap4-theme/1.4.0/dist/select2-bootstrap4.min.css">
     <link rel="stylesheet" href="style.css">
     <title>Project Stemma</title>
-
 </head>
 <body>
 
-<!-- Vertical navbar -->
-<div class="vertical-nav bg-dark active" id="sidebar">
-    <form>
-        <p class="text-light font-weight-bold text-uppercase px-4 small pt-4 pb-2">Kinsman</p>
-
-        <div class="form-floating mb-3 mx-4">
-            <input id="name" type="text" class="form-control">
-            <label for="name" class="form-label">name</label>
-        </div>
-        <div class="form-floating mb-3 mx-4">
-            <input id="birthDate" type="date" class="form-control">
-            <label for="birthDate" class="form-label">birth date</label>
-        </div>
-        <div class="form-floating mb-3 mx-4">
-            <input id="deathDate" type="date" class="form-control">
-            <label for="deathDate" class="form-label">death date</label>
-        </div>
-
-        <button id="submitKinsman" type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>
-    </form>
-
-    <form>
-        <p class="text-light font-weight-bold text-uppercase px-4 small py-2">Family</p>
-
-        <div class="form-floating mb-3 mx-4">
-            <input id="parent1" type="text" class="form-control">
-            <label for="parent1" class="col-form-label">first parent</label>
-        </div>
-        <div class="form-floating mb-3 mx-4">
-            <input id="parent2" type="text" class="form-control">
-            <label for="parent2" class="col-form-label">second parent</label>
-        </div>
-        <div class="form-floating mb-3 mx-4">
-            <textarea id="children" class="form-control" rows="5"></textarea>
-            <label for="children" class="col-form-label">children, comma separated</label>
-        </div>
-        <button id="submitFamily" type="submit" class="btn btn-primary mx-4 mt-2">Submit</button>
-    </form>
-</div>
-<!-- End vertical navbar -->
-
-
 <!-- Page content holder -->
-<div class="page-content pb-5 active" id="content">
-    <!-- Toggle button -->
-    <button id="sidebarCollapse" type="button" class="btn m-3">
-        <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
-    </button>
-
-    <div id="data_viz" class="w-50 h-50"></div>
+<div id="content">
+   <div id="data_viz" class="w-75 h-75"></div>
 </div>
 
+<div class="modal fade" id="addKinsmanModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exampleModalLabel">New relation</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" tabindex="-1">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="form-group">
+                        <label for="kinsmanSelector">Kinsman</label>
+                        <select id="kinsmanSelector" class="form-control" required></select>
+                    </div>
+                    <div class="form-group mt-2">
+                        <label for="newKinsmanName">New kinsman</label>
+                        <input id="newKinsmanName" type="text" class="form-control" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <span class="d-inline-block" data-placement="bottom" data-toggle="tooltip" title="Alt + 1">
+                    <button id="addChild" type="button" class="btn btn-primary">Add as child</button>
+                </span>
+                <span class="d-inline-block" data-placement="bottom" data-toggle="tooltip" title="Alt + 2">
+                    <button id="addSpouse" type="button" class="btn btn-primary" >Add as spouse</button>
+                </span>
+                <span class="d-inline-block" data-placement="bottom" data-toggle="tooltip" title="Alt + 3">
+                    <button id="addParent" type="button" class="btn btn-primary">Add as parent</button>
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
 
-<script src="bootstrap/5.0.0-beta1/js/bootstrap.bundle.min.js"></script>
+<button id="btn-add-node" type="button" class="btn btn-danger btn-circle btn-xl" data-toggle="modal" data-target="#addKinsmanModal">
+    <i class="fa fa-plus"></i>
+</button>
+
+
 <script src="jquery/3.5.1/jquery.min.js"></script>
+<script src="bootstrap/4.6.0/js/bootstrap.bundle.min.js"></script>
 <script src="d3js/6.2.0/d3.min.js"></script>
-<script src="client.js"></script>
-<script src="family.js"></script>
+<script src="select2/4.0.13/js/select2.min.js"></script>
+<script src="api.js"></script>
+<script src="graph.js"></script>
+<script src="ui.js"></script>
 
 </body>
 </html>

@@ -5,11 +5,6 @@ function stringify(obj) {
     );
 }
 
-$("#sidebarCollapse").click(function(e) {
-    e.preventDefault();
-    $('#sidebar, #content').toggleClass('active');
-});
-
 $('#submitKinsman').click(function(e) {
     e.preventDefault();
     async function callAddKinsmanService() {

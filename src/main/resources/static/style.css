@@ -1,60 +1,14 @@
-.vertical-nav {
-  min-width: 30rem;
-  width: 30rem;
-  height: 100vh;
-  position: fixed;
-  top: 0;
-  left: 0;
-  transition: all 0.4s;
+.btn-circle.btn-xl {
+    width: 70px;
+    height: 70px;
+    padding: 10px 16px;
+    font-size: 24px;
+    line-height: 1.33;
+    border-radius: 35px;
 }
 
-.page-content {
-  width: calc(100% - 30rem);
-  margin-left: 30rem;
-  transition: all 0.4s;
-}
-
-/* for toggle behavior */
-
-#sidebar.active {
-  margin-left: -30rem;
-}
-
-#content.active {
-  width: 100%;
-  margin: 0;
-}
-
-@media (max-width: 768px) {
-  #sidebar {
-    margin-left: -30rem;
-  }
-  #sidebar.active {
-    margin-left: 0;
-  }
-  #content {
-    width: 100%;
-    margin: 0;
-  }
-  #content.active {
-    margin-left: 30rem;
-    width: calc(100% - 30rem);
-  }
-}
-
-
-.circle {
-    background-color: blue;
-    height: 100%;
-    border-radius: 100%;
-    text-align: center;
-    line-height: 200px;
-    font-size: 30px;
-}
-.circle span {
-    line-height: normal;
-    display:inline-block;
-    vertical-align: middle;
-    color: white;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+#btn-add-node {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
 }
