@@ -1,17 +1,40 @@
+// Selectors of add relation modal ============================================================================
 $('#addKinsmanModal').on('show.bs.modal', event => {
     var modalTitle = addKinsmanModal.querySelector('.modal-title');
     var modalBodyInput = addKinsmanModal.querySelector('.modal-body input');
 
-
-    $('#kinsmanSelector').children().remove().end();
-//    $('#kinsmanSelector').focus();
+    $('#sourceKinsmanSelector').children().remove().end();
+    $('#targetKinsmanSelector').children().remove().end();
     $.each(dataVertexes, function(key, value) {
-      if(value.type == 'person')
-          $('#kinsmanSelector').append($("<option></option>").text(value.name));
+      if(value.type == 'person') {
+        $('#sourceKinsmanSelector').append($("<option></option>").attr("value", value.id).text(value.name));
+        $('#targetKinsmanSelector').append($("<option></option>").attr("value", value.id).text(value.name));
+      }
     });
-
-    $('#kinsmanSelector').focus();
 });
+
+function disableSelfReference() {
+    const sourceKinsmanId = $('#sourceKinsmanSelector').val();
+    const targetKinsmanId = $('#targetKinsmanSelector').val();
+    if(sourceKinsmanId == targetKinsmanId) {
+        console.log("disabled!");
+        $('#addChild').attr('disabled', true);
+        $('#addSpouse').attr('disabled', true);
+        $('#addParent').attr('disabled', true);
+    } else {
+                console.log("enabled!");
+        $('#addChild').removeAttr('disabled');
+        $('#addSpouse').removeAttr('disabled');
+        $('#addParent').removeAttr('disabled');
+    }
+}
+
+$('#sourceKinsmanSelector').on('select2:select', disableSelfReference);
+$('#targetKinsmanSelector').on('select2:select', disableSelfReference);
+
+$('#sourceKinsmanSelector').select2({ theme: 'bootstrap4' });
+$('#targetKinsmanSelector').select2({ theme: 'bootstrap4' });
+// ============================================================================================================
 
 
 
@@ -82,10 +105,6 @@ const dataEdges = [
 
 // Init states ============================================
 drawStemma(dataVertexes, dataEdges);
-$('#kinsmanSelector').select2({
-    theme: 'bootstrap4'
-});
-
 $(() => {
   $('[data-toggle="tooltip"]').tooltip()
 });
