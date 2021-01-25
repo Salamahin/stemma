@@ -16,11 +16,11 @@
    <div id="data_viz" class="w-75 h-75"></div>
 </div>
 
-<div class="modal fade" id="addKinsmanModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+<div class="modal fade" id="addRelationModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="exampleModalLabel">New relation</h5>
+                <h5 class="modal-title">Relation</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close" tabindex="-1">
                     <span aria-hidden="true">&times;</span>
                 </button>
@@ -35,41 +35,68 @@
                         <label for="targetKinsmanSelector">To kinsman</label>
                         <select id="targetKinsmanSelector" class="form-control" required></select>
                     </div>
-<!--                    <div class="form-row">-->
-<!--                        <div class="form-group col-md-6">-->
-<!--                            <label for="birthDate">Birth date</label>-->
-<!--                            <input type="date" class="form-control" id="birthDate" placeholder="Birth date">-->
-<!--                        </div>-->
-<!--                        <div class="form-group col-md-6">-->
-<!--                            <label for="deathDate">Death date</label>-->
-<!--                            <input type="date" class="form-control" id="deathDate" placeholder="Death date">-->
-<!--                        </div>-->
-<!--                    </div>-->
                 </form>
             </div>
             <div class="modal-footer">
                 <span class="d-inline-block" data-placement="bottom" data-toggle="tooltip" title="Alt + 1">
-                    <button id="addChild" type="button" class="btn btn-primary">Add as child</button>
+                    <button id="addChild" type="button" class="btn btn-primary" disabled>Add as child</button>
                 </span>
                 <span class="d-inline-block" data-placement="bottom" data-toggle="tooltip" title="Alt + 2">
-                    <button id="addSpouse" type="button" class="btn btn-primary" >Add as spouse</button>
+                    <button id="addSpouse" type="button" class="btn btn-primary" disabled>Add as spouse</button>
                 </span>
                 <span class="d-inline-block" data-placement="bottom" data-toggle="tooltip" title="Alt + 3">
-                    <button id="addParent" type="button" class="btn btn-primary">Add as parent</button>
+                    <button id="addParent" type="button" class="btn btn-primary" disabled>Add as parent</button>
                 </span>
             </div>
         </div>
     </div>
 </div>
 
-<button id="btn-add-node" type="button" class="btn btn-danger btn-circle btn-xl" data-toggle="modal" data-target="#addKinsmanModal">
-    <i class="fa fa-plus"></i>
+<div class="modal fade" id="addUpdateKinsmanModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Kinsman</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" tabindex="-1">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="form-group">
+                        <label for="createOrUpdateKinsmanSelector">Relation from</label>
+                        <input type="text" id="createOrUpdateKinsmanSelector" class="form-control" required/>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="birthDate">Birth date</label>
+                            <input type="date" class="form-control" id="birthDate" placeholder="Birth date">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="deathDate">Death date</label>
+                            <input type="date" class="form-control" id="deathDate" placeholder="Death date">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button id="createOrUpdate" type="button" class="btn btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<button id="btn-add-kinsman" type="button" class="btn btn-danger btn-circle btn-xl" data-toggle="modal" data-target="#addUpdateKinsmanModal">
+    <i class="fa fa-user-plus"></i>
+</button>
+<button id="btn-add-relation" type="button" class="btn btn-danger btn-circle btn-xl" data-toggle="modal" data-target="#addRelationModal">
+    <i class="fa fa-link"></i>
 </button>
 
 
 <script src="jquery/3.5.1/jquery.min.js"></script>
 <script src="bootstrap/4.6.0/js/bootstrap.bundle.min.js"></script>
-<script src="d3js/6.2.0/d3.min.js"></script>
+<script src="d3js/6.2.0/d3.js"></script>
 <script src="select2/4.0.13/js/select2.min.js"></script>
 <script src="api.js"></script>
 <script src="graph.js"></script>

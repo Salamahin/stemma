@@ -1,4 +1,26 @@
-function drawStemma(dataVertexes, dataEdges) {
+function stemma(el) {
+    const width = window.innerWidth, height = window.innerHeight;
+    const childCircleR = 10;
+    const spouseCircleR = 5;
+    const nodeColor = '#69b3a2';
+    const childRelationColor = "grey";
+    const spouseRelationColor = '#69b3a2';
+    const childRelationWidth = 0.5;
+    const spouseRelationWidth = 2;
+
+    const vertexes = [];
+    const edges = [];
+
+    this.addVertex = function(v) {
+        vertexes.push(v);
+        update();
+    }
+
+    this.addEdge = function(e) {
+        edges.push(e);
+        update();
+    }
+
     function dragstarted(event) {
         if (!event.active) simulation.alphaTarget(0.3).restart();
         event.subject.fx = event.x;
@@ -16,42 +38,25 @@ function drawStemma(dataVertexes, dataEdges) {
         event.subject.fy = null;
     }
 
-    function showModal(event) {
-        $("#addKinsmanModal").show();
-      var modalTitle = exampleModal.querySelector('.modal-title')
-      var modalBodyInput = exampleModal.querySelector('.modal-body input')
-
-      modalTitle.textContent = 'New message to wtfff'
-      modalBodyInput.value = "wtf"
-    }
-
-    const width = window.innerWidth, height = window.innerHeight;
-    const childCircleR = 10;
-    const spouseCircleR = 5;
-    const nodeColor = '#69b3a2';
-    const childRelationColor = "grey";
-    const spouseRelationColor = '#69b3a2';
-    const childRelationWidth = 0.5;
-    const spouseRelationWidth = 2;
-
-    const simulation = d3.forceSimulation(dataVertexes)
+    const simulation = d3.forceSimulation(vertexes)
         .force("link", d3.forceLink()
             .id(d => d.id)
-            .links(dataEdges)
+            .links(edges)
         )
         .force("x", d3.forceX(width / 2).strength(0.4))
         .force("y", d3.forceY(height / 2).strength(0.6))
+        .force('center', d3.forceCenter(width / 2, height / 2))
         .force("link", d3.forceLink().id(d => d.id).distance(() => 100).strength(1.5))
         .force("collide", d3.forceCollide().radius(d => d.r * 20).iterations(10).strength(1))
         .force("repelForce", d3.forceManyBody().strength(-3000).distanceMin(85));
 
-    const svg = d3.select("#data_viz")
+    const svg = d3.select(el)
         .append("svg")
         .attr("width", width)
         .attr("height", height)
         .append("g");
 
-    const defs = svg.append('defs')
+    const defs = svg.append('defs');
 
     defs.append('marker')
         .attr('id', 'child-arrow')
@@ -79,7 +84,6 @@ function drawStemma(dataVertexes, dataEdges) {
         .append('path')
         .attr('d', 'M 0 0 L 10 3 L 0 6 Z');
 
-
     svg.call(d3
         .drag()
         .container(svg.node())
@@ -89,59 +93,85 @@ function drawStemma(dataVertexes, dataEdges) {
         .on('end', dragended)
     );
 
-    const link = svg
-        .selectAll("line")
-        .data(dataEdges)
-        .enter()
-        .append("line")
+    const edgesGroup = svg.append("g").attr("class", "links");
+    const vertexGroup = svg.append("g").attr("class", "nodes");
+    let edgeElements, vertexElements, textElements;
 
-    link
-        .filter(d => d.type == "child")
-        .attr("stroke-width", childRelationWidth + "px")
-        .attr("stroke", childRelationColor)
-        .attr('marker-end', 'url(#child-arrow)')
-        .style('fill', 'none');
+    var update = function () {
+        edgeElements = edgesGroup.selectAll("line").data(edges);
+        vertexElements = vertexGroup.selectAll("g").data(vertexes);
 
-    link
-        .filter(d => d.type == "spouse")
-        .attr("stroke-width", spouseRelationWidth + "px")
-        .attr("stroke", spouseRelationColor)
-        .attr('marker-end', 'url(#spouse-arrow)')
-        .style('fill', 'none');
+        edgeElements.exit().remove();
+        vertexElements.exit().remove();
 
+        const edgeEnter = edgeElements
+            .enter()
+            .append("line")
+            .attr("stroke-width", d => d.type == "child"? childRelationWidth + "px" : spouseRelationWidth + "px")
+            .attr("stroke", d => d.type == "child"? childRelationColor : spouseRelationColor)
+            .attr('marker-end', d => d.type == "child"? 'url(#child-arrow)' : 'url(#spouse-arrow)');
 
-    const node = svg
-        .selectAll("node")
-        .data(dataVertexes)
-        .enter()
-        .append("g")
+        const vertexEnter = vertexElements
+            .enter()
+            .append("g");
 
-    node
-        .append("text")
-        .text(d => d.name)
-        .style("font-size", "11px")
-        .style("text-anchor", "middle")
-        .attr("dy", "25");
+        vertexEnter
+            .append("text")
+            .text(d => d.name)
+            .style("font-size", "11px")
+            .style("text-anchor", "middle")
+            .attr("dy", "25");
 
-    node
-        .append("circle")
-        .attr("fill", nodeColor)
-        .attr("r", d => d.type == "family"? spouseCircleR : childCircleR);
+        vertexEnter
+            .append("circle")
+            .attr("fill", nodeColor)
+            .attr("r", d => d.type == "family"? spouseCircleR : childCircleR);
 
-    node
-        .filter(d => d.type == "person")
-        .attr("r", "childCircleR")
-        .on("click", showModal);
+        edgeElements = edgeEnter.merge(edgeElements);
+        vertexElements = vertexEnter.merge(vertexElements);
 
-    simulation.nodes(dataVertexes);
-    simulation.force("link").links(dataEdges);
-    simulation.on("tick", function() {
-        link
-            .attr("x1", d => d.source.x)
-            .attr("y1", d => d.source.y)
-            .attr("x2", d => d.target.x)
-            .attr("y2", d => d.target.y)
+        simulation.nodes(vertexes);
+        simulation.force("link").links(edges);
+        simulation.on("tick", function() {
+            edgeElements
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y)
 
-        node.attr("transform", d => "translate(" + d.x + "," + d.y + ")");
-    });
+            vertexElements.attr("transform", d => "translate(" + d.x + "," + d.y + ")");
+        });
+
+        simulation.alphaTarget(0.7).restart();
+    }
+
+    update();
+}
+
+function drawGraph() {
+    graph = new stemma("#data_viz");
+
+    setTimeout(function() {
+        graph.addVertex({ id: "k1", name: "Голощапов Данила Сергеевич", birtDate: "1990-06-11", type: "person" });
+        graph.addVertex({ id: "k2", name: "Сулерова Ангелина Сергеевна", birtDate: "1991-03-14", type: "person" });
+        graph.addVertex({ id: "f1", type: "family" });
+        graph.addEdge({ id: "1", source: "k1", target: "f1", type: "spouse" });
+        graph.addEdge({ id: "2", source: "k2", target: "f1", type: "spouse" });
+    }, 5000);
+
+    setTimeout(function() {
+        graph.addVertex({ id: "k4", name: "Голощапов Сергей Георгиевич", type: "person"});
+        graph.addVertex({ id: "k5", name: "Голощапов Евгения Анатольевна", type: "person"});
+        graph.addVertex({ id: "k6", name: "Голощапов Егор Сергеевич", type: "person"});
+        graph.addVertex({ id: "k7", name: "Голощапов Федор Сергеевич", type: "person"});
+        graph.addVertex({ id: "k8", name: "Голощапова Ольга Сергеевна", type: "person"});
+        graph.addVertex({ id: "f3", type: "family" });
+
+        graph.addEdge({ id: "4", source: "k4", target: "f3", type: "spouse" });
+        graph.addEdge({ id: "5", source: "k5", target: "f3", type: "spouse" });
+        graph.addEdge({ id: "7", source: "f3", target: "k1", type: "child" });
+        graph.addEdge({ id: "8", source: "f3", target: "k6", type: "child" });
+        graph.addEdge({ id: "9", source: "f3", target: "k7", type: "child" });
+        graph.addEdge({ id: "10", source: "f3", target: "k8", type: "child" });
+    }, 10000);
 }

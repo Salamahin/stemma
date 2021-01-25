@@ -7,8 +7,14 @@
     border-radius: 35px;
 }
 
-#btn-add-node {
+#btn-add-kinsman {
     position: fixed;
     bottom: 20px;
+    right: 20px;
+}
+
+#btn-add-relation {
+    position: fixed;
+    bottom: 110px;
     right: 20px;
 }
