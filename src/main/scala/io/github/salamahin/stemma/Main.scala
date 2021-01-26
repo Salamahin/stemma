@@ -34,11 +34,12 @@ object Main extends zio.App {
   implicit def circeJsonEncoder[A](implicit decoder: Encoder[A]): EntityEncoder[StemmaTask, A] = jsonEncoderOf[StemmaTask, A]
 
   private val api = HttpRoutes.of[StemmaTask] {
-    case GET -> Root / "kinsman" => Ok(repo(_.get.kinsmen))
-    case GET -> Root / "family"  => Ok(repo(_.get.families))
-
-    case req @ POST -> Root / "kinsman" => req.as[Kinsman].flatMap(kinsman => Ok(repo(_.get newKinsman kinsman)))
-    case req @ POST -> Root / "family"  => req.as[Family].flatMap(family => Ok(repo(_.get newFamily family)))
+    ???
+//    case GET -> Root / "kinsman" => Ok(repo(_.get.kinsmen))
+//    case GET -> Root / "family"  => Ok(repo(_.get.families))
+//
+//    case req @ POST -> Root / "kinsman" => req.as[Kinsman].flatMap(kinsman => Ok(repo(_.get newKinsman kinsman)))
+//    case req @ POST -> Root / "family"  => req.as[Family].flatMap(family => Ok(repo(_.get newFamily family)))
   }
 
   private def static(ec: ExecutionContext) = HttpRoutes.of[StemmaTask] {
@@ -73,7 +74,7 @@ object Main extends zio.App {
           .toManagedZIO
           .useForever
       }
-      .provideCustomLayer(repository.fileBased(Paths.get("state.json")))
+      .provideCustomLayer(repository.fileBased(Paths.get("stemma.graphson.json")))
       .foldCauseM(
         err => putStrLn(err.prettyPrint).as(zio.ExitCode.failure),
         _ => ZIO.succeed(zio.ExitCode.success)

@@ -65,6 +65,6 @@ $(document).keydown(event => {
 // Init states ============================================
 drawGraph();
 $(() => {
-  $('[data-toggle="tooltip"]').tooltip()
+    $('[data-toggle="tooltip"]').tooltip()
 });
 // ========================================================

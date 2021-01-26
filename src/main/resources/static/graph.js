@@ -148,30 +148,28 @@ function stemma(el) {
     update();
 }
 
-function drawGraph() {
-    graph = new stemma("#data_viz");
+graph = new stemma("#data_viz");
 
-    setTimeout(function() {
-        graph.addVertex({ id: "k1", name: "Голощапов Данила Сергеевич", birtDate: "1990-06-11", type: "person" });
-        graph.addVertex({ id: "k2", name: "Сулерова Ангелина Сергеевна", birtDate: "1991-03-14", type: "person" });
-        graph.addVertex({ id: "f1", type: "family" });
-        graph.addEdge({ id: "1", source: "k1", target: "f1", type: "spouse" });
-        graph.addEdge({ id: "2", source: "k2", target: "f1", type: "spouse" });
-    }, 5000);
+setTimeout(function() {
+    graph.addVertex({ id: "k1", name: "Голощапов Данила Сергеевич", birtDate: "1990-06-11", type: "person" });
+    graph.addVertex({ id: "k2", name: "Сулерова Ангелина Сергеевна", birtDate: "1991-03-14", type: "person" });
+    graph.addVertex({ id: "f1", type: "family" });
+    graph.addEdge({ id: "1", source: "k1", target: "f1", type: "spouse" });
+    graph.addEdge({ id: "2", source: "k2", target: "f1", type: "spouse" });
+}, 5000);
 
-    setTimeout(function() {
-        graph.addVertex({ id: "k4", name: "Голощапов Сергей Георгиевич", type: "person"});
-        graph.addVertex({ id: "k5", name: "Голощапов Евгения Анатольевна", type: "person"});
-        graph.addVertex({ id: "k6", name: "Голощапов Егор Сергеевич", type: "person"});
-        graph.addVertex({ id: "k7", name: "Голощапов Федор Сергеевич", type: "person"});
-        graph.addVertex({ id: "k8", name: "Голощапова Ольга Сергеевна", type: "person"});
-        graph.addVertex({ id: "f3", type: "family" });
+setTimeout(function() {
+    graph.addVertex({ id: "k4", name: "Голощапов Сергей Георгиевич", type: "person"});
+    graph.addVertex({ id: "k5", name: "Голощапов Евгения Анатольевна", type: "person"});
+    graph.addVertex({ id: "k6", name: "Голощапов Егор Сергеевич", type: "person"});
+    graph.addVertex({ id: "k7", name: "Голощапов Федор Сергеевич", type: "person"});
+    graph.addVertex({ id: "k8", name: "Голощапова Ольга Сергеевна", type: "person"});
+    graph.addVertex({ id: "f3", type: "family" });
 
-        graph.addEdge({ id: "4", source: "k4", target: "f3", type: "spouse" });
-        graph.addEdge({ id: "5", source: "k5", target: "f3", type: "spouse" });
-        graph.addEdge({ id: "7", source: "f3", target: "k1", type: "child" });
-        graph.addEdge({ id: "8", source: "f3", target: "k6", type: "child" });
-        graph.addEdge({ id: "9", source: "f3", target: "k7", type: "child" });
-        graph.addEdge({ id: "10", source: "f3", target: "k8", type: "child" });
-    }, 10000);
-}
+    graph.addEdge({ id: "4", source: "k4", target: "f3", type: "spouse" });
+    graph.addEdge({ id: "5", source: "k5", target: "f3", type: "spouse" });
+    graph.addEdge({ id: "7", source: "f3", target: "k1", type: "child" });
+    graph.addEdge({ id: "8", source: "f3", target: "k6", type: "child" });
+    graph.addEdge({ id: "9", source: "f3", target: "k7", type: "child" });
+    graph.addEdge({ id: "10", source: "f3", target: "k8", type: "child" });
+}, 10000);
