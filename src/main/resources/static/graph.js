@@ -1,3 +1,6 @@
+const vertexes = [];
+const edges = [];
+
 function stemma(el) {
     const width = window.innerWidth, height = window.innerHeight;
     const childCircleR = 10;
@@ -8,18 +11,15 @@ function stemma(el) {
     const childRelationWidth = 0.5;
     const spouseRelationWidth = 2;
 
-    const vertexes = [];
-    const edges = [];
-
-    this.addVertex = function(v) {
-        vertexes.push(v);
-        update();
-    }
-
-    this.addEdge = function(e) {
-        edges.push(e);
-        update();
-    }
+//    this.addVertex = function(v) {
+//        vertexes.push(v);
+//        update();
+//    }
+//
+//    this.addEdge = function(e) {
+//        edges.push(e);
+//        update();
+//    }
 
     function dragstarted(event) {
         if (!event.active) simulation.alphaTarget(0.3).restart();
@@ -97,7 +97,7 @@ function stemma(el) {
     const vertexGroup = svg.append("g").attr("class", "nodes");
     let edgeElements, vertexElements, textElements;
 
-    var update = function () {
+    this.update = function () {
         edgeElements = edgesGroup.selectAll("line").data(edges);
         vertexElements = vertexGroup.selectAll("g").data(vertexes);
 
@@ -145,31 +145,35 @@ function stemma(el) {
         simulation.alphaTarget(0.7).restart();
     }
 
-    update();
+    this.update();
 }
 
 graph = new stemma("#data_viz");
 
 setTimeout(function() {
-    graph.addVertex({ id: "k1", name: "Голощапов Данила Сергеевич", birtDate: "1990-06-11", type: "person" });
-    graph.addVertex({ id: "k2", name: "Сулерова Ангелина Сергеевна", birtDate: "1991-03-14", type: "person" });
-    graph.addVertex({ id: "f1", type: "family" });
-    graph.addEdge({ id: "1", source: "k1", target: "f1", type: "spouse" });
-    graph.addEdge({ id: "2", source: "k2", target: "f1", type: "spouse" });
+    vertexes.push({ id: "k1", name: "Голощапов Данила Сергеевич", birtDate: "1990-06-11", type: "person" });
+    vertexes.push({ id: "k2", name: "Сулерова Ангелина Сергеевна", birtDate: "1991-03-14", type: "person" });
+    vertexes.push({ id: "f1", type: "family" });
+    edges.push({ id: "1", source: "k1", target: "f1", type: "spouse" });
+    edges.push({ id: "2", source: "k2", target: "f1", type: "spouse" });
+
+    graph.update()
 }, 5000);
 
 setTimeout(function() {
-    graph.addVertex({ id: "k4", name: "Голощапов Сергей Георгиевич", type: "person"});
-    graph.addVertex({ id: "k5", name: "Голощапов Евгения Анатольевна", type: "person"});
-    graph.addVertex({ id: "k6", name: "Голощапов Егор Сергеевич", type: "person"});
-    graph.addVertex({ id: "k7", name: "Голощапов Федор Сергеевич", type: "person"});
-    graph.addVertex({ id: "k8", name: "Голощапова Ольга Сергеевна", type: "person"});
-    graph.addVertex({ id: "f3", type: "family" });
+    vertexes.push({ id: "k4", name: "Голощапов Сергей Георгиевич", type: "person"});
+    vertexes.push({ id: "k5", name: "Голощапов Евгения Анатольевна", type: "person"});
+    vertexes.push({ id: "k6", name: "Голощапов Егор Сергеевич", type: "person"});
+    vertexes.push({ id: "k7", name: "Голощапов Федор Сергеевич", type: "person"});
+    vertexes.push({ id: "k8", name: "Голощапова Ольга Сергеевна", type: "person"});
+    vertexes.push({ id: "f3", type: "family" });
 
-    graph.addEdge({ id: "4", source: "k4", target: "f3", type: "spouse" });
-    graph.addEdge({ id: "5", source: "k5", target: "f3", type: "spouse" });
-    graph.addEdge({ id: "7", source: "f3", target: "k1", type: "child" });
-    graph.addEdge({ id: "8", source: "f3", target: "k6", type: "child" });
-    graph.addEdge({ id: "9", source: "f3", target: "k7", type: "child" });
-    graph.addEdge({ id: "10", source: "f3", target: "k8", type: "child" });
+    edges.push({ id: "4", source: "k4", target: "f3", type: "spouse" });
+    edges.push({ id: "5", source: "k5", target: "f3", type: "spouse" });
+    edges.push({ id: "7", source: "f3", target: "k1", type: "child" });
+    edges.push({ id: "8", source: "f3", target: "k6", type: "child" });
+    edges.push({ id: "9", source: "f3", target: "k7", type: "child" });
+    edges.push({ id: "10", source: "f3", target: "k8", type: "child" });
+
+    graph.update()
 }, 10000);

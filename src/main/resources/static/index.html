@@ -28,12 +28,12 @@
             <div class="modal-body">
                 <form>
                     <div class="form-group">
-                        <label for="sourceKinsmanSelector">Relation from</label>
-                        <select id="sourceKinsmanSelector" class="form-control" required></select>
+                        <label for="sourcePersonSelector">Relation from</label>
+                        <select id="sourcePersonSelector" class="form-control" required></select>
                     </div>
                     <div class="form-group mt-2">
-                        <label for="targetKinsmanSelector">To kinsman</label>
-                        <select id="targetKinsmanSelector" class="form-control" required></select>
+                        <label for="targetPersonSelector">To</label>
+                        <select id="targetPersonSelector" class="form-control" required></select>
                     </div>
                 </form>
             </div>
@@ -52,11 +52,11 @@
     </div>
 </div>
 
-<div class="modal fade" id="addUpdateKinsmanModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+<div class="modal fade" id="addUpdatePersonModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Kinsman</h5>
+                <h5 class="modal-title">Person</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close" tabindex="-1">
                     <span aria-hidden="true">&times;</span>
                 </button>
@@ -64,8 +64,8 @@
             <div class="modal-body">
                 <form>
                     <div class="form-group">
-                        <label for="createOrUpdateKinsmanSelector">Relation from</label>
-                        <input type="text" id="createOrUpdateKinsmanSelector" class="form-control" required/>
+                        <label for="createOrUpdatePersonSelector">Relation from</label>
+                        <input type="text" id="createOrUpdatePersonSelector" class="form-control" required/>
                     </div>
                     <div class="form-row">
                         <div class="form-group col-md-6">
@@ -86,7 +86,7 @@
     </div>
 </div>
 
-<button id="btn-add-kinsman" type="button" class="btn btn-danger btn-circle btn-xl" data-toggle="modal" data-target="#addUpdateKinsmanModal">
+<button id="btn-add-person" type="button" class="btn btn-danger btn-circle btn-xl" data-toggle="modal" data-target="#addUpdatePersonModal">
     <i class="fa fa-user-plus"></i>
 </button>
 <button id="btn-add-relation" type="button" class="btn btn-danger btn-circle btn-xl" data-toggle="modal" data-target="#addRelationModal">

@@ -5,25 +5,25 @@ function stringify(obj) {
     );
 }
 
-$('#submitKinsman').click(function(e) {
+$('#submitPerson').click(function(e) {
     e.preventDefault();
-    async function callAddKinsmanService() {
-        const newKinsman = {
+    async function callAddpersonService() {
+        const newperson = {
             name: $('#name').val(),
             birthDate: $('#birthDate').val(),
             deathDate: $("#deathDate").val()
         };
 
         const response = await fetch(
-            '/api/kinsman',
+            '/api/person',
              {
                 method: 'POST',
-                body: stringify(newKinsman)
+                body: stringify(newperson)
              }
         );
-        const kinsmanId = await response.json();
-        return kinsmanId;
+        const personId = await response.json();
+        return personId;
     }
 
-    callAddKinsmanService().then(kinsmenId => console.log(kinsmenId));
+    callAddpersonService().then(kinsmenId => console.log(kinsmenId));
 });

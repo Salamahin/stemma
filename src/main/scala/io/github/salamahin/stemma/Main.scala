@@ -74,7 +74,7 @@ object Main extends zio.App {
           .toManagedZIO
           .useForever
       }
-      .provideCustomLayer(repository.tinkerpop("stemma.graphson.json"))
+      .provideCustomLayer(repository.tinkerpop("stemma.graphson"))
       .foldCauseM(
         err => putStrLn(err.prettyPrint).as(zio.ExitCode.failure),
         _ => ZIO.succeed(zio.ExitCode.success)
