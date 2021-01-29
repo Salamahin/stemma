@@ -2,7 +2,7 @@
 $('#addRelationModal').on('show.bs.modal', event => {
     $('#sourcePersonSelector').children().remove().end();
     $('#targetPersonSelector').children().remove().end();
-    $.each(vertexes, function(key, value) {
+    $.each(graph.people(), function(key, value) {
       if(value.type == 'person') {
         $('#sourcePersonSelector').append($("<option></option>").attr("value", value.id).text(value.name));
         $('#targetPersonSelector').append($("<option></option>").attr("value", value.id).text(value.name));

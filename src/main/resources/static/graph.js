@@ -56,8 +56,8 @@ function stemma(el) {
         update();
     }
 
-    this.vertexes = function() {
-        return [..._vertexes];
+    this.people = function() {
+        return _vertexes.find(x => x.type === "person");
     }
 
     function dragstarted(event) {
@@ -199,7 +199,7 @@ setTimeout(function() {
 
 setTimeout(function() {
     graph.addPerson({ id: "k4", name: "Голощапов Сергей Георгиевич" });
-    graph.addPerson({ id: "k5", name: "Голощапов Евгения Анатольевна" });
+    graph.addPerson({ id: "k5", name: "Голощапова Евгения Анатольевна" });
     graph.addPerson({ id: "k6", name: "Голощапов Егор Сергеевич" });
     graph.addPerson({ id: "k7", name: "Голощапов Федор Сергеевич" });
     graph.addPerson({ id: "k8", name: "Голощапова Ольга Сергеевна" });
