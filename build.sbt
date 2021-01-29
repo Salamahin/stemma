@@ -17,6 +17,7 @@ libraryDependencies ++= Seq(
   "io.circe"             %% "circe-parser"                    % versions.circeV,
   "org.apache.tinkerpop" % "tinkergraph-gremlin"              % "3.4.10",
   "com.michaelpollmeier" %% "gremlin-scala"                   % "3.4.7.8",
+  "io.scalaland"         %% "chimney"                         % "0.6.1",
   "dev.zio"              %% "zio"                             % "1.0.3",
   "dev.zio"              %% "zio-interop-cats"                % "2.2.0.1",
   "org.slf4j"            % "slf4j-api"                        % "2.0.0-alpha1",
