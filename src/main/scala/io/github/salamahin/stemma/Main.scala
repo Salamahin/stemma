@@ -2,7 +2,9 @@ package io.github.salamahin.stemma
 
 import cats.effect.Blocker
 import io.circe.{Decoder, Encoder}
-import io.github.salamahin.stemma.repository.Repository
+import io.github.salamahin.stemma.service.request.{NewChild, NewPerson, NewSpouse}
+import io.github.salamahin.stemma.storage.repository
+import io.github.salamahin.stemma.storage.repository.Repository
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.Router
@@ -34,12 +36,10 @@ object Main extends zio.App {
   implicit def circeJsonEncoder[A](implicit decoder: Encoder[A]): EntityEncoder[StemmaTask, A] = jsonEncoderOf[StemmaTask, A]
 
   private val api = HttpRoutes.of[StemmaTask] {
-    ???
-//    case GET -> Root / "kinsman" => Ok(repo(_.get.kinsmen))
-//    case GET -> Root / "family"  => Ok(repo(_.get.families))
-//
-//    case req @ POST -> Root / "kinsman" => req.as[Kinsman].flatMap(kinsman => Ok(repo(_.get newKinsman kinsman)))
-//    case req @ POST -> Root / "family"  => req.as[Family].flatMap(family => Ok(repo(_.get newFamily family)))
+    case GET -> Root / "stemma"        => Ok(repo(_.get.stemma))
+    case req @ POST -> Root / "person" => req.as[NewPerson].flatMap(person => Ok(repo(_.get newPerson person)))
+    case req @ POST -> Root / "spouse" => req.as[NewSpouse].flatMap(family => Ok(repo(_.get newSpouse family)))
+    case req @ POST -> Root / "child"  => req.as[NewChild].flatMap(child => Ok(repo(_.get newChild child)))
   }
 
   private def static(ec: ExecutionContext) = HttpRoutes.of[StemmaTask] {
@@ -74,7 +74,7 @@ object Main extends zio.App {
           .toManagedZIO
           .useForever
       }
-      .provideCustomLayer(repository.fileBased(Paths.get("stemma.graphson.json")))
+      .provideCustomLayer(repository.tinkerpop("stemma.graphson.json"))
       .foldCauseM(
         err => putStrLn(err.prettyPrint).as(zio.ExitCode.failure),
         _ => ZIO.succeed(zio.ExitCode.success)

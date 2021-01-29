@@ -1,6 +1,7 @@
 package io.github.salamahin.stemma.storage
 
-import io.github.salamahin.stemma.service.domain.{Child, Family, Spouse, Stemma, Person => ServicePerson}
+import io.github.salamahin.stemma.service.request.{NewChild, NewPerson, NewSpouse}
+import io.github.salamahin.stemma.service.response.{Child, Family, Spouse, Stemma, Person => ServicePerson}
 import io.github.salamahin.stemma.storage.domain.{Person => PersonVertex}
 import org.apache.tinkerpop.gremlin.process.traversal.IO
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
@@ -14,7 +15,7 @@ final case class NoSuchParentId(id: String)  extends RuntimeException(s"No paren
 final case class NoSuchChildId(id: String)   extends RuntimeException(s"No child with id $id found")
 final case class NoSuchPartnerId(id: String) extends RuntimeException(s"No person with id $id found")
 
-class TinkerpopRepository(file: String) {
+class TinkerpopRepository(file: String) extends AutoCloseable {
   import gremlin.scala._
   import io.scalaland.chimney.dsl._
 
@@ -32,33 +33,31 @@ class TinkerpopRepository(file: String) {
   private val deathDate  = Key[String]("deathDate")
   private val dateFormat = DateTimeFormatter.ISO_DATE
 
-  def init(): Unit = {
-//    new GraphTraversalSource(graph.asJava())
-//      .io(file)
-//      .`with`(IO.reader, IO.graphson)
-//      .read()
-//      .iterate()
-  }
+  new GraphTraversalSource(graph.asJava())
+    .io(file)
+    .`with`(IO.reader, IO.graphson)
+    .read()
+    .iterate()
 
-  def newPerson(name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate]) = {
-    val birthDateProps = birthDate.map(this.birthDate -> dateFormat.format(_)).toSeq
-    val deathDateProps = deathDate.map(this.deathDate -> dateFormat.format(_)).toSeq
-    val nameProps      = this.name -> name :: Nil
+  def newPerson(request: NewPerson) = {
+    val birthDateProps = request.birthDate.map(this.birthDate -> dateFormat.format(_)).toSeq
+    val deathDateProps = request.deathDate.map(this.deathDate -> dateFormat.format(_)).toSeq
+    val nameProps      = this.name -> request.name :: Nil
 
-    val newParent = graph + (name, nameProps ++ birthDateProps ++ deathDateProps: _*)
+    val newParent = graph + (request.name, nameProps ++ birthDateProps ++ deathDateProps: _*)
     newParent.id().asInstanceOf[String]
   }
 
-  def addChild(parentId: String, childId: String) = {
-    val parent   = graph.V(parentId).headOption().getOrElse(throw NoSuchParentId(parentId))
-    val child    = graph.V(childId).headOption().getOrElse(throw NoSuchChildId(childId))
+  def addChild(request: NewChild) = {
+    val parent   = graph.V(request.parentId).headOption().getOrElse(throw NoSuchParentId(request.parentId))
+    val child    = graph.V(request.childId).headOption().getOrElse(throw NoSuchChildId(request.childId))
     val newChild = parent <-- "childOf" --- child
     newChild.id().asInstanceOf[String]
   }
 
-  def addSpouse(partner1Id: String, partner2Id: String) = {
-    val partner1 = graph.V(partner1Id).headOption().getOrElse(throw NoSuchPartnerId(partner1Id))
-    val partner2 = graph.V(partner2Id).headOption().getOrElse(throw NoSuchPartnerId(partner2Id))
+  def addSpouse(request: NewSpouse) = {
+    val partner1 = graph.V(request.partner1Id).headOption().getOrElse(throw NoSuchPartnerId(request.partner1Id))
+    val partner2 = graph.V(request.partner2Id).headOption().getOrElse(throw NoSuchPartnerId(request.partner2Id))
 
     partner1 <-- "spouseOf" --> partner2
   }
@@ -89,7 +88,7 @@ class TinkerpopRepository(file: String) {
           }
       }
 
-    val (familiesWithoutChildren, spouceRelationWithoutChildren) = (for {
+    val (familiesWithoutChildren, spouseRelationWithoutChildren) = (for {
       partner  <- graph.V
       partners <- partner.out("spouseOf").fold()
     } yield (partner, partners))
@@ -98,23 +97,23 @@ class TinkerpopRepository(file: String) {
         case (x, y) => x -> y.asScala.toList
       }
       .foldLeft((Set.empty[Family], Set.empty[Spouse])) {
-        case ((families, spouces), (person, partners)) =>
+        case ((families, spouses), (person, partners)) =>
           val personId    = person.id().toString
           val partnersIds = partners.map(_.id()).map(_.toString)
 
-          val (newFamilies, newSpouces) = partnersIds.map { partnerId =>
+          val (newFamilies, newSpouses) = partnersIds.map { partnerId =>
             val familyId = syntheticId(personId, partnerId)
 
             (Family(familyId), Spouse(syntheticId(partnerId, familyId), partnerId, familyId))
           }.unzip
 
-          (families ++ newFamilies, spouces ++ newSpouces)
+          (families ++ newFamilies, spouses ++ newSpouses)
       }
 
     Stemma(
       people,
       (familiesWithChildren ++ familiesWithoutChildren).toList,
-      (spouceRelationWithoutChildren ++ spouseRelationWithChildren).toList,
+      (spouseRelationWithoutChildren ++ spouseRelationWithChildren).toList,
       children
     )
   }
@@ -127,32 +126,11 @@ class TinkerpopRepository(file: String) {
       .withFieldComputed(_.id, _.id.get)
       .transform
 
-  def close(): Unit = {
+  override def close(): Unit = {
     new GraphTraversalSource(graph.asJava())
       .io(file)
       .`with`(IO.writer, IO.graphson)
       .write()
       .iterate()
   }
-}
-
-object TinkerpopRepository extends App {
-  val a = new TinkerpopRepository("stemma.graphson")
-  a.init()
-  val p0 = a.newPerson("parent0", None, None)
-  val p1 = a.newPerson("parent1", None, None)
-  val p2 = a.newPerson("parent2", None, None)
-  val c1 = a.newPerson("child1", None, None)
-  val c2 = a.newPerson("child2", None, None)
-  val r1 = a.addChild(p1, c1)
-  val r2 = a.addChild(p2, c1)
-  val r3 = a.addChild(p2, c2)
-  val r4 = a.addChild(p0, p1)
-  val r5 = a.addSpouse(p1, p2)
-
-  println(s"$c1 is a child of $p1 and $p2")
-  println(s"$c2 is a child of $p2")
-  println(s"$p1 is a child of $p0")
-
-  println(a.stemma())
 }

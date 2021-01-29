@@ -2,7 +2,7 @@ package io.github.salamahin.stemma.service
 
 import java.time.LocalDate
 
-object domain {
+object response {
 
   sealed trait Id {
     val id: String
@@ -19,4 +19,10 @@ object domain {
   final case class Child(id: String, source: String, target: String)                                            extends Edge
 
   final case class Stemma(people: List[Person], families: List[Family], spouses: List[Spouse], children: List[Child])
+}
+
+object request {
+  final case class NewPerson(name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate])
+  final case class NewSpouse(partner1Id: String, partner2Id: String)
+  final case class NewChild(parentId: String, childId: String)
 }
