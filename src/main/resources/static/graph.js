@@ -1,5 +1,15 @@
-const vertexes = [];
-const edges = [];
+Array.prototype.inArray = function(comparer) {
+    for(var i = 0; i < this.length; i++) {
+        if(comparer(this[i])) return true;
+    }
+    return false;
+};
+
+Array.prototype.pushIfNotExist = function(element, comparer) {
+    if (!this.inArray(comparer)) {
+        this.push(element);
+    }
+};
 
 function stemma(el) {
     const width = window.innerWidth, height = window.innerHeight;
@@ -11,15 +21,44 @@ function stemma(el) {
     const childRelationWidth = 0.5;
     const spouseRelationWidth = 2;
 
-//    this.addVertex = function(v) {
-//        vertexes.push(v);
-//        update();
-//    }
-//
-//    this.addEdge = function(e) {
-//        edges.push(e);
-//        update();
-//    }
+    const _vertexes = [];
+    const _edges = [];
+
+    this.addPerson = function(v) {
+        let newPerson = {
+            type: "person"
+        };
+        _vertexes.pushIfNotExist(Object.assign(newPerson, v), next => next.id === v.id);
+        update();
+    }
+
+    this.addFamily = function(v) {
+        let newFamily = {
+            type: "family"
+        };
+        _vertexes.pushIfNotExist(Object.assign(newFamily, v), next => next.id === v.id);
+        update();
+    }
+
+    this.addChild = function(e) {
+        let newChild = {
+            type: "child"
+        };
+        _edges.pushIfNotExist(Object.assign(newChild, e), next => next.id === e.id);
+        update();
+    }
+
+    this.addSpouse = function(e) {
+        let newSpouse = {
+            type: "spouse"
+        };
+        _edges.pushIfNotExist(Object.assign(newSpouse, e), next => next.id === e.id);
+        update();
+    }
+
+    this.vertexes = function() {
+        return [..._vertexes];
+    }
 
     function dragstarted(event) {
         if (!event.active) simulation.alphaTarget(0.3).restart();
@@ -38,10 +77,10 @@ function stemma(el) {
         event.subject.fy = null;
     }
 
-    const simulation = d3.forceSimulation(vertexes)
+    const simulation = d3.forceSimulation(_vertexes)
         .force("link", d3.forceLink()
             .id(d => d.id)
-            .links(edges)
+            .links(_edges)
         )
         .force("x", d3.forceX(width / 2).strength(0.4))
         .force("y", d3.forceY(height / 2).strength(0.6))
@@ -95,11 +134,11 @@ function stemma(el) {
 
     const edgesGroup = svg.append("g").attr("class", "links");
     const vertexGroup = svg.append("g").attr("class", "nodes");
-    let edgeElements, vertexElements, textElements;
+    let edgeElements, vertexElements;
 
-    this.update = function () {
-        edgeElements = edgesGroup.selectAll("line").data(edges);
-        vertexElements = vertexGroup.selectAll("g").data(vertexes);
+    const update = function () {
+        edgeElements = edgesGroup.selectAll("line").data(_edges);
+        vertexElements = vertexGroup.selectAll("g").data(_vertexes);
 
         edgeElements.exit().remove();
         vertexElements.exit().remove();
@@ -130,8 +169,8 @@ function stemma(el) {
         edgeElements = edgeEnter.merge(edgeElements);
         vertexElements = vertexEnter.merge(vertexElements);
 
-        simulation.nodes(vertexes);
-        simulation.force("link").links(edges);
+        simulation.nodes(_vertexes);
+        simulation.force("link").links(_edges);
         simulation.on("tick", function() {
             edgeElements
                 .attr("x1", d => d.source.x)
@@ -145,35 +184,31 @@ function stemma(el) {
         simulation.alphaTarget(0.7).restart();
     }
 
-    this.update();
+    update();
 }
 
 graph = new stemma("#data_viz");
 
 setTimeout(function() {
-    vertexes.push({ id: "k1", name: "Голощапов Данила Сергеевич", birtDate: "1990-06-11", type: "person" });
-    vertexes.push({ id: "k2", name: "Сулерова Ангелина Сергеевна", birtDate: "1991-03-14", type: "person" });
-    vertexes.push({ id: "f1", type: "family" });
-    edges.push({ id: "1", source: "k1", target: "f1", type: "spouse" });
-    edges.push({ id: "2", source: "k2", target: "f1", type: "spouse" });
-
-    graph.update()
+    graph.addPerson({ id: "k1", name: "Голощапов Данила Сергеевич", birtDate: "1990-06-11" });
+    graph.addPerson({ id: "k2", name: "Сулерова Ангелина Сергеевна", birtDate: "1991-03-14" });
+    graph.addFamily({ id: "f1" });
+    graph.addSpouse({ id: "1", source: "k1", target: "f1" });
+    graph.addSpouse({ id: "2", source: "k2", target: "f1" });
 }, 5000);
 
 setTimeout(function() {
-    vertexes.push({ id: "k4", name: "Голощапов Сергей Георгиевич", type: "person"});
-    vertexes.push({ id: "k5", name: "Голощапов Евгения Анатольевна", type: "person"});
-    vertexes.push({ id: "k6", name: "Голощапов Егор Сергеевич", type: "person"});
-    vertexes.push({ id: "k7", name: "Голощапов Федор Сергеевич", type: "person"});
-    vertexes.push({ id: "k8", name: "Голощапова Ольга Сергеевна", type: "person"});
-    vertexes.push({ id: "f3", type: "family" });
+    graph.addPerson({ id: "k4", name: "Голощапов Сергей Георгиевич" });
+    graph.addPerson({ id: "k5", name: "Голощапов Евгения Анатольевна" });
+    graph.addPerson({ id: "k6", name: "Голощапов Егор Сергеевич" });
+    graph.addPerson({ id: "k7", name: "Голощапов Федор Сергеевич" });
+    graph.addPerson({ id: "k8", name: "Голощапова Ольга Сергеевна" });
+    graph.addFamily({ id: "f3" });
 
-    edges.push({ id: "4", source: "k4", target: "f3", type: "spouse" });
-    edges.push({ id: "5", source: "k5", target: "f3", type: "spouse" });
-    edges.push({ id: "7", source: "f3", target: "k1", type: "child" });
-    edges.push({ id: "8", source: "f3", target: "k6", type: "child" });
-    edges.push({ id: "9", source: "f3", target: "k7", type: "child" });
-    edges.push({ id: "10", source: "f3", target: "k8", type: "child" });
-
-    graph.update()
+    graph.addSpouse({ id: "4", source: "k4", target: "f3" });
+    graph.addSpouse({ id: "5", source: "k5", target: "f3" });
+    graph.addChild({ id: "7", source: "f3", target: "k1" });
+    graph.addChild({ id: "8", source: "f3", target: "k6" });
+    graph.addChild({ id: "9", source: "f3", target: "k7" });
+    graph.addChild({ id: "10", source: "f3", target: "k8" });
 }, 10000);
