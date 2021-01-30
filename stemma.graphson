@@ -1,3 +1,5 @@
-{"id":"v0","label":"asdasda","properties":{"name":[{"id":{"@type":"g:Int64","@value":3},"value":"asdasda"}]}}
-{"id":"v1","label":"dddddddddd","properties":{"name":[{"id":{"@type":"g:Int64","@value":1},"value":"dddddddddd"}]}}
-{"id":"v2","label":"vvvvvvvvvv","properties":{"name":[{"id":{"@type":"g:Int64","@value":2},"value":"vvvvvvvvvv"}]}}
+{"id":"v0","label":"Голощапов Сергей Георгиевич","inE":{"spouseOf":[{"id":"e7","outV":"v1"}]},"outE":{"spouseOf":[{"id":"e6","inV":"v1"}]},"properties":{"name":[{"id":{"@type":"g:Int64","@value":0},"value":"Голощапов Сергей Георгиевич"}]}}
+{"id":"v1","label":"Голощапова Евгения Анатольевна","inE":{"spouseOf":[{"id":"e6","outV":"v0"}]},"outE":{"spouseOf":[{"id":"e7","inV":"v0"}]},"properties":{"name":[{"id":{"@type":"g:Int64","@value":1},"value":"Голощапова Евгения Анатольевна"}]}}
+{"id":"v2","label":"Голощапова Ольга Сергеевна","properties":{"name":[{"id":{"@type":"g:Int64","@value":2},"value":"Голощапова Ольга Сергеевна"}]}}
+{"id":"v3","label":"Голощапов Данила Сергеевич","properties":{"name":[{"id":{"@type":"g:Int64","@value":3},"value":"Голощапов Данила Сергеевич"}]}}
+{"id":"v5","label":"Голощапов Егор Сергеевич","properties":{"name":[{"id":{"@type":"g:Int64","@value":4},"value":"Голощапов Егор Сергеевич"}]}}

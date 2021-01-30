@@ -57,7 +57,8 @@ function stemma(el) {
     }
 
     this.people = function() {
-        return _vertexes.find(x => x.type === "person");
+        const p = _vertexes.filter(x => x.type === "person");
+        return p;
     }
 
     function dragstarted(event) {
@@ -186,29 +187,3 @@ function stemma(el) {
 
     update();
 }
-
-graph = new stemma("#data_viz");
-
-setTimeout(function() {
-    graph.addPerson({ id: "k1", name: "Голощапов Данила Сергеевич", birtDate: "1990-06-11" });
-    graph.addPerson({ id: "k2", name: "Сулерова Ангелина Сергеевна", birtDate: "1991-03-14" });
-    graph.addFamily({ id: "f1" });
-    graph.addSpouse({ id: "1", source: "k1", target: "f1" });
-    graph.addSpouse({ id: "2", source: "k2", target: "f1" });
-}, 5000);
-
-setTimeout(function() {
-    graph.addPerson({ id: "k4", name: "Голощапов Сергей Георгиевич" });
-    graph.addPerson({ id: "k5", name: "Голощапова Евгения Анатольевна" });
-    graph.addPerson({ id: "k6", name: "Голощапов Егор Сергеевич" });
-    graph.addPerson({ id: "k7", name: "Голощапов Федор Сергеевич" });
-    graph.addPerson({ id: "k8", name: "Голощапова Ольга Сергеевна" });
-    graph.addFamily({ id: "f3" });
-
-    graph.addSpouse({ id: "4", source: "k4", target: "f3" });
-    graph.addSpouse({ id: "5", source: "k5", target: "f3" });
-    graph.addChild({ id: "7", source: "f3", target: "k1" });
-    graph.addChild({ id: "8", source: "f3", target: "k6" });
-    graph.addChild({ id: "9", source: "f3", target: "k7" });
-    graph.addChild({ id: "10", source: "f3", target: "k8" });
-}, 10000);

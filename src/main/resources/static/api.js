@@ -5,12 +5,8 @@ function stringify(obj) {
     );
 }
 
-async function callAddPersonService() {
-    const newPerson = {
-        name: $('#createOrUpdatePersonSelector').val(),
-        birthDate: $('#birthDate').val(),
-        deathDate: $("#deathDate").val()
-    };
+async function callAddPersonService(name, birthDate, deathDate) {
+    const newPerson = { name: name, birthDate: birthDate, deathDate: deathDate };
 
     const response = await fetch(
         '/api/person',
@@ -23,7 +19,37 @@ async function callAddPersonService() {
     return await response.json();
 }
 
-$('#createOrUpdate').click(function(e) {
-    e.preventDefault();
-    callAddPersonService().then(personId => console.log(personId));
-});
+async function callAddSpouseService(partner1Id, partner2Id) {
+    const newSpouse = { partner1Id: partner1Id, partner2Id: partner2Id };
+
+    const response = await fetch(
+        '/api/spouse',
+         {
+            method: 'POST',
+            body: stringify(newSpouse)
+         }
+    );
+
+    return await response.json();
+}
+
+async function callAddChildService(parentId, childId) {
+    const newChild = { parentId: parentId, childId: childId };
+
+    const response = await fetch(
+        '/api/child',
+         {
+            method: 'POST',
+            body: stringify(newChild)
+         }
+    );
+
+    return await response.json();
+}
+
+async function callGetStemmaService() {
+    const response = await fetch('/api/stemma');
+    const json = await response.json();
+    return json;
+}
+

@@ -118,7 +118,7 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
     )
   }
 
-  private def syntheticId(values: String*) = values.mkString("+")
+  private def syntheticId(values: String*) = values.sorted.mkString("+")
 
   private def storedToService(stored: PersonVertex) =
     stored
