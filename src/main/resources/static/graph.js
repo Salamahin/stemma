@@ -94,6 +94,9 @@ function stemma(el) {
         .append("svg")
         .attr("width", width)
         .attr("height", height)
+         .call(d3.zoom().on("zoom", function (event) {
+            svg.attr("transform", event.transform)
+         }))
         .append("g");
 
     const defs = svg.append('defs');

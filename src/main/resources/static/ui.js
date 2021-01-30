@@ -34,7 +34,16 @@ $('#commitFamilyButton').click(function(e) {
     ].filter(childName => childName != null && childName != "");
 
     createOrUpdateFamily(personName, spouseName, childrenNames)
-        .then(() => $('#addFamilyModal').modal('hide'));
+        .then(() => {
+            $('#addFamilyModal').modal('hide');
+            $('#personNameInput').val(null);
+            $('#spouseNameInput').val(null);
+            $('#child1NameInput').val(null);
+            $('#child2NameInput').val(null);
+            $('#child3NameInput').val(null);
+            $('#child4NameInput').val(null);
+            $('#child5NameInput').val(null);
+        });
 });
 
 $('#btn-download').click(function(e) {

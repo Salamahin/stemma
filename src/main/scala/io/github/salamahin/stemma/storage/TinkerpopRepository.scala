@@ -3,12 +3,11 @@ package io.github.salamahin.stemma.storage
 import io.github.salamahin.stemma.service.request.{NewChild, NewPerson, NewSpouse}
 import io.github.salamahin.stemma.service.response.{Child, Family, Spouse, Stemma, Person => ServicePerson}
 import io.github.salamahin.stemma.storage.domain.{Person => PersonVertex}
+import org.apache.commons.configuration.BaseConfiguration
 import org.apache.tinkerpop.gremlin.process.traversal.IO
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
-import org.apache.commons.configuration.BaseConfiguration
 
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 final case class NoSuchParentId(id: String)  extends RuntimeException(s"No parent with id $id found")
@@ -23,8 +22,8 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
 
   private implicit val graph = {
     val config = new BaseConfiguration
-    config.addProperty(TinkerGraph.GREMLIN_TINKERGRAPH_EDGE_ID_MANAGER, "io.github.salamahin.stemma.StemmaEdgeIdManager")
-    config.addProperty(TinkerGraph.GREMLIN_TINKERGRAPH_VERTEX_ID_MANAGER, "io.github.salamahin.stemma.StemmaVertexIdManager")
+    config.addProperty(TinkerGraph.GREMLIN_TINKERGRAPH_EDGE_ID_MANAGER, "UUID")
+    config.addProperty(TinkerGraph.GREMLIN_TINKERGRAPH_VERTEX_ID_MANAGER, "UUID")
     TinkerGraph.open(config).asScala()
   }
 
@@ -48,10 +47,10 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
       .V
       .hasLabel(request.name)
       .headOption()
-      .map(_.id().asInstanceOf[String])
+      .map(_.id().toString())
       .getOrElse {
         val newParent = graph + (request.name, nameProps ++ birthDateProps ++ deathDateProps: _*)
-        newParent.id().asInstanceOf[String]
+        newParent.id().toString
       }
   }
 
@@ -63,7 +62,7 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
       .V(request.childId)
       .out("childOf")
       .toList()
-      .exists(v => v.id().asInstanceOf[String] == request.parentId)
+      .exists(v => v.id().toString == request.parentId)
 
     if (!relationExists) parent <-- "childOf" --- child
   }
@@ -76,7 +75,7 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
       .V(request.partner1Id)
       .out("spouseOf")
       .toList()
-      .exists(v => v.id().asInstanceOf[String] == request.partner2Id)
+      .exists(v => v.id().toString == request.partner2Id)
 
     if (!relationExists) partner1 <-- "spouseOf" --> partner2
   }
@@ -144,7 +143,7 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
   private def storedToService(stored: PersonVertex) =
     stored
       .into[ServicePerson]
-      .withFieldComputed(_.id, _.id.get)
+      .withFieldComputed(_.id, _.id.map(_.toString).get)
       .transform
 
   override def close(): Unit = {
