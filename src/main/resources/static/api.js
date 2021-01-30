@@ -35,6 +35,7 @@ async function callAddSpouseService(partner1Id, partner2Id) {
 
 async function callAddChildService(parentId, childId) {
     const newChild = { parentId: parentId, childId: childId };
+    console.log(newChild);
 
     const response = await fetch(
         '/api/child',

@@ -44,22 +44,41 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
     val deathDateProps = request.deathDate.map(this.deathDate -> dateFormat.format(_)).toSeq
     val nameProps      = this.name -> request.name :: Nil
 
-    val newParent = graph + (request.name, nameProps ++ birthDateProps ++ deathDateProps: _*)
-    newParent.id().asInstanceOf[String]
+    graph
+      .V
+      .hasLabel(request.name)
+      .headOption()
+      .map(_.id().asInstanceOf[String])
+      .getOrElse {
+        val newParent = graph + (request.name, nameProps ++ birthDateProps ++ deathDateProps: _*)
+        newParent.id().asInstanceOf[String]
+      }
   }
 
   def addChild(request: NewChild) = {
-    val parent   = graph.V(request.parentId).headOption().getOrElse(throw NoSuchParentId(request.parentId))
-    val child    = graph.V(request.childId).headOption().getOrElse(throw NoSuchChildId(request.childId))
-    val newChild = parent <-- "childOf" --- child
-    newChild.id().asInstanceOf[String]
+    val parent = graph.V(request.parentId).headOption().getOrElse(throw NoSuchParentId(request.parentId))
+    val child  = graph.V(request.childId).headOption().getOrElse(throw NoSuchChildId(request.childId))
+
+    val relationExists = graph
+      .V(request.childId)
+      .out("childOf")
+      .toList()
+      .exists(v => v.id().asInstanceOf[String] == request.parentId)
+
+    if (!relationExists) parent <-- "childOf" --- child
   }
 
   def addSpouse(request: NewSpouse) = {
     val partner1 = graph.V(request.partner1Id).headOption().getOrElse(throw NoSuchPartnerId(request.partner1Id))
     val partner2 = graph.V(request.partner2Id).headOption().getOrElse(throw NoSuchPartnerId(request.partner2Id))
 
-    partner1 <-- "spouseOf" --> partner2
+    val relationExists = graph
+      .V(request.partner1Id)
+      .out("spouseOf")
+      .toList()
+      .exists(v => v.id().asInstanceOf[String] == request.partner2Id)
+
+    if (!relationExists) partner1 <-- "spouseOf" --> partner2
   }
 
   def stemma() = {
@@ -77,10 +96,10 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
           val serviceParentsIds = parents.map(_.id()).map(_.toString)
 
           if (serviceParentsIds.nonEmpty) {
-            val familyId       = syntheticId(serviceParentsIds: _*)
+            val familyId       = syntheticFamilyId(serviceParentsIds)
             val family         = Family(familyId)
-            val childRelation  = Child(syntheticId(familyId, servicePerson.id), familyId, servicePerson.id)
-            val spouseRelation = serviceParentsIds.map(parentId => Spouse(syntheticId(parentId, familyId), parentId, familyId))
+            val childRelation  = Child(syntheticChildId(familyId, servicePerson.id), familyId, servicePerson.id)
+            val spouseRelation = serviceParentsIds.map(parentId => Spouse(syntheticSpouseId(parentId, familyId), parentId, familyId))
 
             (servicePerson :: people, childRelation :: children, families + family, spouses ++ spouseRelation)
           } else {
@@ -102,9 +121,9 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
           val partnersIds = partners.map(_.id()).map(_.toString)
 
           val (newFamilies, newSpouses) = partnersIds.map { partnerId =>
-            val familyId = syntheticId(personId, partnerId)
+            val familyId = syntheticFamilyId(personId :: partnerId :: Nil)
 
-            (Family(familyId), Spouse(syntheticId(partnerId, familyId), partnerId, familyId))
+            (Family(familyId), Spouse(syntheticSpouseId(partnerId, familyId), partnerId, familyId))
           }.unzip
 
           (families ++ newFamilies, spouses ++ newSpouses)
@@ -118,7 +137,9 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
     )
   }
 
-  private def syntheticId(values: String*) = values.sorted.mkString("+")
+  private def syntheticFamilyId(parentsIds: Seq[String]) = s"family_${parentsIds.sorted.mkString("_")}"
+  private def syntheticChildId(familyId: String, childId: String) = s"child_${familyId}_${childId}"
+  private def syntheticSpouseId(partnerId: String, familyId: String) = s"spouse_${partnerId}_${familyId}"
 
   private def storedToService(stored: PersonVertex) =
     stored

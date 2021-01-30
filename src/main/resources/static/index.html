@@ -2,10 +2,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <link rel="stylesheet" href="bootstrap/4.6.0/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="bootstrap/5.0.0-beta1/css/bootstrap.min.css"/>
     <link rel="stylesheet" href="font-awesome/4.7.0/css/font-awesome.min.css">
-    <link rel="stylesheet" href="select2/4.0.13/css/select2.min.css">
-    <link rel="stylesheet" href="ttskch__select2-bootstrap4-theme/1.4.0/dist/select2-bootstrap4.min.css">
     <link rel="stylesheet" href="style.css">
     <title>Project Stemma</title>
 </head>
@@ -13,88 +11,70 @@
 
 <!-- Page content holder -->
 <div id="content">
-   <div id="data_viz" class="w-75 h-75"></div>
+    <div id="data_viz" class="w-75 h-75"></div>
 </div>
 
-<div class="modal fade" id="addRelationModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+<div class="modal fade" id="addFamilyModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Relation</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close" tabindex="-1">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <h5 class="modal-title">Add new family or person</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"  tabindex="-1"></button>
             </div>
             <div class="modal-body">
                 <form>
-                    <div class="form-group">
-                        <label for="sourcePersonSelector">Relation from</label>
-                        <select id="sourcePersonSelector" class="form-control" required></select>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" id="personNameInput" placeholder="Ivanov Ivan Invanovich" autofocus required>
+                        <label for="personNameInput">Person</label>
                     </div>
-                    <div class="form-group mt-2">
-                        <label for="targetPersonSelector">To</label>
-                        <select id="targetPersonSelector" class="form-control" required></select>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" id="spouseNameInput" placeholder="Ivanova Lidiya Pavlovna">
+                        <label for="spouseNameInput">Spouse</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" id="child1NameInput" placeholder="Ivanov Petr Ivanovich">
+                        <label for="child1NameInput">Child 1</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" id="child2NameInput" placeholder="Ivanov Petr Ivanovich">
+                        <label for="child2NameInput">Child 2</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" id="child3NameInput" placeholder="Ivanov Petr Ivanovich">
+                        <label for="child3NameInput">Child 3</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" id="child4NameInput" placeholder="Ivanov Petr Ivanovich">
+                        <label for="child4NameInput">Child 4</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" id="child5NameInput" placeholder="Ivanov Petr Ivanovich">
+                        <label for="child5NameInput">Child 5</label>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <span class="d-inline-block" data-placement="bottom" data-toggle="tooltip" title="Alt + 1">
-                    <button id="addChild" type="button" class="btn btn-primary" disabled>Add as child</button>
-                </span>
-                <span class="d-inline-block" data-placement="bottom" data-toggle="tooltip" title="Alt + 2">
-                    <button id="addSpouse" type="button" class="btn btn-primary" disabled>Add as spouse</button>
+                <span class="d-inline-block" data-placement="bottom">
+                    <button id="commitFamilyButton" type="button" class="btn btn-primary">Commit</button>
                 </span>
             </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="addUpdatePersonModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Person</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close" tabindex="-1">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <form>
-                    <div class="form-group">
-                        <label for="createOrUpdatePersonSelector">New person</label>
-                        <input type="text" id="createOrUpdatePersonSelector" class="form-control" required/>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label for="birthDate">Birth date</label>
-                            <input type="date" class="form-control" id="birthDate" placeholder="Birth date">
-                        </div>
-                        <div class="form-group col-md-6">
-                            <label for="deathDate">Death date</label>
-                            <input type="date" class="form-control" id="deathDate" placeholder="Death date">
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button id="createOrUpdate" type="button" class="btn btn-primary">Save</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<button id="btn-add-person" type="button" class="btn btn-danger btn-circle btn-xl" data-toggle="modal" data-target="#addUpdatePersonModal">
-    <i class="fa fa-user-plus"></i>
+<button id="btn-download" type="button" class="btn btn-primary btn-circle btn-xl">
+    <i class="fa fa-download"></i>
 </button>
-<button id="btn-add-relation" type="button" class="btn btn-danger btn-circle btn-xl" data-toggle="modal" data-target="#addRelationModal">
+<button id="btn-add-family" type="button" class="btn btn-danger btn-circle btn-xl" data-bs-toggle="modal"
+        data-bs-target="#addFamilyModal">
     <i class="fa fa-link"></i>
 </button>
 
 
 <script src="jquery/3.5.1/jquery.min.js"></script>
-<script src="bootstrap/4.6.0/js/bootstrap.bundle.min.js"></script>
+<script src="bootstrap/5.0.0-beta1/js/bootstrap.bundle.min.js"></script>
+<script src="file-saver/dist/FileSaver.min.js"></script>
 <script src="d3js/6.2.0/d3.js"></script>
-<script src="select2/4.0.13/js/select2.min.js"></script>
 <script src="api.js"></script>
 <script src="graph.js"></script>
 <script src="ui.js"></script>

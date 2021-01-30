@@ -88,7 +88,7 @@ function stemma(el) {
         .force('center', d3.forceCenter(width / 2, height / 2))
         .force("link", d3.forceLink().id(d => d.id).distance(() => 100).strength(1.5))
         .force("collide", d3.forceCollide().radius(d => d.r * 20).iterations(10).strength(1))
-        .force("repelForce", d3.forceManyBody().strength(-3000).distanceMin(85));
+        .force("repelForce", d3.forceManyBody().strength(-2500).distanceMin(85));
 
     const svg = d3.select(el)
         .append("svg")
