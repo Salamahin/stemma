@@ -1,16 +1,3 @@
-Array.prototype.inArray = function(comparer) {
-    for(var i = 0; i < this.length; i++) {
-        if(comparer(this[i])) return true;
-    }
-    return false;
-};
-
-Array.prototype.pushIfNotExist = function(element, comparer) {
-    if (!this.inArray(comparer)) {
-        this.push(element);
-    }
-};
-
 function stemma(el) {
     const width = window.innerWidth, height = window.innerHeight;
     const childCircleR = 10;
@@ -22,8 +9,8 @@ function stemma(el) {
     const childRelationWidth = 0.5;
     const spouseRelationWidth = 2;
 
-    const _vertexes = [];
-    const _edges = [];
+    var _vertexes = [];
+    var _edges = [];
 
     const clickObservers = []
 
@@ -31,35 +18,37 @@ function stemma(el) {
         clickObservers.push(fn);
     }
 
-    this.addPerson = function(v) {
-        let newPerson = {
-            type: "person"
-        };
-        _vertexes.pushIfNotExist(Object.assign(newPerson, v), next => next.id === v.id);
-        update();
-    }
+    this.updateData = function(people, families, children, spouses) {
+        const pp = people.map(p => {
+            let newPerson = {
+                type: "person"
+            };
+            return Object.assign(newPerson, p);
+        });
 
-    this.addFamily = function(v) {
-        let newFamily = {
-            type: "family"
-        };
-        _vertexes.pushIfNotExist(Object.assign(newFamily, v), next => next.id === v.id);
-        update();
-    }
+        const ff = families.map(f => {
+            let newFamily = {
+                type: "family"
+            };
+            return Object.assign(newFamily, f);
+        });
 
-    this.addChild = function(e) {
-        let newChild = {
-            type: "child"
-        };
-        _edges.pushIfNotExist(Object.assign(newChild, e), next => next.id === e.id);
-        update();
-    }
+        const cc = children.map(c => {
+            let newChild = {
+                type: "child"
+            };
+            return Object.assign(newChild, c);
+        });
 
-    this.addSpouse = function(e) {
-        let newSpouse = {
-            type: "spouse"
-        };
-        _edges.pushIfNotExist(Object.assign(newSpouse, e), next => next.id === e.id);
+        const ss = children.map(s => {
+            let newSpouse = {
+                type: "spouse"
+            };
+            return Object.assign(newSpouse, s);
+        });
+
+        _vertexes = pp.concat(ff);
+        _edges = cc.concat(ss);
         update();
     }
 

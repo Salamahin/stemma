@@ -2,7 +2,7 @@ package io.github.salamahin.stemma
 
 import cats.effect.Blocker
 import io.circe.{Decoder, Encoder}
-import io.github.salamahin.stemma.service.request.{NewChild, NewPerson, NewSpouse}
+import io.github.salamahin.stemma.service.request.{CreateOrUpdatePerson, NewChild, NewSpouse}
 import io.github.salamahin.stemma.storage.repository
 import io.github.salamahin.stemma.storage.repository.Repository
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
@@ -10,14 +10,16 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.server.Router
 import org.http4s.server.blaze.BlazeServerBuilder
 import org.http4s.server.staticcontent.webjarServiceBuilder
-import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes, StaticFile}
+import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes, QueryParamDecoder, StaticFile}
 import zio.clock.Clock
 import zio.console.putStrLn
 import zio.{RIO, URIO, ZEnv, ZIO}
 
 import java.nio.file.Paths
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 import scala.concurrent.ExecutionContext
+import scala.util.Try
 
 object Main extends zio.App {
   import cats.implicits._
@@ -35,11 +37,29 @@ object Main extends zio.App {
   implicit def circeJsonDecoder[A](implicit decoder: Decoder[A]): EntityDecoder[StemmaTask, A] = jsonOf[StemmaTask, A]
   implicit def circeJsonEncoder[A](implicit decoder: Encoder[A]): EntityEncoder[StemmaTask, A] = jsonEncoderOf[StemmaTask, A]
 
+  object UUID {
+    def unapply(str: String): Option[java.util.UUID] =
+      Option(str).flatMap(uuid => Try(java.util.UUID.fromString(uuid)).toOption)
+  }
+
   private val api = HttpRoutes.of[StemmaTask] {
-    case GET -> Root / "stemma"        => Ok(repo(_.get.stemma))
-    case req @ POST -> Root / "person" => req.as[NewPerson].flatMap(person => Ok(repo(_.get newPerson person)))
-    case req @ POST -> Root / "spouse" => req.as[NewSpouse].flatMap(family => Ok(repo(_.get newSpouse family)))
-    case req @ POST -> Root / "child"  => req.as[NewChild].flatMap(child => Ok(repo(_.get newChild child)))
+    case GET -> Root / "stemma" =>
+      Ok(repo(_.get.stemma))
+
+    case req @ POST -> Root / "person" =>
+      req.as[CreateOrUpdatePerson].flatMap(person => Ok(repo(_.get newPerson person)))
+
+    case req @ POST -> Root / "person" / UUID(uuid) =>
+      req.as[CreateOrUpdatePerson].flatMap(person => Ok(repo(_.get.updatePerson(uuid, person))))
+
+    case DELETE -> Root / "person" / UUID(uuid) =>
+      Ok(repo(_.get.removePerson(uuid)))
+
+    case req @ POST -> Root / "spouse" =>
+      req.as[NewSpouse].flatMap(family => Ok(repo(_.get newSpouse family)))
+
+    case req @ POST -> Root / "child" =>
+      req.as[NewChild].flatMap(child => Ok(repo(_.get newChild child)))
   }
 
   private def static(ec: ExecutionContext) = HttpRoutes.of[StemmaTask] {

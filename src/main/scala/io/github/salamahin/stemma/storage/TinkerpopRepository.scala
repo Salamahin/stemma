@@ -1,6 +1,6 @@
 package io.github.salamahin.stemma.storage
 
-import io.github.salamahin.stemma.service.request.{NewChild, NewPerson, NewSpouse}
+import io.github.salamahin.stemma.service.request.{CreateOrUpdatePerson, NewChild, NewSpouse}
 import io.github.salamahin.stemma.service.response.{Child, Family, Spouse, Stemma, Person => ServicePerson}
 import io.github.salamahin.stemma.storage.domain.{Person => PersonVertex}
 import org.apache.commons.configuration.BaseConfiguration
@@ -9,12 +9,14 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 final case class NoSuchParentId(id: String)  extends RuntimeException(s"No parent with id $id found")
 final case class NoSuchChildId(id: String)   extends RuntimeException(s"No child with id $id found")
 final case class NoSuchPartnerId(id: String) extends RuntimeException(s"No person with id $id found")
 
 class TinkerpopRepository(file: String) extends AutoCloseable {
+
   import gremlin.scala._
   import io.scalaland.chimney.dsl._
 
@@ -38,7 +40,7 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
     .read()
     .iterate()
 
-  def newPerson(request: NewPerson) = {
+  def newPerson(request: CreateOrUpdatePerson) = {
     val birthDateProps = request.birthDate.map(this.birthDate -> dateFormat.format(_)).toSeq
     val deathDateProps = request.deathDate.map(this.deathDate -> dateFormat.format(_)).toSeq
     val nameProps      = this.name -> request.name :: Nil
@@ -49,9 +51,23 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
       .headOption()
       .map(_.id().toString())
       .getOrElse {
-        val newParent = graph + (request.name, nameProps ++ birthDateProps ++ deathDateProps: _*)
-        newParent.id().toString
+        val newVertex = graph + ("person", nameProps ++ birthDateProps ++ deathDateProps: _*)
+        newVertex.id().toString
       }
+  }
+
+  def removePerson(uuid: UUID) = {
+    val vertex = graph.V(uuid)
+    vertex.inE("childOf").toList().foreach(_.remove())
+    vertex.bothE("spouseOf").toList().foreach(_.remove())
+    vertex.drop().head()
+  }
+
+  def updatePerson(uuid: UUID, request: CreateOrUpdatePerson) = {
+    graph
+      .V(uuid)
+      .head()
+      .updateAs[PersonVertex](vertex => vertex.copy(name = request.name, birthDate = request.birthDate, deathDate = request.deathDate))
   }
 
   def addChild(request: NewChild) = {
@@ -136,8 +152,8 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
     )
   }
 
-  private def syntheticFamilyId(parentsIds: Seq[String]) = s"family_${parentsIds.sorted.mkString("_")}"
-  private def syntheticChildId(familyId: String, childId: String) = s"child_${familyId}_${childId}"
+  private def syntheticFamilyId(parentsIds: Seq[String])             = s"family_${parentsIds.sorted.mkString("_")}"
+  private def syntheticChildId(familyId: String, childId: String)    = s"child_${familyId}_${childId}"
   private def syntheticSpouseId(partnerId: String, familyId: String) = s"spouse_${partnerId}_${familyId}"
 
   private def storedToService(stored: PersonVertex) =

@@ -19,6 +19,27 @@ async function callAddPersonService(name, birthDate, deathDate) {
     return await response.json();
 }
 
+async function callUpdatePersonService(uuid, newName, newBirthDate, newDeathDate) {
+    const person = { name: newName, birthDate: newBirthDate, deathDate: newDeathDate };
+
+    await fetch(
+        '/api/person/' + uuid,
+         {
+            method: 'POST',
+            body: stringify(person)
+         }
+    );
+}
+
+async function callRemovePersonService(uuid) {
+   await fetch(
+        '/api/person/' + uuid,
+         {
+            method: 'DELETE'
+         }
+   );
+}
+
 async function callAddSpouseService(partner1Id, partner2Id) {
     const newSpouse = { partner1Id: partner1Id, partner2Id: partner2Id };
 

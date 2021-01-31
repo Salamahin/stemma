@@ -22,7 +22,7 @@ object response {
 }
 
 object request {
-  final case class NewPerson(name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate])
+  final case class CreateOrUpdatePerson(name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate])
   final case class NewSpouse(partner1Id: String, partner2Id: String)
   final case class NewChild(parentId: String, childId: String)
 }

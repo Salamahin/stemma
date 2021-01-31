@@ -1,10 +1,7 @@
 const graph = new stemma("#data_viz");
 
 function updateStemma(stemma) {
-    stemma.people.forEach(graph.addPerson);
-    stemma.families.forEach(graph.addFamily);
-    stemma.children.forEach(graph.addChild);
-    stemma.spouses.forEach(graph.addSpouse);
+    graph.updateData(stemma.people, stemma.families, stemma.children, stemma.spouses);
 }
 
 async function createOrUpdateFamily(personName, spouseName, childrenNames) {
@@ -66,6 +63,23 @@ $('#btn-download').click(function(e) {
 graph.onPersonClicked(d => {
     $('#personOldNameInput').val(d.name);
     $('#personNewNameInput').val(d.name);
+    $('#updatePersonButton').click(function(e) {
+        const newName = $('#personNewNameInput').val();
+        callUpdatePersonService(d.id, newName)
+            .then(
+                callGetStemmaService()
+                    .then(updateStemma)
+                    .then(() => $('#updatePersonModal').modal('hide'))
+            );
+    });
+    $('#removePersonButton').click(function(e) {
+            callRemovePersonService(d.id)
+                .then(
+                    callGetStemmaService()
+                        .then(updateStemma)
+                        .then(() => $('#updatePersonModal').modal('hide'))
+            );
+    });
     $('#updatePersonModal').modal('show');
 })
 
