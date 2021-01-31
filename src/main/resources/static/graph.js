@@ -1,3 +1,10 @@
+Array.prototype.inArray = function(comparer) {
+    for(var i = 0; i < this.length; i++) {
+        if(comparer(this[i])) return true;
+    }
+    return false;
+};
+
 function stemma(el) {
     const width = window.innerWidth, height = window.innerHeight;
     const childCircleR = 10;
@@ -40,7 +47,7 @@ function stemma(el) {
             return Object.assign(newChild, c);
         });
 
-        const ss = children.map(s => {
+        const ss = spouses.map(s => {
             let newSpouse = {
                 type: "spouse"
             };
@@ -202,17 +209,6 @@ function stemma(el) {
 
             vertexElements.attr("transform", d => "translate(" + d.x + "," + d.y + ")");
         });
-
-//         vertexGroup
-//            .selectAll("g")
-//            .filter(x => x.type == "person")
-//            .on('mouseenter', (event, d) => {
-//                if (event.defaultPrevented) return; // dragged
-//                d3
-//                    .select(event.currentTarget)
-//                    .style('fill', selectedNodeColor)
-//                    .attr("r", spouseCircleR * 2);
-//            })
 
         simulation.alphaTarget(0.7).restart();
     }

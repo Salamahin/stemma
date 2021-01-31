@@ -58,9 +58,7 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
 
   def removePerson(uuid: UUID) = {
     val vertex = graph.V(uuid)
-    vertex.inE("childOf").toList().foreach(_.remove())
-    vertex.bothE("spouseOf").toList().foreach(_.remove())
-    vertex.drop().head()
+    vertex.drop().iterate()
   }
 
   def updatePerson(uuid: UUID, request: CreateOrUpdatePerson) = {
