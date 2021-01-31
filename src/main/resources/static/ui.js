@@ -63,6 +63,12 @@ $('#btn-download').click(function(e) {
     saveAs(blob, "stemma.svg");
 });
 
+graph.onPersonClicked(d => {
+    $('#personOldNameInput').val(d.name);
+    $('#personNewNameInput').val(d.name);
+    $('#updatePersonModal').modal('show');
+})
+
 
 $(document).ready(function() {
     callGetStemmaService().then(updateStemma)

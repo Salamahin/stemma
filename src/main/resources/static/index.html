@@ -24,7 +24,7 @@
             <div class="modal-body">
                 <form>
                     <div class="form-floating mb-3">
-                        <input class="form-control" id="personNameInput" placeholder="Ivanov Ivan Invanovich" autofocus required>
+                        <input class="form-control" id="personNameInput" placeholder="Ivanov Ivan Ivanovich" autofocus required>
                         <label for="personNameInput">Person</label>
                     </div>
                     <div class="form-floating mb-3">
@@ -56,6 +56,35 @@
             <div class="modal-footer">
                 <span class="d-inline-block" data-placement="bottom">
                     <button id="commitFamilyButton" type="button" class="btn btn-primary">Commit</button>
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="updatePersonModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update or remove person</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"  tabindex="-1"></button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" id="personOldNameInput" placeholder="Ivanov Ivan Ivanovich" readonly>
+                        <label for="personOldNameInput">Current name</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" id="personNewNameInput" placeholder="Ivanov Ivan Ivanovich" autofocus>
+                        <label for="personNewNameInput">New name</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <span class="d-inline-block" data-placement="bottom">
+                    <button id="updatePersonButton" type="button" class="btn btn-primary">Update</button>
+                    <button id="removePersonButton" type="button" class="btn btn-danger">Remove</button>
                 </span>
             </div>
         </div>

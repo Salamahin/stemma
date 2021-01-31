@@ -16,6 +16,7 @@ function stemma(el) {
     const childCircleR = 10;
     const spouseCircleR = 5;
     const nodeColor = '#69b3a2';
+    const selectedNodeColor = '#4d8074'
     const childRelationColor = "grey";
     const spouseRelationColor = '#69b3a2';
     const childRelationWidth = 0.5;
@@ -23,6 +24,12 @@ function stemma(el) {
 
     const _vertexes = [];
     const _edges = [];
+
+    const clickObservers = []
+
+    this.onPersonClicked = function(fn) {
+        clickObservers.push(fn);
+    }
 
     this.addPerson = function(v) {
         let newPerson = {
@@ -61,6 +68,10 @@ function stemma(el) {
         return p;
     }
 
+    var onPersonClicked = function(node) {
+        //no op
+    }
+
     function dragstarted(event) {
         if (!event.active) simulation.alphaTarget(0.3).restart();
         event.subject.fx = event.x;
@@ -83,8 +94,8 @@ function stemma(el) {
             .id(d => d.id)
             .links(_edges)
         )
-        .force("x", d3.forceX(width / 2).strength(0.4))
-        .force("y", d3.forceY(height / 2).strength(0.6))
+        .force("x", d3.forceX(width / 2).strength(0.5))
+        .force("y", d3.forceY(height / 2).strength(0.5))
         .force('center', d3.forceCenter(width / 2, height / 2))
         .force("link", d3.forceLink().id(d => d.id).distance(() => 100).strength(1.5))
         .force("collide", d3.forceCollide().radius(d => d.r * 20).iterations(10).strength(1))
@@ -168,7 +179,25 @@ function stemma(el) {
         vertexEnter
             .append("circle")
             .attr("fill", nodeColor)
-            .attr("r", d => d.type == "family"? spouseCircleR : childCircleR);
+            .attr("r", d => d.type == "family"? spouseCircleR : childCircleR)
+            .on('mouseenter', (event, d) => {
+                if (event.defaultPrevented || d.type == "family") return;
+                d3
+                    .select(event.currentTarget)
+                    .style('fill', selectedNodeColor)
+                    .attr("r", childCircleR * 1.2);
+            })
+            .on('mouseleave', (event, d) => {
+                if (event.defaultPrevented || d.type == "family") return;
+                d3
+                    .select(event.currentTarget)
+                    .style('fill', nodeColor)
+                    .attr("r", childCircleR);
+            })
+            .on('click', (event, d) => {
+                clickObservers.forEach(fn => fn(d));
+            });
+
 
         edgeElements = edgeEnter.merge(edgeElements);
         vertexElements = vertexEnter.merge(vertexElements);
@@ -185,8 +214,23 @@ function stemma(el) {
             vertexElements.attr("transform", d => "translate(" + d.x + "," + d.y + ")");
         });
 
+//         vertexGroup
+//            .selectAll("g")
+//            .filter(x => x.type == "person")
+//            .on('mouseenter', (event, d) => {
+//                if (event.defaultPrevented) return; // dragged
+//                d3
+//                    .select(event.currentTarget)
+//                    .style('fill', selectedNodeColor)
+//                    .attr("r", spouseCircleR * 2);
+//            })
+
         simulation.alphaTarget(0.7).restart();
     }
+
+    function clicked(event, d) {
+
+      }
 
     update();
 }
