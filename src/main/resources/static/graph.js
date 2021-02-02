@@ -94,7 +94,7 @@ function stemma(el) {
         .force("y", d3.forceY(height / 2).strength(0.5))
         .force('center', d3.forceCenter(width / 2, height / 2))
         .force("link", d3.forceLink().id(d => d.id).distance(() => 100).strength(1.5))
-        .force("collide", d3.forceCollide().radius(d => d.r * 20).iterations(10).strength(1))
+        .force("collide", d3.forceCollide().radius(d => d.r * 20))
         .force("repelForce", d3.forceManyBody().strength(-2500).distanceMin(85));
 
     const svg = d3.select(el)
@@ -151,8 +151,8 @@ function stemma(el) {
         edgeElements = edgesGroup.selectAll("line").data(_edges);
         vertexElements = vertexGroup.selectAll("g").data(_vertexes);
 
-        edgeElements.exit().remove();
-        vertexElements.exit().remove();
+//        edgeElements.exit().remove();
+//        vertexElements.exit().remove();
 
         const edgeEnter = edgeElements
             .enter()

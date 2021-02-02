@@ -40,29 +40,14 @@ async function callRemovePersonService(uuid) {
    );
 }
 
-async function callAddSpouseService(partner1Id, partner2Id) {
-    const newSpouse = { partner1Id: partner1Id, partner2Id: partner2Id };
+async function callAddFamilyService(partner1Id, partner2Id, childrenIds) {
+    const newSpouse = { parent1Id: partner1Id, parent2Id: partner2Id, childrenIds: childrenIds };
 
     const response = await fetch(
-        '/api/spouse',
+        '/api/family',
          {
             method: 'POST',
             body: stringify(newSpouse)
-         }
-    );
-
-    return await response.json();
-}
-
-async function callAddChildService(parentId, childId) {
-    const newChild = { parentId: parentId, childId: childId };
-    console.log(newChild);
-
-    const response = await fetch(
-        '/api/child',
-         {
-            method: 'POST',
-            body: stringify(newChild)
          }
     );
 

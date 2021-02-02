@@ -7,15 +7,15 @@ function updateStemma(stemma) {
 async function createOrUpdateFamily(personName, spouseName, childrenNames) {
     const personId = await callAddPersonService(personName);
     const childrenIds = await Promise.all(childrenNames.map(childName => callAddPersonService(childName)));
-    await Promise.all(childrenIds.map(childId => callAddChildService(personId, childId)));
 
+    var spouseId = null;
     if(spouseName != null && spouseName != "") {
-        const spouseId = await callAddPersonService(spouseName);
-        await callAddSpouseService(personId, spouseId);
-        await Promise.all(childrenIds.map(childId => callAddChildService(spouseId, childId)));
+        spouseId = await callAddPersonService(spouseName);
     }
 
-    const stemma = await callGetStemmaService();
+    await callAddFamilyService(personId, spouseId, childrenIds);
+
+    const stemma = await callGetStemmaService()
     updateStemma(stemma);
 }
 
