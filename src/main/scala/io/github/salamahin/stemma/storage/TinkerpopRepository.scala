@@ -1,6 +1,6 @@
 package io.github.salamahin.stemma.storage
 
-import io.github.salamahin.stemma.service.request.{NewChild, NewPerson, NewSpouse}
+import io.github.salamahin.stemma.service.request.{FamilyRequest, PersonRequest}
 import io.github.salamahin.stemma.service.response.{Child, Family, Spouse, Stemma, Person => ServicePerson}
 import io.github.salamahin.stemma.storage.domain.{Person => PersonVertex}
 import org.apache.commons.configuration.BaseConfiguration
@@ -9,16 +9,16 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 final case class NoSuchParentId(id: String)  extends RuntimeException(s"No parent with id $id found")
 final case class NoSuchChildId(id: String)   extends RuntimeException(s"No child with id $id found")
 final case class NoSuchPartnerId(id: String) extends RuntimeException(s"No person with id $id found")
 
 class TinkerpopRepository(file: String) extends AutoCloseable {
+
   import gremlin.scala._
   import io.scalaland.chimney.dsl._
-
-  import scala.jdk.CollectionConverters._
 
   private implicit val graph = {
     val config = new BaseConfiguration
@@ -38,107 +38,104 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
     .read()
     .iterate()
 
-  def newPerson(request: NewPerson) = {
+  private val personLabel    = "person"
+  private val familyLabel    = "family"
+  private val childRelation  = "childOf"
+  private val spouseRelation = "spouseOf"
+
+  def newPerson(request: PersonRequest) = {
     val birthDateProps = request.birthDate.map(this.birthDate -> dateFormat.format(_)).toSeq
     val deathDateProps = request.deathDate.map(this.deathDate -> dateFormat.format(_)).toSeq
     val nameProps      = this.name -> request.name :: Nil
 
     graph
       .V
-      .hasLabel(request.name)
+      .hasLabel(personLabel)
+      .has(this.name, request.name)
       .headOption()
       .map(_.id().toString())
       .getOrElse {
-        val newParent = graph + (request.name, nameProps ++ birthDateProps ++ deathDateProps: _*)
-        newParent.id().toString
+        val newVertex = graph + (personLabel, nameProps ++ birthDateProps ++ deathDateProps: _*)
+        newVertex.id().toString
       }
   }
 
-  def addChild(request: NewChild) = {
-    val parent = graph.V(request.parentId).headOption().getOrElse(throw NoSuchParentId(request.parentId))
-    val child  = graph.V(request.childId).headOption().getOrElse(throw NoSuchChildId(request.childId))
-
-    val relationExists = graph
-      .V(request.childId)
-      .out("childOf")
-      .toList()
-      .exists(v => v.id().toString == request.parentId)
-
-    if (!relationExists) parent <-- "childOf" --- child
+  def removePerson(uuid: UUID) = {
+    graph.V(uuid).drop().iterate()
+    graph
+      .V
+      .hasLabel(familyLabel)
+      .where(_.in(spouseRelation).count().is(P.eq(0)))
+      .drop()
+      .iterate()
   }
 
-  def addSpouse(request: NewSpouse) = {
-    val partner1 = graph.V(request.partner1Id).headOption().getOrElse(throw NoSuchPartnerId(request.partner1Id))
-    val partner2 = graph.V(request.partner2Id).headOption().getOrElse(throw NoSuchPartnerId(request.partner2Id))
+  def updatePerson(uuid: UUID, request: PersonRequest) = {
+    graph
+      .V(uuid)
+      .head()
+      .updateAs[PersonVertex](vertex => vertex.copy(name = request.name, birthDate = request.birthDate, deathDate = request.deathDate))
+  }
 
-    val relationExists = graph
-      .V(request.partner1Id)
-      .out("spouseOf")
-      .toList()
-      .exists(v => v.id().toString == request.partner2Id)
+  private def createNewFamily(partner1: Vertex, partner2: Vertex) = {
+    val existingFamily =
+      partner1
+        .out()
+        .hasLabel(familyLabel)
+        .where(_.in(spouseRelation).id().is(partner2.id()))
+        .headOption()
 
-    if (!relationExists) partner1 <-- "spouseOf" --> partner2
+    existingFamily
+      .getOrElse {
+        val newFamily = graph + familyLabel
+        partner1 --- spouseRelation --> newFamily
+        partner2 --- spouseRelation --> newFamily
+        newFamily
+      }
+  }
+
+  def addFamily(request: FamilyRequest) = {
+    val parent1 = graph.V(request.parent1Id).headOption().getOrElse(throw NoSuchParentId(request.parent1Id))
+    val family = request
+      .parent2Id
+      .map(parent2Id => {
+        val parent2 = graph.V(parent2Id).headOption().getOrElse(throw NoSuchParentId(parent2Id))
+        createNewFamily(parent1, parent2)
+      })
+      .orElse(parent1.out(familyLabel).headOption())
+      .getOrElse {
+        val newFamily = graph + familyLabel
+        parent1 --- spouseRelation --> newFamily
+        newFamily
+      }
+
+    request
+      .childrenIds
+      .foreach(childId => {
+        val child = graph.V(childId).headOption().getOrElse(throw NoSuchChildId(childId))
+        family --- childRelation --> child
+      })
   }
 
   def stemma() = {
-    val (people, children, familiesWithChildren, spouseRelationWithChildren) = (for {
-      person  <- graph.V
-      parents <- person.out("childOf").fold()
-    } yield (person, parents))
-      .toMap
-      .map {
-        case (x, y) => x -> y.asScala.toList
-      }
-      .foldLeft((List.empty[ServicePerson], List.empty[Child], Set.empty[Family], Set.empty[Spouse])) {
-        case ((people, children, families, spouses), (person, parents)) =>
-          val servicePerson     = storedToService(person.toCC[PersonVertex])
-          val serviceParentsIds = parents.map(_.id()).map(_.toString)
+    val people = graph.V.hasLabel(personLabel).toCC[PersonVertex].toList().map(storedToService)
 
-          if (serviceParentsIds.nonEmpty) {
-            val familyId       = syntheticFamilyId(serviceParentsIds)
-            val family         = Family(familyId)
-            val childRelation  = Child(syntheticChildId(familyId, servicePerson.id), familyId, servicePerson.id)
-            val spouseRelation = serviceParentsIds.map(parentId => Spouse(syntheticSpouseId(parentId, familyId), parentId, familyId))
+    val families = graph.V.hasLabel(familyLabel).toList().map(x => Family(x.id.toString))
 
-            (servicePerson :: people, childRelation :: children, families + family, spouses ++ spouseRelation)
-          } else {
-            (servicePerson :: people, children, families, spouses)
-          }
-      }
+    val spouseRelations = graph
+      .E
+      .hasLabel(spouseRelation)
+      .toList()
+      .map(v => Spouse(v.id.toString, v.outVertex().id().toString, v.inVertex().id().toString))
 
-    val (familiesWithoutChildren, spouseRelationWithoutChildren) = (for {
-      partner  <- graph.V
-      partners <- partner.out("spouseOf").fold()
-    } yield (partner, partners))
-      .toMap
-      .map {
-        case (x, y) => x -> y.asScala.toList
-      }
-      .foldLeft((Set.empty[Family], Set.empty[Spouse])) {
-        case ((families, spouses), (person, partners)) =>
-          val personId    = person.id().toString
-          val partnersIds = partners.map(_.id()).map(_.toString)
+    val childRelations = graph
+      .E
+      .hasLabel(childRelation)
+      .toList()
+      .map(v => Child(v.id.toString, v.outVertex().id().toString, v.inVertex().id().toString))
 
-          val (newFamilies, newSpouses) = partnersIds.map { partnerId =>
-            val familyId = syntheticFamilyId(personId :: partnerId :: Nil)
-
-            (Family(familyId), Spouse(syntheticSpouseId(partnerId, familyId), partnerId, familyId))
-          }.unzip
-
-          (families ++ newFamilies, spouses ++ newSpouses)
-      }
-
-    Stemma(
-      people,
-      (familiesWithChildren ++ familiesWithoutChildren).toList,
-      (spouseRelationWithoutChildren ++ spouseRelationWithChildren).toList,
-      children
-    )
+    Stemma(people, families, spouseRelations, childRelations)
   }
-
-  private def syntheticFamilyId(parentsIds: Seq[String]) = s"family_${parentsIds.sorted.mkString("_")}"
-  private def syntheticChildId(familyId: String, childId: String) = s"child_${familyId}_${childId}"
-  private def syntheticSpouseId(partnerId: String, familyId: String) = s"spouse_${partnerId}_${familyId}"
 
   private def storedToService(stored: PersonVertex) =
     stored

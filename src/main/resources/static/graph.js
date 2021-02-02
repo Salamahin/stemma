@@ -5,12 +5,6 @@ Array.prototype.inArray = function(comparer) {
     return false;
 };
 
-Array.prototype.pushIfNotExist = function(element, comparer) {
-    if (!this.inArray(comparer)) {
-        this.push(element);
-    }
-};
-
 function stemma(el) {
     const width = window.innerWidth, height = window.innerHeight;
     const childCircleR = 10;
@@ -22,8 +16,8 @@ function stemma(el) {
     const childRelationWidth = 0.5;
     const spouseRelationWidth = 2;
 
-    const _vertexes = [];
-    const _edges = [];
+    var _vertexes = [];
+    var _edges = [];
 
     const clickObservers = []
 
@@ -31,35 +25,37 @@ function stemma(el) {
         clickObservers.push(fn);
     }
 
-    this.addPerson = function(v) {
-        let newPerson = {
-            type: "person"
-        };
-        _vertexes.pushIfNotExist(Object.assign(newPerson, v), next => next.id === v.id);
-        update();
-    }
+    this.updateData = function(people, families, children, spouses) {
+        const pp = people.map(p => {
+            let newPerson = {
+                type: "person"
+            };
+            return Object.assign(newPerson, p);
+        });
 
-    this.addFamily = function(v) {
-        let newFamily = {
-            type: "family"
-        };
-        _vertexes.pushIfNotExist(Object.assign(newFamily, v), next => next.id === v.id);
-        update();
-    }
+        const ff = families.map(f => {
+            let newFamily = {
+                type: "family"
+            };
+            return Object.assign(newFamily, f);
+        });
 
-    this.addChild = function(e) {
-        let newChild = {
-            type: "child"
-        };
-        _edges.pushIfNotExist(Object.assign(newChild, e), next => next.id === e.id);
-        update();
-    }
+        const cc = children.map(c => {
+            let newChild = {
+                type: "child"
+            };
+            return Object.assign(newChild, c);
+        });
 
-    this.addSpouse = function(e) {
-        let newSpouse = {
-            type: "spouse"
-        };
-        _edges.pushIfNotExist(Object.assign(newSpouse, e), next => next.id === e.id);
+        const ss = spouses.map(s => {
+            let newSpouse = {
+                type: "spouse"
+            };
+            return Object.assign(newSpouse, s);
+        });
+
+        _vertexes = pp.concat(ff);
+        _edges = cc.concat(ss);
         update();
     }
 
@@ -98,7 +94,7 @@ function stemma(el) {
         .force("y", d3.forceY(height / 2).strength(0.5))
         .force('center', d3.forceCenter(width / 2, height / 2))
         .force("link", d3.forceLink().id(d => d.id).distance(() => 100).strength(1.5))
-        .force("collide", d3.forceCollide().radius(d => d.r * 20).iterations(10).strength(1))
+        .force("collide", d3.forceCollide().radius(d => d.r * 20))
         .force("repelForce", d3.forceManyBody().strength(-2500).distanceMin(85));
 
     const svg = d3.select(el)
@@ -154,9 +150,6 @@ function stemma(el) {
     const update = function () {
         edgeElements = edgesGroup.selectAll("line").data(_edges);
         vertexElements = vertexGroup.selectAll("g").data(_vertexes);
-
-        edgeElements.exit().remove();
-        vertexElements.exit().remove();
 
         const edgeEnter = edgeElements
             .enter()
@@ -214,18 +207,8 @@ function stemma(el) {
             vertexElements.attr("transform", d => "translate(" + d.x + "," + d.y + ")");
         });
 
-//         vertexGroup
-//            .selectAll("g")
-//            .filter(x => x.type == "person")
-//            .on('mouseenter', (event, d) => {
-//                if (event.defaultPrevented) return; // dragged
-//                d3
-//                    .select(event.currentTarget)
-//                    .style('fill', selectedNodeColor)
-//                    .attr("r", spouseCircleR * 2);
-//            })
 
-        simulation.alphaTarget(0.7).restart();
+        simulation.alphaTarget(0.2).restart();
     }
 
     function clicked(event, d) {

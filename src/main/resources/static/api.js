@@ -19,29 +19,35 @@ async function callAddPersonService(name, birthDate, deathDate) {
     return await response.json();
 }
 
-async function callAddSpouseService(partner1Id, partner2Id) {
-    const newSpouse = { partner1Id: partner1Id, partner2Id: partner2Id };
+async function callUpdatePersonService(uuid, newName, newBirthDate, newDeathDate) {
+    const person = { name: newName, birthDate: newBirthDate, deathDate: newDeathDate };
+
+    await fetch(
+        '/api/person/' + uuid,
+         {
+            method: 'POST',
+            body: stringify(person)
+         }
+    );
+}
+
+async function callRemovePersonService(uuid) {
+   await fetch(
+        '/api/person/' + uuid,
+         {
+            method: 'DELETE'
+         }
+   );
+}
+
+async function callAddFamilyService(partner1Id, partner2Id, childrenIds) {
+    const newSpouse = { parent1Id: partner1Id, parent2Id: partner2Id, childrenIds: childrenIds };
 
     const response = await fetch(
-        '/api/spouse',
+        '/api/family',
          {
             method: 'POST',
             body: stringify(newSpouse)
-         }
-    );
-
-    return await response.json();
-}
-
-async function callAddChildService(parentId, childId) {
-    const newChild = { parentId: parentId, childId: childId };
-    console.log(newChild);
-
-    const response = await fetch(
-        '/api/child',
-         {
-            method: 'POST',
-            body: stringify(newChild)
          }
     );
 
