@@ -151,9 +151,6 @@ function stemma(el) {
         edgeElements = edgesGroup.selectAll("line").data(_edges);
         vertexElements = vertexGroup.selectAll("g").data(_vertexes);
 
-//        edgeElements.exit().remove();
-//        vertexElements.exit().remove();
-
         const edgeEnter = edgeElements
             .enter()
             .append("line")
@@ -210,7 +207,8 @@ function stemma(el) {
             vertexElements.attr("transform", d => "translate(" + d.x + "," + d.y + ")");
         });
 
-        simulation.alphaTarget(0.7).restart();
+
+        simulation.alphaTarget(0.2).restart();
     }
 
     function clicked(event, d) {
