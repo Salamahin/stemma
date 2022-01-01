@@ -65,7 +65,8 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
     graph
       .V
       .hasLabel(familyLabel)
-      .where(_.in(spouseRelation).count().is(P.eq(0)))
+      .where(_.in(spouseRelation).count().is(P.lte(1)))
+      .where(_.out(childRelation).count().is(P.is(0)))
       .drop()
       .iterate()
   }
