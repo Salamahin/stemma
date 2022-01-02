@@ -10,6 +10,9 @@ object domain {
     name: String,
     birthDate: Option[LocalDate],
     deathDate: Option[LocalDate],
+    phone: Option[String],
+    bio: Option[String],
+    generation: Int,
     @id id: Option[UUID] = None,
     @underlying vertex: Option[Vertex] = None
   )

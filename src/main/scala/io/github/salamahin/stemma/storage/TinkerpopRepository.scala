@@ -10,6 +10,7 @@ import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import scala.annotation.tailrec
 
 final case class NoSuchParentId(id: String)  extends RuntimeException(s"No parent with id $id found")
 final case class NoSuchChildId(id: String)   extends RuntimeException(s"No child with id $id found")
@@ -30,6 +31,7 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
   private val name       = Key[String]("name")
   private val birthDate  = Key[String]("birthDate")
   private val deathDate  = Key[String]("deathDate")
+  private val generation = Key[Int]("generation")
   private val dateFormat = DateTimeFormatter.ISO_DATE
 
   new GraphTraversalSource(graph.asJava())
@@ -44,9 +46,10 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
   private val spouseRelation = "spouseOf"
 
   def newPerson(request: PersonRequest) = {
-    val birthDateProps = request.birthDate.map(this.birthDate -> dateFormat.format(_)).toSeq
-    val deathDateProps = request.deathDate.map(this.deathDate -> dateFormat.format(_)).toSeq
-    val nameProps      = this.name -> request.name :: Nil
+    val birthDateProps  = request.birthDate.map(this.birthDate -> dateFormat.format(_)).toSeq
+    val deathDateProps  = request.deathDate.map(this.deathDate -> dateFormat.format(_)).toSeq
+    val nameProps       = this.name -> request.name
+    val generationProps = this.generation -> 0
 
     graph
       .V
@@ -55,18 +58,12 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
       .headOption()
       .map(_.id().toString())
       .getOrElse {
-        val newVertex = graph + (personLabel, nameProps ++ birthDateProps ++ deathDateProps: _*)
+        val newVertex = graph + (personLabel, nameProps +: generationProps +: (birthDateProps ++ deathDateProps): _*)
         newVertex.id().toString
       }
   }
 
-  def removePerson(uuid: UUID) = {
-    graph.V(uuid).toCC[PersonVertex].toList().foreach(println)
-
-    graph.V(uuid).inE().drop().iterate()
-    graph.V(uuid).outE().drop().iterate()
-    graph.V(uuid).drop().iterate()
-
+  private def dropEmptyFamilies() = {
     graph
       .V
       .hasLabel(familyLabel)
@@ -76,36 +73,53 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
       .iterate()
   }
 
+  private def recalculateGenerations() = {
+    @tailrec
+    def iter(parents: List[String], generation: Int): Unit = {
+      graph
+        .V(parents: _*)
+        .toList()
+        .foreach(_.updateAs[PersonVertex](vertex => vertex.copy(generation = generation)))
+
+      val children = graph
+        .V(parents: _*)
+        .out(spouseRelation)
+        .out(childRelation)
+        .map(_.id().toString)
+        .toList()
+        .distinct
+
+      if (children.nonEmpty) iter(children, generation + 1)
+    }
+
+    val eldar = graph
+      .V()
+      .hasLabel(personLabel)
+      .where(_.in(childRelation).count().is(P.eq(0)))
+      .map(_.id().toString)
+      .toList()
+
+    iter(eldar, 0)
+  }
+
+  private def sanitizeGraph() = {
+    dropEmptyFamilies()
+    recalculateGenerations()
+  }
+
+  def removePerson(uuid: UUID) = {
+    graph.V(uuid).toCC[PersonVertex].toList().foreach(println)
+
+    graph.V(uuid).inE().drop().iterate()
+    graph.V(uuid).outE().drop().iterate()
+    graph.V(uuid).drop().iterate()
+  }
+
   def updatePerson(uuid: UUID, request: PersonRequest) = {
     graph
       .V(uuid)
       .head()
       .updateAs[PersonVertex](vertex => vertex.copy(name = request.name, birthDate = request.birthDate, deathDate = request.deathDate))
-  }
-
-  def merge(oldUUID: UUID, newUUID: UUID) = {
-    val person = graph
-      .V(oldUUID)
-      .head()
-      .toCC[PersonVertex]
-
-    val hisChildren = graph
-      .V(oldUUID)
-      .head()
-      .out(personLabel)
-      .toCC[PersonVertex]
-      .toList()
-
-    val hisParents = graph
-      .V(oldUUID)
-      .head()
-
-    val newVertex = graph
-      .V(newUUID)
-      .head()
-
-    ???
-
   }
 
   private def createNewFamily(partner1: Vertex, partner2: Vertex) = {
@@ -149,8 +163,9 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
   }
 
   def stemma() = {
-    val people = graph.V.hasLabel(personLabel).toCC[PersonVertex].toList().map(storedToService)
+    sanitizeGraph()
 
+    val people   = graph.V.hasLabel(personLabel).toCC[PersonVertex].toList().map(storedToService)
     val families = graph.V.hasLabel(familyLabel).toList().map(x => Family(x.id.toString))
 
     val spouseRelations = graph
