@@ -65,7 +65,7 @@ function stemma(el) {
 
     function color(person) {
         console.log(person.name + " generation is " + person.generation);
-        return d3.interpolateCividis(person.generation / _max_generation);
+        return d3.interpolatePlasma(person.generation / _max_generation);
     }
 
     function dragstarted(event) {
