@@ -64,7 +64,6 @@ function stemma(el) {
     }
 
     function color(person) {
-        console.log(person.name + " generation is " + person.generation);
         return d3.interpolatePlasma(person.generation / _max_generation);
     }
 
@@ -92,7 +91,6 @@ function stemma(el) {
         )
         .force("x", d3.forceX(width / 2).strength(0.5))
         .force("y", d3.forceY(height / 2).strength(0.5))
-        .force('center', d3.forceCenter(width / 2, height / 2))
         .force("link", d3.forceLink().id(d => d.id).distance(() => 100).strength(1.5))
         .force("collide", d3.forceCollide().radius(d => d.r * 20))
         .force("repelForce", d3.forceManyBody().strength(-2500).distanceMin(85));
@@ -183,21 +181,20 @@ function stemma(el) {
               if (event.defaultPrevented || d.type == "family") return;
               d3
                   .select(event.currentTarget)
-//                  .style('fill', selectedNodeColor)
                   .attr("r", childCircleR * 1.2);
             })
             .on('mouseleave', (event, d) => {
               if (event.defaultPrevented || d.type == "family") return;
               d3
                   .select(event.currentTarget)
-//                  .style('fill', nodeColor)
                   .attr("r", childCircleR);
             });
 
         vertexElements
             .append("text")
             .text(d => d.name)
-            .style("font-size", "11px")
+            .style("font-size", d => d.updated? "15px" : "11px")
+            .style("font-weight", d => d.updated? "bold" : "normal")
             .style("text-anchor", "middle")
             .attr("dy", "25");
 

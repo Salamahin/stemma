@@ -31,6 +31,7 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
   private val name       = Key[String]("name")
   private val birthDate  = Key[String]("birthDate")
   private val deathDate  = Key[String]("deathDate")
+  private val generation = Key[Int]("generation")
   private val dateFormat = DateTimeFormatter.ISO_DATE
 
   new GraphTraversalSource(graph.asJava())
@@ -45,9 +46,10 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
   private val spouseRelation = "spouseOf"
 
   def newPerson(request: PersonRequest) = {
-    val birthDateProps = request.birthDate.map(this.birthDate -> dateFormat.format(_)).toSeq
-    val deathDateProps = request.deathDate.map(this.deathDate -> dateFormat.format(_)).toSeq
-    val nameProps      = this.name -> request.name :: Nil
+    val birthDateProps  = request.birthDate.map(this.birthDate -> dateFormat.format(_)).toSeq
+    val deathDateProps  = request.deathDate.map(this.deathDate -> dateFormat.format(_)).toSeq
+    val nameProps       = this.name -> request.name
+    val generationProps = this.generation -> 0
 
     graph
       .V
@@ -56,7 +58,7 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
       .headOption()
       .map(_.id().toString())
       .getOrElse {
-        val newVertex = graph + (personLabel, nameProps ++ birthDateProps ++ deathDateProps: _*)
+        val newVertex = graph + (personLabel, nameProps +: generationProps +: (birthDateProps ++ deathDateProps): _*)
         newVertex.id().toString
       }
   }
@@ -87,7 +89,7 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
         .toList()
         .distinct
 
-      if(children.nonEmpty) iter(children, generation + 1)
+      if (children.nonEmpty) iter(children, generation + 1)
     }
 
     val eldar = graph
@@ -163,7 +165,7 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
   def stemma() = {
     sanitizeGraph()
 
-    val people = graph.V.hasLabel(personLabel).toCC[PersonVertex].toList().map(storedToService)
+    val people   = graph.V.hasLabel(personLabel).toCC[PersonVertex].toList().map(storedToService)
     val families = graph.V.hasLabel(familyLabel).toList().map(x => Family(x.id.toString))
 
     val spouseRelations = graph

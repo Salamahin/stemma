@@ -16,6 +16,18 @@ async function createOrUpdateFamily(personName, spouseName, childrenNames) {
     await callAddFamilyService(personId, spouseId, childrenIds);
 
     const stemma = await callGetStemmaService()
+
+    const familyIds = childrenIds.slice()
+    familyIds.push(personId)
+    if(spouseId != null)
+        familyIds.push(personId);
+
+
+    stemma.people.forEach(p => {
+        if(familyIds.includes(p.id))
+            p.updated = true;
+    });
+
     updateStemma(stemma);
 }
 
