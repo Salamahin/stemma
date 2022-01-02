@@ -13,10 +13,11 @@ object response {
     val target: String
   }
 
-  final case class Person(id: String, name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate]) extends Node
-  final case class Family(id: String)                                                                           extends Node
-  final case class Spouse(id: String, source: String, target: String)                                           extends Edge
-  final case class Child(id: String, source: String, target: String)                                            extends Edge
+  final case class Person(id: String, name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate], generation: Int)
+      extends Node
+  final case class Family(id: String)                                 extends Node
+  final case class Spouse(id: String, source: String, target: String) extends Edge
+  final case class Child(id: String, source: String, target: String)  extends Edge
 
   final case class Stemma(people: List[Person], families: List[Family], spouses: List[Spouse], children: List[Child])
 }

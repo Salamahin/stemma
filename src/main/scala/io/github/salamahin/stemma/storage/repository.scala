@@ -14,7 +14,6 @@ object repository {
     def newPerson(request: PersonRequest): Task[String]
     def updatePerson(uuid: UUID, request: PersonRequest): Task[Unit]
     def removePerson(uuid: UUID): Task[Unit]
-    def mergePerson(oldUUID: UUID, newUUID: UUID): Task[Unit]
     def newFamily(request: FamilyRequest): Task[Unit]
     def stemma: Task[Stemma]
   }
@@ -59,13 +58,6 @@ object repository {
               lock <- locker
               _    <- lock.acquireWrite
               _    = repo.removePerson(uuid)
-            } yield ()).commit
-
-          override def mergePerson(oldUUID: UUID, newUUID: UUID): Task[Unit] =
-            (for {
-              lock <- locker
-              _    <- lock.acquireWrite
-              _    = repo.merge(oldUUID, newUUID)
             } yield ()).commit
         }
       }
