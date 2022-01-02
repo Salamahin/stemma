@@ -61,7 +61,12 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
   }
 
   def removePerson(uuid: UUID) = {
+    graph.V(uuid).toCC[PersonVertex].toList().foreach(println)
+
+    graph.V(uuid).inE().drop().iterate()
+    graph.V(uuid).outE().drop().iterate()
     graph.V(uuid).drop().iterate()
+
     graph
       .V
       .hasLabel(familyLabel)
@@ -76,6 +81,31 @@ class TinkerpopRepository(file: String) extends AutoCloseable {
       .V(uuid)
       .head()
       .updateAs[PersonVertex](vertex => vertex.copy(name = request.name, birthDate = request.birthDate, deathDate = request.deathDate))
+  }
+
+  def merge(oldUUID: UUID, newUUID: UUID) = {
+    val person = graph
+      .V(oldUUID)
+      .head()
+      .toCC[PersonVertex]
+
+    val hisChildren = graph
+      .V(oldUUID)
+      .head()
+      .out(personLabel)
+      .toCC[PersonVertex]
+      .toList()
+
+    val hisParents = graph
+      .V(oldUUID)
+      .head()
+
+    val newVertex = graph
+      .V(newUUID)
+      .head()
+
+    ???
+
   }
 
   private def createNewFamily(partner1: Vertex, partner2: Vertex) = {

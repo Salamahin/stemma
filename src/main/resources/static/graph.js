@@ -59,15 +59,6 @@ function stemma(el) {
         update();
     }
 
-    this.people = function() {
-        const p = _vertexes.filter(x => x.type === "person");
-        return p;
-    }
-
-    var onPersonClicked = function(node) {
-        //no op
-    }
-
     function dragstarted(event) {
         if (!event.active) simulation.alphaTarget(0.3).restart();
         event.subject.fx = event.x;
@@ -145,55 +136,61 @@ function stemma(el) {
 
     const edgesGroup = svg.append("g").attr("class", "links");
     const vertexGroup = svg.append("g").attr("class", "nodes");
-    let edgeElements, vertexElements;
 
     const update = function () {
-        edgeElements = edgesGroup.selectAll("line").data(_edges);
-        vertexElements = vertexGroup.selectAll("g").data(_vertexes);
+        edgesGroup.selectAll("line").remove();
+        vertexGroup.selectAll("g").remove();
 
-        const edgeEnter = edgeElements
-            .enter()
-            .append("line")
-            .attr("stroke-width", d => d.type == "child"? childRelationWidth + "px" : spouseRelationWidth + "px")
-            .attr("stroke", d => d.type == "child"? childRelationColor : spouseRelationColor)
-            .attr('marker-end', d => d.type == "child"? 'url(#child-arrow)' : 'url(#spouse-arrow)');
+        const edgeElements = edgesGroup
+            .selectAll("line")
+            .data(_edges)
+            .join(
+                enter => enter.append("line"),
+                update => update,
+                exit => exit.remove()
+            )
+           .attr("stroke-width", d => d.type == "child"? childRelationWidth + "px" : spouseRelationWidth + "px")
+           .attr("stroke", d => d.type == "child"? childRelationColor : spouseRelationColor)
+           .attr('marker-end', d => d.type == "child"? 'url(#child-arrow)' : 'url(#spouse-arrow)');
 
-        const vertexEnter = vertexElements
-            .enter()
-            .append("g");
+        const vertexElements = vertexGroup
+            .selectAll("g")
+            .data(_vertexes)
+            .join(
+                enter => enter.append("g"),
+                update => update,
+                exit => exit.remove()
+            );
 
-        vertexEnter
+
+        vertexElements
+            .append("circle")
+            .attr("fill", nodeColor)
+            .attr("r", d => d.type == "family"? spouseCircleR : childCircleR)
+            .on('click', (event, d) => {
+                clickObservers.forEach(fn => fn(d));
+            })
+            .on('mouseenter', (event, d) => {
+              if (event.defaultPrevented || d.type == "family") return;
+              d3
+                  .select(event.currentTarget)
+                  .style('fill', selectedNodeColor)
+                  .attr("r", childCircleR * 1.2);
+            })
+            .on('mouseleave', (event, d) => {
+              if (event.defaultPrevented || d.type == "family") return;
+              d3
+                  .select(event.currentTarget)
+                  .style('fill', nodeColor)
+                  .attr("r", childCircleR);
+            });
+
+        vertexElements
             .append("text")
             .text(d => d.name)
             .style("font-size", "11px")
             .style("text-anchor", "middle")
             .attr("dy", "25");
-
-        vertexEnter
-            .append("circle")
-            .attr("fill", nodeColor)
-            .attr("r", d => d.type == "family"? spouseCircleR : childCircleR)
-            .on('mouseenter', (event, d) => {
-                if (event.defaultPrevented || d.type == "family") return;
-                d3
-                    .select(event.currentTarget)
-                    .style('fill', selectedNodeColor)
-                    .attr("r", childCircleR * 1.2);
-            })
-            .on('mouseleave', (event, d) => {
-                if (event.defaultPrevented || d.type == "family") return;
-                d3
-                    .select(event.currentTarget)
-                    .style('fill', nodeColor)
-                    .attr("r", childCircleR);
-            })
-            .on('click', (event, d) => {
-                clickObservers.forEach(fn => fn(d));
-            });
-
-
-        edgeElements = edgeEnter.merge(edgeElements);
-        vertexElements = vertexEnter.merge(vertexElements);
 
         simulation.nodes(_vertexes);
         simulation.force("link").links(_edges);
@@ -206,14 +203,8 @@ function stemma(el) {
 
             vertexElements.attr("transform", d => "translate(" + d.x + "," + d.y + ")");
         });
-
-
         simulation.alphaTarget(0.2).restart();
     }
-
-    function clicked(event, d) {
-
-      }
 
     update();
 }

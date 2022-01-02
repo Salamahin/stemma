@@ -66,19 +66,15 @@ graph.onPersonClicked(d => {
     $('#updatePersonButton').click(function(e) {
         const newName = $('#personNewNameInput').val();
         callUpdatePersonService(d.id, newName)
-            .then(
-                callGetStemmaService()
-                    .then(updateStemma)
-                    .then(() => $('#updatePersonModal').modal('hide'))
-            );
+            .then(() => callGetStemmaService())
+            .then(stemma => updateStemma)
+            .then(() => $('#updatePersonModal').modal('hide'));
     });
     $('#removePersonButton').click(function(e) {
             callRemovePersonService(d.id)
-                .then(
-                    callGetStemmaService()
-                        .then(updateStemma)
-                        .then(() => $('#updatePersonModal').modal('hide'))
-            );
+                .then(() => callGetStemmaService())
+                .then(stemma => updateStemma(stemma))
+                .then(() => $('#updatePersonModal').modal('hide'));
     });
     $('#updatePersonModal').modal('show');
 })
