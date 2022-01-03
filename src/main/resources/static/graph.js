@@ -1,12 +1,3 @@
-Array.prototype.inArray = function(comparer) {
-    for(var i = 0; i < this.length; i++) {
-        if(comparer(this[i])) return true;
-    }
-    return false;
-};
-
-
-
 function stemma(el) {
     const width = window.innerWidth, height = window.innerHeight;
     const childCircleR = 10;
@@ -20,6 +11,7 @@ function stemma(el) {
     var _vertexes = [];
     var _edges = [];
     var _max_generation = 0;
+    var _lineage = new Map();
 
     const clickObservers = []
 
@@ -29,6 +21,39 @@ function stemma(el) {
 
     this.updateData = function(people, families, children, spouses) {
         _max_generation = Math.max.apply(null, people.map(p => p.generation));
+
+        let childOfFamily = new Map();
+        let spouseOfFamily = new Map();
+        let personById = new Map();
+
+        people.forEach(p => {
+            personById.set(p.id, p);
+        });
+        children.forEach(c => {
+            childOfFamily.set(c.target, c.source);
+        });
+        spouses.forEach(s => {
+            var family = spouseOfFamily.get(s.target);
+            if(!family) {
+                family = [];
+                spouseOfFamily.set(s.target, family);
+            }
+
+            family.push(s.source)
+        });
+
+        function lineage(p) {
+            let familyId = childOfFamily.get(p.id);
+            let parentsIds = spouseOfFamily.get(familyId);
+
+            if(!parentsIds || parentsIds.length == 0) return [p.id, familyId];
+            else if (parentsIds && parentsIds.length == 1) return [p.id, familyId].concat(lineage(personById.get(parentsIds[0])));
+            else return [p.id, familyId].concat(lineage(personById.get(parentsIds[0]))).concat(lineage(personById.get(parentsIds[1])));
+        }
+
+        people.forEach(p => {
+            _lineage.set(p.id, lineage(p));
+        });
 
         const pp = people.map(p => {
             let newPerson = {
@@ -68,7 +93,7 @@ function stemma(el) {
     }
 
     function dragstarted(event) {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
+        if (!event.active) simulation.alphaTarget(0.5).restart();
         event.subject.fx = event.x;
         event.subject.fy = event.y;
     }
@@ -178,16 +203,28 @@ function stemma(el) {
                 clickObservers.forEach(fn => fn(d));
             })
             .on('mouseenter', (event, d) => {
-              if (event.defaultPrevented || d.type == "family") return;
-              d3
+                if (event.defaultPrevented || d.type == "family") return;
+
+                if (!event.active) simulation.alphaTarget(0.0).restart();
+
+                d3
                   .select(event.currentTarget)
-                  .attr("r", childCircleR * 1.2);
+                  .attr("r", childCircleR * 1.5);
+
+                vertexElements.style("opacity", dd => _lineage.get(d.id).includes(dd.id)? 1.0 : 0.2);
+                edgeElements.style("opacity", dd =>  _lineage.get(d.id).includes(dd.target.id)? 1.0 : 0.1);
             })
             .on('mouseleave', (event, d) => {
-              if (event.defaultPrevented || d.type == "family") return;
-              d3
+                if (event.defaultPrevented || d.type == "family") return;
+
+                if (!event.active) simulation.alphaTarget(0.2).restart();
+
+                d3
                   .select(event.currentTarget)
                   .attr("r", childCircleR);
+
+                vertexElements.style("opacity", 1.0);
+                edgeElements.style("opacity", 1.0);
             });
 
         vertexElements
