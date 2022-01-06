@@ -4,15 +4,16 @@ import io.github.salamahin.stemma.request.{FamilyRequest, PersonRequest}
 import io.github.salamahin.stemma.response.Stemma
 
 import java.time.LocalDate
-import java.util.UUID
 
-final case class NoSuchPersonId(id: String) extends RuntimeException(s"No person with id $id found")
+sealed trait StemmaError
+final case class NoSuchPersonId(id: String)    extends RuntimeException(s"No person with id $id found") with StemmaError
+final case class IncompleteFamily(msg: String) extends RuntimeException(msg) with StemmaError
 
 trait StemmaRepository {
   def newPerson(request: PersonRequest): String
   def removePerson(id: String): Either[NoSuchPersonId, Unit]
   def updatePerson(id: String, request: PersonRequest): Either[NoSuchPersonId, Unit]
-  def newFamily(request: FamilyRequest): String
+  def newFamily(request: FamilyRequest): Either[StemmaError, String]
   def stemma(): Stemma
 }
 

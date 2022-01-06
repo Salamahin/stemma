@@ -14,11 +14,11 @@ object repository {
   class PersistentStemmaService(repo: StemmaRepository, persistence: StorageService) {
     persistence.load()
 
-    def newPerson(request: PersonRequest): UIO[String]                               = UIO(repo.newPerson(request)) <* persistence.persist()
+    def newPerson(request: PersonRequest): UIO[String]                             = UIO(repo.newPerson(request)) <* persistence.persist()
     def removePerson(id: String): IO[NoSuchPersonId, Unit]                         = IO.fromEither(repo.removePerson(id)) <* persistence.persist()
     def updatePerson(id: String, request: PersonRequest): IO[NoSuchPersonId, Unit] = IO.fromEither(repo.updatePerson(id, request)) <* persistence.persist()
-    def newFamily(request: FamilyRequest): UIO[String]                               = UIO(repo.newFamily(request)) <* persistence.persist()
-    def stemma(): UIO[Stemma]                                                        = UIO(repo.stemma())
+    def newFamily(request: FamilyRequest): UIO[String]                             = UIO(repo.newFamily(request)) <* persistence.persist()
+    def stemma(): UIO[Stemma]                                                      = UIO(repo.stemma())
   }
 
   val live: ZLayer[Storage with Graph, Nothing, Repository] =

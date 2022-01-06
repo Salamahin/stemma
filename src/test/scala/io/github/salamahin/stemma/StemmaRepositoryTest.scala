@@ -1,7 +1,7 @@
 package io.github.salamahin.stemma
 
 import io.github.salamahin.stemma.gremlin.{GraphConfig, GremlinBasedStemmaRepository}
-import io.github.salamahin.stemma.request.PersonRequest
+import io.github.salamahin.stemma.request.{FamilyRequest, PersonRequest}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -16,8 +16,11 @@ class StemmaRepositoryTest extends AnyFunSuite with Matchers with BeforeAndAfter
     stemma = new GremlinBasedStemmaRepository(GraphConfig.newGraph())
   }
 
-  private val johnDoe = PersonRequest("John Doe", Some(LocalDate.parse("1900-01-01")), Some(LocalDate.parse("2000-01-01")))
-  private val janeDoe = PersonRequest("Jane Doe", Some(LocalDate.parse("1850-01-01")), Some(LocalDate.parse("1950-01-01")))
+  private val johnDoe  = PersonRequest("John Doe", Some(LocalDate.parse("1900-01-01")), Some(LocalDate.parse("2000-01-01")))
+  private val janeDoe  = PersonRequest("Jane Doe", Some(LocalDate.parse("1850-01-01")), Some(LocalDate.parse("1950-01-01")))
+  private val jamesDoe = PersonRequest("James Doe", None, None)
+  private val julyDoe  = PersonRequest("July Doe", None, None)
+  private val joshDoe  = PersonRequest("Josh Doe", None, None)
 
   test("can add a person") {
     val id = stemma.newPerson(johnDoe)
@@ -41,5 +44,15 @@ class StemmaRepositoryTest extends AnyFunSuite with Matchers with BeforeAndAfter
   test("modification attempt of non-existing person yields an exception") {
     val Left(err) = stemma.updatePerson("aaa", johnDoe)
     err should be(NoSuchPersonId("aaa"))
+  }
+
+  test("a single without children cant form a family") {
+    val parentId = stemma.newPerson(johnDoe)
+    val Left(err) = stemma.newFamily(FamilyRequest(parentId, None, Nil))
+    ???
+  }
+
+  test("when removing a person his child/spouse relations are also removed") {
+    ???
   }
 }

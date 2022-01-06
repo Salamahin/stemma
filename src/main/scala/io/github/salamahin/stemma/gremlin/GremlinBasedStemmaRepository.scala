@@ -4,7 +4,7 @@ import gremlin.scala.ScalaGraph
 import io.github.salamahin.stemma.gremlin.GraphConfig.PersonVertex
 import io.github.salamahin.stemma.request.{FamilyRequest, PersonRequest}
 import io.github.salamahin.stemma.response.{Child, Family, Spouse, Stemma, Person => ServicePerson}
-import io.github.salamahin.stemma.{NoSuchPersonId, StemmaRepository}
+import io.github.salamahin.stemma.{IncompleteFamily, NoSuchPersonId, StemmaError, StemmaRepository}
 
 import java.time.format.DateTimeFormatter
 import scala.annotation.tailrec
@@ -95,13 +95,17 @@ class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
   }
 
   override def removePerson(id: String): Either[NoSuchPersonId, Unit] = {
-    graph.V(id).toCC[PersonVertex].toList().foreach(println)
+    val person = graph.V(id).headOption()
+    if (person.isEmpty) Left(NoSuchPersonId(id))
+    else {
+      person.foreach(p => {
+        p.inE().drop().iterate()
+        p.outE().drop().iterate()
+        p.remove()
+      })
 
-    graph.V(id).inE().drop().iterate()
-    graph.V(id).outE().drop().iterate()
-    graph.V(id).drop().iterate()
-
-    ???
+      Right()
+    }
   }
 
   override def updatePerson(id: String, request: PersonRequest): Either[NoSuchPersonId, Unit] = {
@@ -130,7 +134,7 @@ class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
       }
   }
 
-  override def newFamily(request: FamilyRequest): String = {
+  override def newFamily(request: FamilyRequest): Either[StemmaError, String] = {
     val parent1 = graph.V(request.parent1Id).headOption().getOrElse(throw NoSuchPersonId(request.parent1Id))
     val family = request
       .parent2Id
