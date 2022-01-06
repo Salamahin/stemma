@@ -2,9 +2,11 @@ package io.github.salamahin.stemma
 
 import cats.effect.Blocker
 import io.circe.{Decoder, Encoder}
-import io.github.salamahin.stemma.service.request.{FamilyRequest, PersonRequest}
-import io.github.salamahin.stemma.storage.repository
-import io.github.salamahin.stemma.storage.repository.Repository
+import io.github.salamahin.stemma.request.{FamilyRequest, PersonRequest}
+import io.github.salamahin.stemma.storage.GraphService.Graph
+import io.github.salamahin.stemma.storage.StemmaService.Repository
+import io.github.salamahin.stemma.storage.StorageService.Storage
+import io.github.salamahin.stemma.storage.{GraphService, StemmaService, StorageService}
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.Router
@@ -15,7 +17,6 @@ import zio.clock.Clock
 import zio.console.putStrLn
 import zio.{RIO, URIO, ZEnv, ZIO}
 
-import java.time.format.DateTimeFormatter
 import scala.concurrent.ExecutionContext
 import scala.util.Try
 
@@ -25,11 +26,11 @@ object Main extends zio.App {
   import org.http4s.implicits._
   import zio.interop.catz._
 
-  type StemmaTask[A] = RIO[Repository with Clock, A]
+  type StemmaTask[A] = RIO[Repository with Storage with Graph with Clock, A]
 
-  val localDatePattern = DateTimeFormatter.ISO_DATE
-  val repo             = ZIO.accessM[Repository]
-  val dsl              = Http4sDsl[StemmaTask]
+  val repo = ZIO.accessM[Repository]
+  val dsl  = Http4sDsl[StemmaTask]
+
   import dsl._
 
   implicit def circeJsonDecoder[A](implicit decoder: Decoder[A]): EntityDecoder[StemmaTask, A] = jsonOf[StemmaTask, A]
@@ -41,20 +42,11 @@ object Main extends zio.App {
   }
 
   private val api = HttpRoutes.of[StemmaTask] {
-    case GET -> Root / "stemma" =>
-      Ok(repo(_.get.stemma))
-
-    case req @ POST -> Root / "person" =>
-      req.as[PersonRequest].flatMap(person => Ok(repo(_.get newPerson person)))
-
-    case req @ POST -> Root / "person" / UUID(uuid) =>
-      req.as[PersonRequest].flatMap(person => Ok(repo(_.get.updatePerson(uuid, person))))
-
-    case DELETE -> Root / "person" / UUID(uuid) =>
-      Ok(repo(_.get.removePerson(uuid)))
-
-    case req @ POST -> Root / "family" =>
-      req.as[FamilyRequest].flatMap(family => Ok(repo(_.get newFamily family)))
+    case GET -> Root / "stemma"                     => Ok(repo(_.get.stemma()))
+    case req @ POST -> Root / "person"              => req.as[PersonRequest].flatMap(person => Ok(repo(_.get newPerson person)))
+    case req @ POST -> Root / "person" / UUID(uuid) => req.as[PersonRequest].flatMap(person => Ok(repo(_.get.updatePerson(uuid, person))))
+    case DELETE -> Root / "person" / UUID(uuid)     => Ok(repo(_.get.removePerson(uuid)))
+    case req @ POST -> Root / "family"              => req.as[FamilyRequest].flatMap(family => Ok(repo(_.get newFamily family)))
   }
 
   private def static(ec: ExecutionContext) = HttpRoutes.of[StemmaTask] {
@@ -73,7 +65,7 @@ object Main extends zio.App {
 
   override def run(args: List[String]): URIO[ZEnv, zio.ExitCode] = {
     ZIO
-      .runtime[ZEnv with Repository]
+      .runtime[ZEnv with Repository with Storage with Graph]
       .flatMap { implicit runtime =>
         val executor = runtime.platform.executor.asEC
 
@@ -89,7 +81,11 @@ object Main extends zio.App {
           .toManagedZIO
           .useForever
       }
-      .provideCustomLayer(repository.tinkerpop("stemma.graphson"))
+      .provideCustomLayer(
+        GraphService.singleton >+>
+          StorageService.localGraphsonFile("stemma.graphson") >+>
+          StemmaService.live
+      )
       .foldCauseM(
         err => putStrLn(err.prettyPrint).as(zio.ExitCode.failure),
         _ => ZIO.succeed(zio.ExitCode.success)

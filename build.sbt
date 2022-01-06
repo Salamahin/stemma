@@ -26,7 +26,8 @@ libraryDependencies ++= Seq(
   "org.webjars"                     % "bootstrap"            % "5.0.0-beta1",
   "org.webjars"                     % "jquery"               % "3.5.1",
   "org.webjars"                     % "font-awesome"         % "4.7.0",
-  "org.webjars.bowergithub.eligrey" % "filesaver.js"         % "2.0.4"
+  "org.webjars.bowergithub.eligrey" % "filesaver.js"         % "2.0.4",
+  "org.scalatest"                   %% "scalatest"           % "3.3.0-SNAP3" % Test
 )
 
 addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
