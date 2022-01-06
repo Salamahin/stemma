@@ -1,19 +1,15 @@
-package io.github.salamahin.stemma.storage
+package io.github.salamahin.stemma.gremlin
 
 import gremlin.scala.ScalaGraph
+import io.github.salamahin.stemma.gremlin.GraphConfig.PersonVertex
 import io.github.salamahin.stemma.request.{FamilyRequest, PersonRequest}
 import io.github.salamahin.stemma.response.{Child, Family, Spouse, Stemma, Person => ServicePerson}
-import io.github.salamahin.stemma.storage.GraphConfig.PersonVertex
-import zio.Task
+import io.github.salamahin.stemma.{NoSuchPersonId, StemmaRepository}
 
 import java.time.format.DateTimeFormatter
-import java.util.UUID
 import scala.annotation.tailrec
 
-final case class NoSuchParentId(id: String)  extends RuntimeException(s"No parent with id $id found")
-final case class NoSuchChildId(id: String)   extends RuntimeException(s"No child with id $id found")
-
-class GremlinBasedStemmaService(graph: ScalaGraph) extends StemmaService {
+class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
   import gremlin.scala._
   import io.scalaland.chimney.dsl._
 
@@ -35,7 +31,7 @@ class GremlinBasedStemmaService(graph: ScalaGraph) extends StemmaService {
     val spouseOf = "spouseOf"
   }
 
-  override def newPerson(request: PersonRequest): Task[UUID] = Task {
+  override def newPerson(request: PersonRequest): String = {
     val birthDateProps  = request.birthDate.map(keys.birthDate -> dateFormat.format(_)).toSeq
     val deathDateProps  = request.deathDate.map(keys.deathDate -> dateFormat.format(_)).toSeq
     val nameProps       = keys.name -> request.name
@@ -46,11 +42,11 @@ class GremlinBasedStemmaService(graph: ScalaGraph) extends StemmaService {
       .hasLabel(labels.person)
       .has(keys.name, request.name)
       .headOption()
-      .map(_.id().asInstanceOf[UUID])
+      .map(_.id().toString)
       .getOrElse {
 
         val newVertex = graph + (labels.person, nameProps +: generationProps +: (birthDateProps ++ deathDateProps): _*)
-        newVertex.id().asInstanceOf[UUID]
+        newVertex.id().toString
       }
   }
 
@@ -98,19 +94,23 @@ class GremlinBasedStemmaService(graph: ScalaGraph) extends StemmaService {
     recalculateGenerations()
   }
 
-  override def removePerson(uuid: UUID): Task[Unit] = Task {
-    graph.V(uuid).toCC[PersonVertex].toList().foreach(println)
+  override def removePerson(id: String): Either[NoSuchPersonId, Unit] = {
+    graph.V(id).toCC[PersonVertex].toList().foreach(println)
 
-    graph.V(uuid).inE().drop().iterate()
-    graph.V(uuid).outE().drop().iterate()
-    graph.V(uuid).drop().iterate()
+    graph.V(id).inE().drop().iterate()
+    graph.V(id).outE().drop().iterate()
+    graph.V(id).drop().iterate()
+
+    ???
   }
 
-  override def updatePerson(uuid: UUID, request: PersonRequest): Task[Unit] = Task {
+  override def updatePerson(id: String, request: PersonRequest): Either[NoSuchPersonId, Unit] = {
     graph
-      .V(uuid)
-      .head()
-      .updateAs[PersonVertex](vertex => vertex.copy(name = request.name, birthDate = request.birthDate, deathDate = request.deathDate))
+      .V(id)
+      .headOption()
+      .map(_.updateAs[PersonVertex](vertex => vertex.copy(name = request.name, birthDate = request.birthDate, deathDate = request.deathDate)))
+      .map(_ => Right())
+      .getOrElse(Left(NoSuchPersonId(id)))
   }
 
   private def createNewFamily(partner1: Vertex, partner2: Vertex) = {
@@ -130,12 +130,12 @@ class GremlinBasedStemmaService(graph: ScalaGraph) extends StemmaService {
       }
   }
 
-  override def newFamily(request: FamilyRequest): Task[UUID] = Task {
-    val parent1 = graph.V(request.parent1Id).headOption().getOrElse(throw NoSuchParentId(request.parent1Id))
+  override def newFamily(request: FamilyRequest): String = {
+    val parent1 = graph.V(request.parent1Id).headOption().getOrElse(throw NoSuchPersonId(request.parent1Id))
     val family = request
       .parent2Id
       .map(parent2Id => {
-        val parent2 = graph.V(parent2Id).headOption().getOrElse(throw NoSuchParentId(parent2Id))
+        val parent2 = graph.V(parent2Id).headOption().getOrElse(throw NoSuchPersonId(parent2Id))
         createNewFamily(parent1, parent2)
       })
       .orElse(parent1.out(labels.family).headOption())
@@ -148,14 +148,14 @@ class GremlinBasedStemmaService(graph: ScalaGraph) extends StemmaService {
     request
       .childrenIds
       .foreach(childId => {
-        val child = graph.V(childId).headOption().getOrElse(throw NoSuchChildId(childId))
+        val child = graph.V(childId).headOption().getOrElse(throw NoSuchPersonId(childId))
         family --- labels.childOf --> child
       })
 
-    family.id().asInstanceOf[UUID]
+    family.id().toString
   }
 
-  override def stemma(): Task[Stemma] = Task {
+  override def stemma(): Stemma = {
     sanitizeGraph()
 
     val people   = graph.V.hasLabel(labels.person).toCC[PersonVertex].toList().map(storedToService)

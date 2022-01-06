@@ -1,17 +1,17 @@
-package io.github.salamahin.stemma.storage
+package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.storage.GraphService.Graph
+import io.github.salamahin.stemma.service.graph.{Graph, GraphService}
 import org.apache.tinkerpop.gremlin.process.traversal.IO
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import zio.{Has, UIO, ZLayer}
 
-trait StorageService {
-  def load(): UIO[Unit]
-  def persist(): UIO[Unit]
-}
-
-object StorageService {
+object storage {
   type Storage = Has[StorageService]
+
+  trait StorageService {
+    def load(): UIO[Unit]
+    def persist(): UIO[Unit]
+  }
 
   def localGraphsonFile(file: String): ZLayer[Graph, Nothing, Storage] =
     ZLayer.fromService[GraphService, StorageService](graphService =>

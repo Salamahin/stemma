@@ -1,6 +1,25 @@
 package io.github.salamahin.stemma
 
+import io.github.salamahin.stemma.request.{FamilyRequest, PersonRequest}
+import io.github.salamahin.stemma.response.Stemma
+
 import java.time.LocalDate
+import java.util.UUID
+
+final case class NoSuchPersonId(id: String) extends RuntimeException(s"No person with id $id found")
+
+trait StemmaRepository {
+  def newPerson(request: PersonRequest): String
+  def removePerson(id: String): Either[NoSuchPersonId, Unit]
+  def updatePerson(id: String, request: PersonRequest): Either[NoSuchPersonId, Unit]
+  def newFamily(request: FamilyRequest): String
+  def stemma(): Stemma
+}
+
+object request {
+  final case class PersonRequest(name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate])
+  final case class FamilyRequest(parent1Id: String, parent2Id: Option[String], childrenIds: List[String])
+}
 
 object response {
   final case class Person(id: String, name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate], generation: Int)
@@ -9,9 +28,4 @@ object response {
   final case class Child(id: String, source: String, target: String)
 
   final case class Stemma(people: List[Person], families: List[Family], spouses: List[Spouse], children: List[Child])
-}
-
-object request {
-  final case class PersonRequest(name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate])
-  final case class FamilyRequest(parent1Id: String, parent2Id: Option[String], childrenIds: List[String])
 }

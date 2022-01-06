@@ -1,4 +1,4 @@
-package io.github.salamahin.stemma.storage
+package io.github.salamahin.stemma.gremlin
 
 import gremlin.scala.{Vertex, id, underlying}
 import org.apache.commons.configuration.BaseConfiguration
