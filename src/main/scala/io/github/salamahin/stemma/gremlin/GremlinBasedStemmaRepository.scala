@@ -2,12 +2,11 @@ package io.github.salamahin.stemma.gremlin
 
 import gremlin.scala.ScalaGraph
 import io.github.salamahin.stemma.gremlin.GraphConfig.PersonVertex
-import io.github.salamahin.stemma.request.{FamilyRequest, PersonRequest}
+import io.github.salamahin.stemma.request.PersonRequest
 import io.github.salamahin.stemma.response.{Child, Family, Spouse, Stemma, Person => ServicePerson}
-import io.github.salamahin.stemma.{IncompleteFamily, NoSuchPersonId, StemmaError, StemmaRepository}
+import io.github.salamahin.stemma.{NoSuchFamilyId, NoSuchPersonId, StemmaError, StemmaRepository}
 
 import java.time.format.DateTimeFormatter
-import scala.annotation.tailrec
 
 class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
   import gremlin.scala._
@@ -50,50 +49,6 @@ class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
       }
   }
 
-  private def dropEmptyFamilies() = {
-    graph
-      .V
-      .hasLabel(labels.family)
-      .where(_.in(labels.spouseOf).count().is(P.lte(1)))
-      .where(_.out(labels.childOf).count().is(P.is(0)))
-      .drop()
-      .iterate()
-  }
-
-  private def recalculateGenerations() = {
-    @tailrec
-    def iter(parents: List[String], generation: Int): Unit = {
-      graph
-        .V(parents: _*)
-        .toList()
-        .foreach(_.updateAs[PersonVertex](vertex => vertex.copy(generation = generation)))
-
-      val children = graph
-        .V(parents: _*)
-        .out(labels.spouseOf)
-        .out(labels.childOf)
-        .map(_.id().toString)
-        .toList()
-        .distinct
-
-      if (children.nonEmpty) iter(children, generation + 1)
-    }
-
-    val eldar = graph
-      .V()
-      .hasLabel(labels.person)
-      .where(_.in(labels.childOf).count().is(P.eq(0)))
-      .map(_.id().toString)
-      .toList()
-
-    iter(eldar, 0)
-  }
-
-  private def sanitizeGraph() = {
-    dropEmptyFamilies()
-    recalculateGenerations()
-  }
-
   override def removePerson(id: String): Either[NoSuchPersonId, Unit] = {
     val person = graph.V(id).headOption()
     if (person.isEmpty) Left(NoSuchPersonId(id))
@@ -117,50 +72,18 @@ class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
       .getOrElse(Left(NoSuchPersonId(id)))
   }
 
-  private def createNewFamily(partner1: Vertex, partner2: Vertex) = {
-    val existingFamily =
-      partner1
-        .out()
-        .hasLabel(labels.family)
-        .where(_.in(labels.spouseOf).id().is(partner2.id()))
-        .headOption()
-
-    existingFamily
-      .getOrElse {
-        val newFamily = graph + labels.family
-        partner1 --- labels.spouseOf --> newFamily
-        partner2 --- labels.spouseOf --> newFamily
-        newFamily
-      }
-  }
-
-  override def newFamily(request: FamilyRequest): Either[StemmaError, String] = {
-    val parent1 = graph.V(request.parent1Id).headOption().getOrElse(throw NoSuchPersonId(request.parent1Id))
-    val family = request
-      .parent2Id
-      .map(parent2Id => {
-        val parent2 = graph.V(parent2Id).headOption().getOrElse(throw NoSuchPersonId(parent2Id))
-        createNewFamily(parent1, parent2)
-      })
-      .orElse(parent1.out(labels.family).headOption())
-      .getOrElse {
-        val newFamily = graph + labels.family
-        parent1 --- labels.spouseOf --> newFamily
-        newFamily
-      }
-
-    request
-      .childrenIds
-      .foreach(childId => {
-        val child = graph.V(childId).headOption().getOrElse(throw NoSuchPersonId(childId))
-        family --- labels.childOf --> child
-      })
-
-    family.id().toString
+  private def dropEmptyFamilies() = {
+    graph
+      .V
+      .hasLabel(labels.family)
+      .where(_.in(labels.spouseOf).count().is(P.lte(1)))
+      .where(_.out(labels.childOf).count().is(P.is(0)))
+      .drop()
+      .iterate()
   }
 
   override def stemma(): Stemma = {
-    sanitizeGraph()
+    dropEmptyFamilies()
 
     val people   = graph.V.hasLabel(labels.person).toCC[PersonVertex].toList().map(storedToService)
     val families = graph.V.hasLabel(labels.family).toList().map(x => Family(x.id.toString))
@@ -185,4 +108,45 @@ class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
       .into[ServicePerson]
       .withFieldComputed(_.id, _.id.map(_.toString).get)
       .transform
+
+  private def makeFamily(spouses: Vertex*) = {
+    val newFamily = graph + labels.family
+    spouses.foreach(_ --- labels.spouseOf --> newFamily)
+    newFamily.id().toString
+  }
+
+  override def newFamily(parentId: String): Either[NoSuchPersonId, String] =
+    for {
+      parent <- graph.V(parentId).headOption().toRight(NoSuchPersonId(parentId))
+    } yield makeFamily(parent)
+
+  override def newFamily(parent1Id: String, parent2Id: String): Either[NoSuchPersonId, String] =
+    for {
+      parent1 <- graph.V(parent1Id).headOption().toRight(NoSuchPersonId(parent1Id))
+      parent2 <- graph.V(parent2Id).headOption().toRight(NoSuchPersonId(parent2Id))
+    } yield makeFamily(parent1, parent2)
+
+  override def removeFamily(id: String): Either[NoSuchFamilyId, Unit] = {
+    for {
+      family <- graph.V(id).headOption().toRight(NoSuchFamilyId(id))
+      _      = family.out(labels.childOf).map(_.updateAs[PersonVertex](_.copy(generation = 0))).iterate()
+    } yield family.remove()
+  }
+
+  override def addChild(familyId: String, personId: String): Either[StemmaError, Unit] =
+    for {
+      family           <- graph.V(familyId).headOption().toRight(NoSuchFamilyId(familyId))
+      child            <- graph.V(personId).headOption().toRight(NoSuchPersonId(personId))
+      parentGeneration = family.in(labels.spouseOf).value(keys.generation).toList().max
+      _                = child.updateAs[PersonVertex](_.copy(generation = parentGeneration + 1))
+    } yield family --- labels.childOf --> child
+
+  override def removeChild(familyId: String, personId: String): Either[StemmaError, Unit] =
+    for {
+      family <- graph.V(familyId).headOption().toRight(NoSuchFamilyId(familyId))
+      child  <- graph.V(personId).headOption().toRight(NoSuchPersonId(personId))
+      _      = child.updateAs[PersonVertex](_.copy(generation = 0))
+    } yield {
+      family.outE(labels.childOf).where(_.otherV().hasId(personId)).drop().iterate()
+    }
 }

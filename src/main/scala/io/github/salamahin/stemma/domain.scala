@@ -6,20 +6,27 @@ import io.github.salamahin.stemma.response.Stemma
 import java.time.LocalDate
 
 sealed trait StemmaError
-final case class NoSuchPersonId(id: String)    extends RuntimeException(s"No person with id $id found") with StemmaError
-final case class IncompleteFamily(msg: String) extends RuntimeException(msg) with StemmaError
+final case class NoSuchPersonId(id: String) extends RuntimeException(s"No person with id $id found") with StemmaError
+final case class NoSuchFamilyId(id: String) extends RuntimeException(s"No family with id $id found") with StemmaError
 
 trait StemmaRepository {
   def newPerson(request: PersonRequest): String
   def removePerson(id: String): Either[NoSuchPersonId, Unit]
   def updatePerson(id: String, request: PersonRequest): Either[NoSuchPersonId, Unit]
-  def newFamily(request: FamilyRequest): Either[StemmaError, String]
+
+  def newFamily(parentId: String): Either[NoSuchPersonId, String]
+  def newFamily(parent1Id: String, parent2Id: String): Either[NoSuchPersonId, String]
+  def removeFamily(id: String): Either[NoSuchFamilyId, Unit]
+
+  def addChild(familyId: String, personId: String): Either[StemmaError, Unit]
+  def removeChild(familyId: String, personId: String): Either[StemmaError, Unit]
+
   def stemma(): Stemma
 }
 
 object request {
   final case class PersonRequest(name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate])
-  final case class FamilyRequest(parent1Id: String, parent2Id: Option[String], childrenIds: List[String])
+  final case class FamilyRequest(parent1Id: String, parent2Id: Option[String])
 }
 
 object response {
