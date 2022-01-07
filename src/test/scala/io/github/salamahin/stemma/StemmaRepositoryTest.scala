@@ -18,6 +18,27 @@ class StemmaRepositoryTest extends AnyFunSuite with Matchers with BeforeAndAfter
     repo = new GremlinBasedStemmaRepository(GraphConfig.newGraph())
   }
 
+  class FamilyTree(stemma: Stemma) {
+    private val personIdToFamilyId = stemma.spouses.groupBy(_.source).view.mapValues(_.map(_.target))
+
+    def spouses(personId: String) = {
+      val families = personIdToFamilyId(personId)
+      stemma
+        .spouses
+        .filter(s => families.contains(s.target))
+        .map(_.source)
+        .filter(_ != personId)
+    }
+
+    def children(personId: String) = {
+      val families = personIdToFamilyId(personId)
+      stemma
+        .children
+        .filter(c => families.contains(c.source))
+        .map(_.target)
+    }
+  }
+
   private val johnDoe  = PersonRequest("John Doe", Some(LocalDate.parse("1900-01-01")), Some(LocalDate.parse("2000-01-01")))
   private val janeDoe  = PersonRequest("Jane Doe", Some(LocalDate.parse("1850-01-01")), Some(LocalDate.parse("1950-01-01")))
   private val jamesDoe = PersonRequest("James Doe", None, None)
@@ -46,27 +67,6 @@ class StemmaRepositoryTest extends AnyFunSuite with Matchers with BeforeAndAfter
     val id        = UUID.randomUUID().toString
     val Left(err) = repo.updatePerson(id, johnDoe)
     err should be(NoSuchPersonId(id))
-  }
-
-  class FamilyTree(stemma: Stemma) {
-    private val personIdToFamilyId = stemma.spouses.groupBy(_.source).view.mapValues(_.map(_.target))
-
-    def spouses(personId: String) = {
-      val families = personIdToFamilyId(personId)
-      stemma
-        .spouses
-        .filter(s => families.contains(s.target))
-        .map(_.source)
-        .filter(_ != personId)
-    }
-
-    def children(personId: String) = {
-      val families = personIdToFamilyId(personId)
-      stemma
-        .children
-        .filter(c => families.contains(c.source))
-        .map(_.target)
-    }
   }
 
   test("a single person can make family if he has children") {
@@ -100,20 +100,6 @@ class StemmaRepositoryTest extends AnyFunSuite with Matchers with BeforeAndAfter
 
     val Stemma(_, _, spouses, _) = repo.stemma()
     spouses.map(_.source) should not contain parent1Id
-  }
-
-  test("when all children of a single parent removed the family is removed as well") {
-    val parentId = repo.newPerson(johnDoe)
-    val childId  = repo.newPerson(janeDoe)
-    repo
-      .newFamily(parentId)
-      .foreach(repo.addChild(_, childId))
-
-    repo.removePerson(childId)
-
-    val Stemma(_, families, _, children) = repo.stemma()
-    families shouldBe empty
-    children shouldBe empty
   }
 
   test("if the only child removed from a family where there is a single parent, than family is removed") {
@@ -152,9 +138,9 @@ class StemmaRepositoryTest extends AnyFunSuite with Matchers with BeforeAndAfter
   }
 
   test("generation of a child is greater than max generation of his parents") {
-    val johnId = repo.newPerson(johnDoe)
-    val janeId = repo.newPerson(janeDoe)
-    val joshId = repo.newPerson(joshDoe)
+    val johnId  = repo.newPerson(johnDoe)
+    val janeId  = repo.newPerson(janeDoe)
+    val joshId  = repo.newPerson(joshDoe)
     val jamesId = repo.newPerson(jamesDoe)
 
     val johnsFamilyId = repo.newFamily(johnId).getOrElse(throw new IllegalStateException("Failed to create a family"))
@@ -168,15 +154,15 @@ class StemmaRepositoryTest extends AnyFunSuite with Matchers with BeforeAndAfter
   }
 
   test("when removing a family all family relations are removed as well") {
-    val johnId = repo.newPerson(johnDoe)
-    val janeId = repo.newPerson(janeDoe)
+    val johnId        = repo.newPerson(johnDoe)
+    val janeId        = repo.newPerson(janeDoe)
     val johnsFamilyId = repo.newFamily(johnId).getOrElse(throw new IllegalStateException("Failed to create a family"))
     repo.addChild(johnsFamilyId, janeId)
 
     repo.removeFamily(johnsFamilyId)
 
     val Stemma(people, families, spouses, children) = repo.stemma()
-    people.map(_.id) should contain only(johnId, janeId)
+    people.map(_.id) should contain only (johnId, janeId)
     people.map(_.generation).distinct should contain only 0
 
     families shouldBe empty
