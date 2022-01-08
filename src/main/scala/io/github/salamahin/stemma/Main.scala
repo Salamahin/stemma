@@ -2,7 +2,7 @@ package io.github.salamahin.stemma
 
 import cats.effect.Blocker
 import io.circe.{Decoder, Encoder}
-import io.github.salamahin.stemma.request.{FamilyRequest, PersonRequest}
+import io.github.salamahin.stemma.request.{PersonDescription}
 import io.github.salamahin.stemma.service.graph.Graph
 import io.github.salamahin.stemma.service.repository.Repository
 import io.github.salamahin.stemma.service.storage.Storage
@@ -28,14 +28,14 @@ object Main extends zio.App {
 
   implicit def circeJsonDecoder[A](implicit decoder: Decoder[A]): EntityDecoder[StemmaTask, A] = jsonOf[StemmaTask, A]
   implicit def circeJsonEncoder[A](implicit decoder: Encoder[A]): EntityEncoder[StemmaTask, A] = jsonEncoderOf[StemmaTask, A]
-
-  private val api = HttpRoutes.of[StemmaTask] {
-    case GET -> Root / "stemma"             => Ok(repo(_.get.stemma()))
-    case req @ POST -> Root / "person"      => req.as[PersonRequest].flatMap(person => Ok(repo(_.get newPerson person)))
-    case req @ POST -> Root / "person" / id => req.as[PersonRequest].flatMap(person => Ok(repo(_.get.updatePerson(id, person))))
-    case DELETE -> Root / "person" / id     => Ok(repo(_.get.removePerson(id)))
-    case req @ POST -> Root / "family"      => req.as[FamilyRequest].flatMap(family => Ok(repo(_.get newFamily family)))
-  }
+//
+//  private val api = HttpRoutes.of[StemmaTask] {
+//    case GET -> Root / "stemma"             => Ok(repo(_.get.stemma()))
+//    case req @ POST -> Root / "person"      => req.as[PersonDescription].flatMap(person => Ok(repo(_.get newPerson person)))
+//    case req @ POST -> Root / "person" / id => req.as[PersonDescription].flatMap(person => Ok(repo(_.get.updatePerson(id, person))))
+//    case DELETE -> Root / "person" / id     => Ok(repo(_.get.removePerson(id)))
+//    case req @ POST -> Root / "family"      => req.as[FamilyRequest].flatMap(family => Ok(repo(_.get newFamily family)))
+//  }
 
   private def static(ec: ExecutionContext) = HttpRoutes.of[StemmaTask] {
     case request @ GET -> Root =>
