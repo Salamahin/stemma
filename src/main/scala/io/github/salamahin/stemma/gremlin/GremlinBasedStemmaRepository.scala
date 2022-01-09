@@ -1,17 +1,16 @@
 package io.github.salamahin.stemma.gremlin
 
 import cats.data.EitherT
-import gremlin.scala.ScalaGraph
+import gremlin.scala._
+import io.github.salamahin.stemma._
 import io.github.salamahin.stemma.gremlin.GraphConfig.PersonVertex
 import io.github.salamahin.stemma.request.{ExistingPersonId, FamilyDescription, PersonDefinition, PersonDescription}
 import io.github.salamahin.stemma.response.{Family, Person, Stemma}
-import io.github.salamahin.stemma._
+import io.scalaland.chimney.dsl._
 
 import java.time.format.DateTimeFormatter
 
 class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
-  import gremlin.scala._
-  import io.scalaland.chimney.dsl._
 
   private implicit val _graph = graph
 
@@ -41,6 +40,23 @@ class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
 
     graph + (types.person, nameProps +: generationProps +: (birthDateProps ++ deathDateProps): _*)
   }
+
+  private def getOrCreate(person: PersonDefinition) = person match {
+    case ExistingPersonId(id)           => graph.V(id).headOption().toRight(NoSuchPersonId(id))
+    case description: PersonDescription => Right(makePerson(description))
+  }
+
+  private def checkAlreadyMarried(parent1: Vertex, parent2: Vertex): Either[StemmaError, Unit] =
+    parent1.outE(relations.spouseOf).otherV().where(_.inE(relations.spouseOf).otherV().is(parent2)).headOption() match {
+      case None         => Right()
+      case Some(family) => Left(SuchFamilyAlreadyExist(family.id().toString, parent1.id().toString, parent2.id().toString))
+    }
+
+  private def checkIfChildBelongsToDifferentFamily(person: Vertex): Either[StemmaError, Unit] =
+    person.inE(relations.childOf).otherV().headOption() match {
+      case None         => Right()
+      case Some(family) => Left(ChildBelongsToDifferentFamily(person.id().toString, family.id().toString))
+    }
 
   override def newPerson(request: PersonDescription): String =
     makePerson(request).id().toString
@@ -79,38 +95,9 @@ class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
     Stemma(people, families)
   }
 
-  private def getOrCreate(person: PersonDefinition) = person match {
-    case ExistingPersonId(id)           => graph.V(id).headOption().toRight(NoSuchPersonId(id))
-    case description: PersonDescription => Right(makePerson(description))
-  }
-
   override def removeFamilyIfExist(id: String): Unit = {
     ???
-//    for {
-//      family <- graph.V(id).headOption().toRight(NoSuchFamilyId(id))
-//      _      = family.out(relations.childOf).map(_.updateAs[PersonVertex](_.copy(generation = 0))).iterate()
-//    } yield family.remove()
   }
-
-//  override def addChild(familyId: String, personId: String): Either[StemmaError, Unit] =
-//    for {
-//      family           <- graph.V(familyId).headOption().toRight(NoSuchFamilyId(familyId))
-//      child            <- graph.V(personId).headOption().toRight(NoSuchPersonId(personId))
-//      parentGeneration = family.in(relations.spouseOf).value(keys.generation).toList().max
-//      _                = child.updateAs[PersonVertex](_.copy(generation = parentGeneration + 1))
-//    } yield family --- relations.childOf --> child
-
-//  override def removeChild(familyId: String, personId: String): Either[StemmaError, Unit] =
-//    for {
-//      family        <- graph.V(familyId).headOption().toRight(NoSuchFamilyId(familyId))
-//      child         <- graph.V(personId).headOption().toRight(NoSuchPersonId(personId))
-//      _             = child.updateAs[PersonVertex](_.copy(generation = 0))
-//      parentsCount  = family.inE(relations.spouseOf).count().head()
-//      childrenCount = family.outE(relations.childOf).count().head()
-//    } yield {
-//      family.outE(relations.childOf).where(_.otherV().hasId(personId)).drop().iterate()
-//      if (parentsCount == 1 && childrenCount == 1) family.remove()
-//    }
 
   override def describePerson(id: String): Either[NoSuchPersonId, PersonDescription] =
     for {
@@ -118,34 +105,31 @@ class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
     } yield person.into[PersonDescription].transform
 
   override def newFamily(request: FamilyDescription): Either[StemmaError, String] = {
-    import cats.implicits._
+    import cats.syntax.alternative._
 
-    val existentFamily = (for {
-      p1     <- EitherT(request.parent1.map(getOrCreate))
-      p2     <- EitherT(request.parent2.map(getOrCreate))
-      family <- EitherT.right(p1.outE(relations.spouseOf).otherV().where(_.inE(relations.spouseOf).otherV().is(p2)).headOption())
-    } yield (p1, p2, family)).value
+    if ((request.parent1 ++ request.parent2 ++ request.children).size <= 1) Left(IncompleteFamily())
+    else {
+      val family = graph + types.family
 
-    val x = existentFamily
-      .map {
-        case err @ Left(_)      => err
-        case Right((p1, p2, f)) => SuchFamilyAlreadyExist(f.id().toString, p1.id().toString, p2.id().toString)
+      val createdParents = (for {
+        parent <- EitherT[List, StemmaError, Vertex]((request.parent1 ++ request.parent2).toList.map(getOrCreate))
+      } yield parent).value
+
+      val (_, parents) = createdParents.separate
+      val checkedMarriage = parents match {
+        case p1 :: p2 :: Nil => checkAlreadyMarried(p1, p2)
+        case _               => Right()
       }
+      parents.foreach(_ --- relations.spouseOf --> family)
 
-    val family  = graph + types.family
-    val parents = (request.parent1 ++ request.parent2).toList
+      val createdChildren = (for {
+        child <- EitherT[List, StemmaError, Vertex](request.children.map(getOrCreate))
+        _     <- EitherT(checkIfChildBelongsToDifferentFamily(child) :: Nil)
+      } yield family --- relations.childOf --> child).value
 
-    val a = EitherT(parents.map(getOrCreate)).map(_ --- relations.spouseOf --> family).map(_ => ())
-    val b = EitherT(request.children.map(getOrCreate)).map(family --- relations.childOf --> _).map(_ => ())
-
-//    val c = a *> b
-//
-//    (for {
-//      _ <- EitherT(parents.map(getOrCreate)).map()
-//      _ <- EitherT(request.children.map(getOrCreate)).map(family --- relations.childOf --> _)
-//    } yield family.id().toString).value
-
-    ???
+      val (lefts, _) = (createdParents ++ createdChildren :+ checkedMarriage).separate
+      if (lefts.isEmpty) Right(family.id().toString) else Left(CompositeError(lefts))
+    }
   }
 
   override def describeFamily(familyId: String): Either[NoSuchFamilyId, FamilyDescription] = ???

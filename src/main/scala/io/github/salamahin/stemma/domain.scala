@@ -6,10 +6,12 @@ import io.github.salamahin.stemma.response.Stemma
 import java.time.LocalDate
 
 sealed trait StemmaError
-final case class NoSuchPersonId(id: String)                                                     extends RuntimeException(s"No person with id $id found") with StemmaError
-final case class NoSuchFamilyId(id: String)                                                     extends RuntimeException(s"No family with id $id found") with StemmaError
-final case class SuchFamilyAlreadyExist(familyId: String, parent1Id: String, parent2Id: String) extends RuntimeException(s"Parents with ids $parent1Id and $parent2Id are already have a family $familyId") with StemmaError
-final case class ChildBelongsToDifferentFamily(childId: String, existentFamilyId: String)       extends RuntimeException(s"Child $childId already belongs to a family $existentFamilyId")
+final case class NoSuchPersonId(id: String)                                                     extends StemmaError
+final case class NoSuchFamilyId(id: String)                                                     extends StemmaError
+final case class SuchFamilyAlreadyExist(familyId: String, parent1Id: String, parent2Id: String) extends StemmaError
+final case class ChildBelongsToDifferentFamily(childId: String, existentFamilyId: String)       extends StemmaError
+final case class CompositeError(errs: List[StemmaError])                                        extends StemmaError
+final case class IncompleteFamily()                                                             extends StemmaError
 
 trait StemmaRepository {
   def newPerson(request: PersonDescription): String
