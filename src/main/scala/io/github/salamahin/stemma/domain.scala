@@ -22,7 +22,7 @@ trait StemmaRepository {
   def newFamily(request: FamilyDescription): Either[StemmaError, String]
   def describeFamily(familyId: String): Either[NoSuchFamilyId, FamilyDescription]
   def removeFamilyIfExist(id: String): Unit
-  def updateFamily(id: String, request: FamilyDescription): Either[NoSuchFamilyId, Unit]
+  def updateFamily(id: String, request: FamilyDescription): Either[StemmaError, Unit]
 
   def stemma(): Stemma
 }

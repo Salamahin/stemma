@@ -11,8 +11,9 @@ import io.scalaland.chimney.dsl._
 import java.time.format.DateTimeFormatter
 
 class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
-
   private implicit val _graph = graph
+
+  import cats.syntax.alternative._
 
   private val dateFormat = DateTimeFormatter.ISO_DATE
 
@@ -105,8 +106,6 @@ class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
     } yield person.into[PersonDescription].transform
 
   override def newFamily(request: FamilyDescription): Either[StemmaError, String] = {
-    import cats.syntax.alternative._
-
     if ((request.parent1 ++ request.parent2 ++ request.children).size <= 1) Left(IncompleteFamily())
     else {
       val family = graph + types.family
@@ -134,5 +133,32 @@ class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
 
   override def describeFamily(familyId: String): Either[NoSuchFamilyId, FamilyDescription] = ???
 
-  override def updateFamily(id: String, request: FamilyDescription): Either[NoSuchFamilyId, Unit] = ???
+  override def updateFamily(id: String, request: FamilyDescription): Either[StemmaError, Unit] = {
+    def separateNewAndExistent(people: List[PersonDefinition]) = people.partition {
+      case ExistingPersonId(_) => true
+      case _                   => false
+    }
+
+    def updateRelation(family: EitherT[List, StemmaError, Vertex], actors: EitherT[List, StemmaError, Vertex])(func: (Vertex, Vertex) => Unit) =
+      (for {
+        f <- family
+        v <- actors.map { a => func(f, a); a }
+      } yield v).value
+
+    val family = EitherT.fromEither[List](graph.V(id).headOption().toRight[StemmaError](NoSuchFamilyId(id)))
+
+    family.map(_.inE(relations.spouseOf).drop().iterate())
+    family.map(_.outE(relations.childOf).drop().iterate())
+
+    val (existingParents, newParents)   = separateNewAndExistent((request.parent1 ++ request.parent2).toList)
+    val (existingChildren, newChildren) = separateNewAndExistent(request.children)
+
+    val parentsVertexes  = updateRelation(family, EitherT(existingParents.map(getOrCreate)))((f, p) => p.outE(relations.spouseOf).where(_.otherV() is f).drop())
+    val childrenVertexes = updateRelation(family, EitherT(existingChildren.map(getOrCreate)))((f, c) => c.inE(relations.childOf).where(_.otherV() is f).drop())
+    val parents          = updateRelation(family, EitherT(parentsVertexes ++ newParents.map(getOrCreate)))((f, p) => p --- relations.spouseOf --> f)
+    val children         = updateRelation(family, EitherT(childrenVertexes ++ newChildren.map(getOrCreate)))((f, c) => f --- relations.childOf --> c)
+
+    val (lefts, _) = (parents ++ children ++ family.value).separate
+    if (lefts.isEmpty) Right() else Left(CompositeError(lefts))
+  }
 }
