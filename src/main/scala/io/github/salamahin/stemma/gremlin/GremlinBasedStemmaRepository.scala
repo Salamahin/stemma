@@ -59,11 +59,11 @@ class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
       case Some(family) => Left(ChildBelongsToDifferentFamily(person.id().toString, family.id().toString))
     }
 
-  override def newPerson(request: PersonDescription): String =
-    makePerson(request).id().toString
+  override def newPerson(request: PersonDescription): String = makePerson(request).id().toString
 
-  override def removePersonIfExist(id: String): Unit =
-    graph.V(id).headOption().foreach(_.remove())
+  override def removePersonIfExist(id: String): Unit = graph.V(id).headOption().foreach(_.remove())
+
+  override def removeFamilyIfExist(id: String): Unit = graph.V(id).headOption().foreach(_.remove())
 
   override def updatePerson(id: String, request: PersonDescription): Either[NoSuchPersonId, Unit] = {
     graph
@@ -94,10 +94,6 @@ class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
       .toList()
 
     Stemma(people, families)
-  }
-
-  override def removeFamilyIfExist(id: String): Unit = {
-    ???
   }
 
   override def describePerson(id: String): Either[NoSuchPersonId, PersonDescription] =
@@ -131,7 +127,21 @@ class GremlinBasedStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
     }
   }
 
-  override def describeFamily(familyId: String): Either[NoSuchFamilyId, FamilyDescription] = ???
+  override def describeFamily(familyId: String): Either[NoSuchFamilyId, FamilyDescription] =
+    graph
+      .V(familyId)
+      .headOption()
+      .map { f =>
+        val parents  = f.inE(relations.spouseOf).otherV().map(_.id().toString).map(ExistingPersonId).toList()
+        val children = f.outE(relations.childOf).otherV().map(_.id().toString).map(ExistingPersonId).toList()
+
+        parents match {
+          case Nil             => FamilyDescription(None, None, children)
+          case p :: Nil        => FamilyDescription(Some(p), None, children)
+          case p1 :: p2 :: Nil => FamilyDescription(Some(p1), Some(p2), children)
+        }
+      }
+      .toRight(NoSuchFamilyId(familyId))
 
   override def updateFamily(id: String, request: FamilyDescription): Either[StemmaError, Unit] = {
     def separateNewAndExistent(people: List[PersonDefinition]) = people.partition {

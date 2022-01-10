@@ -118,4 +118,28 @@ class StemmaRepositoryTest extends AnyFunSuite with BeforeAndAfterEach with Matc
     families.head.parents should contain only ids(jillDoe.name)
     families.head.children should contain only (ids(janeDoe.name), ids(joshDoe.name))
   }
+
+  test("can remove a family") {
+    val family   = FamilyDescription(Some(johnDoe), Some(janeDoe), joshDoe :: Nil)
+    val familyId = repo.newFamily(family).getOrElse(throw new IllegalStateException())
+
+    repo.removeFamilyIfExist(familyId)
+    val Stemma(people, families) = repo.stemma()
+
+    people.map(_.name) should contain only (johnDoe.name, janeDoe.name, joshDoe.name)
+    families shouldBe empty
+  }
+
+  test("family can be described") {
+    val family   = FamilyDescription(Some(johnDoe), Some(janeDoe), joshDoe :: Nil)
+    val familyId = repo.newFamily(family).getOrElse(throw new IllegalStateException())
+
+    val Stemma(_, families) = repo.stemma()
+
+    val FamilyDescription(Some(ExistingPersonId(p1)), Some(ExistingPersonId(p2)), ExistingPersonId(c1) :: Nil) =
+      repo.describeFamily(familyId).getOrElse(throw new IllegalStateException())
+
+    families.head.parents should contain only (p1, p2)
+    families.head.children should contain only c1
+  }
 }
