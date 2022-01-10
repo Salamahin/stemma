@@ -1,12 +1,31 @@
 package io.github.salamahin.stemma
 
-import io.github.salamahin.stemma.request.{ExistingPersonId, FamilyDescription}
-import io.github.salamahin.stemma.response.Stemma
+import io.github.salamahin.stemma.gremlin.{GraphConfig, GremlinBasedStemmaRepository}
+import io.github.salamahin.stemma.request.{ExistingPersonId, FamilyDescription, PersonDescription}
+import io.github.salamahin.stemma.response.{Person, Stemma}
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Inside.inside
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
-class StemmaRepositoryAddFamilySuite extends AnyFunSuite with StemmaFamilySuite with Matchers {
+import java.time.LocalDate
+
+class StemmaRepositoryTest extends AnyFunSuite with BeforeAndAfterEach with Matchers {
+  private var repo: StemmaRepository = _
+
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+    repo = new GremlinBasedStemmaRepository(GraphConfig.newGraph())
+  }
+
+  private val johnDoe  = PersonDescription("John Doe", Some(LocalDate.parse("1900-01-01")), Some(LocalDate.parse("2000-01-01")))
+  private val janeDoe  = PersonDescription("Jane Doe", Some(LocalDate.parse("1850-01-01")), Some(LocalDate.parse("1950-01-01")))
+  private val jamesDoe = PersonDescription("James Doe", None, None)
+  private val joshDoe  = PersonDescription("James Doe", None, None)
+  private val jillDoe  = PersonDescription("Jill Doe", None, None)
+
+  private def nameToId(people: List[Person]) = people.map(p => p.name -> p.id).toMap
+
   test("can create a family when without parents") {
     repo.newFamily(FamilyDescription(None, None, johnDoe :: janeDoe :: Nil))
 
@@ -80,5 +99,23 @@ class StemmaRepositoryAddFamilySuite extends AnyFunSuite with StemmaFamilySuite 
         childId shouldBe joshDoeId
         familyId shouldBe existentFamilyId
     }
+  }
+
+  test("existent family can be updated") {
+    val family1 = FamilyDescription(Some(johnDoe), Some(janeDoe), Nil)
+
+    val family1Id = repo.newFamily(family1).getOrElse(throw new IllegalStateException())
+    var ids       = nameToId(repo.stemma().people)
+    val janeDoeId = ids(janeDoe.name)
+
+    val family2 = FamilyDescription(Some(jillDoe), None, ExistingPersonId(janeDoeId) :: joshDoe :: Nil)
+    repo.updateFamily(family1Id, family2)
+    ids = nameToId(repo.stemma().people)
+
+    val Stemma(people, families) = repo.stemma()
+    people.map(_.name) should contain only (johnDoe.name, janeDoe.name, jillDoe.name, joshDoe.name)
+    families.size shouldBe 1
+    families.head.parents should contain only ids(jillDoe.name)
+    families.head.children should contain only (ids(janeDoe.name), ids(joshDoe.name))
   }
 }
