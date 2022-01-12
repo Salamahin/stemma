@@ -1,38 +1,46 @@
 package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.service.graph.{Graph, GraphService}
+import gremlin.scala.ScalaGraph
+import org.apache.commons.configuration.BaseConfiguration
 import org.apache.tinkerpop.gremlin.process.traversal.IO
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import zio.{Has, UIO, ZLayer}
+import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
+import zio.{UIO, ZLayer}
 
 object storage {
-  type Storage = Has[StorageService]
-
-  trait StorageService {
-    def load(): UIO[Unit]
-    def persist(): UIO[Unit]
+  trait GraphStorage {
+    def make(): UIO[ScalaGraph]
+    def save(): UIO[Unit]
   }
 
-  def localGraphsonFile(file: String): ZLayer[Graph, Nothing, Storage] =
-    ZLayer.fromService[GraphService, StorageService](graphService =>
-      new StorageService {
-        import gremlin.scala._
+  private class GraphsonFile(file: String) extends GraphStorage {
+    import gremlin.scala._
 
-        override def load(): UIO[Unit] = UIO {
-          new GraphTraversalSource(graphService.graph.asJava())
-            .io(file)
-            .`with`(IO.reader, IO.graphson)
-            .read()
-            .iterate()
-        }
+    private val graph = {
+      val config = new BaseConfiguration
+      config.addProperty(TinkerGraph.GREMLIN_TINKERGRAPH_EDGE_ID_MANAGER, "UUID")
+      config.addProperty(TinkerGraph.GREMLIN_TINKERGRAPH_VERTEX_ID_MANAGER, "UUID")
+      TinkerGraph.open(config).asScala()
+    }
 
-        override def persist(): UIO[Unit] = UIO {
-          new GraphTraversalSource(graphService.graph.asJava())
-            .io(file)
-            .`with`(IO.reader, IO.graphson)
-            .write()
-            .iterate()
-        }
-      }
-    )
+    override def make(): UIO[ScalaGraph] = UIO {
+      new GraphTraversalSource(graph.asJava())
+        .io(file)
+        .`with`(IO.reader, IO.graphson)
+        .read()
+        .iterate()
+
+      graph
+    }
+
+    override def save(): UIO[Unit] = UIO {
+      new GraphTraversalSource(graph.asJava())
+        .io(file)
+        .`with`(IO.reader, IO.graphson)
+        .write()
+        .iterate()
+    }
+  }
+
+  def graphsonFile(file: String) = ZLayer.succeed(new GraphsonFile(file))
 }

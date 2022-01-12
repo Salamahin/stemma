@@ -1,28 +1,40 @@
 package io.github.salamahin.stemma
 
-import io.github.salamahin.stemma.request.{FamilyDescription, PersonDescription}
-import io.github.salamahin.stemma.response.Stemma
+import io.github.salamahin.stemma.request.{ExtendedPersonDescription, FamilyDescription, PersonDescription}
+import io.github.salamahin.stemma.response.{Family, Stemma}
 
 import java.time.LocalDate
 
 sealed trait StemmaError
-final case class NoSuchPersonId(id: String)                                                     extends StemmaError
-final case class NoSuchFamilyId(id: String)                                                     extends StemmaError
+final case class NoSuchPersonId(id: String)                                               extends StemmaError
+final case class NoSuchFamilyId(id: String)                                               extends StemmaError
+final case class ChildAlreadyBelongsToFamily(familyId: String, personId: String)          extends StemmaError
+final case class ChildBelongsToDifferentFamily(existentFamilyId: String, childId: String) extends StemmaError
+final case class ChildDoesNotBelongToFamily(familyId: String, childId: String)            extends StemmaError
+final case class SpouseAlreadyBelongsToFamily(familyId: String, personId: String)         extends StemmaError
+final case class SpouseBelongsToDifferentFamily(familyId: String, personId: String)       extends StemmaError
+final case class SpouseDoesNotBelongToFamily(familyId: String, personId: String)          extends StemmaError
+
 final case class SuchFamilyAlreadyExist(familyId: String, parent1Id: String, parent2Id: String) extends StemmaError
-final case class ChildBelongsToDifferentFamily(childId: String, existentFamilyId: String)       extends StemmaError
-final case class CompositeError(errs: List[StemmaError])                                        extends StemmaError
-final case class IncompleteFamily()                                                             extends StemmaError
+
+final case class CompositeError(errs: List[StemmaError]) extends StemmaError
+final case class IncompleteFamily()                      extends StemmaError
 
 trait StemmaRepository {
-  def newPerson(request: PersonDescription): String
-  def describePerson(id: String): Either[NoSuchPersonId, PersonDescription]
-  def removePersonIfExist(id: String): Unit
-  def updatePerson(id: String, request: PersonDescription): Either[NoSuchPersonId, Unit]
+  def newFamily(): String
+  def newPerson(descr: PersonDescription): String
 
-  def newFamily(request: FamilyDescription): Either[StemmaError, String]
-  def describeFamily(familyId: String): Either[NoSuchFamilyId, FamilyDescription]
-  def removeFamilyIfExist(id: String): Unit
-  def updateFamily(id: String, request: FamilyDescription): Either[StemmaError, Unit]
+  def removeFamily(id: String): Either[NoSuchFamilyId, Unit]
+  def removePerson(id: String): Either[NoSuchPersonId, Unit]
+
+  def describePerson(id: String): Either[NoSuchPersonId, ExtendedPersonDescription]
+  def describeFamily(id: String): Either[NoSuchFamilyId, Family]
+
+  def setSpouseRelation(familyId: String, personId: String): Either[StemmaError, Unit]
+  def setChildRelation(familyId: String, personId: String): Either[StemmaError, Unit]
+
+  def removeChildRelation(familyId: String, personId: String): Either[StemmaError, Unit]
+  def removeSpouseRelation(familyId: String, personId: String): Either[StemmaError, Unit]
 
   def stemma(): Stemma
 }
@@ -33,6 +45,7 @@ object request {
   final case class PersonDescription(name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate]) extends PersonDefinition
 
   final case class FamilyDescription(parent1: Option[PersonDefinition], parent2: Option[PersonDefinition], children: List[PersonDefinition])
+  final case class ExtendedPersonDescription(personDescription: PersonDescription, childOf: Option[String], spouseOf: Option[String])
 }
 
 object response {
