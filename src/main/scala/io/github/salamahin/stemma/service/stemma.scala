@@ -4,11 +4,12 @@ import com.vladkopanev.zio.saga.Saga
 import io.github.salamahin.stemma._
 import io.github.salamahin.stemma.gremlin.TinkerpopStemmaRepository
 import io.github.salamahin.stemma.request._
-import io.github.salamahin.stemma.service.storage.GraphStorage
-import zio._
+import io.github.salamahin.stemma.service.storage.{GraphStorage, STORAGE}
 import zio.stm.{TReentrantLock, USTM}
+import zio._
 
 object stemma {
+
   trait StemmaService {
     def newFamily(family: FamilyDescription): ZIO[Any, StemmaError, String]
     def updateFamily(familyId: String, family: FamilyDescription): ZIO[Any, NoSuchFamilyId, Unit]
@@ -16,6 +17,8 @@ object stemma {
     def updatePerson(id: String, description: PersonDescription): ZIO[Any, StemmaError, Unit]
     def stemma(): UIO[response.Stemma]
   }
+
+  type STEMMA = Has[StemmaService]
 
   private class StemmaServiceImpl(repo: StemmaRepository) extends StemmaService {
     import com.vladkopanev.zio.saga.Saga._
@@ -60,14 +63,14 @@ object stemma {
     private def createNewFamily(newParents: List[PersonDescription], newChildren: List[PersonDescription], existentParents: List[ExistingPersonId], existentChildren: List[ExistingPersonId]) =
       (for {
         familyId       <- createFamily()
-        newParentIds   <- Saga.collectAllPar(newParents.map(createPerson))
-        newChildrenIds <- Saga.collectAllPar(newChildren.map(createPerson))
+        newParentIds   <- SagaExt.collectAll(newParents.map(createPerson))
+        newChildrenIds <- SagaExt.collectAll(newChildren.map(createPerson))
 
         parentIds   = newParentIds ++ existentParents.map(_.id)
         childrenIds = newChildrenIds ++ existentChildren.map(_.id)
 
-        _ <- Saga.collectAllPar(parentIds.map(createSpouseRelation(familyId)))
-        _ <- Saga.collectAllPar(childrenIds.map(createChildRelation(familyId)))
+        _ <- SagaExt.collectAll(parentIds.map(createSpouseRelation(familyId)))
+        _ <- SagaExt.collectAll(childrenIds.map(createChildRelation(familyId)))
       } yield familyId).transact
 
     override def newFamily(family: FamilyDescription): ZIO[Any, StemmaError, String] =
@@ -103,35 +106,34 @@ object stemma {
     override def newFamily(family: FamilyDescription): ZIO[Any, StemmaError, String] =
       for {
         l      <- lock.commit
-        family <- l.writeLock.useDiscard(underlying.newFamily(family) <* storage.save())
+        family <- l.writeLock.use_(underlying.newFamily(family) <* storage.save())
       } yield family
 
     override def updateFamily(familyId: String, family: FamilyDescription): ZIO[Any, NoSuchFamilyId, Unit] =
       for {
         l <- lock.commit
-        _ <- l.writeLock.useDiscard(underlying.updateFamily(familyId, family) <* storage.save())
+        _ <- l.writeLock.use_(underlying.updateFamily(familyId, family) <* storage.save())
       } yield ()
 
     override def removePerson(id: String): ZIO[Any, StemmaError, Unit] =
       for {
         l <- lock.commit
-        _ <- l.writeLock.useDiscard(underlying.removePerson(id) <* storage.save())
+        _ <- l.writeLock.use_(underlying.removePerson(id) <* storage.save())
       } yield ()
 
     override def updatePerson(id: String, description: PersonDescription): ZIO[Any, StemmaError, Unit] =
       for {
         l <- lock.commit
-        _ <- l.writeLock.useDiscard(underlying.updatePerson(id, description) <* storage.save())
+        _ <- l.writeLock.use_(underlying.updatePerson(id, description) <* storage.save())
       } yield ()
 
     override def stemma(): UIO[response.Stemma] =
       for {
         l  <- lock.commit
-        st <- l.readLock.useDiscard(underlying.stemma())
+        st <- l.readLock.use_(underlying.stemma())
       } yield st
   }
 
-  val basic: ZLayer[GraphStorage, Nothing, StemmaService] = ZLayer.fromFunctionZIO(gs => gs.get.make().map(fm => new StemmaServiceImpl(new TinkerpopStemmaRepository(fm))))
-
-  val durable: URLayer[StemmaService with GraphStorage, StemmaService] = (new PersistentStemmaService(_, _, TReentrantLock.make)).toLayer[StemmaService]
+  val basic: ZLayer[STORAGE, Nothing, STEMMA]       = ZLayer.fromFunctionM(gs => gs.get.make().map(fm => new StemmaServiceImpl(new TinkerpopStemmaRepository(fm))))
+  val durable: URLayer[STEMMA with STORAGE, STEMMA] = (new PersistentStemmaService(_, _, TReentrantLock.make)).toLayer[StemmaService]
 }

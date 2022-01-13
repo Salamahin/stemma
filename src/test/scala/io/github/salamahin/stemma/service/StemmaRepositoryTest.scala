@@ -1,32 +1,44 @@
-package io.github.salamahin.stemma
+package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.request.PersonDescription
-import io.github.salamahin.stemma.response.Person
-import io.github.salamahin.stemma.service.stemma
-import io.github.salamahin.stemma.service.stemma.StemmaService
+import io.github.salamahin.stemma.gremlin.GraphConfig
+import io.github.salamahin.stemma.request.{FamilyDescription, PersonDescription}
+import io.github.salamahin.stemma.response.{Family, Person, Stemma}
+import io.github.salamahin.stemma.service.stemma.STEMMA
 import io.github.salamahin.stemma.service.storage.GraphStorage
-import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerFactory
-import zio.test.Assertion.isNull
-import zio.test.{DefaultRunnableSpec, TestEnvironment, ZSpec, assert}
-import zio.{UIO, ZIO}
-import gremlin.scala.ScalaGraph
+import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
+import zio.test.Assertion._
+import zio.test.{DefaultRunnableSpec, assert}
+import zio.{UIO, ZIO, ZLayer}
 
 import java.time.LocalDate
 
 object StemmaRepositoryTest extends DefaultRunnableSpec {
+  import gremlin.scala._
 
-  val nopStorage = new GraphStorage {
-    override def make(): UIO[ScalaGraph] = UIO(TinkerFactory.createModern().asScala())
+  private val nopStorage = ZLayer.succeed(new GraphStorage {
+    override def make(): UIO[ScalaGraph] = UIO(TinkerGraph.open(new GraphConfig).asScala())
     override def save(): UIO[Unit]       = UIO.succeed()
+  })
+
+  private def render(stemma: Stemma): List[String] = {
+    val Stemma(people: List[Person], families: List[Family]) = stemma
+    val personById                                           = people.map(p => (p.id, p)).toMap
+
+    families
+      .map {
+        case Family(_, parents, children) =>
+          val parentNames   = parents.map(personById).map(_.name).sorted.mkString("(", ", ", ")")
+          val childrenNames = children.map(personById).map(_.name).sorted.mkString("(", ", ", ")")
+
+          s"$parentNames parentsOf $childrenNames"
+      }
   }
 
-  private val johnDoe  = PersonDescription("John Doe", Some(LocalDate.parse("1900-01-01")), Some(LocalDate.parse("2000-01-01")))
-  private val janeDoe  = PersonDescription("Jane Doe", Some(LocalDate.parse("1850-01-01")), Some(LocalDate.parse("1950-01-01")))
-  private val jamesDoe = PersonDescription("James Doe", None, None)
-  private val joshDoe  = PersonDescription("James Doe", None, None)
-  private val jillDoe  = PersonDescription("Jill Doe", None, None)
-
-  private def nameToId(people: List[Person]) = people.map(p => p.name -> p.id).toMap
+  private val john  = PersonDescription("John", Some(LocalDate.parse("1900-01-01")), Some(LocalDate.parse("2000-01-01")))
+  private val jane  = PersonDescription("Jane", Some(LocalDate.parse("1850-01-01")), Some(LocalDate.parse("1950-01-01")))
+  private val james = PersonDescription("James", None, None)
+  private val josh  = PersonDescription("Josh", None, None)
+  private val jill  = PersonDescription("Jill", None, None)
 
 //  test("can create a family when without parents") {
 //    repo.newFamily(FamilyDescription(None, None, johnDoe :: janeDoe :: Nil))
@@ -145,14 +157,21 @@ object StemmaRepositoryTest extends DefaultRunnableSpec {
 //    families.head.children should contain only c1
 //  }
 
-  val canCreateFamilies = test("can create different families with and without children & parents") {
+  private val canCreateFamilies = testM("can create different family with both parents and several children") {
     for {
-      service <- ZIO.environment[StemmaService].map(_.get)
-    } yield assert(service)(isNull)
+      service  <- ZIO.environment[STEMMA].map(_.get)
+      _        <- service.newFamily(FamilyDescription(Some(john), Some(jane), josh :: jill :: Nil))
+      stemma   <- service.stemma()
+      families = render(stemma)
+    } yield assert(families) {
+      hasSameElements(
+        "(Jane, John) parentsOf (Jill, Josh)" :: Nil
+      )
+    }
   }
 
-  override def spec: ZSpec[TestEnvironment, Any] =
+  override def spec =
     suite("StemmaReposotoryTest") {
       canCreateFamilies
-    }.provide(stemma.basic)
+    }.provideCustomLayer(nopStorage >>> stemma.basic)
 }

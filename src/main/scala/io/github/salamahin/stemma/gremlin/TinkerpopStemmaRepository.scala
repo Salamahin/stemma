@@ -2,7 +2,6 @@ package io.github.salamahin.stemma.gremlin
 
 import gremlin.scala._
 import io.github.salamahin.stemma._
-import io.github.salamahin.stemma.gremlin.GraphConfig.PersonVertex
 import io.github.salamahin.stemma.request.{ExtendedPersonDescription, PersonDescription}
 import io.github.salamahin.stemma.response.{Family, Person, Stemma}
 
@@ -14,10 +13,9 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
   private val dateFormat = DateTimeFormatter.ISO_DATE
 
   private val keys = new {
-    val name       = Key[String]("name")
-    val birthDate  = Key[String]("birthDate")
-    val deathDate  = Key[String]("deathDate")
-    val generation = Key[Int]("generation")
+    val name      = Key[String]("name")
+    val birthDate = Key[String]("birthDate")
+    val deathDate = Key[String]("deathDate")
   }
 
   private val types = new {
@@ -35,12 +33,11 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
   }
 
   override def newPerson(descr: PersonDescription): String = {
-    val birthDateProps  = descr.birthDate.map(keys.birthDate -> dateFormat.format(_))
-    val deathDateProps  = descr.deathDate.map(keys.deathDate -> dateFormat.format(_))
-    val nameProps       = keys.name -> descr.name
-    val generationProps = keys.generation -> 0
+    val birthDateProps = descr.birthDate.map(keys.birthDate -> dateFormat.format(_))
+    val deathDateProps = descr.deathDate.map(keys.deathDate -> dateFormat.format(_))
+    val nameProps      = keys.name -> descr.name
 
-    val person = graph + (types.person, nameProps +: generationProps +: (birthDateProps ++ deathDateProps).toSeq: _*)
+    val person = graph + (types.person, nameProps +: (birthDateProps ++ deathDateProps).toSeq: _*)
     person.id.toString
   }
 
@@ -106,11 +103,11 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
       family <- graph.V(familyId).headOption().toRight(NoSuchFamilyId(familyId))
 
       _ <- person
-        .bothE(relation)
-        .where(_.otherV().is(family))
-        .drop()
-        .headOption()
-        .toRight(noSuchRelation(familyId, personId))
+            .bothE(relation)
+            .where(_.otherV().is(family))
+            .drop()
+            .headOption()
+            .toRight(noSuchRelation(familyId, personId))
     } yield ()
 
   override def setSpouseRelation(familyId: String, personId: String): Either[StemmaError, Unit] =

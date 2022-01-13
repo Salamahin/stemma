@@ -7,7 +7,7 @@ version := "0.1.0-SNAPSHOT"
 lazy val versions = new {
   val http4sV = "1.0.0-M10"
   val circeV  = "0.14.0-M3"
-  val zioV    = "2.0.0-RC1"
+  val zioV    = "1.0.13"
 }
 
 libraryDependencies ++= Seq(
@@ -21,7 +21,7 @@ libraryDependencies ++= Seq(
   "io.scalaland"                    %% "chimney"             % "0.6.1",
   "dev.zio"                         %% "zio"                 % versions.zioV,
   "com.vladkopanev"                 %% "zio-saga-core"       % "0.4.0",
-  "dev.zio"                         %% "zio-interop-cats"    % "3.3.0-RC1",
+  "dev.zio"                         %% "zio-interop-cats"    % "2.2.0.1",
   "org.slf4j"                       % "slf4j-api"            % "2.0.0-alpha1",
   "ch.qos.logback"                  % "logback-classic"      % "1.3.0-alpha5",
   "org.webjars"                     % "d3js"                 % "6.2.0",
