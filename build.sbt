@@ -29,7 +29,9 @@ libraryDependencies ++= Seq(
   "org.webjars"                     % "jquery"               % "3.5.1",
   "org.webjars"                     % "font-awesome"         % "4.7.0",
   "org.webjars.bowergithub.eligrey" % "filesaver.js"         % "2.0.4",
-  "org.scalatest"                   %% "scalatest"           % "3.3.0-SNAP3" % Test
+  "dev.zio"                         %% "zio-test"            % versions.zioV % Test,
+  "dev.zio"                         %% "zio-test-sbt"        % versions.zioV % Test
 )
 
+testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
 addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")

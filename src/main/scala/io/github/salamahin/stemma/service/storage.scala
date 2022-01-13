@@ -5,7 +5,7 @@ import org.apache.commons.configuration.BaseConfiguration
 import org.apache.tinkerpop.gremlin.process.traversal.IO
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
-import zio.{UIO, ZLayer}
+import zio.{UIO, ULayer, ZLayer}
 
 object storage {
   trait GraphStorage {
@@ -42,5 +42,5 @@ object storage {
     }
   }
 
-  def graphsonFile(file: String) = ZLayer.succeed(new GraphsonFile(file))
+  def graphsonFile(file: String): ULayer[GraphStorage] = ZLayer.succeed(new GraphsonFile(file))
 }

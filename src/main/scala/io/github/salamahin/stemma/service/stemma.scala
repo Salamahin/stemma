@@ -9,7 +9,7 @@ import zio._
 import zio.stm.{TReentrantLock, USTM}
 
 object stemma {
-  trait Stemma {
+  trait StemmaService {
     def newFamily(family: FamilyDescription): ZIO[Any, StemmaError, String]
     def updateFamily(familyId: String, family: FamilyDescription): ZIO[Any, NoSuchFamilyId, Unit]
     def removePerson(id: String): ZIO[Any, StemmaError, Unit]
@@ -17,7 +17,7 @@ object stemma {
     def stemma(): UIO[response.Stemma]
   }
 
-  private class StemmaService(repo: StemmaRepository) extends Stemma {
+  private class StemmaServiceImpl(repo: StemmaRepository) extends StemmaService {
     import com.vladkopanev.zio.saga.Saga._
 
     private def separatePeople(people: List[PersonDefinition]) = people.partitionMap {
@@ -99,7 +99,7 @@ object stemma {
     override def stemma(): UIO[response.Stemma] = UIO.succeed(repo.stemma())
   }
 
-  private class PersistentStemmaService(underlying: Stemma, storage: GraphStorage, lock: USTM[TReentrantLock]) extends Stemma {
+  private class PersistentStemmaService(underlying: StemmaService, storage: GraphStorage, lock: USTM[TReentrantLock]) extends StemmaService {
     override def newFamily(family: FamilyDescription): ZIO[Any, StemmaError, String] =
       for {
         l      <- lock.commit
@@ -131,7 +131,7 @@ object stemma {
       } yield st
   }
 
-  val basic: ZLayer[GraphStorage, Nothing, Stemma] = ZLayer.fromFunctionZIO(gs => gs.get.make().map(fm => new StemmaService(new TinkerpopStemmaRepository(fm))))
+  val basic: ZLayer[GraphStorage, Nothing, StemmaService] = ZLayer.fromFunctionZIO(gs => gs.get.make().map(fm => new StemmaServiceImpl(new TinkerpopStemmaRepository(fm))))
 
-  val durable: URLayer[Stemma with GraphStorage, Stemma] = (new PersistentStemmaService(_, _, TReentrantLock.make)).toLayer[Stemma]
+  val durable: URLayer[StemmaService with GraphStorage, StemmaService] = (new PersistentStemmaService(_, _, TReentrantLock.make)).toLayer[StemmaService]
 }

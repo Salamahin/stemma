@@ -1,19 +1,23 @@
 package io.github.salamahin.stemma
 
-import io.github.salamahin.stemma.gremlin.GraphConfig
-import io.github.salamahin.stemma.request.{ExistingPersonId, FamilyDescription, PersonDescription}
-import io.github.salamahin.stemma.response.{Person, Stemma}
-import org.scalatest.BeforeAndAfterEach
-import org.scalatest.Inside.inside
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.matchers.should.Matchers
+import io.github.salamahin.stemma.request.PersonDescription
+import io.github.salamahin.stemma.response.Person
+import io.github.salamahin.stemma.service.stemma
+import io.github.salamahin.stemma.service.stemma.StemmaService
+import io.github.salamahin.stemma.service.storage.GraphStorage
+import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerFactory
+import zio.test.Assertion.isNull
+import zio.test.{DefaultRunnableSpec, TestEnvironment, ZSpec, assert}
+import zio.{UIO, ZIO}
+import gremlin.scala.ScalaGraph
 
 import java.time.LocalDate
 
-class StemmaRepositoryTest extends AnyFunSuite with BeforeAndAfterEach with Matchers {
-  override def beforeEach(): Unit = {
-    super.beforeEach()
-//    repo = new GremlinBasedStemmaRepository(GraphConfig.newGraph())
+object StemmaRepositoryTest extends DefaultRunnableSpec {
+
+  val nopStorage = new GraphStorage {
+    override def make(): UIO[ScalaGraph] = UIO(TinkerFactory.createModern().asScala())
+    override def save(): UIO[Unit]       = UIO.succeed()
   }
 
   private val johnDoe  = PersonDescription("John Doe", Some(LocalDate.parse("1900-01-01")), Some(LocalDate.parse("2000-01-01")))
@@ -140,4 +144,15 @@ class StemmaRepositoryTest extends AnyFunSuite with BeforeAndAfterEach with Matc
 //    families.head.parents should contain only (p1, p2)
 //    families.head.children should contain only c1
 //  }
+
+  val canCreateFamilies = test("can create different families with and without children & parents") {
+    for {
+      service <- ZIO.environment[StemmaService].map(_.get)
+    } yield assert(service)(isNull)
+  }
+
+  override def spec: ZSpec[TestEnvironment, Any] =
+    suite("StemmaReposotoryTest") {
+      canCreateFamilies
+    }.provide(stemma.basic)
 }
