@@ -1,6 +1,6 @@
 package io.github.salamahin.stemma
 
-import io.github.salamahin.stemma.request.{ExtendedPersonDescription, FamilyDescription, PersonDescription}
+import io.github.salamahin.stemma.request.{ExtendedPersonDescription, PersonDescription}
 import io.github.salamahin.stemma.response.{Family, Stemma}
 
 import java.time.LocalDate
@@ -14,11 +14,8 @@ final case class ChildDoesNotBelongToFamily(familyId: String, childId: String)  
 final case class SpouseAlreadyBelongsToFamily(familyId: String, personId: String)         extends StemmaError
 final case class SpouseBelongsToDifferentFamily(familyId: String, personId: String)       extends StemmaError
 final case class SpouseDoesNotBelongToFamily(familyId: String, personId: String)          extends StemmaError
-
-final case class SuchFamilyAlreadyExist(familyId: String, parent1Id: String, parent2Id: String) extends StemmaError
-
-final case class CompositeError(errs: List[StemmaError]) extends StemmaError
-final case class IncompleteFamily()                      extends StemmaError
+final case class IncompleteFamily()                                                       extends StemmaError
+final case class CompositeError(errs: List[StemmaError])                                  extends StemmaError
 
 trait StemmaRepository {
   def newFamily(): String

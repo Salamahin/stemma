@@ -1,17 +1,17 @@
 package io.github.salamahin.stemma.service
 
-import com.vladkopanev.zio.saga.Saga
 import io.github.salamahin.stemma._
 import io.github.salamahin.stemma.gremlin.TinkerpopStemmaRepository
 import io.github.salamahin.stemma.request._
+import io.github.salamahin.stemma.response.Family
 import io.github.salamahin.stemma.service.storage.{GraphStorage, STORAGE}
-import zio.stm.{TReentrantLock, USTM}
 import zio._
+import zio.stm.{TReentrantLock, USTM}
 
 object stemma {
 
   trait StemmaService {
-    def newFamily(family: FamilyDescription): ZIO[Any, StemmaError, String]
+    def newFamily(family: FamilyDescription): ZIO[Any, StemmaError, Family]
     def updateFamily(familyId: String, family: FamilyDescription): ZIO[Any, NoSuchFamilyId, Unit]
     def removePerson(id: String): ZIO[Any, StemmaError, Unit]
     def updatePerson(id: String, description: PersonDescription): ZIO[Any, StemmaError, Unit]
@@ -23,15 +23,11 @@ object stemma {
   private class StemmaServiceImpl(repo: StemmaRepository) extends StemmaService {
     import com.vladkopanev.zio.saga.Saga._
 
-    private def separatePeople(people: List[PersonDefinition]) = people.partitionMap {
-      case existing: ExistingPersonId   => Left(existing)
-      case newPerson: PersonDescription => Right(newPerson)
-    }
-
-    private def createPerson(p: PersonDescription) =
-      for {
-        id <- ZIO.succeed(repo.newPerson(p)).compensateIfSuccess(id => ZIO.fromEither(repo.removePerson(id)))
-      } yield id
+    private def getOrCreatePerson(p: PersonDefinition) =
+      p match {
+        case ExistingPersonId(id) => ZIO.succeed(id).noCompensate
+        case p: PersonDescription => ZIO.succeed(repo.newPerson(p)).compensateIfSuccess(id => ZIO.fromEither(repo.removePerson(id)))
+      }
 
     private def createFamily() =
       for {
@@ -60,25 +56,22 @@ object stemma {
       } yield personId
     }
 
-    private def createNewFamily(newParents: List[PersonDescription], newChildren: List[PersonDescription], existentParents: List[ExistingPersonId], existentChildren: List[ExistingPersonId]) =
+    private def createNewFamily(parents: Seq[PersonDefinition], children: Seq[PersonDefinition]) =
       (for {
-        familyId       <- createFamily()
-        newParentIds   <- SagaExt.collectAll(newParents.map(createPerson))
-        newChildrenIds <- SagaExt.collectAll(newChildren.map(createPerson))
-
-        parentIds   = newParentIds ++ existentParents.map(_.id)
-        childrenIds = newChildrenIds ++ existentChildren.map(_.id)
+        familyId    <- createFamily()
+        parentIds   <- SagaExt.collectAll(parents.map(getOrCreatePerson))
+        childrenIds <- SagaExt.collectAll(children.map(getOrCreatePerson))
 
         _ <- SagaExt.collectAll(parentIds.map(createSpouseRelation(familyId)))
         _ <- SagaExt.collectAll(childrenIds.map(createChildRelation(familyId)))
-      } yield familyId).transact
+      } yield Family(familyId, parentIds, childrenIds)).transact
 
-    override def newFamily(family: FamilyDescription): ZIO[Any, StemmaError, String] =
+    override def newFamily(family: FamilyDescription): ZIO[Any, StemmaError, Family] =
       for {
         FamilyDescription(p1, p2, children) <- ZIO.succeed(family)
-        (existentParents, newParents)       = separatePeople((p1 ++ p2).toList)
-        (existentChildren, newChildren)     = separatePeople(children)
-        familyId                            <- createNewFamily(newParents, newChildren, existentParents, existentChildren)
+        parents                             = (p1 ++ p2).toSeq
+        _                                   <- if ((parents ++ children).size <= 1) ZIO.fail(IncompleteFamily()) else ZIO.succeed()
+        familyId                            <- createNewFamily(parents, children)
       } yield familyId
 
     override def updateFamily(familyId: String, family: FamilyDescription): ZIO[Any, NoSuchFamilyId, Unit] =
@@ -89,13 +82,13 @@ object stemma {
     override def removePerson(id: String): ZIO[Any, StemmaError, Unit] =
       (for {
         descr <- ZIO.fromEither(repo.describePerson(id)).noCompensate
-        _     <- ZIO.fromEither(repo.removePerson(id)) compensate remakePerson(descr).map(_ => ())
+        _     <- ZIO.fromEither(repo.removePerson(id)) compensate remakePerson(descr).unit
       } yield ()).transact
 
     override def updatePerson(id: String, description: PersonDescription): ZIO[Any, StemmaError, Unit] =
       (for {
         descr <- ZIO.fromEither(repo.describePerson(id)).noCompensate
-        _     <- ZIO.fromEither(repo.removePerson(id)) compensate remakePerson(descr).map(_ => ())
+        _     <- ZIO.fromEither(repo.removePerson(id)) compensate remakePerson(descr).unit
         _     <- remakePerson(descr.copy(personDescription = description)).compensateIfSuccess(id => ZIO.fromEither(repo.removePerson(id)))
       } yield ()).transact
 
@@ -103,7 +96,7 @@ object stemma {
   }
 
   private class PersistentStemmaService(underlying: StemmaService, storage: GraphStorage, lock: USTM[TReentrantLock]) extends StemmaService {
-    override def newFamily(family: FamilyDescription): ZIO[Any, StemmaError, String] =
+    override def newFamily(family: FamilyDescription): ZIO[Any, StemmaError, Family] =
       for {
         l      <- lock.commit
         family <- l.writeLock.use_(underlying.newFamily(family) <* storage.save())
