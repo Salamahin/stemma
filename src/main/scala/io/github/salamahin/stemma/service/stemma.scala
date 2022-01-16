@@ -55,10 +55,9 @@ object stemma {
     override def updateFamily(familyId: String, family: FamilyDescription): ZIO[Any, NoSuchFamilyId, Unit] = ???
 
     override def removePerson(id: String): ZIO[Any, StemmaError, Unit] = {
-      def membersCount(f: Family) = (f.parents ++ f.children).size
       def removeFamilyIfNotConnecting2Persons(family: Option[Family]) =
         family
-          .find(f => membersCount(f) <= 2)
+          .find(f => (f.parents ++ f.children).size <= 2)
           .map(f => ZIO.fromEither(repo.removeFamily(f.id)))
           .getOrElse(ZIO.succeed())
 
