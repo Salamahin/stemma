@@ -9,7 +9,7 @@ import zio.{Has, UIO}
 
 object storage {
   trait GraphStorage {
-    def make(): UIO[ScalaGraph]
+    def load(): UIO[ScalaGraph]
     def save(): UIO[Unit]
   }
 
@@ -20,7 +20,7 @@ object storage {
 
     private val graph = TinkerGraph.open(new GraphConfig).asScala()
 
-    override def make(): UIO[ScalaGraph] = UIO {
+    override def load(): UIO[ScalaGraph] = UIO {
       new GraphTraversalSource(graph.asJava())
         .io(file)
         .`with`(IO.reader, IO.graphson)

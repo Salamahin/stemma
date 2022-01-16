@@ -20,7 +20,6 @@ libraryDependencies ++= Seq(
   "com.michaelpollmeier"            %% "gremlin-scala"       % "3.4.7.8",
   "io.scalaland"                    %% "chimney"             % "0.6.1",
   "dev.zio"                         %% "zio"                 % versions.zioV,
-  "com.vladkopanev"                 %% "zio-saga-core"       % "0.4.0",
   "dev.zio"                         %% "zio-interop-cats"    % "2.2.0.1",
   "org.slf4j"                       % "slf4j-api"            % "2.0.0-alpha1",
   "ch.qos.logback"                  % "logback-classic"      % "1.3.0-alpha5",

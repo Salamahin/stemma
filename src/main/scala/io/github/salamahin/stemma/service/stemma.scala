@@ -21,37 +21,27 @@ object stemma {
   type STEMMA = Has[StemmaService]
 
   private class StemmaServiceImpl(repo: StemmaRepository) extends StemmaService {
-    import com.vladkopanev.zio.saga.Saga._
 
-    private def foldEitherOption[E](value: Option[Either[E, Unit]]): Either[E, Unit] = value match {
-      case Some(x) => x
-      case None    => Right()
+    private def fromOptionEither[E, T](value: Option[Either[E, T]]) = value match {
+      case Some(value) => ZIO.fromEither(value.map(Some(_)))
+      case None        => ZIO.none
     }
 
     private def createNewFamily(parents: Seq[PersonDefinition], children: Seq[PersonDefinition]) = {
       def getOrCreatePerson(p: PersonDefinition) =
         p match {
-          case ExistingPersonId(id) => ZIO.succeed(id).noCompensate
-          case p: PersonDescription => ZIO.succeed(repo.newPerson(p)).compensateIfSuccess(id => ZIO.fromEither(repo.removePerson(id)))
+          case ExistingPersonId(id) => ZIO.succeed(id)
+          case p: PersonDescription => ZIO.succeed(repo.newPerson(p))
         }
 
-      def createChildRelation(familyId: String)(personId: String) =
-        ZIO.fromEither(repo.setChildRelation(familyId, personId)) compensate ZIO.fromEither(repo.removeChildRelation(familyId, personId))
+      for {
+        familyId    <- ZIO.succeed(repo.newFamily())
+        parentIds   <- ZIO.foreach(parents)(getOrCreatePerson)
+        childrenIds <- ZIO.foreach(children)(getOrCreatePerson)
 
-      def createSpouseRelation(familyId: String)(personId: String) =
-        ZIO.fromEither(repo.setSpouseRelation(familyId, personId)) compensate ZIO.fromEither(repo.removeSpouseRelation(familyId, personId))
-
-      val createFamily =
-        ZIO.succeed(repo.newFamily()).compensateIfSuccess(id => ZIO.fromEither(repo.removeFamily(id)))
-
-      (for {
-        familyId    <- createFamily
-        parentIds   <- SagaExt.collectAll(parents map getOrCreatePerson)
-        childrenIds <- SagaExt.collectAll(children map getOrCreatePerson)
-
-        _ <- SagaExt.collectAll(parentIds map createSpouseRelation(familyId))
-        _ <- SagaExt.collectAll(childrenIds map createChildRelation(familyId))
-      } yield Family(familyId, parentIds, childrenIds)).transact
+        _ <- ZIO.foreach_(parentIds)(personId => ZIO.fromEither(repo.setSpouseRelation(familyId, personId)))
+        _ <- ZIO.foreach_(childrenIds)(personId => ZIO.fromEither(repo.setChildRelation(familyId, personId)))
+      } yield Family(familyId, parentIds, childrenIds)
     }
 
     override def newFamily(family: FamilyDescription): ZIO[Any, StemmaError, Family] =
@@ -62,25 +52,34 @@ object stemma {
         familyId                            <- createNewFamily(parents, children)
       } yield familyId
 
-    override def updateFamily(familyId: String, family: FamilyDescription): ZIO[Any, NoSuchFamilyId, Unit] =
-      (for {
-        descr <- ZIO.fromEither(repo.describeFamily(familyId)).noCompensate
-      } yield ()).transact
+    override def updateFamily(familyId: String, family: FamilyDescription): ZIO[Any, NoSuchFamilyId, Unit] = ???
 
-    override def removePerson(id: String): ZIO[Any, StemmaError, Unit] =
-      (for {
-        descr               <- ZIO.fromEither(repo.describePerson(id)).noCompensate
-        parentOfWhichFamily = foldEitherOption(descr.spouseOf.map(id => repo.describeFamily(id)))
-        childOfWhichFamily  = ZIO.fromOption(descr.childOf).flatMap(id => ZIO.fromEither(repo.describeFamily(id))).noCompensate
+    override def removePerson(id: String): ZIO[Any, StemmaError, Unit] = {
+      def membersCount(f: Family) = (f.parents ++ f.children).size
+      def removeFamilyIfNotConnecting2Persons(family: Option[Family]) =
+        family
+          .find(f => membersCount(f) <= 2)
+          .map(f => ZIO.fromEither(repo.removeFamily(f.id)))
+          .getOrElse(ZIO.succeed())
 
-        _ <- ZIO.fromEither(repo.removePerson(id)) compensate remakePerson(descr).unit
-      } yield ()).transact
+      for {
+        descr               <- ZIO.fromEither(repo.describePerson(id))
+        _                   <- ZIO.fromEither(repo.removePerson(id))
+
+        parentOfWhichFamily <- fromOptionEither(descr.spouseOf.map(id => repo.describeFamily(id)))
+        childOfWhichFamily  <- fromOptionEither(descr.childOf.map(id => repo.describeFamily(id)))
+
+        _                   <- removeFamilyIfNotConnecting2Persons(parentOfWhichFamily)
+        _                   <- removeFamilyIfNotConnecting2Persons(childOfWhichFamily)
+      } yield ()
+    }
 
     override def updatePerson(id: String, description: PersonDescription): ZIO[Any, StemmaError, Unit] = ???
 
     override def stemma(): UIO[response.Stemma] = UIO.succeed(repo.stemma())
   }
 
+  //todo: reload graph on error
   private class PersistentStemmaService(underlying: StemmaService, storage: GraphStorage, lock: USTM[TReentrantLock]) extends StemmaService {
     override def newFamily(family: FamilyDescription): ZIO[Any, StemmaError, Family] =
       for {
@@ -113,6 +112,6 @@ object stemma {
       } yield st
   }
 
-  val basic: ZLayer[STORAGE, Nothing, STEMMA]       = ZLayer.fromFunctionM(gs => gs.get.make().map(fm => new StemmaServiceImpl(new TinkerpopStemmaRepository(fm))))
+  val basic: ZLayer[STORAGE, Nothing, STEMMA]       = ZLayer.fromFunctionM(gs => gs.get.load().map(fm => new StemmaServiceImpl(new TinkerpopStemmaRepository(fm))))
   val durable: URLayer[STEMMA with STORAGE, STEMMA] = (new PersistentStemmaService(_, _, TReentrantLock.make)).toLayer[StemmaService]
 }
