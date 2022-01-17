@@ -150,4 +150,18 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
 
     Stemma(people, families)
   }
+
+  override def updatePerson(id: String, description: PersonDescription): Either[NoSuchPersonId, Unit] = {
+    import io.scalaland.chimney.dsl._
+    for {
+      person <- graph.V(id).headOption().toRight(NoSuchPersonId(id))
+      _ = person.updateWith[PersonVertex](
+        description
+          .into[PersonVertex]
+          .withFieldComputed(_.phone, _ => None)
+          .withFieldComputed(_.bio, _ => None)
+          .transform
+      )
+    } yield ()
+  }
 }

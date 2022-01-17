@@ -19,7 +19,9 @@ final case class CompositeError(errs: List[StemmaError])                        
 
 trait StemmaRepository {
   def newFamily(): String
+
   def newPerson(descr: PersonDescription): String
+  def updatePerson(id: String, description: PersonDescription): Either[NoSuchPersonId, Unit]
 
   def removeFamily(id: String): Either[NoSuchFamilyId, Unit]
   def removePerson(id: String): Either[NoSuchPersonId, Unit]

@@ -33,7 +33,7 @@ object StemmaRepositoryTest extends DefaultRunnableSpec {
     }
   }
 
-  private val disposable =
+  private val disposableGraph =
     UIO(new Graph {
       override val graph: ScalaGraph = {
         import gremlin.scala._
@@ -41,7 +41,10 @@ object StemmaRepositoryTest extends DefaultRunnableSpec {
       }
     }).toLayer
 
-  private val createJohn           = PersonDescription("John", Some(LocalDate.parse("1900-01-01")), Some(LocalDate.parse("2000-01-01")))
+  private val johnsBirthDay = LocalDate.parse("1900-01-01")
+  private val johnsDeathDay = LocalDate.parse("2000-01-01")
+
+  private val createJohn           = PersonDescription("John", Some(johnsBirthDay), Some(johnsDeathDay))
   private val createJane           = PersonDescription("Jane", Some(LocalDate.parse("1850-01-01")), Some(LocalDate.parse("1950-01-01")))
   private val createJames          = PersonDescription("James", None, None)
   private val createJake           = PersonDescription("Jake", None, None)
@@ -126,12 +129,33 @@ object StemmaRepositoryTest extends DefaultRunnableSpec {
     } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "James" :: Nil))
   }
 
+  private val canUpdateExistingPerson = testM("can update existing person") {
+    for {
+      s <- service
+
+      Family(_, janeId :: Nil, _) <- s.newFamily(family(createJane)(createJill))
+
+      _ <- s.updatePerson(janeId, createJohn)
+
+      st @ Stemma(people, _) <- s.stemma()
+      render(families)       = st
+    } yield assertTrue(families == List("(John) parentsOf (Jill)")) && assertTrue(
+      people.exists(p =>
+        p.name == "John" &&
+          p.id == janeId &&
+          p.birthDate.contains(johnsBirthDay) &&
+          p.deathDate.contains(johnsDeathDay)
+      )
+    )
+  }
+
   override def spec =
     suite("StemmaRepository's positive scenarios")(
       canCreateFamily,
       cantCreateFamilyOfSingleParent,
       cantCreateFamilyOfSingleChild,
       canRemoveChild,
-      leavingSingleMemberOfFamilyDropsTheFamily
-    ).provideCustomLayer(disposable >>> stemma.basic)
+      leavingSingleMemberOfFamilyDropsTheFamily,
+      canUpdateExistingPerson
+    ).provideCustomLayer(disposableGraph >>> stemma.basic)
 }

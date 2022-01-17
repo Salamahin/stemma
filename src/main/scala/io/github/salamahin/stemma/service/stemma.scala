@@ -73,7 +73,7 @@ object stemma {
       } yield ()
     }
 
-    override def updatePerson(id: String, description: PersonDescription): ZIO[Any, StemmaError, Unit] = ???
+    override def updatePerson(id: String, description: PersonDescription): ZIO[Any, StemmaError, Unit] = ZIO.fromEither(repo.updatePerson(id, description))
 
     override def stemma(): UIO[response.Stemma] = UIO(repo.stemma())
   }
