@@ -1,4 +1,4 @@
-package io.github.salamahin.stemma.gremlin
+package io.github.salamahin.stemma.tinkerpop
 
 import org.apache.commons.configuration.BaseConfiguration
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph

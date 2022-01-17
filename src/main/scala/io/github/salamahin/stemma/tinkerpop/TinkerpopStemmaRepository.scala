@@ -1,4 +1,4 @@
-package io.github.salamahin.stemma.gremlin
+package io.github.salamahin.stemma.tinkerpop
 
 import gremlin.scala._
 import io.github.salamahin.stemma._

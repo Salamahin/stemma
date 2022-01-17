@@ -1,15 +1,15 @@
 package io.github.salamahin.stemma.service
 
 import io.github.salamahin.stemma._
-import io.github.salamahin.stemma.gremlin.TinkerpopStemmaRepository
 import io.github.salamahin.stemma.request._
 import io.github.salamahin.stemma.response.Family
-import io.github.salamahin.stemma.service.storage.{GraphStorage, STORAGE}
+import io.github.salamahin.stemma.service.graph.GRAPH
+import io.github.salamahin.stemma.service.storage.{STORAGE, Storage}
+import io.github.salamahin.stemma.tinkerpop.TinkerpopStemmaRepository
 import zio._
 import zio.stm.{TReentrantLock, USTM}
 
 object stemma {
-
   trait StemmaService {
     def newFamily(family: FamilyDescription): ZIO[Any, StemmaError, Family]
     def updateFamily(familyId: String, family: FamilyDescription): ZIO[Any, NoSuchFamilyId, Unit]
@@ -31,11 +31,11 @@ object stemma {
       def getOrCreatePerson(p: PersonDefinition) =
         p match {
           case ExistingPersonId(id) => ZIO.succeed(id)
-          case p: PersonDescription => ZIO.succeed(repo.newPerson(p))
+          case p: PersonDescription => UIO(repo.newPerson(p))
         }
 
       for {
-        familyId    <- ZIO.succeed(repo.newFamily())
+        familyId    <- UIO(repo.newFamily())
         parentIds   <- ZIO.foreach(parents)(getOrCreatePerson)
         childrenIds <- ZIO.foreach(children)(getOrCreatePerson)
 
@@ -57,51 +57,53 @@ object stemma {
     override def removePerson(id: String): ZIO[Any, StemmaError, Unit] = {
       def removeFamilyIfNotConnecting2Persons(family: Option[Family]) =
         family
-          .find(f => (f.parents ++ f.children).size <= 2)
+          .find(f => (f.parents ++ f.children).size < 2)
           .map(f => ZIO.fromEither(repo.removeFamily(f.id)))
           .getOrElse(ZIO.succeed())
 
       for {
-        descr               <- ZIO.fromEither(repo.describePerson(id))
-        _                   <- ZIO.fromEither(repo.removePerson(id))
+        descr <- ZIO.fromEither(repo describePerson id)
+        _     <- ZIO.fromEither(repo removePerson id)
 
-        parentOfWhichFamily <- fromOptionEither(descr.spouseOf.map(id => repo.describeFamily(id)))
-        childOfWhichFamily  <- fromOptionEither(descr.childOf.map(id => repo.describeFamily(id)))
+        parentOfWhichFamily <- fromOptionEither(descr.spouseOf map repo.describeFamily)
+        childOfWhichFamily  <- fromOptionEither(descr.childOf map repo.describeFamily)
 
-        _                   <- removeFamilyIfNotConnecting2Persons(parentOfWhichFamily)
-        _                   <- removeFamilyIfNotConnecting2Persons(childOfWhichFamily)
+        _ <- removeFamilyIfNotConnecting2Persons(parentOfWhichFamily)
+        _ <- removeFamilyIfNotConnecting2Persons(childOfWhichFamily)
       } yield ()
     }
 
     override def updatePerson(id: String, description: PersonDescription): ZIO[Any, StemmaError, Unit] = ???
 
-    override def stemma(): UIO[response.Stemma] = UIO.succeed(repo.stemma())
+    override def stemma(): UIO[response.Stemma] = UIO(repo.stemma())
   }
 
-  //todo: reload graph on error
-  private class PersistentStemmaService(underlying: StemmaService, storage: GraphStorage, lock: USTM[TReentrantLock]) extends StemmaService {
+  private class PersistentStemmaService(storage: Storage, underlying: StemmaService, lock: USTM[TReentrantLock]) extends StemmaService {
+    private def saveChangesOrReload[E, V](f: StemmaService => ZIO[Any, E, V]) =
+      f(underlying).tapError(_ => storage.load()) <* storage.save()
+
     override def newFamily(family: FamilyDescription): ZIO[Any, StemmaError, Family] =
       for {
         l      <- lock.commit
-        family <- l.writeLock.use_(underlying.newFamily(family) <* storage.save())
+        family <- l.writeLock.use_(saveChangesOrReload(_.newFamily(family)))
       } yield family
 
     override def updateFamily(familyId: String, family: FamilyDescription): ZIO[Any, NoSuchFamilyId, Unit] =
       for {
         l <- lock.commit
-        _ <- l.writeLock.use_(underlying.updateFamily(familyId, family) <* storage.save())
+        _ <- l.writeLock.use_(saveChangesOrReload(_.updateFamily(familyId, family)))
       } yield ()
 
     override def removePerson(id: String): ZIO[Any, StemmaError, Unit] =
       for {
         l <- lock.commit
-        _ <- l.writeLock.use_(underlying.removePerson(id) <* storage.save())
+        _ <- l.writeLock.use_(saveChangesOrReload(_.removePerson(id)))
       } yield ()
 
     override def updatePerson(id: String, description: PersonDescription): ZIO[Any, StemmaError, Unit] =
       for {
         l <- lock.commit
-        _ <- l.writeLock.use_(underlying.updatePerson(id, description) <* storage.save())
+        _ <- l.writeLock.use_(saveChangesOrReload(_.updatePerson(id, description)))
       } yield ()
 
     override def stemma(): UIO[response.Stemma] =
@@ -111,6 +113,9 @@ object stemma {
       } yield st
   }
 
-  val basic: ZLayer[STORAGE, Nothing, STEMMA]       = ZLayer.fromFunctionM(gs => gs.get.load().map(fm => new StemmaServiceImpl(new TinkerpopStemmaRepository(fm))))
+  val basic: ZLayer[GRAPH, Nothing, STEMMA] = {
+    ZIO.access[GRAPH](gr => new StemmaServiceImpl(new TinkerpopStemmaRepository(gr.get.graph))).toLayer
+  }
+
   val durable: URLayer[STEMMA with STORAGE, STEMMA] = (new PersistentStemmaService(_, _, TReentrantLock.make)).toLayer[StemmaService]
 }

@@ -1,26 +1,20 @@
 package io.github.salamahin.stemma.service
 
+import gremlin.scala.ScalaGraph
 import io.github.salamahin.stemma.IncompleteFamily
-import io.github.salamahin.stemma.gremlin.GraphConfig
 import io.github.salamahin.stemma.request.{ExistingPersonId, FamilyDescription, PersonDefinition, PersonDescription}
 import io.github.salamahin.stemma.response.{Family, Person, Stemma}
+import io.github.salamahin.stemma.service.graph.Graph
 import io.github.salamahin.stemma.service.stemma.STEMMA
-import io.github.salamahin.stemma.service.storage.GraphStorage
+import io.github.salamahin.stemma.tinkerpop.GraphConfig
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import zio.test.Assertion._
 import zio.test.{DefaultRunnableSpec, assert, assertTrue}
-import zio.{UIO, ZIO, ZLayer}
+import zio.{UIO, ZIO}
 
 import java.time.LocalDate
 
 object StemmaRepositoryTest extends DefaultRunnableSpec {
-  import gremlin.scala._
-
-  private val nopStorage = ZLayer.succeed(new GraphStorage {
-    override def load(): UIO[ScalaGraph] = UIO(TinkerGraph.open(new GraphConfig).asScala())
-    override def save(): UIO[Unit]       = UIO.succeed()
-  })
-
   object render {
     def unapply(stemma: Stemma) = {
       val Stemma(people: List[Person], families: List[Family]) = stemma
@@ -39,6 +33,14 @@ object StemmaRepositoryTest extends DefaultRunnableSpec {
     }
   }
 
+  private val disposable =
+    UIO(new Graph {
+      override val graph: ScalaGraph = {
+        import gremlin.scala._
+        TinkerGraph.open(new GraphConfig).asScala()
+      }
+    }).toLayer
+
   private val createJohn           = PersonDescription("John", Some(LocalDate.parse("1900-01-01")), Some(LocalDate.parse("2000-01-01")))
   private val createJane           = PersonDescription("Jane", Some(LocalDate.parse("1850-01-01")), Some(LocalDate.parse("1950-01-01")))
   private val createJames          = PersonDescription("James", None, None)
@@ -48,7 +50,7 @@ object StemmaRepositoryTest extends DefaultRunnableSpec {
   private val createJill           = PersonDescription("Jill", None, None)
   private def existing(id: String) = ExistingPersonId(id)
 
-  def family(parents: PersonDefinition*)(children: PersonDefinition*) = parents.toList match {
+  private def family(parents: PersonDefinition*)(children: PersonDefinition*) = parents.toList match {
     case Nil             => FamilyDescription(None, None, children.toList)
     case p1 :: Nil       => FamilyDescription(Some(p1), None, children.toList)
     case p1 :: p2 :: Nil => FamilyDescription(Some(p1), Some(p2), children.toList)
@@ -117,8 +119,8 @@ object StemmaRepositoryTest extends DefaultRunnableSpec {
       Family(_, _, jillId :: Nil) <- s.newFamily(family(createJane)(createJill))
       Family(_, joshId :: Nil, _) <- s.newFamily(family(createJosh)(createJames))
 
-      _                           <- s.removePerson(jillId)
-      _                           <- s.removePerson(joshId)
+      _ <- s.removePerson(jillId)
+      _ <- s.removePerson(joshId)
 
       Stemma(people, families) <- s.stemma()
     } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "James" :: Nil))
@@ -131,5 +133,5 @@ object StemmaRepositoryTest extends DefaultRunnableSpec {
       cantCreateFamilyOfSingleChild,
       canRemoveChild,
       leavingSingleMemberOfFamilyDropsTheFamily
-    ).provideCustomLayer(nopStorage >>> stemma.basic)
+    ).provideCustomLayer(disposable >>> stemma.basic)
 }
