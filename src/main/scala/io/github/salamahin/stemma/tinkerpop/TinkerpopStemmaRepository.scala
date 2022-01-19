@@ -47,10 +47,10 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
   override def describePerson(id: String): Either[NoSuchPersonId, ExtendedPersonDescription] =
     graph
       .V(id)
-      .map { v =>
-        val person   = v.toCC[PersonDescription]
-        val spouseOf = v.outE(relations.spouseOf).otherV().map(_.id().toString).headOption()
-        val childOf  = v.inE(relations.childOf).otherV().map(_.id().toString).headOption()
+      .map { p =>
+        val person   = p.toCC[PersonDescription]
+        val spouseOf = p.outE(relations.spouseOf).otherV().map(_.id().toString).headOption()
+        val childOf  = p.outE(relations.childOf).otherV().map(_.id().toString).headOption()
 
         ExtendedPersonDescription(person, childOf, spouseOf)
       }
@@ -63,7 +63,7 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
       .headOption()
       .map { f =>
         val parents  = f.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
-        val children = f.outE(relations.childOf).otherV().id().map(_.toString).toList()
+        val children = f.inE(relations.childOf).otherV().id().map(_.toString).toList()
 
         Family(f.id().toString, parents, children)
       }
@@ -71,8 +71,7 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
 
   private def setRelation(familyId: String, personId: String, relation: String)(
     alreadyRelated: (String, String) => StemmaError,
-    relationConflict: (String, String) => StemmaError,
-    makeRelation: (Vertex, Vertex) => Unit
+    relationConflict: (String, String) => StemmaError
   ) = {
     for {
       person <- graph.V(personId).headOption().toRight(NoSuchPersonId(personId))
@@ -81,7 +80,7 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
       isFamily = P.is(family)
 
       conflicts = person
-        .bothE(relation)
+        .outE(relation)
         .otherV()
         .map(otherFamily =>
           if (isFamily.test(otherFamily)) alreadyRelated(familyId, personId)
@@ -91,7 +90,7 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
 
       _ <- if (conflicts.isEmpty) Right() else Left(CompositeError(conflicts))
 
-      _ = makeRelation(family, person)
+      _ = person --- relation --> family
     } yield ()
   }
 
@@ -103,25 +102,23 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
       family <- graph.V(familyId).headOption().toRight(NoSuchFamilyId(familyId))
 
       _ <- person
-            .bothE(relation)
-            .where(_.otherV().is(family))
-            .drop()
+            .outE(relation)
+            .where(_.otherV().hasId(family.id()))
             .headOption()
+            .map(_.remove())
             .toRight(noSuchRelation(familyId, personId))
     } yield ()
 
   override def setSpouseRelation(familyId: String, personId: String): Either[StemmaError, Unit] =
     setRelation(familyId, personId, relations.spouseOf)(
       SpouseAlreadyBelongsToFamily,
-      SpouseBelongsToDifferentFamily,
-      (family, person) => person --- relations.spouseOf --> family
+      SpouseBelongsToDifferentFamily
     )
 
   override def setChildRelation(familyId: String, personId: String): Either[StemmaError, Unit] =
     setRelation(familyId, personId, relations.childOf)(
       ChildAlreadyBelongsToFamily,
-      ChildBelongsToDifferentFamily,
-      (family, person) => family --- relations.childOf --> person
+      ChildBelongsToDifferentFamily
     )
 
   override def removeChildRelation(familyId: String, personId: String): Either[StemmaError, Unit]  = removeRelation(familyId, personId, relations.childOf)(ChildDoesNotBelongToFamily)
@@ -142,7 +139,7 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
       .hasLabel(types.family)
       .map { family =>
         val parents  = family.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
-        val children = family.outE(relations.childOf).otherV().id().map(_.toString).toList()
+        val children = family.inE(relations.childOf).otherV().id().map(_.toString).toList()
 
         Family(family.id().toString, parents, children)
       }

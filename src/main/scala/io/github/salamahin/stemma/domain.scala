@@ -16,6 +16,7 @@ final case class SpouseBelongsToDifferentFamily(familyId: String, personId: Stri
 final case class SpouseDoesNotBelongToFamily(familyId: String, personId: String)          extends StemmaError
 final case class IncompleteFamily()                                                       extends StemmaError
 final case class CompositeError(errs: List[StemmaError])                                  extends StemmaError
+final case class DuplicatedIds(duplicatedIds: Seq[String])                                extends StemmaError
 
 trait StemmaRepository {
   def newFamily(): String

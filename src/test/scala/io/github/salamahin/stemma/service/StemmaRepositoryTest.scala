@@ -1,12 +1,12 @@
 package io.github.salamahin.stemma.service
 
 import gremlin.scala.ScalaGraph
-import io.github.salamahin.stemma.IncompleteFamily
 import io.github.salamahin.stemma.request.{ExistingPersonId, FamilyDescription, PersonDefinition, PersonDescription}
 import io.github.salamahin.stemma.response.{Family, Person, Stemma}
 import io.github.salamahin.stemma.service.graph.Graph
 import io.github.salamahin.stemma.service.stemma.STEMMA
 import io.github.salamahin.stemma.tinkerpop.GraphConfig
+import io.github.salamahin.stemma.{CompositeError, DuplicatedIds, IncompleteFamily}
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import zio.test.Assertion._
 import zio.test.{DefaultRunnableSpec, assert, assertTrue}
@@ -33,14 +33,6 @@ object StemmaRepositoryTest extends DefaultRunnableSpec {
     }
   }
 
-  private val disposableGraph =
-    UIO(new Graph {
-      override val graph: ScalaGraph = {
-        import gremlin.scala._
-        TinkerGraph.open(new GraphConfig).asScala()
-      }
-    }).toLayer
-
   private val johnsBirthDay = LocalDate.parse("1900-01-01")
   private val johnsDeathDay = LocalDate.parse("2000-01-01")
 
@@ -60,6 +52,15 @@ object StemmaRepositoryTest extends DefaultRunnableSpec {
     case _               => throw new IllegalArgumentException("too many parents")
   }
 
+  private val disposableGraph =
+    UIO(new Graph {
+      override val graph: ScalaGraph = {
+        import gremlin.scala._
+        TinkerGraph.open(new GraphConfig).asScala()
+      }
+    }).toLayer
+
+  private val layer   = disposableGraph >>> stemma.basic
   private val service = ZIO.environment[STEMMA].map(_.get)
 
   private val canCreateFamily = testM("can create different family with both parents and several children") {
@@ -87,17 +88,25 @@ object StemmaRepositoryTest extends DefaultRunnableSpec {
     for {
       s   <- service
       err <- s.newFamily(family(createJohn)()).flip
-    } yield assertTrue(err == IncompleteFamily())
+    } yield assertTrue(err == CompositeError(IncompleteFamily() :: Nil))
   }
 
   private val cantCreateFamilyOfSingleChild = testM("there cant be a family with no parents and a single child") {
     for {
       s   <- service
       err <- s.newFamily(family()(createJill)).flip
-    } yield assertTrue(err == IncompleteFamily())
+    } yield assertTrue(err == CompositeError(IncompleteFamily() :: Nil))
   }
 
-  private val canRemoveChild = testM("when removing a person hist child & spouse relations are removed as well") {
+  private val duplicatedIdsForbidden = testM("cant update a family when there are duplicated ids in members") {
+    for {
+      s                                               <- service
+      Family(familyId, jamesId :: Nil, jillId :: Nil) <- s.newFamily(family(createJames)(createJill))
+      err                                             <- s.updateFamily(familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
+    } yield assertTrue(err == CompositeError(DuplicatedIds(jamesId :: Nil) :: Nil))
+  }
+
+  private val canRemovePerson = testM("when removing a person hist child & spouse relations are removed as well") {
     for {
       s <- service
 
@@ -149,13 +158,30 @@ object StemmaRepositoryTest extends DefaultRunnableSpec {
     )
   }
 
+  private val canUpdateExistingFamily = testM("when updating a family members are not removed") {
+    for {
+      s <- service
+
+      Family(familyId, _ :: johnId :: Nil, jillId :: Nil) <- s.newFamily(family(createJane, createJohn)(createJill))
+      _                                                   <- s.updateFamily(familyId, family(createJuly, existing(johnId))(existing(jillId), createJames))
+
+      st @ Stemma(people, _) <- s.stemma()
+      render(families)       = st
+    } yield assertTrue(families == List("(John, July) parentsOf (James, Jill)")) &&
+      assert(people.map(_.name))(hasSameElements("Jane" :: "John" :: "Jill" :: "July" :: "James" :: Nil))
+  }
+
   override def spec =
-    suite("StemmaRepository's positive scenarios")(
+    suite("StemmaRepository: basic operations")(
       canCreateFamily,
-      cantCreateFamilyOfSingleParent,
-      cantCreateFamilyOfSingleChild,
-      canRemoveChild,
+      canRemovePerson,
       leavingSingleMemberOfFamilyDropsTheFamily,
-      canUpdateExistingPerson
-    ).provideCustomLayer(disposableGraph >>> stemma.basic)
+      canUpdateExistingPerson,
+      canUpdateExistingFamily
+    ).provideCustomLayer(layer) +
+      suite("StemmaRepository: validation")(
+        cantCreateFamilyOfSingleParent,
+        cantCreateFamilyOfSingleChild,
+        duplicatedIdsForbidden
+      ).provideCustomLayer(layer)
 }
