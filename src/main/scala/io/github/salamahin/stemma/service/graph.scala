@@ -12,7 +12,7 @@ object graph {
 
   type GRAPH = Has[Graph]
 
-  val live: ULayer[Has[Graph]] = ZRef
+  def newGraph: ULayer[Has[Graph]] = ZRef
     .make {
       import gremlin.scala._
       TinkerGraph.open(new GraphConfig).asScala()

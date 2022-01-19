@@ -1,16 +1,12 @@
 package io.github.salamahin.stemma.service
 
-import gremlin.scala.ScalaGraph
 import io.github.salamahin.stemma.request.{ExistingPersonId, FamilyDescription, PersonDefinition, PersonDescription}
 import io.github.salamahin.stemma.response.{Family, Person, Stemma}
-import io.github.salamahin.stemma.service.graph.Graph
 import io.github.salamahin.stemma.service.stemma.STEMMA
-import io.github.salamahin.stemma.tinkerpop.GraphConfig
 import io.github.salamahin.stemma.{CompositeError, DuplicatedIds, IncompleteFamily}
-import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
+import zio.ZIO
 import zio.test.Assertion._
 import zio.test.{DefaultRunnableSpec, assert, assertTrue}
-import zio.{Ref, ZIO, ZLayer}
 
 import java.time.LocalDate
 
@@ -52,21 +48,11 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
     case _               => throw new IllegalArgumentException("too many parents")
   }
 
-  private def service =
-    for {
-      newGraph <- Ref.make {
-                   import gremlin.scala._
-                   TinkerGraph.open(new GraphConfig).asScala()
-                 }
-      graphService = ZLayer.succeed(new Graph {
-        override val graph: Ref[ScalaGraph] = newGraph
-      })
-      stemmaService <- ZIO.environment[STEMMA].map(_.get).provideCustomLayer(graphService >>> stemma.basic)
-    } yield stemmaService
+  private def newStemmaService = ZIO.environment[STEMMA].map(_.get).provideCustomLayer(graph.newGraph >>> stemma.basic)
 
   private val canCreateFamily = testM("can create different family with both parents and several children") {
     for {
-      s <- service
+      s <- newStemmaService
 
       _ <- s.newFamily(family(createJane, createJohn)(createJill, createJosh))
       _ <- s.newFamily(family(createJohn)(createJosh))
@@ -87,21 +73,21 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
 
   private val cantCreateFamilyOfSingleParent = testM("there cant be a family with a single parent and no children") {
     for {
-      s   <- service
+      s   <- newStemmaService
       err <- s.newFamily(family(createJohn)()).flip
     } yield assertTrue(err == CompositeError(IncompleteFamily() :: Nil))
   }
 
   private val cantCreateFamilyOfSingleChild = testM("there cant be a family with no parents and a single child") {
     for {
-      s   <- service
+      s   <- newStemmaService
       err <- s.newFamily(family()(createJill)).flip
     } yield assertTrue(err == CompositeError(IncompleteFamily() :: Nil))
   }
 
   private val duplicatedIdsForbidden = testM("cant update a family when there are duplicated ids in members") {
     for {
-      s                                               <- service
+      s                                               <- newStemmaService
       Family(familyId, jamesId :: Nil, jillId :: Nil) <- s.newFamily(family(createJames)(createJill))
       err                                             <- s.updateFamily(familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
     } yield assertTrue(err == CompositeError(DuplicatedIds(jamesId :: Nil) :: Nil))
@@ -109,7 +95,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
 
   private val canRemovePerson = testM("when removing a person hist child & spouse relations are removed as well") {
     for {
-      s <- service
+      s <- newStemmaService
 
       Family(_, _, jillId :: _ :: Nil) <- s.newFamily(family(createJane, createJohn)(createJill, createJames))
       _                                <- s.newFamily(family(existing(jillId), createJosh)(createJake))
@@ -127,7 +113,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
 
   private val leavingSingleMemberOfFamilyDropsTheFamily = testM("when the only member of family left the family is removed") {
     for {
-      s <- service
+      s <- newStemmaService
 
       Family(_, _, jillId :: Nil) <- s.newFamily(family(createJane)(createJill))
       Family(_, joshId :: Nil, _) <- s.newFamily(family(createJosh)(createJames))
@@ -141,7 +127,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
 
   private val canUpdateExistingPerson = testM("can update existing person") {
     for {
-      s <- service
+      s <- newStemmaService
 
       Family(_, janeId :: Nil, _) <- s.newFamily(family(createJane)(createJill))
 
@@ -161,7 +147,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
 
   private val canUpdateExistingFamily = testM("when updating a family members are not removed") {
     for {
-      s <- service
+      s <- newStemmaService
 
       Family(familyId, _ :: johnId :: Nil, jillId :: Nil) <- s.newFamily(family(createJane, createJohn)(createJill))
       _                                                   <- s.updateFamily(familyId, family(createJuly, existing(johnId))(existing(jillId), createJames))
