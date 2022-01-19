@@ -1,7 +1,8 @@
 package io.github.salamahin.stemma
 
-import io.github.salamahin.stemma.request.{ExtendedPersonDescription, PersonDescription}
+import io.github.salamahin.stemma.request.{ExtendedPersonDescription, FamilyDescription, PersonDescription}
 import io.github.salamahin.stemma.response.{Family, Stemma}
+import zio.{IO, UIO}
 
 import java.time.LocalDate
 
@@ -17,27 +18,6 @@ final case class SpouseDoesNotBelongToFamily(familyId: String, personId: String)
 final case class IncompleteFamily()                                                       extends StemmaError
 final case class CompositeError(errs: List[StemmaError])                                  extends StemmaError
 final case class DuplicatedIds(duplicatedIds: Seq[String])                                extends StemmaError
-
-trait StemmaRepository {
-  def newFamily(): String
-
-  def newPerson(descr: PersonDescription): String
-  def updatePerson(id: String, description: PersonDescription): Either[NoSuchPersonId, Unit]
-
-  def removeFamily(id: String): Either[NoSuchFamilyId, Unit]
-  def removePerson(id: String): Either[NoSuchPersonId, Unit]
-
-  def describePerson(id: String): Either[NoSuchPersonId, ExtendedPersonDescription]
-  def describeFamily(id: String): Either[NoSuchFamilyId, Family]
-
-  def setSpouseRelation(familyId: String, personId: String): Either[StemmaError, Unit]
-  def setChildRelation(familyId: String, personId: String): Either[StemmaError, Unit]
-
-  def removeChildRelation(familyId: String, personId: String): Either[StemmaError, Unit]
-  def removeSpouseRelation(familyId: String, personId: String): Either[StemmaError, Unit]
-
-  def stemma(): Stemma
-}
 
 object request {
   sealed trait PersonDefinition

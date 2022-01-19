@@ -1,10 +1,11 @@
 package io.github.salamahin.stemma.service
 
-import gremlin.scala.ScalaGraph
-import io.github.salamahin.stemma.service.graph.Graph
+import io.github.salamahin.stemma.service.graph.GRAPH
+import io.github.salamahin.stemma.tinkerpop.GraphConfig
 import org.apache.tinkerpop.gremlin.process.traversal.IO
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import zio.{Has, UIO, ZIO, ZLayer}
+import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
+import zio.{Has, Ref, UIO, URLayer, ZIO}
 
 object storage {
   trait Storage {
@@ -14,18 +15,23 @@ object storage {
 
   type STORAGE = Has[Storage]
 
-  private class GraphsonFile(file: String, graph: ScalaGraph) extends Storage {
-    import gremlin.scala._
-    override def load() = UIO {
-      new GraphTraversalSource(graph.asJava())
-        .io(file)
-        .`with`(IO.reader, IO.graphson)
-        .read()
-        .iterate()
-    }
+  import gremlin.scala._
+  private class GraphsonFile(file: String, graph: Ref[ScalaGraph]) extends Storage {
+    override def load(): UIO[Unit] =
+      graph.set {
+        val graph = TinkerGraph.open(new GraphConfig).asScala()
 
-    override def save(): UIO[Unit] = UIO {
-      new GraphTraversalSource(graph.asJava())
+        new GraphTraversalSource(graph.asJava())
+          .io(file)
+          .`with`(IO.reader, IO.graphson)
+          .read()
+          .iterate()
+
+        graph
+      }
+
+    override def save(): UIO[Unit] = graph.get.map { g =>
+      new GraphTraversalSource(g.asJava())
         .io(file)
         .`with`(IO.reader, IO.graphson)
         .write()
@@ -33,6 +39,5 @@ object storage {
     }
   }
 
-  def localGraphsonFile(file: String): ZLayer[Graph, Nothing, STORAGE] =
-    ZIO.access[Graph](gr => new GraphsonFile(file, gr.graph)).toLayer
+  def localGraphsonFile(file: String): URLayer[GRAPH, STORAGE] = ZIO.access[GRAPH](g => new GraphsonFile(file, g.get.graph)).toLayer
 }

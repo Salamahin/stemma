@@ -10,7 +10,7 @@ import io.github.salamahin.stemma.{CompositeError, DuplicatedIds, IncompleteFami
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import zio.test.Assertion._
 import zio.test.{DefaultRunnableSpec, assert, assertTrue}
-import zio.{UIO, ZIO}
+import zio.{Ref, ZIO, ZLayer}
 
 import java.time.LocalDate
 
@@ -52,16 +52,17 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
     case _               => throw new IllegalArgumentException("too many parents")
   }
 
-  private val disposableGraph =
-    UIO(new Graph {
-      override val graph: ScalaGraph = {
-        import gremlin.scala._
-        TinkerGraph.open(new GraphConfig).asScala()
-      }
-    }).toLayer
-
-  private val layer   = disposableGraph >>> stemma.basic
-  private val service = ZIO.environment[STEMMA].map(_.get)
+  private def service =
+    for {
+      newGraph <- Ref.make {
+                   import gremlin.scala._
+                   TinkerGraph.open(new GraphConfig).asScala()
+                 }
+      graphService = ZLayer.succeed(new Graph {
+        override val graph: Ref[ScalaGraph] = newGraph
+      })
+      stemmaService <- ZIO.environment[STEMMA].map(_.get).provideCustomLayer(graphService >>> stemma.basic)
+    } yield stemmaService
 
   private val canCreateFamily = testM("can create different family with both parents and several children") {
     for {
@@ -172,7 +173,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
   }
 
   override def spec =
-    (suite("StemmaRepository: basic operations")(
+    suite("StemmaRepository: basic operations")(
       canCreateFamily,
       canRemovePerson,
       leavingSingleMemberOfFamilyDropsTheFamily,
@@ -182,5 +183,5 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
       cantCreateFamilyOfSingleParent,
       cantCreateFamilyOfSingleChild,
       duplicatedIdsForbidden
-    )).provideCustomLayer(layer)
+    )
 }

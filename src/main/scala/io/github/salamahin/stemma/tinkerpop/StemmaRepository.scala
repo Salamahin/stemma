@@ -7,7 +7,7 @@ import io.github.salamahin.stemma.response.{Family, Person, Stemma}
 
 import java.time.format.DateTimeFormatter
 
-class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
+class StemmaRepository(graph: ScalaGraph) {
   private implicit val _graph = graph
 
   private val dateFormat = DateTimeFormatter.ISO_DATE
@@ -27,12 +27,12 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
     val spouseOf = "spouseOf"
   }
 
-  override def newFamily(): String = {
+  def newFamily(): String = {
     val family = graph + types.family
     family.id().toString
   }
 
-  override def newPerson(descr: PersonDescription): String = {
+  def newPerson(descr: PersonDescription): String = {
     val birthDateProps = descr.birthDate.map(keys.birthDate -> dateFormat.format(_))
     val deathDateProps = descr.deathDate.map(keys.deathDate -> dateFormat.format(_))
     val nameProps      = keys.name -> descr.name
@@ -41,10 +41,10 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
     person.id.toString
   }
 
-  override def removeFamily(id: String): Either[NoSuchFamilyId, Unit] = graph.V(id).headOption().map(_.remove()).toRight(NoSuchFamilyId(id))
-  override def removePerson(id: String): Either[NoSuchPersonId, Unit] = graph.V(id).headOption().map(_.remove()).toRight(NoSuchPersonId(id))
+  def removeFamily(id: String): Either[NoSuchFamilyId, Unit] = graph.V(id).headOption().map(_.remove()).toRight(NoSuchFamilyId(id))
+  def removePerson(id: String): Either[NoSuchPersonId, Unit] = graph.V(id).headOption().map(_.remove()).toRight(NoSuchPersonId(id))
 
-  override def describePerson(id: String): Either[NoSuchPersonId, ExtendedPersonDescription] =
+  def describePerson(id: String): Either[NoSuchPersonId, ExtendedPersonDescription] =
     graph
       .V(id)
       .map { p =>
@@ -57,7 +57,7 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
       .headOption()
       .toRight(NoSuchPersonId(id))
 
-  override def describeFamily(id: String): Either[NoSuchFamilyId, Family] =
+  def describeFamily(id: String): Either[NoSuchFamilyId, Family] =
     graph
       .V(id)
       .headOption()
@@ -109,22 +109,22 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
             .toRight(noSuchRelation(familyId, personId))
     } yield ()
 
-  override def setSpouseRelation(familyId: String, personId: String): Either[StemmaError, Unit] =
+  def setSpouseRelation(familyId: String, personId: String): Either[StemmaError, Unit] =
     setRelation(familyId, personId, relations.spouseOf)(
       SpouseAlreadyBelongsToFamily,
       SpouseBelongsToDifferentFamily
     )
 
-  override def setChildRelation(familyId: String, personId: String): Either[StemmaError, Unit] =
+  def setChildRelation(familyId: String, personId: String): Either[StemmaError, Unit] =
     setRelation(familyId, personId, relations.childOf)(
       ChildAlreadyBelongsToFamily,
       ChildBelongsToDifferentFamily
     )
 
-  override def removeChildRelation(familyId: String, personId: String): Either[StemmaError, Unit]  = removeRelation(familyId, personId, relations.childOf)(ChildDoesNotBelongToFamily)
-  override def removeSpouseRelation(familyId: String, personId: String): Either[StemmaError, Unit] = removeRelation(familyId, personId, relations.spouseOf)(SpouseDoesNotBelongToFamily)
+  def removeChildRelation(familyId: String, personId: String): Either[StemmaError, Unit]  = removeRelation(familyId, personId, relations.childOf)(ChildDoesNotBelongToFamily)
+  def removeSpouseRelation(familyId: String, personId: String): Either[StemmaError, Unit] = removeRelation(familyId, personId, relations.spouseOf)(SpouseDoesNotBelongToFamily)
 
-  override def stemma(): Stemma = {
+  def stemma(): Stemma = {
     import io.scalaland.chimney.dsl._
 
     val people = graph
@@ -148,7 +148,7 @@ class TinkerpopStemmaRepository(graph: ScalaGraph) extends StemmaRepository {
     Stemma(people, families)
   }
 
-  override def updatePerson(id: String, description: PersonDescription): Either[NoSuchPersonId, Unit] = {
+  def updatePerson(id: String, description: PersonDescription): Either[NoSuchPersonId, Unit] = {
     import io.scalaland.chimney.dsl._
     for {
       person <- graph.V(id).headOption().toRight(NoSuchPersonId(id))
