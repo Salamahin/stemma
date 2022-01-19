@@ -14,7 +14,7 @@ import zio.{UIO, ZIO}
 
 import java.time.LocalDate
 
-object StemmaRepositoryTest extends DefaultRunnableSpec {
+object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
   object render {
     def unapply(stemma: Stemma) = {
       val Stemma(people: List[Person], families: List[Family]) = stemma
@@ -172,16 +172,15 @@ object StemmaRepositoryTest extends DefaultRunnableSpec {
   }
 
   override def spec =
-    suite("StemmaRepository: basic operations")(
+    (suite("StemmaRepository: basic operations")(
       canCreateFamily,
       canRemovePerson,
       leavingSingleMemberOfFamilyDropsTheFamily,
       canUpdateExistingPerson,
       canUpdateExistingFamily
-    ).provideCustomLayer(layer) +
-      suite("StemmaRepository: validation")(
-        cantCreateFamilyOfSingleParent,
-        cantCreateFamilyOfSingleChild,
-        duplicatedIdsForbidden
-      ).provideCustomLayer(layer)
+    ) + suite("StemmaRepository: validation")(
+      cantCreateFamilyOfSingleParent,
+      cantCreateFamilyOfSingleChild,
+      duplicatedIdsForbidden
+    )).provideCustomLayer(layer)
 }
