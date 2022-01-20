@@ -15,9 +15,7 @@ object ConcurrentStemmaRepositoryTest extends DefaultRunnableSpec with Requests 
     val tempFile     = File.createTempFile("stemma-test-", ".graphson")
     val resourceFile = Paths.get(getClass.getResource(resource).getPath)
 
-    Using(new FileOutputStream(tempFile)) { os =>
-      Files.copy(resourceFile, os)
-    }
+    Using(new FileOutputStream(tempFile)) { os => Files.copy(resourceFile, os) }
 
     tempFile
   }

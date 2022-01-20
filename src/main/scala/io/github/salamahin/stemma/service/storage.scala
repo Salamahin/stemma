@@ -14,7 +14,7 @@ object storage {
   }
 
   import gremlin.scala._
-  private class GraphsonFile(file: String, graph: Ref[ScalaGraph]) extends StorageService {
+  private class GraphsonFile(file: String, graph: Ref.Synchronized[ScalaGraph]) extends StorageService {
     override def load(): UIO[Unit] =
       graph.set {
         val graph = TinkerGraph.open(new GraphConfig).asScala()
