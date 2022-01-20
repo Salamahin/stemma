@@ -8,7 +8,11 @@ import zio.test.Assertion._
 import zio.test.{DefaultRunnableSpec, assert, assertTrue}
 
 object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with RenderStemma {
-  private def newStemmaService = ZIO.environment[StemmaService].map(_.get).provideCustomLayer(graph.newGraph >>> stemma.basic)
+  private def newStemmaService =
+    ZIO
+      .environment[StemmaService]
+      .map(_.get)
+      .provideCustomLayer(graph.newGraph >>> stemma.basic)
 
   private val canCreateFamily = test("can create different family with both parents and several children") {
     for {

@@ -7,7 +7,7 @@ import io.github.salamahin.stemma.service.graph.GraphService
 import io.github.salamahin.stemma.service.storage.StorageService
 import io.github.salamahin.stemma.tinkerpop.StemmaRepository
 import zio._
-import zio.stm.{TReentrantLock, USTM}
+import zio.stm.{TReentrantLock, TSemaphore, USTM}
 
 object stemma {
 
@@ -118,50 +118,32 @@ object stemma {
     override def removeFamily(familyId: String): IO[NoSuchFamilyId, Unit] = repo.get.flatMap(r => IO.fromEither(r.removeFamily(familyId)))
   }
 
-  private class PersistentStemmaService(storage: StorageService, underlying: StemmaService, lock: USTM[TReentrantLock]) extends StemmaService {
+  private class PersistentStemmaService(storage: StorageService, underlying: StemmaService, lock: USTM[TSemaphore]) extends StemmaService {
     private def saveChangesOrReload[E, V](f: StemmaService => IO[E, V]) =
       f(underlying).tapError(_ => storage.load()) <* storage.save()
 
     override def newFamily(family: FamilyDescription): IO[StemmaError, Family] =
-      for {
-        l      <- lock.commit
-        family <- l.writeLock.useDiscard(saveChangesOrReload(_.newFamily(family)))
-      } yield family
+      lock.commit.flatMap(_.withPermit(saveChangesOrReload(_.newFamily(family))))
 
     override def updateFamily(familyId: String, family: FamilyDescription): IO[StemmaError, Family] =
-      for {
-        l      <- lock.commit
-        family <- l.writeLock.useDiscard(saveChangesOrReload(_.updateFamily(familyId, family)))
-      } yield family
+      lock.commit.flatMap(_.withPermit(saveChangesOrReload(_.updateFamily(familyId, family))))
 
     override def removePerson(id: String): IO[StemmaError, Unit] =
-      for {
-        l <- lock.commit
-        _ <- l.writeLock.useDiscard(saveChangesOrReload(_.removePerson(id)))
-      } yield ()
+      lock.commit.flatMap(_.withPermit(saveChangesOrReload(_.removePerson(id))))
 
     override def updatePerson(id: String, description: PersonDescription): IO[StemmaError, Unit] =
-      for {
-        l <- lock.commit
-        _ <- l.writeLock.useDiscard(saveChangesOrReload(_.updatePerson(id, description)))
-      } yield ()
+      lock.commit.flatMap(_.withPermit(saveChangesOrReload(_.updatePerson(id, description))))
 
     override def stemma(): UIO[response.Stemma] =
-      for {
-        l  <- lock.commit
-        st <- l.readLock.useDiscard(underlying.stemma())
-      } yield st
+      lock.commit.flatMap(_.withPermit(underlying.stemma()))
 
     override def removeFamily(familyId: String): IO[NoSuchFamilyId, Unit] =
-      for {
-        l <- lock.commit
-        _ <- l.writeLock.useDiscard(saveChangesOrReload(_.removeFamily(familyId)))
-      } yield ()
+      lock.commit.flatMap(_.withPermit(saveChangesOrReload(_.removeFamily(familyId))))
   }
 
   val basic: RLayer[GraphService, StemmaService] = ZIO
     .environmentWith[GraphService] { service => new StemmaServiceImpl(service.get.graph.map(new StemmaRepository(_))) }
     .toLayer
 
-  val durable: URLayer[StorageService with StemmaService, StemmaService] = (new PersistentStemmaService(_, _, TReentrantLock.make)).toLayer[StemmaService]
+  val durable: URLayer[StorageService with StemmaService, StemmaService] = (new PersistentStemmaService(_, _, TSemaphore.make(1))).toLayer[StemmaService]
 }
