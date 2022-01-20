@@ -1,6 +1,6 @@
 package io.github.salamahin.stemma.tinkerpop
 
-import org.apache.commons.configuration.BaseConfiguration
+import org.apache.commons.configuration2.BaseConfiguration
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 
 class GraphConfig extends BaseConfiguration {

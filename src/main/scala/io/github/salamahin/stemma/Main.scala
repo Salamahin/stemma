@@ -1,6 +1,5 @@
 package io.github.salamahin.stemma
 
-import cats.effect.Blocker
 import io.circe.{Decoder, Encoder}
 
 import java.util.concurrent.Executors
