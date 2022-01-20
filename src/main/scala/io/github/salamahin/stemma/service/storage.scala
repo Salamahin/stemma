@@ -1,22 +1,20 @@
 package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.service.graph.GRAPH
+import io.github.salamahin.stemma.service.graph.GraphService
 import io.github.salamahin.stemma.tinkerpop.GraphConfig
 import org.apache.tinkerpop.gremlin.process.traversal.IO
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
-import zio.{Has, Ref, UIO, URLayer, ZIO}
+import zio.{Ref, UIO, URLayer, ZIO}
 
 object storage {
-  trait Storage {
+  trait StorageService {
     def save(): UIO[Unit]
     def load(): UIO[Unit]
   }
 
-  type STORAGE = Has[Storage]
-
   import gremlin.scala._
-  private class GraphsonFile(file: String, graph: Ref[ScalaGraph]) extends Storage {
+  private class GraphsonFile(file: String, graph: Ref[ScalaGraph]) extends StorageService {
     override def load(): UIO[Unit] =
       graph.set {
         val graph = TinkerGraph.open(new GraphConfig).asScala()
@@ -39,5 +37,5 @@ object storage {
     }
   }
 
-  def localGraphsonFile(file: String): URLayer[GRAPH, STORAGE] = ZIO.access[GRAPH](g => new GraphsonFile(file, g.get.graph)).toLayer
+  def localGraphsonFile(file: String): URLayer[GraphService, StorageService] = ZIO.environmentWith[GraphService](g => new GraphsonFile(file, g.get.graph)).toLayer
 }

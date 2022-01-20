@@ -1,18 +1,15 @@
 package io.github.salamahin.stemma.service
 
-import gremlin.scala.ScalaGraph
 import io.github.salamahin.stemma._
 import io.github.salamahin.stemma.request._
 import io.github.salamahin.stemma.response.Family
-import io.github.salamahin.stemma.service.graph.GRAPH
-import io.github.salamahin.stemma.service.storage.{STORAGE, Storage}
+import io.github.salamahin.stemma.service.graph.GraphService
+import io.github.salamahin.stemma.service.storage.StorageService
 import io.github.salamahin.stemma.tinkerpop.StemmaRepository
 import zio._
 import zio.stm.{TReentrantLock, USTM}
 
 object stemma {
-
-  type STEMMA = Has[StemmaService]
 
   trait StemmaService {
     def newFamily(family: FamilyDescription): IO[StemmaError, Family]
@@ -23,9 +20,7 @@ object stemma {
     def stemma(): UIO[response.Stemma]
   }
 
-  private class StemmaServiceImpl(graph: Ref[ScalaGraph]) extends StemmaService {
-    private val repo = graph.map(new StemmaRepository(_))
-
+  private class StemmaServiceImpl(repo: ZRef.Synchronized[Any, Any, Nothing, Nothing, _, StemmaRepository]) extends StemmaService {
     private def setFamilyRelations(repo: StemmaRepository, familyId: String, parents: Seq[PersonDefinition], children: Seq[PersonDefinition]) = {
       def getOrCreatePerson(p: PersonDefinition) =
         p match {
@@ -37,8 +32,8 @@ object stemma {
         parentIds   <- ZIO.foreach(parents)(getOrCreatePerson)
         childrenIds <- ZIO.foreach(children)(getOrCreatePerson)
 
-        _ <- ZIO.foreach_(parentIds)(personId => ZIO.fromEither(repo.setSpouseRelation(familyId, personId)))
-        _ <- ZIO.foreach_(childrenIds)(personId => ZIO.fromEither(repo.setChildRelation(familyId, personId)))
+        _ <- ZIO.foreachDiscard(parentIds)(personId => ZIO.fromEither(repo.setSpouseRelation(familyId, personId)))
+        _ <- ZIO.foreachDiscard(childrenIds)(personId => ZIO.fromEither(repo.setChildRelation(familyId, personId)))
       } yield Family(familyId, parentIds, childrenIds)
     }
 
@@ -85,8 +80,8 @@ object stemma {
 
         repo                               <- repo.get
         Family(_, oldParents, oldChildren) <- IO.fromEither(repo.describeFamily(familyId))
-        _                                  <- IO.foreach_(oldParents)(parentId => ZIO.fromEither(repo.removeSpouseRelation(familyId, parentId)))
-        _                                  <- IO.foreach_(oldChildren)(childId => ZIO.fromEither(repo.removeChildRelation(familyId, childId)))
+        _                                  <- IO.foreachDiscard(oldParents)(parentId => ZIO.fromEither(repo.removeSpouseRelation(familyId, parentId)))
+        _                                  <- IO.foreachDiscard(oldChildren)(childId => ZIO.fromEither(repo.removeChildRelation(familyId, childId)))
 
         updatedFamily <- setFamilyRelations(repo, familyId, (p1 ++ p2).toSeq, children)
       } yield updatedFamily
@@ -123,47 +118,50 @@ object stemma {
     override def removeFamily(familyId: String): IO[NoSuchFamilyId, Unit] = repo.get.flatMap(r => IO.fromEither(r.removeFamily(familyId)))
   }
 
-  private class PersistentStemmaService(storage: Storage, underlying: StemmaService, lock: USTM[TReentrantLock]) extends StemmaService {
+  private class PersistentStemmaService(storage: StorageService, underlying: StemmaService, lock: USTM[TReentrantLock]) extends StemmaService {
     private def saveChangesOrReload[E, V](f: StemmaService => IO[E, V]) =
       f(underlying).tapError(_ => storage.load()) <* storage.save()
 
     override def newFamily(family: FamilyDescription): IO[StemmaError, Family] =
       for {
         l      <- lock.commit
-        family <- l.writeLock.use_(saveChangesOrReload(_.newFamily(family)))
+        family <- l.writeLock.useDiscard(saveChangesOrReload(_.newFamily(family)))
       } yield family
 
     override def updateFamily(familyId: String, family: FamilyDescription): IO[StemmaError, Family] =
       for {
         l      <- lock.commit
-        family <- l.writeLock.use_(saveChangesOrReload(_.updateFamily(familyId, family)))
+        family <- l.writeLock.useDiscard(saveChangesOrReload(_.updateFamily(familyId, family)))
       } yield family
 
     override def removePerson(id: String): IO[StemmaError, Unit] =
       for {
         l <- lock.commit
-        _ <- l.writeLock.use_(saveChangesOrReload(_.removePerson(id)))
+        _ <- l.writeLock.useDiscard(saveChangesOrReload(_.removePerson(id)))
       } yield ()
 
     override def updatePerson(id: String, description: PersonDescription): IO[StemmaError, Unit] =
       for {
         l <- lock.commit
-        _ <- l.writeLock.use_(saveChangesOrReload(_.updatePerson(id, description)))
+        _ <- l.writeLock.useDiscard(saveChangesOrReload(_.updatePerson(id, description)))
       } yield ()
 
     override def stemma(): UIO[response.Stemma] =
       for {
         l  <- lock.commit
-        st <- l.readLock.use_(underlying.stemma())
+        st <- l.readLock.useDiscard(underlying.stemma())
       } yield st
 
     override def removeFamily(familyId: String): IO[NoSuchFamilyId, Unit] =
       for {
         l <- lock.commit
-        _ <- l.writeLock.use_(saveChangesOrReload(_.removeFamily(familyId)))
+        _ <- l.writeLock.useDiscard(saveChangesOrReload(_.removeFamily(familyId)))
       } yield ()
   }
 
-  val basic: ZLayer[GRAPH, Nothing, STEMMA]         = ZIO.access[GRAPH] { service => new StemmaServiceImpl(service.get.graph) }.toLayer
-  val durable: URLayer[STEMMA with STORAGE, STEMMA] = (new PersistentStemmaService(_, _, TReentrantLock.make)).toLayer[StemmaService]
+  val basic: RLayer[GraphService, StemmaService] = ZIO
+    .environmentWith[GraphService] { service => new StemmaServiceImpl(service.get.graph.map(new StemmaRepository(_))) }
+    .toLayer
+
+  val durable: URLayer[StorageService with StemmaService, StemmaService] = (new PersistentStemmaService(_, _, TReentrantLock.make)).toLayer[StemmaService]
 }

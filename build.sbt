@@ -1,13 +1,13 @@
-ThisBuild / scalaVersion := "2.13.4"
+ThisBuild / scalaVersion := "2.13.8"
 ThisBuild / organization := "io.github.salamahin"
 
 name := "stemma"
 version := "0.1.0-SNAPSHOT"
 
 lazy val versions = new {
-  val http4sV = "1.0.0-M10"
-  val circeV  = "0.14.0-M3"
-  val zioV    = "1.0.13"
+  val http4sV = "1.0.0-M30"
+  val circeV  = "0.15.0-M1"
+  val zioV    = "2.0.0-RC1"
 }
 
 libraryDependencies ++= Seq(
@@ -16,18 +16,18 @@ libraryDependencies ++= Seq(
   "org.http4s"                      %% "http4s-circe"        % versions.http4sV,
   "io.circe"                        %% "circe-generic"       % versions.circeV,
   "io.circe"                        %% "circe-parser"        % versions.circeV,
-  "org.apache.tinkerpop"            % "tinkergraph-gremlin"  % "3.4.10",
-  "com.michaelpollmeier"            %% "gremlin-scala"       % "3.4.7.8",
+  "org.apache.tinkerpop"            % "tinkergraph-gremlin"  % "3.5.2",
+  "com.michaelpollmeier"            %% "gremlin-scala"       % "3.5.1.4",
   "io.scalaland"                    %% "chimney"             % "0.6.1",
   "dev.zio"                         %% "zio"                 % versions.zioV,
-  "dev.zio"                         %% "zio-interop-cats"    % "2.2.0.1",
-  "org.slf4j"                       % "slf4j-api"            % "2.0.0-alpha1",
-  "ch.qos.logback"                  % "logback-classic"      % "1.3.0-alpha5",
-  "org.webjars"                     % "d3js"                 % "6.2.0",
-  "org.webjars"                     % "bootstrap"            % "5.0.0-beta1",
-  "org.webjars"                     % "jquery"               % "3.5.1",
-  "org.webjars"                     % "font-awesome"         % "4.7.0",
-  "org.webjars.bowergithub.eligrey" % "filesaver.js"         % "2.0.4",
+  "dev.zio"                         %% "zio-interop-cats"    % "3.3.0-RC1",
+  "org.slf4j"                       % "slf4j-api"            % "2.0.0-alpha6",
+  "ch.qos.logback"                  % "logback-classic"      % "1.3.0-alpha12",
+//  "org.webjars"                     % "d3js"                 % "6.2.0",
+//  "org.webjars"                     % "bootstrap"            % "5.0.0-beta1",
+//  "org.webjars"                     % "jquery"               % "3.5.1",
+//  "org.webjars"                     % "font-awesome"         % "4.7.0",
+//  "org.webjars.bowergithub.eligrey" % "filesaver.js"         % "2.0.4",
   "dev.zio"                         %% "zio-test"            % versions.zioV % Test,
   "dev.zio"                         %% "zio-test-sbt"        % versions.zioV % Test
 )

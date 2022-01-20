@@ -1,16 +1,13 @@
 package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.request.{ExistingPersonId, FamilyDescription, PersonDefinition, PersonDescription}
 import io.github.salamahin.stemma.response.{Family, Person, Stemma}
-import io.github.salamahin.stemma.service.stemma.STEMMA
+import io.github.salamahin.stemma.service.stemma.StemmaService
 import io.github.salamahin.stemma.{CompositeError, DuplicatedIds, IncompleteFamily}
 import zio.ZIO
 import zio.test.Assertion._
 import zio.test.{DefaultRunnableSpec, assert, assertTrue}
 
-import java.time.LocalDate
-
-object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
+object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests {
   object render {
     def unapply(stemma: Stemma) = {
       val Stemma(people: List[Person], families: List[Family]) = stemma
@@ -29,28 +26,9 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
     }
   }
 
-  private val johnsBirthDay = LocalDate.parse("1900-01-01")
-  private val johnsDeathDay = LocalDate.parse("2000-01-01")
+  private def newStemmaService = ZIO.environment[StemmaService].map(_.get).provideCustomLayer(graph.newGraph >>> stemma.basic)
 
-  private val createJohn           = PersonDescription("John", Some(johnsBirthDay), Some(johnsDeathDay))
-  private val createJane           = PersonDescription("Jane", Some(LocalDate.parse("1850-01-01")), Some(LocalDate.parse("1950-01-01")))
-  private val createJames          = PersonDescription("James", None, None)
-  private val createJake           = PersonDescription("Jake", None, None)
-  private val createJuly           = PersonDescription("July", None, None)
-  private val createJosh           = PersonDescription("Josh", None, None)
-  private val createJill           = PersonDescription("Jill", None, None)
-  private def existing(id: String) = ExistingPersonId(id)
-
-  private def family(parents: PersonDefinition*)(children: PersonDefinition*) = parents.toList match {
-    case Nil             => FamilyDescription(None, None, children.toList)
-    case p1 :: Nil       => FamilyDescription(Some(p1), None, children.toList)
-    case p1 :: p2 :: Nil => FamilyDescription(Some(p1), Some(p2), children.toList)
-    case _               => throw new IllegalArgumentException("too many parents")
-  }
-
-  private def newStemmaService = ZIO.environment[STEMMA].map(_.get).provideCustomLayer(graph.newGraph >>> stemma.basic)
-
-  private val canCreateFamily = testM("can create different family with both parents and several children") {
+  private val canCreateFamily = test("can create different family with both parents and several children") {
     for {
       s <- newStemmaService
 
@@ -71,21 +49,21 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
     }
   }
 
-  private val cantCreateFamilyOfSingleParent = testM("there cant be a family with a single parent and no children") {
+  private val cantCreateFamilyOfSingleParent = test("there cant be a family with a single parent and no children") {
     for {
       s   <- newStemmaService
       err <- s.newFamily(family(createJohn)()).flip
     } yield assertTrue(err == CompositeError(IncompleteFamily() :: Nil))
   }
 
-  private val cantCreateFamilyOfSingleChild = testM("there cant be a family with no parents and a single child") {
+  private val cantCreateFamilyOfSingleChild = test("there cant be a family with no parents and a single child") {
     for {
       s   <- newStemmaService
       err <- s.newFamily(family()(createJill)).flip
     } yield assertTrue(err == CompositeError(IncompleteFamily() :: Nil))
   }
 
-  private val duplicatedIdsForbidden = testM("cant update a family when there are duplicated ids in members") {
+  private val duplicatedIdsForbidden = test("cant update a family when there are duplicated ids in members") {
     for {
       s                                               <- newStemmaService
       Family(familyId, jamesId :: Nil, jillId :: Nil) <- s.newFamily(family(createJames)(createJill))
@@ -93,7 +71,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
     } yield assertTrue(err == CompositeError(DuplicatedIds(jamesId :: Nil) :: Nil))
   }
 
-  private val canRemovePerson = testM("when removing a person hist child & spouse relations are removed as well") {
+  private val canRemovePerson = test("when removing a person hist child & spouse relations are removed as well") {
     for {
       s <- newStemmaService
 
@@ -111,7 +89,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
     )
   }
 
-  private val leavingSingleMemberOfFamilyDropsTheFamily = testM("when the only member of family left the family is removed") {
+  private val leavingSingleMemberOfFamilyDropsTheFamily = test("when the only member of family left the family is removed") {
     for {
       s <- newStemmaService
 
@@ -125,7 +103,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
     } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "James" :: Nil))
   }
 
-  private val canUpdateExistingPerson = testM("can update existing person") {
+  private val canUpdateExistingPerson = test("can update existing person") {
     for {
       s <- newStemmaService
 
@@ -145,7 +123,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec {
     )
   }
 
-  private val canUpdateExistingFamily = testM("when updating a family members are not removed") {
+  private val canUpdateExistingFamily = test("when updating a family members are not removed") {
     for {
       s <- newStemmaService
 
