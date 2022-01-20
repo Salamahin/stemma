@@ -1,31 +1,13 @@
 package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.response.{Family, Person, Stemma}
+import io.github.salamahin.stemma.response.{Family, Stemma}
 import io.github.salamahin.stemma.service.stemma.StemmaService
 import io.github.salamahin.stemma.{CompositeError, DuplicatedIds, IncompleteFamily}
 import zio.ZIO
 import zio.test.Assertion._
 import zio.test.{DefaultRunnableSpec, assert, assertTrue}
 
-object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests {
-  object render {
-    def unapply(stemma: Stemma) = {
-      val Stemma(people: List[Person], families: List[Family]) = stemma
-      val personById                                           = people.map(p => (p.id, p)).toMap
-
-      val descr = families
-        .map {
-          case Family(_, parents, children) =>
-            val parentNames   = parents.map(personById).map(_.name).sorted.mkString("(", ", ", ")")
-            val childrenNames = children.map(personById).map(_.name).sorted.mkString("(", ", ", ")")
-
-            s"$parentNames parentsOf $childrenNames"
-        }
-
-      Some(descr)
-    }
-  }
-
+object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with RenderStemma {
   private def newStemmaService = ZIO.environment[StemmaService].map(_.get).provideCustomLayer(graph.newGraph >>> stemma.basic)
 
   private val canCreateFamily = test("can create different family with both parents and several children") {
@@ -137,13 +119,13 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests {
   }
 
   override def spec =
-    suite("StemmaRepository: basic operations")(
+    suite("StemmaService: basic operations")(
       canCreateFamily,
       canRemovePerson,
       leavingSingleMemberOfFamilyDropsTheFamily,
       canUpdateExistingPerson,
       canUpdateExistingFamily
-    ) + suite("StemmaRepository: validation")(
+    ) + suite("StemmaService: validation")(
       cantCreateFamilyOfSingleParent,
       cantCreateFamilyOfSingleChild,
       duplicatedIdsForbidden

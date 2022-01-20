@@ -2,29 +2,16 @@ package io.github.salamahin.stemma.service
 
 import io.github.salamahin.stemma.response._
 import io.github.salamahin.stemma.service.stemma.StemmaService
-import io.github.salamahin.stemma.service.storage.StorageService
+import io.github.salamahin.stemma.service.storage.localGraphsonFile
 import io.github.salamahin.stemma.{IncompleteFamily, NoSuchFamilyId, StemmaError, request}
-import zio.test.{DefaultRunnableSpec, TestEnvironment, ZSpec}
-import zio.{IO, Ref, UIO, ZEnv, ZIO, ZIOAppArgs, ZIOAppDefault, ZLayer}
+import zio.test.Assertion._
+import zio.test._
+import zio.{IO, UIO, ZIO}
 
-object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests {
+object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests with RenderStemma {
+  private val storageFromResouces = localGraphsonFile(getClass.getResource("/stemma.graphson").getFile)
 
-  private val storage = new StorageService {
-    val stemmaRef = Ref.make(
-      Stemma(
-        Person("1", "jake", None, None) ::
-          Person("2", "jane", None, None) ::
-          Person("3", "john", None, None) ::
-          Nil,
-        Family("1", "2" :: Nil, "2" :: "3" :: Nil) :: Nil
-      )
-    )
-
-    override def save(): UIO[Unit] = ???
-    override def load(): UIO[Unit] = ???
-  }
-
-  private val failOnWriteStemmaService = ZIO
+  private val failOnWriteStemmaLayer = ZIO
     .environment[StemmaService]
     .map { underlying =>
       val service = underlying.get
@@ -40,15 +27,18 @@ object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests {
     }
     .toLayer
 
-  override def spec: ZSpec[TestEnvironment, Any] = ???
-}
+  private val service = ZIO
+    .environment[StemmaService]
+    .map(_.get)
+    .provideCustomLayer(graph.newGraph >>> (storageFromResouces >+> stemma.basic) >+> failOnWriteStemmaLayer >>> stemma.durable)
 
-object Aa extends ZIOAppDefault with Requests {
-  val depts = (graph.newGraph >>> (storage.localGraphsonFile("test.graphson") >+> stemma.basic)) >>> stemma.durable
+  private val revertChangesOnFailure = test("any change that modifies graph would be reverted on failure") {
+    for {
+      failingStemma  <- service
+      _              <- failingStemma.newFamily(family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())
+      render(stemma) <- failingStemma.stemma()
+    } yield assert(stemma)(hasSameElements("(Jane, John) parentsOf (Jake, Jill)" :: Nil))
+  }
 
-  override def run: ZIO[ZEnv with ZIOAppArgs, Any, Any] =
-    (for {
-      stemma <- ZIO.environment[StemmaService].map(_.get)
-      _ <- stemma.newFamily(family(createJohn, createJane)(createJake, createJill))
-    } yield ()).provideCustomLayer(depts)
+  override def spec = suite("StemmaService: corruption")(revertChangesOnFailure)
 }

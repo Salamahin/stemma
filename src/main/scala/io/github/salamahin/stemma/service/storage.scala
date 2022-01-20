@@ -31,11 +31,14 @@ object storage {
     override def save(): UIO[Unit] = graph.get.map { g =>
       new GraphTraversalSource(g.asJava())
         .io(file)
-        .`with`(IO.reader, IO.graphson)
+        .`with`(IO.writer, IO.graphson)
         .write()
         .iterate()
     }
   }
 
-  def localGraphsonFile(file: String): URLayer[GraphService, StorageService] = ZIO.environmentWith[GraphService](g => new GraphsonFile(file, g.get.graph)).toLayer
+  def localGraphsonFile(file: String): URLayer[GraphService, StorageService] = ZIO.environmentWithZIO[GraphService] { g =>
+    val service = new GraphsonFile(file, g.get.graph)
+    service.load().as(service)
+  }.toLayer
 }
