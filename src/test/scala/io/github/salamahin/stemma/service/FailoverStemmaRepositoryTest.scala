@@ -1,7 +1,7 @@
 package io.github.salamahin.stemma.service
 
 import io.github.salamahin.stemma.response._
-import io.github.salamahin.stemma.service.stemma.StemmaService
+import io.github.salamahin.stemma.service.stemma.{STEMMA, StemmaService}
 import io.github.salamahin.stemma.service.storage.localGraphsonFile
 import io.github.salamahin.stemma.{IncompleteFamily, NoSuchFamilyId, StemmaError, request}
 import zio.test.Assertion._
@@ -12,7 +12,7 @@ object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests wi
   private val storageFromResouces = localGraphsonFile(getClass.getResource("/stemma.graphson").getFile)
 
   private val failOnWriteStemmaLayer = ZIO
-    .environment[StemmaService]
+    .environment[STEMMA]
     .map { underlying =>
       val service = underlying.get
 
@@ -28,11 +28,11 @@ object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests wi
     .toLayer
 
   private val service = ZIO
-    .environment[StemmaService]
+    .environment[STEMMA]
     .map(_.get)
-    .provideCustomLayer(graph.newGraph >>> (storageFromResouces >+> stemma.basic) >+> failOnWriteStemmaLayer >>> stemma.durable)
+    .provideCustomLayer(graph.newGraph >>> (storageFromResouces ++ stemma.basic) >+> failOnWriteStemmaLayer >>> stemma.durable)
 
-  private val revertChangesOnFailure = test("any change that modifies graph would be reverted on failure") {
+  private val revertChangesOnFailure = testM("any change that modifies graph would be reverted on failure") {
     for {
       failingStemma  <- service
       _              <- failingStemma.newFamily(family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())

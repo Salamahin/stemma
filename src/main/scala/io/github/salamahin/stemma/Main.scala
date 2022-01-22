@@ -1,86 +1,110 @@
 package io.github.salamahin.stemma
 
-import io.circe.{Decoder, Encoder}
+import io.github.salamahin.stemma.request.{FamilyDescription, PersonDescription}
+import io.github.salamahin.stemma.response.{Family, Stemma}
+import io.github.salamahin.stemma.service.stemma.STEMMA
+import io.github.salamahin.stemma.service.{graph, stemma, storage}
+import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.server.Router
+import sttp.tapir.docs.openapi.OpenAPIDocsInterpreter
+import sttp.tapir.swagger.bundle.SwaggerInterpreter
+import zio.blocking.Blocking
+import zio.clock.Clock
+import zio.console.putStrLn
+import zio.{ExitCode, RIO, URIO, ZIO}
 
-import java.util.concurrent.Executors
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext, Future}
-//import io.github.salamahin.stemma.request.{PersonDescription}
-//import io.github.salamahin.stemma.service.graph.Graph
-//import io.github.salamahin.stemma.service.repository.Repository
-//import io.github.salamahin.stemma.service.storage.Storage
-import org.http4s.circe.{jsonEncoderOf, jsonOf}
-import org.http4s.dsl.Http4sDsl
-import org.http4s.server.staticcontent.webjarServiceBuilder
-import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes, StaticFile}
-//import zio.clock.Clock
-import zio.{RIO, URIO, ZEnv, ZIO}
+object Main extends zio.App {
+  import io.circe.generic.auto._
+  import sttp.tapir.generic.auto._
+  import sttp.tapir.json.circe._
+  import sttp.tapir.server.http4s.ztapir.ZHttp4sServerInterpreter
+  import sttp.tapir.ztapir._
 
-//import scala.concurrent.ExecutionContext
+  private val repo = ZIO.environment[STEMMA].map(_.get)
 
-//object Main extends zio.App {
-//  import io.circe.generic.auto._
-//  import zio.interop.catz._
-//
-//  type StemmaTask[A] = RIO[Repository with Storage with Graph with Clock, A]
-//
-//  val repo = ZIO.accessM[Repository]
-//  val dsl  = Http4sDsl[StemmaTask]
-//
-//  import dsl._
-//
-//  implicit def circeJsonDecoder[A](implicit decoder: Decoder[A]): EntityDecoder[StemmaTask, A] = jsonOf[StemmaTask, A]
-//  implicit def circeJsonEncoder[A](implicit decoder: Encoder[A]): EntityEncoder[StemmaTask, A] = jsonEncoderOf[StemmaTask, A]
-////
-////  private val api = HttpRoutes.of[StemmaTask] {
-////    case GET -> Root / "stemma"             => Ok(repo(_.get.stemma()))
-////    case req @ POST -> Root / "person"      => req.as[PersonDescription].flatMap(person => Ok(repo(_.get newPerson person)))
-////    case req @ POST -> Root / "person" / id => req.as[PersonDescription].flatMap(person => Ok(repo(_.get.updatePerson(id, person))))
-////    case DELETE -> Root / "person" / id     => Ok(repo(_.get.removePerson(id)))
-////    case req @ POST -> Root / "family"      => req.as[FamilyRequest].flatMap(family => Ok(repo(_.get newFamily family)))
-////  }
-//
-//  private def static(ec: ExecutionContext) = HttpRoutes.of[StemmaTask] {
-//    case request @ GET -> Root =>
-//      StaticFile
-//        .fromResource(s"/static/index.html", Blocker.liftExecutionContext(ec), Some(request))
-//        .getOrElseF(NotFound())
-//
-//    case request @ GET -> Root / resource =>
-//      StaticFile
-//        .fromResource(s"/static/$resource", Blocker.liftExecutionContext(ec), Some(request))
-//        .getOrElseF(NotFound())
-//  }
-//
-//  private def webJars(ec: ExecutionContext) = webjarServiceBuilder[StemmaTask](Blocker.liftExecutionContext(ec)).toRoutes
-//
-//  override def run(args: List[String]): URIO[ZEnv, zio.ExitCode] = {
-//    ???
-////    ZIO
-////      .runtime[ZEnv with Repository with Storage with Graph]
-////      .flatMap { implicit runtime =>
-////        val executor = runtime.platform.executor.asEC
-////
-////        BlazeServerBuilder[StemmaTask](executor)
-////          .bindHttp(8080, "localhost")
-////          .withHttpApp(
-////            Router(
-////              "/"    -> (static(executor) <+> webJars(executor)),
-////              "/api" -> api
-////            ).orNotFound
-////          )
-////          .resource
-////          .toManagedZIO
-////          .useForever
-////      }
-////      .provideCustomLayer(
-////        graph.singleton >+>
-////          storage.localGraphsonFile("stemma.graphson") >+>
-////          repository.live
-////      )
-////      .foldCauseM(
-////        err => putStrLn(err.prettyPrint).as(zio.ExitCode.failure),
-////        _ => ZIO.succeed(zio.ExitCode.success)
-////      )
-//  }
-//}
+  private val getStemmaEndpoint = endpoint
+    .get
+    .in("stemma")
+    .out(customJsonBody[Stemma])
+    .zServerLogic(_ => repo.flatMap(_.stemma()))
+
+  private val newFamilyEndpoint = endpoint
+    .post
+    .in("family")
+    .in(customJsonBody[FamilyDescription])
+    .out(customJsonBody[Family])
+    .errorOut(customJsonBody[StemmaError])
+    .zServerLogic(familyDescr => repo.flatMap(_.newFamily(familyDescr)))
+
+  private val updateFamilyEndpoint = endpoint
+    .put
+    .in("family")
+    .in(path[String])
+    .in(customJsonBody[FamilyDescription])
+    .out(customJsonBody[Family])
+    .errorOut(customJsonBody[StemmaError])
+    .zServerLogic { case (id, family) => repo.flatMap(_.updateFamily(id, family)) }
+
+  private val deleteFamilyEndpoint = endpoint
+    .delete
+    .in("family")
+    .in(path[String])
+    .out(emptyOutput)
+    .errorOut(customJsonBody[StemmaError])
+    .zServerLogic(id => repo.flatMap(_.removeFamily(id)))
+
+  private val updatePersonEndpoint = endpoint
+    .put
+    .in("person")
+    .in(path[String])
+    .in(customJsonBody[PersonDescription])
+    .errorOut(customJsonBody[StemmaError])
+    .zServerLogic { case (id, person) => repo.flatMap(_.updatePerson(id, person)) }
+
+  private val deletePersonEndpoint = endpoint
+    .delete
+    .in("person")
+    .in(path[String])
+    .out(emptyOutput)
+    .errorOut(customJsonBody[StemmaError])
+    .zServerLogic(id => repo.flatMap(_.removePerson(id)))
+
+  private val serviceEndpoints =
+    getStemmaEndpoint ::
+      newFamilyEndpoint ::
+      updateFamilyEndpoint ::
+      deleteFamilyEndpoint ::
+      updatePersonEndpoint ::
+      deletePersonEndpoint ::
+      Nil
+
+  private val serviceRoutes = ZHttp4sServerInterpreter().from(serviceEndpoints).toRoutes
+  private val swaggerRoutes = ZHttp4sServerInterpreter()
+    .from(SwaggerInterpreter().fromServerEndpoints(serviceEndpoints, "Stemma Service", "1.0"))
+    .toRoutes
+
+  override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = {
+    import zio.interop.catz._
+
+    type STEMMA_TASK[A] = RIO[STEMMA with Clock with Blocking, A]
+
+    val deps = (graph.newGraph >>> (storage.localGraphsonFile("stemma.graphson") ++ stemma.basic)) >>> stemma.durable
+    BlazeServerBuilder[STEMMA_TASK]
+      .bindHttp(8080, "localhost")
+      .withHttpApp(
+        Router(
+          "/api/v1"  -> serviceRoutes,
+          "/" -> swaggerRoutes
+        ).orNotFound
+      )
+      .resource
+      .toManagedZIO
+      .useForever
+      .provideCustomLayer(deps)
+      .foldCauseM(
+        err => putStrLn(err.prettyPrint).exitCode,
+        _ => ZIO.succeed(zio.ExitCode.success)
+      )
+
+  }
+}
