@@ -3,7 +3,7 @@ package io.github.salamahin.stemma.service
 import io.github.salamahin.stemma.response.Family
 import io.github.salamahin.stemma.service.stemma.{STEMMA, StemmaService}
 import zio.test.Assertion.hasSameElements
-import zio.test.{DefaultRunnableSpec, ZSpec, assert}
+import zio.test.{DefaultRunnableSpec, assert}
 import zio.{IO, ZIO, ZManaged}
 
 import java.io.{File, FileOutputStream}
@@ -38,7 +38,7 @@ object ConcurrentStemmaRepositoryTest extends DefaultRunnableSpec with Requests 
 
   private val concurrentAccessTest = testM("service is thread safe")(for {
     s              <- service
-    _              <- ZIO.foreachPar_(List.fill(1000)(s))(createAndCleanFamily)
+    _              <- ZIO.foreachPar_(List.fill(500)(s))(createAndCleanFamily)
     render(stemma) <- s.stemma()
   } yield assert(stemma)(hasSameElements("(Jane, John) parentsOf (Jake, Jill)" :: Nil)))
 

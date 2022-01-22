@@ -43,5 +43,6 @@ object storage {
     (for {
       g       <- ZIO.environment[GRAPH]
       storage = new GraphsonFile(file, g.get.graph)
+      _       <- storage.load()
     } yield storage).toLayer
 }

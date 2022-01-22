@@ -86,10 +86,8 @@ object Main extends zio.App {
   override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = {
     import zio.interop.catz._
 
-    type STEMMA_TASK[A] = RIO[STEMMA with Clock with Blocking, A]
-
     val deps = (graph.newGraph >>> (storage.localGraphsonFile("stemma.graphson") ++ stemma.basic)) >>> stemma.durable
-    BlazeServerBuilder[STEMMA_TASK]
+    BlazeServerBuilder[RIO[STEMMA with Clock with Blocking, *]]
       .bindHttp(8080, "localhost")
       .withHttpApp(
         Router(
