@@ -13,6 +13,8 @@ lazy val versions = new {
 
 libraryDependencies ++= Seq(
   "org.http4s"                  %% "http4s-blaze-server"     % versions.http4sV,
+  "org.http4s"                  %% "http4s-blaze-client"     % versions.http4sV,
+  "org.http4s"                  %% "http4s-circe"            % versions.http4sV,
   "io.circe"                    %% "circe-generic"           % versions.circeV,
   "io.circe"                    %% "circe-parser"            % versions.circeV,
   "org.apache.tinkerpop"        % "tinkergraph-gremlin"      % "3.5.2",
@@ -31,5 +33,5 @@ libraryDependencies ++= Seq(
 )
 
 testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
-addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
-addCompilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full)
+addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1")
+addCompilerPlugin("org.typelevel" % "kind-projector"      % "0.13.2" cross CrossVersion.full)

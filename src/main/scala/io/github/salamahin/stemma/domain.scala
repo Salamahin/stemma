@@ -1,9 +1,5 @@
 package io.github.salamahin.stemma
 
-import io.github.salamahin.stemma.request.{ExtendedPersonDescription, FamilyDescription, PersonDescription}
-import io.github.salamahin.stemma.response.{Family, Stemma}
-import zio.{IO, UIO}
-
 import java.time.LocalDate
 
 sealed trait StemmaError
