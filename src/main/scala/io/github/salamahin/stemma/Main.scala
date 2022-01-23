@@ -1,6 +1,6 @@
 package io.github.salamahin.stemma
 
-import io.github.salamahin.stemma.domain.{Family, FamilyDescription, PersonDescription, Stemma, StemmaError}
+import io.github.salamahin.stemma.domain._
 import io.github.salamahin.stemma.service.stemma.STEMMA
 import io.github.salamahin.stemma.service.{graph, stemma, storage}
 import org.http4s.blaze.server.BlazeServerBuilder
@@ -13,7 +13,7 @@ import zio.clock.Clock
 import zio.console.{Console, putStrLn}
 import zio.{ExitCode, RIO, URIO, ZIO}
 
-object Main extends zio.App  {
+object Main extends zio.App with Discriminated {
   import sttp.tapir.generic.auto._
   import sttp.tapir.json.circe._
   import sttp.tapir.ztapir._
