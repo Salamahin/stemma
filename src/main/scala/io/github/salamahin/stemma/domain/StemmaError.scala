@@ -1,20 +1,19 @@
 package io.github.salamahin.stemma.domain
 
 import io.circe.{Decoder, Encoder}
-import org.latestbit.circe.adt.codec.JsonTaggedAdtCodec
 
 sealed trait StemmaError
-final case class NoSuchPersonId(id: String)                                               extends StemmaError
-final case class NoSuchFamilyId(id: String)                                               extends StemmaError
-final case class ChildAlreadyBelongsToFamily(familyId: String, personId: String)          extends StemmaError
-final case class ChildBelongsToDifferentFamily(existentFamilyId: String, childId: String) extends StemmaError
-final case class ChildDoesNotBelongToFamily(familyId: String, childId: String)            extends StemmaError
-final case class SpouseAlreadyBelongsToFamily(familyId: String, personId: String)         extends StemmaError
-final case class SpouseBelongsToDifferentFamily(familyId: String, personId: String)       extends StemmaError
-final case class SpouseDoesNotBelongToFamily(familyId: String, personId: String)          extends StemmaError
-final case class IncompleteFamily()                                                       extends StemmaError
-final case class CompositeError(errs: List[StemmaError])                                  extends StemmaError
-final case class DuplicatedIds(duplicatedIds: Seq[String])                                extends StemmaError
+final case class NoSuchPersonId(id: Long)                                            extends StemmaError
+final case class NoSuchFamilyId(id: Long)                                            extends StemmaError
+final case class ChildAlreadyBelongsToFamily(familyId: Long, personId: Long)          extends StemmaError
+final case class ChildBelongsToDifferentFamily(existentFamilyId: Long, childId: Long) extends StemmaError
+final case class ChildDoesNotBelongToFamily(familyId: Long, childId: Long)            extends StemmaError
+final case class SpouseAlreadyBelongsToFamily(familyId: Long, personId: Long)         extends StemmaError
+final case class SpouseBelongsToDifferentFamily(familyId: Long, personId: Long)       extends StemmaError
+final case class SpouseDoesNotBelongToFamily(familyId: Long, personId: Long)          extends StemmaError
+final case class IncompleteFamily()                                                 extends StemmaError
+final case class CompositeError(errs: List[StemmaError])                            extends StemmaError
+final case class DuplicatedIds(duplicatedIds: Seq[Long])                             extends StemmaError
 
 object StemmaError {
   import io.circe.generic.auto._

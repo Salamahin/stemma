@@ -6,7 +6,7 @@ import org.latestbit.circe.adt.codec.JsonAdt
 import java.time.LocalDate
 
 sealed trait PersonDefinition
-@JsonAdt("existing") final case class ExistingPersonId(id: String)                                                           extends PersonDefinition
+@JsonAdt("existing") final case class ExistingPersonId(id: Long)                                                           extends PersonDefinition
 @JsonAdt("new") final case class PersonDescription(name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate]) extends PersonDefinition
 
 object PersonDefinition {

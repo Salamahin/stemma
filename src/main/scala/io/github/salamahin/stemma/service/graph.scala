@@ -1,7 +1,6 @@
 package io.github.salamahin.stemma.service
 
 import gremlin.scala.ScalaGraph
-import io.github.salamahin.stemma.tinkerpop.GraphConfig
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import zio.{Has, Ref, ULayer, ZRef}
 
@@ -16,7 +15,7 @@ object graph {
     ZRef
       .make {
         import gremlin.scala._
-        TinkerGraph.open(new GraphConfig).asScala()
+        TinkerGraph.open().asScala()
       }
       .map { g =>
         new GraphService {

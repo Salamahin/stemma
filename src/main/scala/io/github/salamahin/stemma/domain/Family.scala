@@ -2,7 +2,7 @@ package io.github.salamahin.stemma.domain
 
 import io.circe.{Decoder, Encoder}
 
-final case class Family(id: String, parents: Seq[String], children: Seq[String])
+final case class Family(id: Long, parents: Seq[Long], children: Seq[Long])
 
 object Family {
   import io.circe.generic.semiauto._

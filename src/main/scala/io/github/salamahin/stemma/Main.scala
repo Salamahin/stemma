@@ -43,7 +43,7 @@ object Main extends zio.App  {
   private val updateFamilyEndpoint = endpoint
     .put
     .in("family")
-    .in(path[String])
+    .in(path[Long].name("familyId"))
     .in(customJsonBody[FamilyDescription])
     .out(customJsonBody[Family])
     .errorOut(customJsonBody[StemmaError])
@@ -53,7 +53,7 @@ object Main extends zio.App  {
   private val deleteFamilyEndpoint = endpoint
     .delete
     .in("family")
-    .in(path[String])
+    .in(path[Long].name("familyId"))
     .out(emptyOutput)
     .errorOut(customJsonBody[StemmaError])
     .zServerLogic(id => repo.flatMap(_.removeFamily(id)))
@@ -62,7 +62,7 @@ object Main extends zio.App  {
   private val updatePersonEndpoint = endpoint
     .put
     .in("person")
-    .in(path[String])
+    .in(path[Long].name("personId"))
     .in(customJsonBody[PersonDescription])
     .errorOut(customJsonBody[StemmaError])
     .zServerLogic { case (id, person) => repo.flatMap(_.updatePerson(id, person)) }
@@ -71,7 +71,7 @@ object Main extends zio.App  {
   private val deletePersonEndpoint = endpoint
     .delete
     .in("person")
-    .in(path[String])
+    .in(path[Long].name("personId"))
     .out(emptyOutput)
     .errorOut(customJsonBody[StemmaError])
     .zServerLogic(id => repo.flatMap(_.removePerson(id)))

@@ -1,11 +1,12 @@
 package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.domain.{Family, FamilyDescription, IncompleteFamily, NoSuchFamilyId, PersonDescription, Stemma, StemmaError}
+import io.github.salamahin.stemma.domain._
 import io.github.salamahin.stemma.service.stemma.{STEMMA, StemmaService}
-import io.github.salamahin.stemma.service.storage.localGraphsonFile
+import io.github.salamahin.stemma.service.storage.{STORAGE, localGraphsonFile}
+import zio.console.putStrLn
 import zio.test.Assertion._
 import zio.test._
-import zio.{IO, UIO, ZIO}
+import zio.{ExitCode, IO, UIO, URIO, ZIO}
 
 object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests with RenderStemma {
   private val storageFromResouces = localGraphsonFile(getClass.getResource("/stemma.graphson").getFile)
@@ -16,12 +17,12 @@ object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests wi
       val service = underlying.get
 
       new StemmaService {
-        override def newFamily(family: FamilyDescription): IO[StemmaError, Family]                      = service.newFamily(family) <* ZIO.fail(IncompleteFamily())
-        override def updateFamily(familyId: String, family: FamilyDescription): IO[StemmaError, Family] = service.updateFamily(familyId, family) <* ZIO.fail(IncompleteFamily())
-        override def removeFamily(familyId: String): IO[NoSuchFamilyId, Unit]                           = service.removeFamily(familyId) <* ZIO.fail(NoSuchFamilyId(familyId))
-        override def removePerson(id: String): IO[StemmaError, Unit]                                    = service.removePerson(id) <* ZIO.fail(IncompleteFamily())
-        override def updatePerson(id: String, description: PersonDescription): IO[StemmaError, Unit]    = service.updatePerson(id, description) <* ZIO.fail(IncompleteFamily())
-        override def stemma(): UIO[Stemma]                                                              = service.stemma()
+        override def newFamily(family: FamilyDescription): IO[StemmaError, Family]                    = service.newFamily(family) <* ZIO.fail(IncompleteFamily())
+        override def updateFamily(familyId: Long, family: FamilyDescription): IO[StemmaError, Family] = service.updateFamily(familyId, family) <* ZIO.fail(IncompleteFamily())
+        override def removeFamily(familyId: Long): IO[NoSuchFamilyId, Unit]                           = service.removeFamily(familyId) <* ZIO.fail(NoSuchFamilyId(familyId))
+        override def removePerson(id: Long): IO[StemmaError, Unit]                                    = service.removePerson(id) <* ZIO.fail(IncompleteFamily())
+        override def updatePerson(id: Long, description: PersonDescription): IO[StemmaError, Unit]    = service.updatePerson(id, description) <* ZIO.fail(IncompleteFamily())
+        override def stemma(): UIO[Stemma]                                                            = service.stemma()
       }
     }
     .toLayer
