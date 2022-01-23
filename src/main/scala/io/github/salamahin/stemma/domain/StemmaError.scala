@@ -1,6 +1,7 @@
-package io.github.salamahin.stemma
+package io.github.salamahin.stemma.domain
 
-import java.time.LocalDate
+import io.circe.{Decoder, Encoder}
+import org.latestbit.circe.adt.codec.JsonTaggedAdtCodec
 
 sealed trait StemmaError
 final case class NoSuchPersonId(id: String)                                               extends StemmaError
@@ -15,18 +16,10 @@ final case class IncompleteFamily()                                             
 final case class CompositeError(errs: List[StemmaError])                                  extends StemmaError
 final case class DuplicatedIds(duplicatedIds: Seq[String])                                extends StemmaError
 
-object request {
-  sealed trait PersonDefinition
-  final case class ExistingPersonId(id: String)                                                                extends PersonDefinition
-  final case class PersonDescription(name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate]) extends PersonDefinition
+object StemmaError {
+  import io.circe.generic.auto._
+  import org.latestbit.circe.adt.codec._
 
-  final case class FamilyDescription(parent1: Option[PersonDefinition], parent2: Option[PersonDefinition], children: List[PersonDefinition])
-  final case class ExtendedPersonDescription(personDescription: PersonDescription, childOf: Option[String], spouseOf: Option[String])
-}
-
-object response {
-  final case class Person(id: String, name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate])
-  final case class Family(id: String, parents: Seq[String], children: Seq[String])
-
-  final case class Stemma(people: List[Person], families: List[Family])
+  implicit val encoder: Encoder[StemmaError] = JsonTaggedAdtCodec.createEncoder[StemmaError]("type")
+  implicit val decoder: Decoder[StemmaError] = JsonTaggedAdtCodec.createDecoder[StemmaError]("type")
 }

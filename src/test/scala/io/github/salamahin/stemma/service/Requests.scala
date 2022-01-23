@@ -1,6 +1,8 @@
 package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.request.{ExistingPersonId, FamilyDescription, PersonDefinition, PersonDescription}
+import io.github.salamahin.stemma.domain
+import io.github.salamahin.stemma.domain.{ExistingPersonId, FamilyDescription, PersonDefinition, PersonDescription}
+import io.github.salamahin.stemma.domain.PersonDescription
 
 import java.time.LocalDate
 
@@ -19,8 +21,8 @@ trait Requests {
 
   def family(parents: PersonDefinition*)(children: PersonDefinition*) = parents.toList match {
     case Nil             => FamilyDescription(None, None, children.toList)
-    case p1 :: Nil       => FamilyDescription(Some(p1), None, children.toList)
-    case p1 :: p2 :: Nil => FamilyDescription(Some(p1), Some(p2), children.toList)
+    case p1 :: Nil       => domain.FamilyDescription(Some(p1), None, children.toList)
+    case p1 :: p2 :: Nil => domain.FamilyDescription(Some(p1), Some(p2), children.toList)
     case _               => throw new IllegalArgumentException("too many parents")
   }
 

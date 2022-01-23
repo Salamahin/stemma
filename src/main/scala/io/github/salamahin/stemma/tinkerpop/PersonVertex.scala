@@ -7,8 +7,8 @@ import java.util.UUID
 
 case class PersonVertex(
   name: String,
-  birthDate: Option[LocalDate],
-  deathDate: Option[LocalDate],
+  birthDate: Option[String],
+  deathDate: Option[String],
   phone: Option[String],
   bio: Option[String],
   @id id: Option[UUID] = None,

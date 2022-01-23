@@ -1,8 +1,9 @@
 package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma._
-import io.github.salamahin.stemma.request._
-import io.github.salamahin.stemma.response.Family
+import cats.implicits.catsSyntaxTuple2Semigroupal
+import io.github.salamahin.stemma.domain._
+import io.github.salamahin.stemma.domain._
+import io.github.salamahin.stemma.domain.Stemma
 import io.github.salamahin.stemma.service.graph.GRAPH
 import io.github.salamahin.stemma.service.storage.{STORAGE, StorageService}
 import io.github.salamahin.stemma.tinkerpop.StemmaRepository
@@ -16,7 +17,7 @@ object stemma {
     def removeFamily(familyId: String): IO[NoSuchFamilyId, Unit]
     def removePerson(id: String): IO[StemmaError, Unit]
     def updatePerson(id: String, description: PersonDescription): IO[StemmaError, Unit]
-    def stemma(): UIO[response.Stemma]
+    def stemma(): UIO[Stemma]
   }
 
   type STEMMA = Has[StemmaService]
@@ -59,8 +60,6 @@ object stemma {
         val duplicatedIds = collectDuplicatedIds((f.parent2 ++ f.parent1).toSeq ++ f.children).toList
         if (duplicatedIds.isEmpty) ().validNec else DuplicatedIds(duplicatedIds).invalidNec
       }
-
-      import cats.syntax.apply._
       (checkMembersCount(f), checkDuplicatedIds(f))
         .mapN((_, _) => f)
         .leftMap(chain => CompositeError(chain.toNonEmptyList.toList))
@@ -114,7 +113,7 @@ object stemma {
 
     override def updatePerson(id: String, description: PersonDescription): ZIO[Any, StemmaError, Unit] = repo.get.flatMap(r => ZIO.fromEither(r.updatePerson(id, description)))
 
-    override def stemma(): UIO[response.Stemma] = repo.get.map(_.stemma())
+    override def stemma(): UIO[Stemma] = repo.get.map(_.stemma())
 
     override def removeFamily(familyId: String): IO[NoSuchFamilyId, Unit] = repo.get.flatMap(r => IO.fromEither(r.removeFamily(familyId)))
   }
@@ -135,7 +134,7 @@ object stemma {
     override def updatePerson(id: String, description: PersonDescription): IO[StemmaError, Unit] =
       lock.writeLock.use_(saveChangesOrReload(_.updatePerson(id, description)))
 
-    override def stemma(): UIO[response.Stemma] =
+    override def stemma(): UIO[Stemma] =
       lock.readLock.use_(underlying.stemma())
 
     override def removeFamily(familyId: String): IO[NoSuchFamilyId, Unit] =

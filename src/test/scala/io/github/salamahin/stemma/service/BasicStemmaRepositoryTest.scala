@@ -1,8 +1,8 @@
 package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.response.{Family, Stemma}
+import io.github.salamahin.stemma.domain.Stemma
 import io.github.salamahin.stemma.service.stemma.STEMMA
-import io.github.salamahin.stemma.{CompositeError, DuplicatedIds, IncompleteFamily}
+import io.github.salamahin.stemma.domain._
 import zio.ZIO
 import zio.test.Assertion._
 import zio.test.{DefaultRunnableSpec, assert, assertTrue}

@@ -1,41 +1,26 @@
 package io.github.salamahin.stemma
 
-import cats.implicits.toFunctorOps
-import io.circe.syntax.EncoderOps
-import io.circe.{Decoder, Encoder}
-import io.github.salamahin.stemma.request.{ExistingPersonId, FamilyDescription, PersonDefinition, PersonDescription}
-import io.github.salamahin.stemma.response.{Family, Stemma}
+import io.github.salamahin.stemma.domain.{Family, FamilyDescription, PersonDescription, Stemma, StemmaError}
 import io.github.salamahin.stemma.service.stemma.STEMMA
 import io.github.salamahin.stemma.service.{graph, stemma, storage}
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.server.Router
 import org.http4s.server.middleware.Logger
+import sttp.tapir.server.http4s.ztapir.ZHttp4sServerInterpreter
 import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import zio.blocking.Blocking
 import zio.clock.Clock
 import zio.console.{Console, putStrLn}
 import zio.{ExitCode, RIO, URIO, ZIO}
 
-object Main extends zio.App {
-  import io.circe.generic.auto._
+object Main extends zio.App  {
   import sttp.tapir.generic.auto._
   import sttp.tapir.json.circe._
-  import sttp.tapir.server.http4s.ztapir.ZHttp4sServerInterpreter
   import sttp.tapir.ztapir._
   import zio.interop.catz._
 
   type STEMMA_ENV     = STEMMA with Console with Clock with Blocking
   type STEMMA_TASK[A] = RIO[STEMMA_ENV, A]
-
-  implicit val accountStatusEncoder: Encoder[PersonDefinition] = Encoder.instance {
-    case descr @ PersonDescription(_, _, _) => descr.asJson
-    case id @ ExistingPersonId(_)           => id.asJson
-  }
-
-  implicit val accountStatusDecoder: Decoder[PersonDefinition] = List[Decoder[PersonDefinition]](
-    Decoder[PersonDescription].widen,
-    Decoder[ExistingPersonId].widen
-  ).reduceLeft(_ or _)
 
   private val repo = ZIO.environment[STEMMA].map(_.get)
 
@@ -52,9 +37,7 @@ object Main extends zio.App {
     .in(customJsonBody[FamilyDescription])
     .out(customJsonBody[Family])
     .errorOut(customJsonBody[StemmaError])
-    .zServerLogic(familyDescr => {
-      repo.flatMap(_.newFamily(familyDescr))
-    })
+    .zServerLogic(familyDescr => repo.flatMap(_.newFamily(familyDescr)))
     .widen[STEMMA_ENV]
 
   private val updateFamilyEndpoint = endpoint

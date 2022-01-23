@@ -1,6 +1,6 @@
 package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.response.Family
+import io.github.salamahin.stemma.domain.Family
 import io.github.salamahin.stemma.service.stemma.{STEMMA, StemmaService}
 import zio.test.Assertion.hasSameElements
 import zio.test.{DefaultRunnableSpec, assert}

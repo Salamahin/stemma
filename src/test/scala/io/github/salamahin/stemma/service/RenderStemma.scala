@@ -1,6 +1,6 @@
 package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.response.{Family, Person, Stemma}
+import io.github.salamahin.stemma.domain.{Family, Person, Stemma}
 
 trait RenderStemma {
   object render {

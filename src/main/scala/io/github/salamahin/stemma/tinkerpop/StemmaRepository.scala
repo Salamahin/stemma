@@ -1,10 +1,24 @@
 package io.github.salamahin.stemma.tinkerpop
 
 import gremlin.scala._
-import io.github.salamahin.stemma._
-import io.github.salamahin.stemma.request.{ExtendedPersonDescription, PersonDescription}
-import io.github.salamahin.stemma.response.{Family, Person, Stemma}
+import io.github.salamahin.stemma.domain.{
+  ChildAlreadyBelongsToFamily,
+  ChildBelongsToDifferentFamily,
+  ChildDoesNotBelongToFamily,
+  CompositeError,
+  Family,
+  NoSuchFamilyId,
+  NoSuchPersonId,
+  Person,
+  PersonDescription,
+  SpouseAlreadyBelongsToFamily,
+  SpouseBelongsToDifferentFamily,
+  SpouseDoesNotBelongToFamily,
+  Stemma,
+  StemmaError
+}
 
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 class StemmaRepository(graph: ScalaGraph) {
@@ -125,13 +139,12 @@ class StemmaRepository(graph: ScalaGraph) {
   def removeSpouseRelation(familyId: String, personId: String): Either[StemmaError, Unit] = removeRelation(familyId, personId, relations.spouseOf)(SpouseDoesNotBelongToFamily)
 
   def stemma(): Stemma = {
-    import io.scalaland.chimney.dsl._
 
     val people = graph
       .V
       .hasLabel(types.person)
       .toCC[PersonVertex]
-      .map { person => person.into[Person].withFieldComputed(_.id, _.id.map(_.toString).get).transform }
+      .map { vertex => Person(vertex.id.map(_.toString).get, vertex.name, vertex.birthDate.map(LocalDate.parse), vertex.deathDate.map(LocalDate.parse)) }
       .toList()
 
     val families = graph
@@ -149,15 +162,14 @@ class StemmaRepository(graph: ScalaGraph) {
   }
 
   def updatePerson(id: String, description: PersonDescription): Either[NoSuchPersonId, Unit] = {
-    import io.scalaland.chimney.dsl._
     for {
       person <- graph.V(id).headOption().toRight(NoSuchPersonId(id))
-      _ = person.updateWith[PersonVertex](
-        description
-          .into[PersonVertex]
-          .withFieldComputed(_.phone, _ => None)
-          .withFieldComputed(_.bio, _ => None)
-          .transform
+      _ = person.updateAs[PersonVertex](vertex =>
+        vertex.copy(
+          name = description.name,
+          birthDate = description.birthDate.map(_.toString),
+          deathDate = description.deathDate.map(_.toString)
+        )
       )
     } yield ()
   }
