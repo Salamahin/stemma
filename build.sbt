@@ -17,7 +17,7 @@ libraryDependencies ++= Seq(
   "org.http4s"                  %% "http4s-circe"            % versions.http4sV,
   "io.circe"                    %% "circe-generic"           % versions.circeV,
   "io.circe"                    %% "circe-parser"            % versions.circeV,
-  "org.latestbit"               %% "circe-tagged-adt-codec"  % "0.10.0",
+  "io.circe"                    %% "circe-generic-extras"    % versions.circeV,
   "org.apache.tinkerpop"        % "tinkergraph-gremlin"      % "3.5.2",
   "com.michaelpollmeier"        %% "gremlin-scala"           % "3.5.1.4",
   "dev.zio"                     %% "zio"                     % versions.zioV,
