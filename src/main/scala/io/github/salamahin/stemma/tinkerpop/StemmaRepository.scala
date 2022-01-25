@@ -26,31 +26,31 @@ class StemmaRepository(graph: ScalaGraph) {
     val spouseOf = "spouseOf"
   }
 
-  def newFamily(): Long = {
+  def newFamily(): String = {
     val family = graph + types.family
-    family.id().toString.toLong
+    family.id().toString
   }
 
-  def newPerson(descr: PersonDescription): Long = {
+  def newPerson(descr: PersonDescription): String = {
     val birthDateProps = descr.birthDate.map(keys.birthDate -> dateFormat.format(_))
     val deathDateProps = descr.deathDate.map(keys.deathDate -> dateFormat.format(_))
     val nameProps      = keys.name -> descr.name
 
     val person = graph + (types.person, nameProps +: (birthDateProps ++ deathDateProps).toSeq: _*)
-    person.id.toString.toLong
+    person.id.toString
   }
 
-  def removeFamily(id: Long): Either[NoSuchFamilyId, Unit] = graph.V(id).headOption().map(_.remove()).toRight(NoSuchFamilyId(id))
-  def removePerson(id: Long): Either[NoSuchPersonId, Unit] = graph.V(id).headOption().map(_.remove()).toRight(NoSuchPersonId(id))
+  def removeFamily(id: String): Either[NoSuchFamilyId, Unit] = graph.V(id).headOption().map(_.remove()).toRight(NoSuchFamilyId(id))
+  def removePerson(id: String): Either[NoSuchPersonId, Unit] = graph.V(id).headOption().map(_.remove()).toRight(NoSuchPersonId(id))
 
-  def describePerson(id: Long): Either[NoSuchPersonId, ExtendedPersonDescription] = {
+  def describePerson(id: String): Either[NoSuchPersonId, ExtendedPersonDescription] = {
     graph
       .V(id)
       .headOption()
       .map { p =>
         val person   = p.toCC[PersonVertex]
-        val spouseOf = p.outE(relations.spouseOf).otherV().map(_.id().toString.toLong).headOption()
-        val childOf  = p.outE(relations.childOf).otherV().map(_.id().toString.toLong).headOption()
+        val spouseOf = p.outE(relations.spouseOf).otherV().map(_.id().toString).headOption()
+        val childOf  = p.outE(relations.childOf).otherV().map(_.id().toString).headOption()
 
         val personDescr = PersonDescription(
           person.name,
@@ -63,21 +63,21 @@ class StemmaRepository(graph: ScalaGraph) {
       .toRight(NoSuchPersonId(id))
   }
 
-  def describeFamily(id: Long): Either[NoSuchFamilyId, Family] =
+  def describeFamily(id: String): Either[NoSuchFamilyId, Family] =
     graph
       .V(id)
       .headOption()
       .map { f =>
-        val parents  = f.inE(relations.spouseOf).otherV().id().map(_.toString.toLong).toList()
-        val children = f.inE(relations.childOf).otherV().id().map(_.toString.toLong).toList()
+        val parents  = f.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
+        val children = f.inE(relations.childOf).otherV().id().map(_.toString).toList()
 
-        Family(f.id().toString.toLong, parents, children)
+        Family(f.id().toString, parents, children)
       }
       .toRight(NoSuchFamilyId(id))
 
-  private def setRelation(familyId: Long, personId: Long, relation: String)(
-    alreadyRelated: (Long, Long) => StemmaError,
-    relationConflict: (Long, Long) => StemmaError
+  private def setRelation(familyId: String, personId: String, relation: String)(
+    alreadyRelated: (String, String) => StemmaError,
+    relationConflict: (String, String) => StemmaError
   ) = {
     for {
       person <- graph.V(personId).headOption().toRight(NoSuchPersonId(personId))
@@ -90,18 +90,18 @@ class StemmaRepository(graph: ScalaGraph) {
         .otherV()
         .map(otherFamily =>
           if (isFamily.test(otherFamily)) alreadyRelated(familyId, personId)
-          else relationConflict(otherFamily.id().toString.toLong, personId)
+          else relationConflict(otherFamily.id().toString, personId)
         )
         .toList()
 
-      _ <- if (conflicts.isEmpty) Right() else Left(CompositeError(conflicts))
+      _ <- if (conflicts.isEmpty) Right((): Unit) else Left(CompositeError(conflicts))
 
       _ = person --- relation --> family
     } yield ()
   }
 
-  private def removeRelation(familyId: Long, personId: Long, relation: String)(
-    noSuchRelation: (Long, Long) => StemmaError
+  private def removeRelation(familyId: String, personId: String, relation: String)(
+    noSuchRelation: (String, String) => StemmaError
   ) =
     for {
       person <- graph.V(personId).headOption().toRight(NoSuchPersonId(personId))
@@ -115,46 +115,45 @@ class StemmaRepository(graph: ScalaGraph) {
             .toRight(noSuchRelation(familyId, personId))
     } yield ()
 
-  def setSpouseRelation(familyId: Long, personId: Long): Either[StemmaError, Unit] =
+  def setSpouseRelation(familyId: String, personId: String): Either[StemmaError, Unit] =
     setRelation(familyId, personId, relations.spouseOf)(
       SpouseAlreadyBelongsToFamily,
       SpouseBelongsToDifferentFamily
     )
 
-  def setChildRelation(familyId: Long, personId: Long): Either[StemmaError, Unit] =
+  def setChildRelation(familyId: String, personId: String): Either[StemmaError, Unit] =
     setRelation(familyId, personId, relations.childOf)(
       ChildAlreadyBelongsToFamily,
       ChildBelongsToDifferentFamily
     )
 
-  def removeChildRelation(familyId: Long, personId: Long): Either[StemmaError, Unit]  = removeRelation(familyId, personId, relations.childOf)(ChildDoesNotBelongToFamily)
-  def removeSpouseRelation(familyId: Long, personId: Long): Either[StemmaError, Unit] = removeRelation(familyId, personId, relations.spouseOf)(SpouseDoesNotBelongToFamily)
+  def removeChildRelation(familyId: String, personId: String): Either[StemmaError, Unit]  = removeRelation(familyId, personId, relations.childOf)(ChildDoesNotBelongToFamily)
+  def removeSpouseRelation(familyId: String, personId: String): Either[StemmaError, Unit] = removeRelation(familyId, personId, relations.spouseOf)(SpouseDoesNotBelongToFamily)
 
   def stemma(): Stemma = {
     val people = graph
-      .V
+      .V()
       .hasLabel(types.person)
       .toCC[PersonVertex]
-      .map { vertex => {
-        Person(vertex.id.get, vertex.name, vertex.birthDate.map(LocalDate.parse), vertex.deathDate.map(LocalDate.parse))
-      } }
+      .map { vertex =>
+        Person(vertex.id.get.toString, vertex.name, vertex.birthDate.map(LocalDate.parse), vertex.deathDate.map(LocalDate.parse)) }
       .toList()
 
     val families = graph
-      .V
+      .V()
       .hasLabel(types.family)
       .map { family =>
-        val parents  = family.inE(relations.spouseOf).otherV().id().map(_.toString.toLong).toList()
-        val children = family.inE(relations.childOf).otherV().id().map(_.toString.toLong).toList()
+        val parents  = family.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
+        val children = family.inE(relations.childOf).otherV().id().map(_.toString).toList()
 
-        Family(family.id().toString.toLong, parents, children)
+        Family(family.id().toString, parents, children)
       }
       .toList()
 
     Stemma(people, families)
   }
 
-  def updatePerson(id: Long, description: PersonDescription): Either[NoSuchPersonId, Unit] = {
+  def updatePerson(id: String, description: PersonDescription): Either[NoSuchPersonId, Unit] = {
     for {
       person <- graph.V(id).headOption().toRight(NoSuchPersonId(id))
       _ = person.updateAs[PersonVertex](vertex =>

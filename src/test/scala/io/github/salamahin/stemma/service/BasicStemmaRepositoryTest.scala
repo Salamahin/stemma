@@ -1,22 +1,21 @@
 package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.domain.Stemma
-import io.github.salamahin.stemma.service.stemma.STEMMA
 import io.github.salamahin.stemma.domain._
+import io.github.salamahin.stemma.service.stemma.STEMMA
 import zio.ZIO
 import zio.test.Assertion._
 import zio.test.{DefaultRunnableSpec, assert, assertTrue}
 
 object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with RenderStemma {
-  private def newStemmaService =
+  private val service =
     ZIO
       .environment[STEMMA]
       .map(_.get)
-      .provideCustomLayer(graph.newGraph >>> stemma.basic)
+      .provideCustomLayer(TempGraphService.make >>> repo.repo >>> stemma.basic)
 
   private val canCreateFamily = testM("can create different family with both parents and several children") {
     for {
-      s <- newStemmaService
+      s <- service
 
       _ <- s.newFamily(family(createJane, createJohn)(createJill, createJosh))
       _ <- s.newFamily(family(createJohn)(createJosh))
@@ -37,21 +36,21 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
 
   private val cantCreateFamilyOfSingleParent = testM("there cant be a family with a single parent and no children") {
     for {
-      s   <- newStemmaService
+      s   <- service
       err <- s.newFamily(family(createJohn)()).flip
     } yield assertTrue(err == CompositeError(IncompleteFamily() :: Nil))
   }
 
   private val cantCreateFamilyOfSingleChild = testM("there cant be a family with no parents and a single child") {
     for {
-      s   <- newStemmaService
+      s   <- service
       err <- s.newFamily(family()(createJill)).flip
     } yield assertTrue(err == CompositeError(IncompleteFamily() :: Nil))
   }
 
   private val duplicatedIdsForbidden = testM("cant update a family when there are duplicated ids in members") {
     for {
-      s                                               <- newStemmaService
+      s                                               <- service
       Family(familyId, jamesId :: Nil, jillId :: Nil) <- s.newFamily(family(createJames)(createJill))
       err                                             <- s.updateFamily(familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
     } yield assertTrue(err == CompositeError(DuplicatedIds(jamesId :: Nil) :: Nil))
@@ -59,7 +58,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
 
   private val canRemovePerson = testM("when removing a person hist child & spouse relations are removed as well") {
     for {
-      s <- newStemmaService
+      s <- service
 
       Family(_, _, jillId :: _ :: Nil) <- s.newFamily(family(createJane, createJohn)(createJill, createJames))
       _                                <- s.newFamily(family(existing(jillId), createJosh)(createJake))
@@ -77,7 +76,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
 
   private val leavingSingleMemberOfFamilyDropsTheFamily = testM("when the only member of family left the family is removed") {
     for {
-      s <- newStemmaService
+      s <- service
 
       Family(_, _, jillId :: Nil) <- s.newFamily(family(createJane)(createJill))
       Family(_, joshId :: Nil, _) <- s.newFamily(family(createJosh)(createJames))
@@ -91,7 +90,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
 
   private val canUpdateExistingPerson = testM("can update existing person") {
     for {
-      s <- newStemmaService
+      s <- service
 
       Family(_, janeId :: Nil, _) <- s.newFamily(family(createJane)(createJill))
 
@@ -111,7 +110,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
 
   private val canUpdateExistingFamily = testM("when updating a family members are not removed") {
     for {
-      s <- newStemmaService
+      s <- service
 
       Family(familyId, _ :: johnId :: Nil, jillId :: Nil) <- s.newFamily(family(createJane, createJohn)(createJill))
       _                                                   <- s.updateFamily(familyId, family(createJuly, existing(johnId))(existing(jillId), createJames))

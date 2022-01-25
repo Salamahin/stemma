@@ -6,7 +6,7 @@ import io.circe.{Decoder, Encoder}
 import java.time.LocalDate
 
 sealed trait PersonDefinition
-final case class ExistingPersonId(id: Long)                                                                  extends PersonDefinition
+final case class ExistingPersonId(id: String)                                                                  extends PersonDefinition
 final case class PersonDescription(name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate]) extends PersonDefinition
 
 object PersonDefinition extends Discriminated {

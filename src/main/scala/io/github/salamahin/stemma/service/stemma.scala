@@ -2,7 +2,7 @@ package io.github.salamahin.stemma.service
 
 import cats.implicits.catsSyntaxTuple2Semigroupal
 import io.github.salamahin.stemma.domain._
-import io.github.salamahin.stemma.service.graph.GRAPH
+import io.github.salamahin.stemma.service.repo.REPO
 import io.github.salamahin.stemma.service.storage.{STORAGE, StorageService}
 import io.github.salamahin.stemma.tinkerpop.StemmaRepository
 import zio._
@@ -11,17 +11,17 @@ import zio.stm.TReentrantLock
 object stemma {
   trait StemmaService {
     def newFamily(family: FamilyDescription): IO[StemmaError, Family]
-    def updateFamily(familyId: Long, family: FamilyDescription): IO[StemmaError, Family]
-    def removeFamily(familyId: Long): IO[NoSuchFamilyId, Unit]
-    def removePerson(id: Long): IO[StemmaError, Unit]
-    def updatePerson(id: Long, description: PersonDescription): IO[StemmaError, Unit]
+    def updateFamily(familyId: String, family: FamilyDescription): IO[StemmaError, Family]
+    def removeFamily(familyId: String): IO[NoSuchFamilyId, Unit]
+    def removePerson(id: String): IO[StemmaError, Unit]
+    def updatePerson(id: String, description: PersonDescription): IO[StemmaError, Unit]
     def stemma(): UIO[Stemma]
   }
 
   type STEMMA = Has[StemmaService]
 
   private class StemmaServiceImpl(repo: ZRef[Nothing, Nothing, _, StemmaRepository]) extends StemmaService {
-    private def setFamilyRelations(repo: StemmaRepository, familyId: Long, parents: Seq[PersonDefinition], children: Seq[PersonDefinition]) = {
+    private def setFamilyRelations(repo: StemmaRepository, familyId: String, parents: Seq[PersonDefinition], children: Seq[PersonDefinition]) = {
       def getOrCreatePerson(p: PersonDefinition) =
         p match {
           case ExistingPersonId(id) => ZIO.succeed(id)
@@ -72,7 +72,7 @@ object stemma {
         createdFamily                       <- setFamilyRelations(r, familyId, (p1 ++ p2).toSeq, children)
       } yield createdFamily
 
-    override def updateFamily(familyId: Long, family: FamilyDescription): IO[StemmaError, Family] =
+    override def updateFamily(familyId: String, family: FamilyDescription): IO[StemmaError, Family] =
       for {
         FamilyDescription(p1, p2, children) <- ZIO.fromEither(validateFamily(family))
 
@@ -84,12 +84,12 @@ object stemma {
         updatedFamily <- setFamilyRelations(repo, familyId, (p1 ++ p2).toSeq, children)
       } yield updatedFamily
 
-    override def removePerson(id: Long): ZIO[Any, StemmaError, Unit] = {
+    override def removePerson(id: String): ZIO[Any, StemmaError, Unit] = {
       def removeFamilyIfNotConnecting2Persons(repo: StemmaRepository, family: Option[Family]) =
         family
           .find(f => (f.parents ++ f.children).size < 2)
           .map(f => ZIO.fromEither(repo.removeFamily(f.id)))
-          .getOrElse(ZIO.succeed())
+          .getOrElse(ZIO.succeed((): Unit))
 
       def fromOptionEither[E, T](value: Option[Either[E, T]]) = value match {
         case Some(value) => ZIO.fromEither(value.map(Some(_)))
@@ -109,39 +109,41 @@ object stemma {
       } yield ()
     }
 
-    override def updatePerson(id: Long, description: PersonDescription): ZIO[Any, StemmaError, Unit] = repo.get.flatMap(r => ZIO.fromEither(r.updatePerson(id, description)))
+    override def updatePerson(id: String, description: PersonDescription): ZIO[Any, StemmaError, Unit] = repo.get.flatMap(r => ZIO.fromEither(r.updatePerson(id, description)))
 
     override def stemma(): UIO[Stemma] = repo.get.map(_.stemma())
 
-    override def removeFamily(familyId: Long): IO[NoSuchFamilyId, Unit] = repo.get.flatMap(r => IO.fromEither(r.removeFamily(familyId)))
+    override def removeFamily(familyId: String): IO[NoSuchFamilyId, Unit] = repo.get.flatMap(r => IO.fromEither(r.removeFamily(familyId)))
   }
 
   private class PersistentStemmaService(storage: StorageService, underlying: StemmaService, lock: TReentrantLock) extends StemmaService {
     private def saveChangesOrReload[E, V](f: StemmaService => IO[E, V]) =
-      f(underlying).tapError { _ => storage.load() } <* storage.save()
+      f(underlying).tapError { _ =>
+        storage.load()
+      } <* storage.save()
 
     override def newFamily(family: FamilyDescription): IO[StemmaError, Family] =
       lock.writeLock.use_(saveChangesOrReload(_.newFamily(family)))
 
-    override def updateFamily(familyId: Long, family: FamilyDescription): IO[StemmaError, Family] =
+    override def updateFamily(familyId: String, family: FamilyDescription): IO[StemmaError, Family] =
       lock.writeLock.use_(saveChangesOrReload(_.updateFamily(familyId, family)))
 
-    override def removePerson(id: Long): IO[StemmaError, Unit] =
+    override def removePerson(id: String): IO[StemmaError, Unit] =
       lock.writeLock.use_(saveChangesOrReload(_.removePerson(id)))
 
-    override def updatePerson(id: Long, description: PersonDescription): IO[StemmaError, Unit] =
+    override def updatePerson(id: String, description: PersonDescription): IO[StemmaError, Unit] =
       lock.writeLock.use_(saveChangesOrReload(_.updatePerson(id, description)))
 
     override def stemma(): UIO[Stemma] =
       lock.readLock.use_(underlying.stemma())
 
-    override def removeFamily(familyId: Long): IO[NoSuchFamilyId, Unit] =
+    override def removeFamily(familyId: String): IO[NoSuchFamilyId, Unit] =
       lock.writeLock.use_(saveChangesOrReload(_.removeFamily(familyId)))
   }
 
-  val basic: URLayer[GRAPH, STEMMA] = (for {
-    g       <- ZIO.environment[GRAPH]
-    service = new StemmaServiceImpl(g.get.graph.map(new StemmaRepository(_)))
+  val basic: URLayer[REPO, STEMMA] = (for {
+    repo    <- ZIO.environment[REPO].map(_.get)
+    service = new StemmaServiceImpl(repo.repo)
   } yield service).toLayer
 
   val durable: URLayer[STORAGE with STEMMA, STEMMA] =
