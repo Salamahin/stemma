@@ -1,7 +1,7 @@
 package io.github.salamahin.stemma.service
 
 import io.github.salamahin.stemma.domain._
-import io.github.salamahin.stemma.service.stemma.STEMMA
+import io.github.salamahin.stemma.service.StemmaService.STEMMA
 import zio.ZIO
 import zio.test.Assertion._
 import zio.test.{DefaultRunnableSpec, assert, assertTrue}
@@ -11,16 +11,16 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     ZIO
       .environment[STEMMA]
       .map(_.get)
-      .provideCustomLayer(TempGraphService.make >>> repo.live >>> stemma.live)
+      .provideCustomLayer(TempGraph.make >>> StemmaService.live)
 
   private val canCreateFamily = testM("can create different family with both parents and several children") {
     for {
       s <- service
 
-      _ <- s.newFamily(family(createJane, createJohn)(createJill, createJosh))
-      _ <- s.newFamily(family(createJohn)(createJosh))
-      _ <- s.newFamily(family(createJane, createJohn)())
-      _ <- s.newFamily(family()(createJane, createJohn))
+      _ <- s.createFamily(family(createJane, createJohn)(createJill, createJosh))
+      _ <- s.createFamily(family(createJohn)(createJosh))
+      _ <- s.createFamily(family(createJane, createJohn)())
+      _ <- s.createFamily(family()(createJane, createJohn))
 
       render(families) <- s.stemma()
     } yield assert(families) {
@@ -37,21 +37,21 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
   private val cantCreateFamilyOfSingleParent = testM("there cant be a family with a single parent and no children") {
     for {
       s   <- service
-      err <- s.newFamily(family(createJohn)()).flip
+      err <- s.createFamily(family(createJohn)()).flip
     } yield assertTrue(err == CompositeError(IncompleteFamily() :: Nil))
   }
 
   private val cantCreateFamilyOfSingleChild = testM("there cant be a family with no parents and a single child") {
     for {
       s   <- service
-      err <- s.newFamily(family()(createJill)).flip
+      err <- s.createFamily(family()(createJill)).flip
     } yield assertTrue(err == CompositeError(IncompleteFamily() :: Nil))
   }
 
   private val duplicatedIdsForbidden = testM("cant update a family when there are duplicated ids in members") {
     for {
       s                                               <- service
-      Family(familyId, jamesId :: Nil, jillId :: Nil) <- s.newFamily(family(createJames)(createJill))
+      Family(familyId, jamesId :: Nil, jillId :: Nil) <- s.createFamily(family(createJames)(createJill))
       err                                             <- s.updateFamily(familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
     } yield assertTrue(err == CompositeError(DuplicatedIds(jamesId :: Nil) :: Nil))
   }
@@ -60,8 +60,8 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     for {
       s <- service
 
-      Family(_, _, jillId :: _ :: Nil) <- s.newFamily(family(createJane, createJohn)(createJill, createJames))
-      _                                <- s.newFamily(family(existing(jillId), createJosh)(createJake))
+      Family(_, _, jillId :: _ :: Nil) <- s.createFamily(family(createJane, createJohn)(createJill, createJames))
+      _                                <- s.createFamily(family(existing(jillId), createJosh)(createJake))
       _                                <- s.removePerson(jillId)
 
       render(families) <- s.stemma()
@@ -78,8 +78,8 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     for {
       s <- service
 
-      Family(_, _, jillId :: Nil) <- s.newFamily(family(createJane)(createJill))
-      Family(_, joshId :: Nil, _) <- s.newFamily(family(createJosh)(createJames))
+      Family(_, _, jillId :: Nil) <- s.createFamily(family(createJane)(createJill))
+      Family(_, joshId :: Nil, _) <- s.createFamily(family(createJosh)(createJames))
 
       _ <- s.removePerson(jillId)
       _ <- s.removePerson(joshId)
@@ -92,7 +92,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     for {
       s <- service
 
-      Family(_, janeId :: Nil, _) <- s.newFamily(family(createJane)(createJill))
+      Family(_, janeId :: Nil, _) <- s.createFamily(family(createJane)(createJill))
 
       _ <- s.updatePerson(janeId, createJohn)
 
@@ -112,7 +112,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     for {
       s <- service
 
-      Family(familyId, _ :: johnId :: Nil, jillId :: Nil) <- s.newFamily(family(createJane, createJohn)(createJill))
+      Family(familyId, _ :: johnId :: Nil, jillId :: Nil) <- s.createFamily(family(createJane, createJohn)(createJill))
       _                                                   <- s.updateFamily(familyId, family(createJuly, existing(johnId))(existing(jillId), createJames))
 
       st @ Stemma(people, _) <- s.stemma()

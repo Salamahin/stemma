@@ -1,9 +1,9 @@
 package io.github.salamahin.stemma.service
 
 import gremlin.scala.ScalaGraph
-import zio.{Has, Ref, UIO, ULayer, ZRef}
+import zio.{Has, UIO, ULayer}
 
-object graph {
+object GraphService {
   trait GraphService {
     val graph: UIO[ScalaGraph]
   }

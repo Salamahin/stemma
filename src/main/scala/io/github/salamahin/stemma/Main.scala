@@ -1,8 +1,8 @@
 package io.github.salamahin.stemma
 
 import io.github.salamahin.stemma.domain._
-import io.github.salamahin.stemma.service.stemma.STEMMA
-import io.github.salamahin.stemma.service.{graph, stemma}
+import io.github.salamahin.stemma.service.StemmaService.STEMMA
+import io.github.salamahin.stemma.service.{GraphService, StemmaService}
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.server.Router
 import org.http4s.server.middleware.Logger
@@ -37,7 +37,7 @@ object Main extends zio.App with Discriminated {
     .in(customJsonBody[FamilyDescription])
     .out(customJsonBody[Family])
     .errorOut(customJsonBody[StemmaError])
-    .zServerLogic(familyDescr => service.flatMap(_.newFamily(familyDescr)))
+    .zServerLogic(familyDescr => service.flatMap(_.createFamily(familyDescr)))
     .widen[STEMMA_ENV]
 
   private val updateFamilyEndpoint = endpoint
