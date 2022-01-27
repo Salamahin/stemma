@@ -2,7 +2,7 @@ package io.github.salamahin.stemma
 
 import io.github.salamahin.stemma.domain._
 import io.github.salamahin.stemma.service.stemma.STEMMA
-import io.github.salamahin.stemma.service.{graph, repo, stemma, storage}
+import io.github.salamahin.stemma.service.{graph, stemma}
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.server.Router
 import org.http4s.server.middleware.Logger

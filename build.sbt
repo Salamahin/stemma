@@ -20,7 +20,7 @@ libraryDependencies ++= Seq(
   "io.circe"                    %% "circe-generic"           % versions.circeV,
   "io.circe"                    %% "circe-parser"            % versions.circeV,
   "io.circe"                    %% "circe-generic-extras"    % versions.circeV,
-  "org.umlg"                    % "sqlg-core"            % "2.1.5",
+  "org.umlg"                    % "sqlg-core"                % "2.1.5",
   "com.michaelpollmeier"        %% "gremlin-scala"           % "3.5.1.4",
   "dev.zio"                     %% "zio"                     % versions.zioV,
   "dev.zio"                     %% "zio-interop-cats"        % "2.2.0.1",
@@ -34,7 +34,7 @@ libraryDependencies ++= Seq(
   "dev.zio"                     %% "zio-test-sbt"            % versions.zioV % Test,
   "org.scalatest"               %% "scalatest"               % "3.3.0-SNAP3" % Test,
 //  "com.h2database"              % "h2"                       % "2.1.210" % Test,
-  "org.umlg"                    % "sqlg-h2-dialect"          % "2.1.5" % Test
+  "org.umlg" % "sqlg-h2-dialect" % "2.1.5" % Test
 )
 
 testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")

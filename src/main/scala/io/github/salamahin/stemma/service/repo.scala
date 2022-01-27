@@ -1,23 +1,23 @@
 package io.github.salamahin.stemma.service
 
 import io.github.salamahin.stemma.service.graph.GRAPH
-import io.github.salamahin.stemma.tinkerpop.StemmaRepository
-import zio.{Has, URLayer, ZIO, ZRef}
+import io.github.salamahin.stemma.tinkerpop.{StemmaOperations, StemmaRepository}
+import zio.{Has, UIO, URLayer, ZIO}
 
 object repo {
-  type REPO = Has[Repository]
-
   trait Repository {
-    val repo: ZRef[Nothing, Nothing, _, StemmaRepository]
+    val repo: UIO[StemmaRepository]
   }
 
-  private case class RepositoryImpl(override val repo: ZRef[Nothing, Nothing, _, StemmaRepository]) extends Repository
+  type REPO = Has[Repository]
 
-  val repo: URLayer[GRAPH, REPO] = ZIO
+  val live: URLayer[GRAPH, REPO] = ZIO
     .environment[GRAPH]
     .map(_.get)
-    .map(_.graph)
-    .map(x => x.map(new StemmaRepository(_)))
-    .map(x => RepositoryImpl(x))
+    .map(graph =>
+      new Repository {
+        override val repo: UIO[StemmaRepository] = graph.graph.map(new StemmaRepository(_, new StemmaOperations))
+      }
+    )
     .toLayer
 }

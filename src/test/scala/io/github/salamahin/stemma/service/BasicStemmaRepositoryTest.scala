@@ -11,7 +11,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     ZIO
       .environment[STEMMA]
       .map(_.get)
-      .provideCustomLayer(TempGraphService.make >>> repo.repo >>> stemma.basic)
+      .provideCustomLayer(TempGraphService.make >>> repo.live >>> stemma.live)
 
   private val canCreateFamily = testM("can create different family with both parents and several children") {
     for {

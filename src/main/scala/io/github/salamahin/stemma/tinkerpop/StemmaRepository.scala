@@ -1,168 +1,127 @@
 package io.github.salamahin.stemma.tinkerpop
 
-import gremlin.scala._
+import gremlin.scala.{ScalaGraph, TraversalSource}
 import io.github.salamahin.stemma.domain._
+import org.apache.commons.lang3.exception.ExceptionUtils
 
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import scala.util.Try
 
-class StemmaRepository(graph: ScalaGraph) {
-  private implicit val _graph = graph
+class StemmaRepository(graph: ScalaGraph, ops: StemmaOperations) {
+  import cats.instances.either._
+  import cats.syntax.either._
+  import cats.syntax.traverse._
 
-  private val dateFormat = DateTimeFormatter.ISO_DATE
-
-  private val keys = new {
-    val name      = Key[String]("name")
-    val birthDate = Key[String]("birthDate")
-    val deathDate = Key[String]("deathDate")
-  }
-
-  private val types = new {
-    val person = "person"
-    val family = "family"
-  }
-  private val relations = new {
-    val childOf  = "childOf"
-    val spouseOf = "spouseOf"
-  }
-
-  def newFamily(): String = {
-    val family = graph + types.family
-    family.id().toString
-  }
-
-  def newPerson(descr: PersonDescription): String = {
-    val birthDateProps = descr.birthDate.map(keys.birthDate -> dateFormat.format(_))
-    val deathDateProps = descr.deathDate.map(keys.deathDate -> dateFormat.format(_))
-    val nameProps      = keys.name -> descr.name
-
-    val person = graph + (types.person, nameProps +: (birthDateProps ++ deathDateProps).toSeq: _*)
-    person.id.toString
-  }
-
-  def removeFamily(id: String): Either[NoSuchFamilyId, Unit] = graph.V(id).headOption().map(_.remove()).toRight(NoSuchFamilyId(id))
-  def removePerson(id: String): Either[NoSuchPersonId, Unit] = graph.V(id).headOption().map(_.remove()).toRight(NoSuchPersonId(id))
-
-  def describePerson(id: String): Either[NoSuchPersonId, ExtendedPersonDescription] = {
-    graph
-      .V(id)
-      .headOption()
-      .map { p =>
-        val person   = p.toCC[PersonVertex]
-        val spouseOf = p.outE(relations.spouseOf).otherV().map(_.id().toString).headOption()
-        val childOf  = p.outE(relations.childOf).otherV().map(_.id().toString).headOption()
-
-        val personDescr = PersonDescription(
-          person.name,
-          person.birthDate.map(LocalDate.parse),
-          person.deathDate.map(LocalDate.parse)
-        )
-
-        ExtendedPersonDescription(personDescr, childOf, spouseOf)
+  private def setFamilyRelations(tx: TraversalSource, familyId: String, parents: Seq[PersonDefinition], children: Seq[PersonDefinition]) = {
+    def getOrCreatePerson(p: PersonDefinition) =
+      p match {
+        case ExistingPersonId(id) => id
+        case p: PersonDescription => ops.newPerson(tx, p)
       }
-      .toRight(NoSuchPersonId(id))
-  }
 
-  def describeFamily(id: String): Either[NoSuchFamilyId, Family] =
-    graph
-      .V(id)
-      .headOption()
-      .map { f =>
-        val parents  = f.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
-        val children = f.inE(relations.childOf).otherV().id().map(_.toString).toList()
+    val parentIds   = parents.map(getOrCreatePerson)
+    val childrenIds = children.map(getOrCreatePerson)
 
-        Family(f.id().toString, parents, children)
-      }
-      .toRight(NoSuchFamilyId(id))
-
-  private def setRelation(familyId: String, personId: String, relation: String)(
-    alreadyRelated: (String, String) => StemmaError,
-    relationConflict: (String, String) => StemmaError
-  ) = {
     for {
-      person <- graph.V(personId).headOption().toRight(NoSuchPersonId(personId))
-      family <- graph.V(familyId).headOption().toRight(NoSuchFamilyId(familyId))
+      _ <- parentIds.map(id => ops.setSpouseRelation(tx, familyId, id)).sequence
+      _ <- childrenIds.map(id => ops.setChildRelation(tx, familyId, id)).sequence
+    } yield Family(familyId, parentIds, childrenIds)
+  }
 
-      isFamily = P.is(family)
+  private def validateFamily(f: FamilyDescription) = {
+    import cats.implicits._
 
-      conflicts = person
-        .outE(relation)
-        .otherV()
-        .map(otherFamily =>
-          if (isFamily.test(otherFamily)) alreadyRelated(familyId, personId)
-          else relationConflict(otherFamily.id().toString, personId)
-        )
-        .toList()
+    def checkMembersCount(f: FamilyDescription) =
+      if ((f.parent1 ++ f.parent2 ++ f.children).size <= 1) IncompleteFamily().invalidNec else ().validNec
 
-      _ <- if (conflicts.isEmpty) Right((): Unit) else Left(CompositeError(conflicts))
+    def checkDuplicatedIds(f: FamilyDescription) = {
+      def collectDuplicatedIds(people: Seq[PersonDefinition]) =
+        people
+          .collect {
+            case ExistingPersonId(id) => id
+          }
+          .groupBy(identity)
+          .values
+          .collect {
+            case ids if ids.size > 1 => ids.head
+          }
 
-      _ = person --- relation --> family
+      val duplicatedIds = collectDuplicatedIds((f.parent2 ++ f.parent1).toSeq ++ f.children).toList
+      if (duplicatedIds.isEmpty) ().validNec else DuplicatedIds(duplicatedIds).invalidNec
+    }
+    (checkMembersCount(f), checkDuplicatedIds(f))
+      .mapN((_, _) => f)
+      .leftMap(chain => CompositeError(chain.toNonEmptyList.toList))
+      .toEither
+  }
+
+  private def createFamilyAndSetRelations(family: FamilyDescription)(tx: TraversalSource) = {
+    for {
+      FamilyDescription(p1, p2, children) <- validateFamily(family)
+      familyId                            = ops.newFamily(tx)
+      createdFamily                       <- setFamilyRelations(tx, familyId, (p1 ++ p2).toSeq, children)
+    } yield createdFamily
+  }
+
+  private def resetFamilyRelations(familyId: String, family: FamilyDescription)(tx: TraversalSource) =
+    for {
+      FamilyDescription(p1, p2, children) <- validateFamily(family)
+      Family(_, oldParents, oldChildren)  <- ops.describeFamily(tx, familyId)
+      _                                   <- oldParents.map(id => ops.removeSpouseRelation(tx, familyId, id)).sequence
+      _                                   <- oldChildren.map(id => ops.removeChildRelation(tx, familyId, id)).sequence
+
+      updatedFamily <- setFamilyRelations(tx, familyId, (p1 ++ p2).toSeq, children)
+    } yield updatedFamily
+
+  private def removePersonAndDropEmptyFamilies(id: String)(tx: TraversalSource) = {
+    def removeFamilyIfNotConnecting2Persons(family: Option[Family]) =
+      family
+        .find(f => (f.parents ++ f.children).size < 2)
+        .map(f => ops.removeFamily(tx, f.id))
+        .getOrElse(Right((): Unit))
+
+    def fromOptionEither[E, T](value: Option[Either[E, T]]) = value match {
+      case Some(value) => value.map(Some(_))
+      case None        => Right(None)
+    }
+
+    for {
+      descr <- ops.describePerson(tx, id)
+      _     <- ops.removePerson(tx, id)
+
+      parentOfWhichFamily <- fromOptionEither(descr.spouseOf.map(ops.describeFamily(tx, _)))
+      childOfWhichFamily  <- fromOptionEither(descr.childOf.map(ops.describeFamily(tx, _)))
+
+      _ <- removeFamilyIfNotConnecting2Persons(parentOfWhichFamily)
+      _ <- removeFamilyIfNotConnecting2Persons(childOfWhichFamily)
     } yield ()
   }
 
-  private def removeRelation(familyId: String, personId: String, relation: String)(
-    noSuchRelation: (String, String) => StemmaError
-  ) =
-    for {
-      person <- graph.V(personId).headOption().toRight(NoSuchPersonId(personId))
-      family <- graph.V(familyId).headOption().toRight(NoSuchFamilyId(familyId))
+  private def transaction[T](f: TraversalSource => Either[StemmaError, T]): Either[StemmaError, T] = {
+    val tx = graph.tx()
 
-      _ <- person
-            .outE(relation)
-            .where(_.otherV().hasId(family.id()))
-            .headOption()
-            .map(_.remove())
-            .toRight(noSuchRelation(familyId, personId))
-    } yield ()
-
-  def setSpouseRelation(familyId: String, personId: String): Either[StemmaError, Unit] =
-    setRelation(familyId, personId, relations.spouseOf)(
-      SpouseAlreadyBelongsToFamily,
-      SpouseBelongsToDifferentFamily
-    )
-
-  def setChildRelation(familyId: String, personId: String): Either[StemmaError, Unit] =
-    setRelation(familyId, personId, relations.childOf)(
-      ChildAlreadyBelongsToFamily,
-      ChildBelongsToDifferentFamily
-    )
-
-  def removeChildRelation(familyId: String, personId: String): Either[StemmaError, Unit]  = removeRelation(familyId, personId, relations.childOf)(ChildDoesNotBelongToFamily)
-  def removeSpouseRelation(familyId: String, personId: String): Either[StemmaError, Unit] = removeRelation(familyId, personId, relations.spouseOf)(SpouseDoesNotBelongToFamily)
-
-  def stemma(): Stemma = {
-    val people = graph
-      .V()
-      .hasLabel(types.person)
-      .toCC[PersonVertex]
-      .map { vertex =>
-        Person(vertex.id.get.toString, vertex.name, vertex.birthDate.map(LocalDate.parse), vertex.deathDate.map(LocalDate.parse)) }
-      .toList()
-
-    val families = graph
-      .V()
-      .hasLabel(types.family)
-      .map { family =>
-        val parents  = family.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
-        val children = family.inE(relations.childOf).otherV().id().map(_.toString).toList()
-
-        Family(family.id().toString, parents, children)
-      }
-      .toList()
-
-    Stemma(people, families)
-  }
-
-  def updatePerson(id: String, description: PersonDescription): Either[NoSuchPersonId, Unit] = {
-    for {
-      person <- graph.V(id).headOption().toRight(NoSuchPersonId(id))
-      _ = person.updateAs[PersonVertex](vertex =>
-        vertex.copy(
-          name = description.name,
-          birthDate = description.birthDate.map(_.toString),
-          deathDate = description.deathDate.map(_.toString)
-        )
+    Try(f(tx.begin()))
+      .toEither
+      .leftMap(err => UnknownError(ExceptionUtils.getStackTrace(err)): StemmaError)
+      .flatten
+      .bimap(
+        err => {
+          tx.rollback()
+          err
+        },
+        res => {
+          tx.commit()
+          tx.close()
+          res
+        }
       )
-    } yield ()
   }
+
+  def newFamily(family: FamilyDescription): Either[StemmaError, Family]                      = transaction { createFamilyAndSetRelations(family) }
+  def updateFamily(familyId: String, family: FamilyDescription): Either[StemmaError, Family] = transaction { resetFamilyRelations(familyId, family) }
+  def removePerson(id: String): Either[StemmaError, Unit]                                    = transaction { removePersonAndDropEmptyFamilies(id) }
+
+  def removeFamily(familyId: String): Either[NoSuchFamilyId, Unit]                           = ops.removeFamily(graph.traversal, familyId)
+  def updatePerson(id: String, description: PersonDescription): Either[NoSuchPersonId, Unit] = ops.updatePerson(graph.traversal, id, description)
+  def stemma(): Stemma                                                                       = ops.stemma(graph.traversal)
+
 }

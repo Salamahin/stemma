@@ -5,7 +5,7 @@ import zio.{Has, Ref, UIO, ULayer, ZRef}
 
 object graph {
   trait GraphService {
-    val graph: Ref[ScalaGraph]
+    val graph: UIO[ScalaGraph]
   }
 
   type GRAPH = Has[GraphService]
