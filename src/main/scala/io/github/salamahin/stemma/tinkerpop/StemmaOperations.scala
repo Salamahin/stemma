@@ -48,6 +48,11 @@ class StemmaOperations {
     family.id().toString
   }
 
+  def newUser(ts: TraversalSource): String = {
+    val user = ts.addV(types.user).head()
+    user.id().toString
+  }
+
   def removeChildRelation(ts: TraversalSource, familyId: String, personId: String): Either[StemmaError, Unit] =
     removeRelation(ts, familyId, personId, relations.childOf)(ChildDoesNotBelongToFamily)
 
@@ -79,41 +84,46 @@ class StemmaOperations {
     personVertex.id().toString
   }
 
-  def setSpouseRelation(ts: TraversalSource, familyId: String, personId: String): Either[StemmaError, Unit] =
+  def makeSpouseRelation(ts: TraversalSource, familyId: String, personId: String): Either[StemmaError, Unit] =
     setRelation(ts, familyId, personId, relations.spouseOf)(
-      SpouseAlreadyBelongsToFamily,
-      SpouseBelongsToDifferentFamily
+      NoSuchPersonId,
+      NoSuchFamilyId,
+      (fid, pid) => Left(SpouseAlreadyBelongsToFamily(fid, pid)),
+      (fid, pid) => Left(SpouseBelongsToDifferentFamily(fid, pid))
     )
 
-  private def setRelation(ts: TraversalSource, familyId: String, personId: String, relation: String)(
-    alreadyRelated: (String, String) => StemmaError,
-    relationConflict: (String, String) => StemmaError
+  private def setRelation(ts: TraversalSource, from: String, to: String, relation: String)(
+    sourceNotFound: String => StemmaError,
+    targetNotFound: String => StemmaError,
+    alreadyRelated: (String, String) => Either[StemmaError, Unit],
+    relationConflict: (String, String) => Either[StemmaError, Unit]
   ) = {
     for {
-      person <- ts.V(personId).headOption().toRight(NoSuchPersonId(personId))
-      family <- ts.V(familyId).headOption().toRight(NoSuchFamilyId(familyId))
+      toV   <- ts.V(to).headOption().toRight(targetNotFound(from))
+      fromV <- ts.V(from).headOption().toRight(sourceNotFound(to))
 
-      isFamily = P.is(family)
+      areRelated = P.is(fromV)
 
-      conflicts = person
-        .outE(relation)
-        .otherV()
-        .map(otherFamily =>
-          if (isFamily.test(otherFamily)) alreadyRelated(familyId, personId)
-          else relationConflict(otherFamily.id().toString, personId)
-        )
-        .toList()
+      _ <- toV
+            .outE(relation)
+            .otherV()
+            .headOption()
+            .map(relation =>
+              if (areRelated.test(relation)) alreadyRelated(from, to)
+              else relationConflict(relation.id().toString, to)
+            )
+            .getOrElse(Right((): Unit))
 
-      _ <- if (conflicts.isEmpty) Right((): Unit) else Left(CompositeError(conflicts))
-
-      _ = ts.addE(relation).from(person).to(family).head()
+      _ = ts.addE(relation).from(toV).to(fromV).head()
     } yield ()
   }
 
-  def setChildRelation(ts: TraversalSource, familyId: String, personId: String): Either[StemmaError, Unit] =
+  def makeChildRelation(ts: TraversalSource, familyId: String, personId: String): Either[StemmaError, Unit] =
     setRelation(ts, familyId, personId, relations.childOf)(
-      ChildAlreadyBelongsToFamily,
-      ChildBelongsToDifferentFamily
+      NoSuchPersonId,
+      NoSuchFamilyId,
+      (fid, pid) => Left(ChildAlreadyBelongsToFamily(fid, pid)),
+      (fid, pid) => Left(ChildBelongsToDifferentFamily(fid, pid))
     )
 
   def removeFamily(ts: TraversalSource, id: String): Either[NoSuchFamilyId, Unit] = ts.V(id).headOption().map(_.remove()).toRight(NoSuchFamilyId(id))
@@ -149,6 +159,45 @@ class StemmaOperations {
         Family(f.id().toString, parents, children)
       }
       .toRight(NoSuchFamilyId(id))
+
+  private def isOwnerOf(ts: TraversalSource, userId: String, resourceId: String)(resourceNotFound: String => StemmaError) =
+    for {
+      user     <- ts.V(userId).headOption().toRight(UnknownUser(userId))
+      resource <- ts.V(resourceId).headOption().toRight(resourceNotFound(resourceId))
+      isOwner  = user.outE(relations.ownerOf).where(_.otherV().is(resource)).headOption().isDefined
+    } yield isOwner
+
+  def isOwnerOfFamily(ts: TraversalSource, userId: String, familyId: String): Either[StemmaError, Boolean] =
+    isOwnerOf(ts, userId, familyId)(NoSuchFamilyId)
+
+  def isOwnerOfPerson(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Boolean] =
+    isOwnerOf(ts, userId, personId)(NoSuchFamilyId)
+
+  def isOwnerOfGraph(ts: TraversalSource, userId: String, graphId: String): Either[StemmaError, Boolean] =
+    isOwnerOf(ts, userId, graphId)(NoSuchFamilyId)
+
+  def makeFamilyOwner(ts: TraversalSource, userId: String, familyId: String): Either[StemmaError, Unit] =
+    setRelation(ts, userId, familyId, relations.ownerOf)(
+      UnknownUser,
+      NoSuchFamilyId,
+      (userId, _) => Left(UserIsAlreadyFamilyOwner(userId)),
+      (userId, _) => Left(FamilyIsOwnedByDifferentUser(userId))
+    )
+
+  def makePersonOwner(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Unit] =
+    setRelation(ts, userId, personId, relations.ownerOf)(
+      UnknownUser,
+      NoSuchPersonId,
+      (userId, _) => Left(UserIsAlreadyPersonOwner(userId)),
+      (userId, _) => Left(PersonIsOwnedByDifferentUser(userId))
+    )
+
+  def makeGraphOwner(ts: TraversalSource, userId: String, graphId: String): Either[StemmaError, Unit] = setRelation(ts, userId, graphId, relations.ownerOf)(
+    UnknownUser,
+    NoSuchPersonId,
+    (familyId, _) => Left(UserIsAlreadyPersonOwner(familyId)),
+    (_, _) => Right()
+  )
 }
 
 private object StemmaOperations {
@@ -157,11 +206,12 @@ private object StemmaOperations {
   object types {
     val person = "person"
     val family = "family"
+    val user   = "user"
   }
 
   object relations {
-    val childOf   = "childOf"
-    val spouseOf  = "spouseOf"
-    val creatorOf = "creatorOf"
+    val childOf  = "childOf"
+    val spouseOf = "spouseOf"
+    val ownerOf  = "ownerOf"
   }
 }

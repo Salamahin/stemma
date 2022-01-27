@@ -51,8 +51,8 @@ object StemmaService {
       val childrenIds = children.map(getOrCreatePerson)
 
       for {
-        _ <- parentIds.map(id => ops.setSpouseRelation(ts, familyId, id)).sequence
-        _ <- childrenIds.map(id => ops.setChildRelation(ts, familyId, id)).sequence
+        _ <- parentIds.map(id => ops.makeSpouseRelation(ts, familyId, id)).sequence
+        _ <- childrenIds.map(id => ops.makeChildRelation(ts, familyId, id)).sequence
       } yield Family(familyId, parentIds, childrenIds)
     }
 
@@ -78,7 +78,7 @@ object StemmaService {
 
       Try(f(TraversalSource(tx.begin(): GraphTraversalSource)))
         .toEither
-        .leftMap(err => UnknownError(ExceptionUtils.getStackTrace(err)): StemmaError)
+        .leftMap(err => UserIsAlreadyFamilyOwner(ExceptionUtils.getStackTrace(err)): StemmaError)
         .flatten
         .bimap(
           err => {

@@ -17,7 +17,11 @@ final case class CompositeError(errs: List[StemmaError])                        
 final case class DuplicatedIds(duplicatedIds: Seq[String])                                extends StemmaError
 final case class UnknownError(message: String)                                            extends StemmaError
 
-final case class UnknownUser(id: String) extends StemmaError
+final case class UserIsAlreadyFamilyOwner(familyId: String)     extends StemmaError
+final case class FamilyIsOwnedByDifferentUser(familyId: String) extends StemmaError
+final case class UserIsAlreadyPersonOwner(personId: String)     extends StemmaError
+final case class PersonIsOwnedByDifferentUser(personId: String) extends StemmaError
+final case class UnknownUser(id: String)                        extends StemmaError
 
 object StemmaError extends Discriminated {
   implicit val encoder: Encoder[StemmaError] = deriveConfiguredEncoder[StemmaError]
