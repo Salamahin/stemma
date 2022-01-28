@@ -122,7 +122,6 @@ object StemmaService {
 
   val live: URLayer[GRAPH with OPS, STEMMA] = (for {
     graph <- ZIO.environment[GRAPH].map(_.get)
-    g <- graph.graph
-    ops <- ZIO.environment[OPS].map(_.get)
-  } yield new StemmaService(g, ops)).toLayer
+    ops   <- ZIO.environment[OPS].map(_.get)
+  } yield new StemmaService(graph.graph, ops)).toLayer
 }

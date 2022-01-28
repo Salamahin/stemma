@@ -104,7 +104,7 @@ class StemmaOperations {
 
   }
 
-  def newGraph(ts: TraversalSource, description: String) = {
+  def newGraph(ts: TraversalSource, description: String): String = {
     val graph = ts.addV(types.graph).head()
     graph.property("description", description)
     graph.id().toString
@@ -143,41 +143,42 @@ class StemmaOperations {
   }
 
   def makeSpouseRelation(ts: TraversalSource, familyId: String, personId: String): Either[StemmaError, Unit] =
-    setRelation(ts, familyId, personId, relations.spouseOf)(
+    setRelation(ts, personId, familyId, types.family, relations.spouseOf)(
       NoSuchPersonId,
       NoSuchFamilyId,
       (fid, pid) => Left(SpouseAlreadyBelongsToFamily(fid, pid)),
       (fid, pid) => Left(SpouseBelongsToDifferentFamily(fid, pid))
     )
 
-  private def setRelation(ts: TraversalSource, from: String, to: String, relation: String)(
+  private def setRelation(ts: TraversalSource, from: String, to: String, toType: String, relation: String)(
     sourceNotFound: String => StemmaError,
     targetNotFound: String => StemmaError,
     alreadyRelated: (String, String) => Either[StemmaError, Unit],
     relationConflict: (String, String) => Either[StemmaError, Unit]
   ) = {
     for {
-      toV   <- ts.V(to).headOption().toRight(targetNotFound(from))
-      fromV <- ts.V(from).headOption().toRight(sourceNotFound(to))
+      fromV <- ts.V(from).headOption().toRight(sourceNotFound(from))
+      toV   <- ts.V(to).headOption().toRight(targetNotFound(to))
 
-      areRelated = P.is(fromV)
+      areRelated = P.is(toV)
 
-      _ <- toV
+      _ <- fromV
             .outE(relation)
             .otherV()
+            .where(_.hasLabel(toType))
             .headOption()
-            .map(relation =>
-              if (areRelated.test(relation)) alreadyRelated(from, to)
-              else relationConflict(relation.id().toString, to)
+            .map(competitor =>
+              if (areRelated.test(competitor)) alreadyRelated(from, to)
+              else relationConflict(competitor.id().toString, to)
             )
             .getOrElse(Right((): Unit))
 
-      _ = ts.addE(relation).from(toV).to(fromV).head()
+      _ = ts.addE(relation).from(fromV).to(toV).iterate()
     } yield ()
   }
 
   def makeChildRelation(ts: TraversalSource, familyId: String, personId: String): Either[StemmaError, Unit] =
-    setRelation(ts, familyId, personId, relations.childOf)(
+    setRelation(ts, personId, familyId, types.family, relations.childOf)(
       NoSuchPersonId,
       NoSuchFamilyId,
       (fid, pid) => Left(ChildAlreadyBelongsToFamily(fid, pid)),
@@ -235,27 +236,28 @@ class StemmaOperations {
     isOwnerOf(ts, userId, graphId)(NoSuchFamilyId)
 
   def makeFamilyOwner(ts: TraversalSource, userId: String, familyId: String): Either[StemmaError, Unit] =
-    setRelation(ts, userId, familyId, relations.ownerOf)(
+    setRelation(ts, userId, familyId, types.family, relations.ownerOf)(
       UnknownUser,
       NoSuchFamilyId,
-      (userId, _) => Left(UserIsAlreadyFamilyOwner(userId)),
-      (userId, _) => Left(FamilyIsOwnedByDifferentUser(userId))
+      (_, familyId) => Left(UserIsAlreadyFamilyOwner(familyId)),
+      (_, familyId) => Left(FamilyIsOwnedByDifferentUser(familyId))
     )
 
   def makePersonOwner(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Unit] =
-    setRelation(ts, userId, personId, relations.ownerOf)(
+    setRelation(ts, userId, personId, types.person, relations.ownerOf)(
       UnknownUser,
       NoSuchPersonId,
-      (userId, _) => Left(UserIsAlreadyPersonOwner(userId)),
-      (userId, _) => Left(PersonIsOwnedByDifferentUser(userId))
+      (_, personId) => Left(UserIsAlreadyPersonOwner(personId)),
+      (_, personId) => Left(PersonIsOwnedByDifferentUser(personId))
     )
 
-  def makeGraphOwner(ts: TraversalSource, userId: String, graphId: String) = setRelation(ts, userId, graphId, relations.ownerOf)(
-    UnknownUser,
-    NoSuchPersonId,
-    (familyId, _) => Left(UserIsAlreadyPersonOwner(familyId)),
-    (_, _) => Right()
-  )
+  def makeGraphOwner(ts: TraversalSource, userId: String, graphId: String): Either[StemmaError, Unit] =
+    setRelation(ts, userId, graphId, types.graph, relations.ownerOf)(
+      UnknownUser,
+      NoSuchGraphId,
+      (_, grapId) => Left(UserIsAlreadyGraphOwner(grapId)),
+      (_, _) => Right()
+    )
 }
 
 private object StemmaOperations {

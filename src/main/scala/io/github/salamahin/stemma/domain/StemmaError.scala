@@ -20,8 +20,10 @@ final case class UnknownError(message: String)                                  
 final case class UserIsAlreadyFamilyOwner(familyId: String)     extends StemmaError
 final case class FamilyIsOwnedByDifferentUser(familyId: String) extends StemmaError
 final case class UserIsAlreadyPersonOwner(personId: String)     extends StemmaError
+final case class UserIsAlreadyGraphOwner(graphId: String)       extends StemmaError
 final case class PersonIsOwnedByDifferentUser(personId: String) extends StemmaError
 final case class UnknownUser(id: String)                        extends StemmaError
+final case class NoSuchGraphId(id: String)                      extends StemmaError
 
 final case class InvalidInviteToken() extends StemmaError
 

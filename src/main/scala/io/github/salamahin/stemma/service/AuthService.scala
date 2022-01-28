@@ -4,9 +4,12 @@ import gremlin.scala.ScalaGraph
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.{Decoder, Encoder, parser}
 import io.github.salamahin.stemma.domain.{InvalidInviteToken, StemmaError, User}
+import io.github.salamahin.stemma.service.GraphService.GRAPH
+import io.github.salamahin.stemma.service.OpsService.OPS
+import io.github.salamahin.stemma.service.SecretService.SECRET
 import io.github.salamahin.stemma.tinkerpop.StemmaOperations
 import io.github.salamahin.stemma.tinkerpop.Transaction._
-import zio.{Has, IO, UIO}
+import zio.{Has, IO, UIO, URLayer, ZIO}
 
 import java.security.MessageDigest
 import java.util
@@ -60,7 +63,8 @@ object AuthService {
 
     private def decryptInviteToken(token: String) = IO.fromEither {
       import cats.syntax.bifunctor._
-      parser.parse(decrypt(secret, token))
+      parser
+        .parse(decrypt(secret, token))
         .flatMap(_.as[InviteToken])
         .leftMap(_ => InvalidInviteToken())
     }
@@ -75,4 +79,10 @@ object AuthService {
   }
 
   type AUTH = Has[AuthService]
+
+  val live: URLayer[OPS with SECRET with GRAPH, AUTH] = (for {
+    graph  <- ZIO.environment[GRAPH].map(_.get)
+    secret <- ZIO.environment[SECRET].map(_.get)
+    ops    <- ZIO.environment[OPS].map(_.get)
+  } yield new LiveAuthService(secret.secret, graph.graph, ops)).toLayer
 }
