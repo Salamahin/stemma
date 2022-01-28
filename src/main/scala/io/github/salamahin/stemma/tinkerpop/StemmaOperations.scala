@@ -8,10 +8,11 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 class StemmaOperations {
-  def stemma(ts: TraversalSource): Stemma = {
+  def stemma(ts: TraversalSource, graphId: String): Stemma = {
     val people = ts
       .V()
       .hasLabel(types.person)
+      .has(Key[String]("graphId"), graphId)
       .toCC[PersonVertex]
       .map { vertex => Person(vertex.id.get.toString, vertex.name, vertex.birthDate.map(LocalDate.parse), vertex.deathDate.map(LocalDate.parse)) }
       .toList()
@@ -19,6 +20,7 @@ class StemmaOperations {
     val families = ts
       .V()
       .hasLabel(types.family)
+      .has(Key[String]("graphId"), graphId)
       .map { family =>
         val parents  = family.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
         val children = family.inE(relations.childOf).otherV().id().map(_.toString).toList()
@@ -43,14 +45,20 @@ class StemmaOperations {
     } yield ()
   }
 
-  def newFamily(ts: TraversalSource): String = {
+  def newFamily(ts: TraversalSource, graphId: String): String = {
     val family = ts.addV(types.family).head()
+    family.property("graph", graphId)
     family.id().toString
   }
 
   def newUser(ts: TraversalSource): String = {
     val user = ts.addV(types.user).head()
     user.id().toString
+  }
+
+  def newGraph(ts: TraversalSource) = {
+    val graph = ts.addV(types.graph).head()
+    graph.id().toString
   }
 
   def removeChildRelation(ts: TraversalSource, familyId: String, personId: String): Either[StemmaError, Unit] =
@@ -74,10 +82,11 @@ class StemmaOperations {
             .toRight(noSuchRelation(familyId, personId))
     } yield ()
 
-  def newPerson(ts: TraversalSource, descr: PersonDescription): String = {
+  def newPerson(ts: TraversalSource, graphId: String, descr: PersonDescription): String = {
     val personVertex = ts.addV(types.person).head()
 
     personVertex.property("name", descr.name)
+    personVertex.property("graphId", graphId)
     descr.birthDate.map(dateFormat.format(_)) foreach (personVertex.property("birthDate", _))
     descr.deathDate.map(dateFormat.format(_)) foreach (personVertex.property("deathDate", _))
 
@@ -192,7 +201,7 @@ class StemmaOperations {
       (userId, _) => Left(PersonIsOwnedByDifferentUser(userId))
     )
 
-  def makeGraphOwner(ts: TraversalSource, userId: String, graphId: String): Either[StemmaError, Unit] = setRelation(ts, userId, graphId, relations.ownerOf)(
+  def makeGraphOwner(ts: TraversalSource, userId: String, graphId: String) = setRelation(ts, userId, graphId, relations.ownerOf)(
     UnknownUser,
     NoSuchPersonId,
     (familyId, _) => Left(UserIsAlreadyPersonOwner(familyId)),
@@ -207,6 +216,7 @@ private object StemmaOperations {
     val person = "person"
     val family = "family"
     val user   = "user"
+    val graph  = "graph"
   }
 
   object relations {

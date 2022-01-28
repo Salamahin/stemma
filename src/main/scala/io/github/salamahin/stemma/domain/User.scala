@@ -1,3 +1,3 @@
 package io.github.salamahin.stemma.domain
 
-case class User(id: Int)
+case class User(vertexId: String, userId: String, email: String)

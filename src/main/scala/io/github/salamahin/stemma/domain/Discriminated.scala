@@ -5,5 +5,5 @@ import sttp.tapir.generic.{Configuration => TConfiguration}
 
 trait Discriminated {
   implicit val circeConfig: CConfication   = CConfication.default.withDiscriminator("type")
-  implicit val tapicConfig: TConfiguration = TConfiguration.default.withDiscriminator("type")
+  implicit val tapirConfig: TConfiguration = TConfiguration.default.withDiscriminator("type")
 }
