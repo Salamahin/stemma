@@ -53,7 +53,7 @@ object StemmaService {
         childrenIds <- children.map(getOrCreatePerson).sequence
         _           <- parentIds.map(id => ops.makeSpouseRelation(ts, familyId, id)).sequence
         _           <- childrenIds.map(id => ops.makeChildRelation(ts, familyId, id)).sequence
-      } yield Family(familyId, parentIds, childrenIds)
+      } yield Family(familyId, parentIds.toList, childrenIds.toList)
     }
 
     private def resetFamilyRelations(ts: TraversalSource, graphId: String, ownerId: String, familyId: String, family: FamilyDescription) = {
