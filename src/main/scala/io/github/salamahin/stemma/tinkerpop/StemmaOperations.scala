@@ -23,11 +23,11 @@ class StemmaOperations {
     val people = ts
       .V()
       .hasLabel(types.person)
-      .has(Key[String]("graphId"), graphId)
+      .has(keys.graphId, graphId)
       .map { vertex =>
-        val name      = vertex.property(Key[String]("name")).value()
-        val birthDate = vertex.property(Key[String]("birthDate")).toOption.map(LocalDate.parse)
-        val deathDate = vertex.property(Key[String]("deathDate")).toOption.map(LocalDate.parse)
+        val name      = vertex.property(personKeys.name).value()
+        val birthDate = vertex.property(personKeys.birthDate).toOption.map(LocalDate.parse)
+        val deathDate = vertex.property(personKeys.deathDate).toOption.map(LocalDate.parse)
 
         Person(vertex.id().toString, name, birthDate, deathDate)
       }
@@ -36,7 +36,7 @@ class StemmaOperations {
     val families = ts
       .V()
       .hasLabel(types.family)
-      .has(Key[String]("graphId"), graphId)
+      .has(keys.graphId, graphId)
       .map { family =>
         val parents  = family.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
         val children = family.inE(relations.childOf).otherV().id().map(_.toString).toList()
@@ -51,15 +51,15 @@ class StemmaOperations {
   def updatePerson(ts: TraversalSource, id: String, description: PersonDescription): Either[NoSuchPersonId, Unit] = {
     for {
       person <- ts.V(id).headOption().toRight(NoSuchPersonId(id))
-      _      = person.property("name", description.name)
-      _      = description.birthDate.map(_.toString).foreach(person.property("birthDate", _))
-      _      = description.deathDate.map(_.toString).foreach(person.property("deathDate", _))
+      _      = person.setProperty(personKeys.name, description.name)
+      _      = description.birthDate.map(_.toString).foreach(person.setProperty(personKeys.birthDate, _))
+      _      = description.deathDate.map(_.toString).foreach(person.setProperty(personKeys.deathDate, _))
     } yield ()
   }
 
   def newFamily(ts: TraversalSource, graphId: String): String = {
     val family = ts.addV(types.family).head()
-    family.property("graphId", graphId)
+    family.setProperty(keys.graphId, graphId)
     family.id().toString
   }
 
@@ -67,11 +67,11 @@ class StemmaOperations {
     val userId = ts
       .V()
       .hasLabel(types.user)
-      .has(Key[String]("email"), email)
+      .has(userKeys.email, email)
       .headOption()
       .getOrElse {
         val newUser = ts.addV(types.user).head()
-        newUser.property("email", email)
+        newUser.setProperty(userKeys.email, email)
         newUser
       }
       .id()
@@ -107,7 +107,7 @@ class StemmaOperations {
 
   def newGraph(ts: TraversalSource, description: String): String = {
     val graph = ts.addV(types.graph).head()
-    graph.property("description", description)
+    graph.setProperty(graphKeys.description, description)
     graph.id().toString
   }
 
@@ -135,10 +135,10 @@ class StemmaOperations {
   def newPerson(ts: TraversalSource, graphId: String, descr: PersonDescription): String = {
     val personVertex = ts.addV(types.person).head()
 
-    personVertex.property("name", descr.name)
-    personVertex.property("graphId", graphId)
-    descr.birthDate.map(dateFormat.format(_)) foreach (personVertex.property("birthDate", _))
-    descr.deathDate.map(dateFormat.format(_)) foreach (personVertex.property("deathDate", _))
+    personVertex.setProperty(personKeys.name, descr.name)
+    personVertex.setProperty(keys.graphId, graphId)
+    descr.birthDate.map(dateFormat.format(_)) foreach (personVertex.setProperty(personKeys.birthDate, _))
+    descr.deathDate.map(dateFormat.format(_)) foreach (personVertex.setProperty(personKeys.deathDate, _))
 
     personVertex.id().toString
   }
@@ -182,9 +182,9 @@ class StemmaOperations {
         val childOf  = p.outE(relations.childOf).otherV().map(_.id().toString).headOption()
 
         val personDescr = PersonDescription(
-          p.property(Key[String]("name")).value(),
-          p.property(Key[String]("birthDate")).toOption.map(LocalDate.parse),
-          p.property(Key[String]("deathDate")).toOption.map(LocalDate.parse)
+          p.property(personKeys.name).value(),
+          p.property(personKeys.birthDate).toOption.map(LocalDate.parse),
+          p.property(personKeys.deathDate).toOption.map(LocalDate.parse)
         )
 
         ExtendedPersonDescription(personDescr, childOf, spouseOf)
@@ -265,6 +265,24 @@ private object StemmaOperations {
   }
 
   val dateFormat = DateTimeFormatter.ISO_DATE
+
+  object keys {
+    val graphId: Key[String] = Key[String]("graphId")
+  }
+
+  object personKeys {
+    val name: Key[String]      = Key[String]("name")
+    val birthDate: Key[String] = Key[String]("birthDate")
+    val deathDate: Key[String] = Key[String]("deathDate")
+  }
+
+  object userKeys {
+    val email: Key[String] = Key[String]("email")
+  }
+
+  object graphKeys {
+    val description: Key[String] = Key[String]("description")
+  }
 
   object types {
     val person = "person"
