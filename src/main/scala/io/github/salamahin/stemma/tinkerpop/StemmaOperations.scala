@@ -8,6 +8,17 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 class StemmaOperations {
+  def listGraphs(ts: TraversalSource, ownerId: String): Either[UnknownUser, List[GraphDescription]] =
+    for {
+      owner <- ts.V(ownerId).headOption().toRight(UnknownUser(ownerId))
+      graphs = owner
+        .outE(relations.ownerOf)
+        .otherV()
+        .where(_.hasLabel(types.graph))
+        .map { v => GraphDescription(v.id().toString, v.property(Key[String]("description")).value()) }
+        .toList()
+    } yield graphs
+
   def stemma(ts: TraversalSource, graphId: String): Stemma = {
     val people = ts
       .V()
@@ -51,13 +62,51 @@ class StemmaOperations {
     family.id().toString
   }
 
-  def newUser(ts: TraversalSource): String = {
-    val user = ts.addV(types.user).head()
-    user.id().toString
+  def getOrCreateUser(ts: TraversalSource, email: String): User = {
+    val userId = ts
+      .V()
+      .hasLabel(types.user)
+      .has(Key[String]("email"), email)
+      .headOption()
+      .getOrElse {
+        val newUser = ts.addV(types.user).head()
+        newUser.property("email", email)
+        newUser
+      }
+      .id()
+      .toString
+
+    User(userId, email)
   }
 
-  def newGraph(ts: TraversalSource) = {
+  def changeOwner(ts: TraversalSource, startPersonId: String, newOwnerId: String): Either[UnknownUser, Unit] = {
+    for {
+      newOwner <- ts.V(newOwnerId).headOption().toRight(UnknownUser(newOwnerId))
+      _ = ts
+        .V(startPersonId)
+        .outE(relations.spouseOf)
+        .otherV()
+        .repeat(_.outE(relations.spouseOf, relations.childOf).otherV())
+        .emit()
+        .map { family =>
+          family.inE(relations.ownerOf).drop().head()
+          newOwner.addEdge(relations.ownerOf, family)
+          family
+        }
+        .repeat(_.inE(relations.spouseOf, relations.childOf).otherV())
+        .emit()
+        .map { person =>
+          person.inE(relations.ownerOf).drop().head()
+          newOwner.addEdge(relations.ownerOf, person)
+        }
+        .iterate()
+    } yield ()
+
+  }
+
+  def newGraph(ts: TraversalSource, description: String) = {
     val graph = ts.addV(types.graph).head()
+    graph.property("description", description)
     graph.id().toString
   }
 

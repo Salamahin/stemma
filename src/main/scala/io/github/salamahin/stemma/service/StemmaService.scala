@@ -3,17 +3,14 @@ package io.github.salamahin.stemma.service
 import gremlin.scala.{ScalaGraph, TraversalSource}
 import io.github.salamahin.stemma.domain._
 import io.github.salamahin.stemma.service.GraphService.GRAPH
+import io.github.salamahin.stemma.service.OpsService.OPS
 import io.github.salamahin.stemma.tinkerpop.StemmaOperations
-import org.apache.commons.lang3.exception.ExceptionUtils
-import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
+import io.github.salamahin.stemma.tinkerpop.Transaction._
 import zio._
-
-import scala.util.Try
 
 object StemmaService {
   class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
     import cats.syntax.apply._
-    import cats.syntax.either._
     import cats.syntax.traverse._
 
     private def removePersonAndDropEmptyFamilies(ts: TraversalSource, id: String) = {
@@ -40,58 +37,43 @@ object StemmaService {
       } yield ()
     }
 
-    private def setFamilyRelations(ts: TraversalSource, familyId: String, parents: Seq[PersonDefinition], children: Seq[PersonDefinition]) = {
+    private def setFamilyRelations(ts: TraversalSource, graphId: String, ownerId: String, familyId: String, parents: Seq[PersonDefinition], children: Seq[PersonDefinition]) = {
       def getOrCreatePerson(p: PersonDefinition) =
         p match {
-          case ExistingPersonId(id) => id
-          case p: PersonDescription => ops.newPerson(ts, p)
+          case ExistingPersonId(id) => Right(id)
+          case p: PersonDescription =>
+            val personId = ops.newPerson(ts, graphId, p)
+            ops
+              .makePersonOwner(ts, ownerId, personId)
+              .map(_ => personId)
         }
 
-      val parentIds   = parents.map(getOrCreatePerson)
-      val childrenIds = children.map(getOrCreatePerson)
-
       for {
-        _ <- parentIds.map(id => ops.makeSpouseRelation(ts, familyId, id)).sequence
-        _ <- childrenIds.map(id => ops.makeChildRelation(ts, familyId, id)).sequence
+        parentIds   <- parents.map(getOrCreatePerson).sequence
+        childrenIds <- children.map(getOrCreatePerson).sequence
+        _           <- parentIds.map(id => ops.makeSpouseRelation(ts, familyId, id)).sequence
+        _           <- childrenIds.map(id => ops.makeChildRelation(ts, familyId, id)).sequence
       } yield Family(familyId, parentIds, childrenIds)
     }
 
-    private def resetFamilyRelations(ts: TraversalSource, familyId: String, family: FamilyDescription) = {
+    private def resetFamilyRelations(ts: TraversalSource, graphId: String, ownerId: String, familyId: String, family: FamilyDescription) = {
       val FamilyDescription(p1, p2, children) = family
       for {
         Family(_, oldParents, oldChildren) <- ops.describeFamily(ts, familyId)
         _                                  <- oldParents.map(id => ops.removeSpouseRelation(ts, familyId, id)).sequence
         _                                  <- oldChildren.map(id => ops.removeChildRelation(ts, familyId, id)).sequence
 
-        updatedFamily <- setFamilyRelations(ts, familyId, (p1 ++ p2).toSeq, children)
+        updatedFamily <- setFamilyRelations(ts, graphId, ownerId, familyId, (p1 ++ p2).toSeq, children)
       } yield updatedFamily
     }
 
-    private def createFamilyAndSetRelations(ts: TraversalSource, family: FamilyDescription) = {
+    private def createFamilyAndSetRelations(ts: TraversalSource, graphId: String, ownerId: String, family: FamilyDescription) = {
       val FamilyDescription(p1, p2, children) = family
-      val familyId                            = ops.newFamily(ts)
-      setFamilyRelations(ts, familyId, (p1 ++ p2).toSeq, children)
+      val familyId                            = ops.newFamily(ts, graphId)
+
+      ops.makeFamilyOwner(ts, ownerId, familyId) *> setFamilyRelations(ts, graphId, ownerId, familyId, (p1 ++ p2).toSeq, children)
     }
 
-    private def transaction[T](f: TraversalSource => Either[StemmaError, T]): Either[StemmaError, T] = {
-      val tx = graph.tx()
-
-      Try(f(TraversalSource(tx.begin(): GraphTraversalSource)))
-        .toEither
-        .leftMap(err => UserIsAlreadyFamilyOwner(ExceptionUtils.getStackTrace(err)): StemmaError)
-        .flatten
-        .bimap(
-          err => {
-            tx.rollback()
-            err
-          },
-          res => {
-            tx.commit()
-            tx.close()
-            res
-          }
-        )
-    }
     private def validateFamily(f: FamilyDescription): Either[StemmaError, FamilyDescription] = {
       import cats.implicits._
 
@@ -119,21 +101,28 @@ object StemmaService {
         .toEither
     }
 
-    def createFamily(family: FamilyDescription)                   = IO.fromEither(validateFamily(family) *> transaction { ts => createFamilyAndSetRelations(ts, family) })
-    def updateFamily(familyId: String, family: FamilyDescription) = IO.fromEither(validateFamily(family) *> transaction { ts => resetFamilyRelations(ts, familyId, family) })
-    def removePerson(id: String)                                  = IO.fromEither(transaction { ts => removePersonAndDropEmptyFamilies(ts, id) })
+    def createGraph(ownerId: String, description: String) =
+      IO.fromEither(transaction(graph) { tx =>
+        val graphId = ops.newGraph(tx, description)
+        ops.makeGraphOwner(tx, ownerId, graphId).map(_ => graphId)
+      })
 
-    def removeFamily(familyId: String)                           = IO.fromEither(ops.removeFamily(graph.traversal, familyId))
-    def updatePerson(id: String, description: PersonDescription) = IO.fromEither(ops.updatePerson(graph.traversal, id, description))
-    def stemma()                                                 = UIO(ops.stemma(graph.traversal))
+    def listOwnedGraphs(ownerId: String) = IO.fromEither(ops.listGraphs(graph.traversal, ownerId))
+
+    def createFamily(graphId: String, ownerId: String, family: FamilyDescription)                   = IO.fromEither(validateFamily(family) *> transaction(graph) { ts => createFamilyAndSetRelations(ts, graphId, ownerId, family) })
+    def updateFamily(graphId: String, ownerId: String, familyId: String, family: FamilyDescription) = IO.fromEither(validateFamily(family) *> transaction(graph) { ts => resetFamilyRelations(ts, graphId, ownerId, familyId, family) })
+    def removePerson(personId: String)                                                              = IO.fromEither(transaction(graph) { ts => removePersonAndDropEmptyFamilies(ts, personId) })
+
+    def removeFamily(familyId: String)                                 = IO.fromEither(ops.removeFamily(graph.traversal, familyId))
+    def updatePerson(personId: String, description: PersonDescription) = IO.fromEither(ops.updatePerson(graph.traversal, personId, description))
+    def stemma(graphId: String)                                        = UIO(ops.stemma(graph.traversal, graphId))
   }
 
   type STEMMA = Has[StemmaService]
 
-  val live: URLayer[GRAPH, STEMMA] = ZIO
-    .environment[GRAPH]
-    .map(_.get)
-    .flatMap(_.graph)
-    .map(new StemmaService(_, new StemmaOperations))
-    .toLayer
+  val live: URLayer[GRAPH with OPS, STEMMA] = (for {
+    graph <- ZIO.environment[GRAPH].map(_.get)
+    g <- graph.graph
+    ops <- ZIO.environment[OPS].map(_.get)
+  } yield new StemmaService(g, ops)).toLayer
 }

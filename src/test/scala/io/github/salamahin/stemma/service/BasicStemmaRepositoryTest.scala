@@ -1,18 +1,21 @@
-//package io.github.salamahin.stemma.service
-//
-//import io.github.salamahin.stemma.domain._
-//import io.github.salamahin.stemma.service.StemmaService.STEMMA
-//import zio.ZIO
-//import zio.test.Assertion._
-//import zio.test.{DefaultRunnableSpec, assert, assertTrue}
-//
-//object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with RenderStemma {
-//  private val service =
-//    ZIO
-//      .environment[STEMMA]
-//      .map(_.get)
-//      .provideCustomLayer(TempGraph.make >>> StemmaService.live)
-//
+package io.github.salamahin.stemma.service
+
+import io.github.salamahin.stemma.service.OpsService.OPS
+import io.github.salamahin.stemma.service.StemmaService.STEMMA
+import zio.test.DefaultRunnableSpec
+import zio.{ULayer, ZIO}
+
+object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with RenderStemma {
+  private val ops = OpsService
+    .live
+    .map(_.get)
+
+  private val layer: ULayer[OPS with STEMMA] = TempGraph.make >+> OpsService.live >+> StemmaService.live
+  private val stemmaService                  = ZIO.environment[STEMMA].map(_.get).provideCustomLayer(layer)
+  private val opsService                     = ZIO.environment[OPS].map(_.get).provideCustomLayer(layer)
+
+  private val newUserAndGraph = opsService.flatMap(_.cre)
+
 //  private val canCreateFamily = testM("can create different family with both parents and several children") {
 //    for {
 //      s <- service
@@ -121,7 +124,7 @@
 //      assert(people.map(_.name))(hasSameElements("Jane" :: "John" :: "Jill" :: "July" :: "James" :: Nil))
 //  }
 //
-//  override def spec =
+  override def spec = ???
 //    suite("StemmaService: basic operations")(
 //      canCreateFamily,
 //      canRemovePerson,
@@ -133,4 +136,4 @@
 //      cantCreateFamilyOfSingleChild,
 //      duplicatedIdsForbidden
 //    )
-//}
+}

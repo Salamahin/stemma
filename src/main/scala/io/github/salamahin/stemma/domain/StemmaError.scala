@@ -23,6 +23,8 @@ final case class UserIsAlreadyPersonOwner(personId: String)     extends StemmaEr
 final case class PersonIsOwnedByDifferentUser(personId: String) extends StemmaError
 final case class UnknownUser(id: String)                        extends StemmaError
 
+final case class InvalidInviteToken() extends StemmaError
+
 object StemmaError extends Discriminated {
   implicit val encoder: Encoder[StemmaError] = deriveConfiguredEncoder[StemmaError]
   implicit val decoder: Decoder[StemmaError] = deriveConfiguredDecoder[StemmaError]
