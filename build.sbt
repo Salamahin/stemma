@@ -32,11 +32,10 @@ libraryDependencies ++= Seq(
   "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui-bundle" % versions.tapirV,
   "dev.zio"                     %% "zio-test"                % versions.zioV % Test,
   "dev.zio"                     %% "zio-test-sbt"            % versions.zioV % Test,
-  "org.scalatest"               %% "scalatest"               % "3.3.0-SNAP3" % Test,
-//  "com.h2database"              % "h2"                       % "2.1.210" % Test,
-  "org.umlg" % "sqlg-h2-dialect" % "2.1.5" % Test
+  "org.umlg"                    % "sqlg-h2-dialect"          % "2.1.5" % Test
 )
 
 testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
+
 addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1")
 addCompilerPlugin("org.typelevel" % "kind-projector"      % "0.13.2" cross CrossVersion.full)

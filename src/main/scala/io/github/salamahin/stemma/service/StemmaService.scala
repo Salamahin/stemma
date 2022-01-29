@@ -14,17 +14,17 @@ object StemmaService {
     import cats.syntax.traverse._
 
     private def removePersonAndDropEmptyFamilies(ts: TraversalSource, id: String) = {
-      def removeFamilyIfNotConnecting2Persons(family: Family): Unit =
-        if ((family.parents ++ family.children).size < 2) ops.removeFamily(ts, family.id)
+      def removeFamilyIfNotConnecting2Persons(family: Family) =
+        if ((family.parents ++ family.children).size < 2) ops.removeFamily(ts, family.id) else Right((): Unit)
 
       for {
         descr <- ops.describePerson(ts, id)
         _     <- ops.removePerson(ts, id)
 
         parentOfWhichFamily <- descr.spouseOf.map(ops.describeFamily(ts, _)).sequence
-        childOfWhichFamily  <- descr.childOf.map(ops.describeFamily(ts, _)).toSeq.sequence
+        childOfWhichFamily  <- descr.childOf.map(ops.describeFamily(ts, _)).toList.sequence
 
-        _ = (parentOfWhichFamily ++ childOfWhichFamily).foreach(removeFamilyIfNotConnecting2Persons)
+        _ <- (parentOfWhichFamily ++ childOfWhichFamily).map(removeFamilyIfNotConnecting2Persons).sequence
       } yield ()
     }
 

@@ -11,11 +11,8 @@ import zio.test.{DefaultRunnableSpec, _}
 import zio.{ULayer, ZIO, ZLayer}
 
 object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with RenderStemma {
-  private val secret = ZLayer.succeed(new Secret {
-    override val secret: String = "secret_string"
-  })
 
-  private val layer: ULayer[GRAPH with OPS with SECRET] = TempGraph.make ++ OpsService.live ++ secret
+  private val layer: ULayer[GRAPH with OPS with SECRET] = tempGraph ++ OpsService.live ++ hardcodedSecret
   private val services = (ZIO.environment[STEMMA].map(_.get) zip ZIO.environment[AUTH].map(_.get))
     .provideCustomLayer(layer >>> (StemmaService.live ++ AuthService.live))
 

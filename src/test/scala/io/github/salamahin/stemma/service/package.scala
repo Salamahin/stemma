@@ -1,21 +1,26 @@
-package io.github.salamahin.stemma.service
+package io.github.salamahin.stemma
 
 import gremlin.scala.ScalaGraph
 import io.github.salamahin.stemma.service.GraphService.{GRAPH, GraphService}
+import io.github.salamahin.stemma.service.SecretService.Secret
 import org.apache.commons.configuration2.BaseConfiguration
 import org.umlg.sqlg.structure.SqlgGraph
-import zio.{Has, UIO, ULayer, ZIO, ZManaged}
+import zio.{Has, UIO, ULayer, ZIO, ZLayer, ZManaged}
 
 import java.io.File
 
-object TempGraph {
+package object service {
+  val hardcodedSecret = ZLayer.succeed(new Secret {
+    override val secret: String = "secret_string"
+  })
+
   private val tempFile = ZManaged
     .make(UIO(File.createTempFile("stemma", ".tmp")))(file => UIO(file.delete()))
     .toLayer
 
   case class TempGraphService(graph: ScalaGraph) extends GraphService
 
-  val make: ULayer[GRAPH] =
+  val tempGraph: ULayer[GRAPH] =
     (for {
       tempFile <- ZIO.environment[Has[File]].map(_.get)
       graph = {
