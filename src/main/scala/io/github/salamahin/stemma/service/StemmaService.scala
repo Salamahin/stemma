@@ -14,26 +14,17 @@ object StemmaService {
     import cats.syntax.traverse._
 
     private def removePersonAndDropEmptyFamilies(ts: TraversalSource, id: String) = {
-      def removeFamilyIfNotConnecting2Persons(family: Option[Family]) =
-        family
-          .find(f => (f.parents ++ f.children).size < 2)
-          .map(f => ops.removeFamily(ts, f.id))
-          .getOrElse(Right((): Unit))
-
-      def fromOptionEither[E, T](value: Option[Either[E, T]]) = value match {
-        case Some(value) => value.map(Some(_))
-        case None        => Right(None)
-      }
+      def removeFamilyIfNotConnecting2Persons(family: Family): Unit =
+        if ((family.parents ++ family.children).size < 2) ops.removeFamily(ts, family.id)
 
       for {
         descr <- ops.describePerson(ts, id)
         _     <- ops.removePerson(ts, id)
 
-        parentOfWhichFamily <- fromOptionEither(descr.spouseOf.map(ops.describeFamily(ts, _)))
-        childOfWhichFamily  <- fromOptionEither(descr.childOf.map(ops.describeFamily(ts, _)))
+        parentOfWhichFamily <- descr.spouseOf.map(ops.describeFamily(ts, _)).sequence
+        childOfWhichFamily  <- descr.childOf.map(ops.describeFamily(ts, _)).toSeq.sequence
 
-        _ <- removeFamilyIfNotConnecting2Persons(parentOfWhichFamily)
-        _ <- removeFamilyIfNotConnecting2Persons(childOfWhichFamily)
+        _ = (parentOfWhichFamily ++ childOfWhichFamily).foreach(removeFamilyIfNotConnecting2Persons)
       } yield ()
     }
 
@@ -75,10 +66,8 @@ object StemmaService {
     }
 
     private def validateFamily(f: FamilyDescription): Either[StemmaError, FamilyDescription] = {
-      import cats.implicits._
-
       def checkMembersCount(f: FamilyDescription) =
-        if ((f.parent1 ++ f.parent2 ++ f.children).size <= 1) IncompleteFamily().invalidNec else ().validNec
+        if ((f.parent1 ++ f.parent2 ++ f.children).size <= 1) Left(IncompleteFamily(): StemmaError) else Right((): Unit)
 
       def checkDuplicatedIds(f: FamilyDescription) = {
         def collectDuplicatedIds(people: Seq[PersonDefinition]) =
@@ -93,12 +82,10 @@ object StemmaService {
             }
 
         val duplicatedIds = collectDuplicatedIds((f.parent2 ++ f.parent1).toSeq ++ f.children).toList
-        if (duplicatedIds.isEmpty) ().validNec else DuplicatedIds(duplicatedIds).invalidNec
+        if (duplicatedIds.isEmpty) Right((): Unit) else Left(DuplicatedIds(duplicatedIds): StemmaError)
       }
-      (checkMembersCount(f), checkDuplicatedIds(f))
-        .mapN((_, _) => f)
-        .leftMap(chain => CompositeError(chain.toNonEmptyList.toList))
-        .toEither
+
+      (checkMembersCount(f) *> checkDuplicatedIds(f)).map(_ => f)
     }
 
     def createGraph(ownerId: String, description: String) =

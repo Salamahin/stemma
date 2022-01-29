@@ -13,7 +13,6 @@ final case class SpouseAlreadyBelongsToFamily(familyId: String, personId: String
 final case class SpouseBelongsToDifferentFamily(familyId: String, personId: String)       extends StemmaError
 final case class SpouseDoesNotBelongToFamily(familyId: String, personId: String)          extends StemmaError
 final case class IncompleteFamily()                                                       extends StemmaError
-final case class CompositeError(errs: List[StemmaError])                                  extends StemmaError
 final case class DuplicatedIds(duplicatedIds: Seq[String])                                extends StemmaError
 final case class UnknownError(message: String)                                            extends StemmaError
 

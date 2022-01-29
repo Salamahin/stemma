@@ -51,7 +51,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       graphId         <- s.createGraph(userId, "test graph")
 
       err <- s.createFamily(graphId, userId, family(createJohn)()).flip
-    } yield assertTrue(err == CompositeError(IncompleteFamily() :: Nil))
+    } yield assertTrue(err == IncompleteFamily())
   }
 
   private val cantCreateFamilyOfSingleChild = testM("there cant be a family with no parents and a single child") {
@@ -62,7 +62,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       graphId         <- s.createGraph(userId, "test graph")
 
       err <- s.createFamily(graphId, userId, family()(createJill)).flip
-    } yield assertTrue(err == CompositeError(IncompleteFamily() :: Nil))
+    } yield assertTrue(err == IncompleteFamily())
   }
 
   private val duplicatedIdsForbidden = testM("cant update a family when there are duplicated ids in members") {
@@ -74,7 +74,19 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
 
       Family(familyId, jamesId :: Nil, jillId :: Nil) <- s.createFamily(graphId, userId, family(createJames)(createJill))
       err                                             <- s.updateFamily(graphId, userId, familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
-    } yield assertTrue(err == CompositeError(DuplicatedIds(jamesId :: Nil) :: Nil))
+    } yield assertTrue(err == DuplicatedIds(jamesId :: Nil))
+  }
+
+  private val aChildCanBelongToASingleFamilyOnly = testM("a child must belong to a single family") {
+    for {
+      (s, a) <- services
+
+      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      graphId         <- s.createGraph(userId, "test graph")
+
+      Family(firstFamilyId, _, jillId :: Nil) <- s.createFamily(graphId, userId, family(createJames)(createJill))
+      err                                     <- s.createFamily(graphId, userId, family(createJane)(existing(jillId))).flip
+    } yield assertTrue(err == ChildAlreadyBelongsToFamily(firstFamilyId, jillId))
   }
 
   private val canRemovePerson = testM("when removing a person hist child & spouse relations are removed as well") {
@@ -89,16 +101,24 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       _                                <- s.removePerson(jillId)
 
       render(families) <- s.stemma(graphId)
-    } yield assert(families)(
-      hasSameElements(
-        "(Jane, John) parentsOf (James)" ::
-          "(Josh) parentsOf (Jake)" ::
-          Nil
-      )
-    )
+    } yield assert(families)(hasSameElements("(Jane, John) parentsOf (James)" :: "(Josh) parentsOf (Jake)" :: Nil))
   }
 
-  private val leavingSingleMemberOfFamilyDropsTheFamily = testM("when the only member of family left the family is removed") {
+  private val aPersonCanBeSpouseInDifferentFamilies = testM("one can have several families as a spouse") {
+    for {
+      (s, a) <- services
+
+      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      graphId         <- s.createGraph(userId, "test graph")
+
+      Family(_, jamesId :: Nil, _) <- s.createFamily(graphId, userId, family(createJames)(createJill))
+      _                            <- s.createFamily(graphId, userId, family(existing(jamesId))(createJuly))
+
+      render(families) <- s.stemma(graphId)
+    } yield assert(families)(hasSameElements("(James) parentsOf (Jill)" :: "(James) parentsOf (July)" :: Nil))
+  }
+
+  private val leavingSingleMemberOfFamilyDropsEmptyFamilies = testM("when the only member of family left the family is removed") {
     for {
       (s, a) <- services
 
@@ -106,13 +126,13 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       graphId         <- s.createGraph(userId, "test graph")
 
       Family(_, _, jillId :: Nil) <- s.createFamily(graphId, userId, family(createJane)(createJill))
-      Family(_, joshId :: Nil, _) <- s.createFamily(graphId, userId, family(createJosh)(createJames))
+      _                           <- s.createFamily(graphId, userId, family(existing(jillId))(createJuly))
+      _                           <- s.createFamily(graphId, userId, family(existing(jillId))(createJames))
 
       _ <- s.removePerson(jillId)
-      _ <- s.removePerson(joshId)
 
       Stemma(people, families) <- s.stemma(graphId)
-    } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "James" :: Nil))
+    } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "July" :: "James" :: Nil))
   }
 
   private val canUpdateExistingPerson = testM("can update existing person") {
@@ -155,15 +175,16 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
   }
 
   override def spec =
-    suite("StemmaService: basic operations")(
+    suite("StemmaService: basic ops & rules")(
       canCreateFamily,
       canRemovePerson,
-      leavingSingleMemberOfFamilyDropsTheFamily,
+      leavingSingleMemberOfFamilyDropsEmptyFamilies,
       canUpdateExistingPerson,
-      canUpdateExistingFamily
-    ) + suite("StemmaService: validation")(
+      canUpdateExistingFamily,
+      aPersonCanBeSpouseInDifferentFamilies,
       cantCreateFamilyOfSingleParent,
       cantCreateFamilyOfSingleChild,
-      duplicatedIdsForbidden
+      duplicatedIdsForbidden,
+      aChildCanBelongToASingleFamilyOnly
     )
 }

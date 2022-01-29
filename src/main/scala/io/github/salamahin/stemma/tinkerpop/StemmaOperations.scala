@@ -158,7 +158,7 @@ class StemmaOperations {
     for {
       fromV <- ts.V(from).headOption().toRight(sourceNotFound)
       toV   <- ts.V(to).headOption().toRight(targetNotFound)
-      x     <- checks.toList.map(_.between(fromV, toV)).sequence
+      _     <- checks.toList.map(_.between(fromV, toV)).sequence
       _     = ts.addE(relation).from(fromV).to(toV).iterate()
     } yield ()
   }
@@ -178,7 +178,7 @@ class StemmaOperations {
     ts.V(id)
       .headOption()
       .map { p =>
-        val spouseOf = p.outE(relations.spouseOf).otherV().map(_.id().toString).headOption()
+        val spouseOf = p.outE(relations.spouseOf).otherV().map(_.id().toString).toList()
         val childOf  = p.outE(relations.childOf).otherV().map(_.id().toString).headOption()
 
         val personDescr = PersonDescription(
