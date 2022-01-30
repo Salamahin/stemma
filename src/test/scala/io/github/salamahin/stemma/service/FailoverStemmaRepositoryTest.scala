@@ -13,7 +13,7 @@ import zio.test._
 import zio.{ULayer, ZIO, ZLayer}
 
 object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests with RenderStemma {
-  val failedToRemoveOps = ZLayer.succeed(new StemmaOperations {
+  private val failedToRemoveOps = ZLayer.succeed(new StemmaOperations {
     override def removeFamily(ts: TraversalSource, id: String): Either[NoSuchFamilyId, Unit] = Left(NoSuchFamilyId(id))
   })
 
