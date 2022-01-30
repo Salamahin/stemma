@@ -4,17 +4,30 @@ import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfigur
 import io.circe.{Decoder, Encoder}
 
 sealed trait StemmaError
-final case class NoSuchPersonId(id: Long)                                             extends StemmaError
-final case class NoSuchFamilyId(id: Long)                                             extends StemmaError
-final case class ChildAlreadyBelongsToFamily(familyId: Long, personId: Long)          extends StemmaError
-final case class ChildBelongsToDifferentFamily(existentFamilyId: Long, childId: Long) extends StemmaError
-final case class ChildDoesNotBelongToFamily(familyId: Long, childId: Long)            extends StemmaError
-final case class SpouseAlreadyBelongsToFamily(familyId: Long, personId: Long)         extends StemmaError
-final case class SpouseBelongsToDifferentFamily(familyId: Long, personId: Long)       extends StemmaError
-final case class SpouseDoesNotBelongToFamily(familyId: Long, personId: Long)          extends StemmaError
-final case class IncompleteFamily()                                                   extends StemmaError
-final case class CompositeError(errs: List[StemmaError])                              extends StemmaError
-final case class DuplicatedIds(duplicatedIds: Seq[Long])                              extends StemmaError
+final case class NoSuchPersonId(id: String)                                               extends StemmaError
+final case class NoSuchFamilyId(id: String)                                               extends StemmaError
+final case class ChildAlreadyBelongsToFamily(familyId: String, personId: String)          extends StemmaError
+final case class ChildBelongsToDifferentFamily(existentFamilyId: String, childId: String) extends StemmaError
+final case class ChildDoesNotBelongToFamily(familyId: String, childId: String)            extends StemmaError
+final case class SpouseAlreadyBelongsToFamily(familyId: String, personId: String)         extends StemmaError
+final case class SpouseBelongsToDifferentFamily(familyId: String, personId: String)       extends StemmaError
+final case class SpouseDoesNotBelongToFamily(familyId: String, personId: String)          extends StemmaError
+final case class IncompleteFamily()                                                       extends StemmaError
+final case class DuplicatedIds(duplicatedIds: Seq[String])                                extends StemmaError
+final case class UnknownError(message: String)                                            extends StemmaError
+
+final case class AccessToFamilyDenied(familyId: String)     extends StemmaError
+final case class AccessToPersonDenied(personId: String)     extends StemmaError
+final case class AccessToGraphDenied(graphId: String)       extends StemmaError
+
+final case class UserIsAlreadyFamilyOwner(familyId: String) extends StemmaError
+final case class UserIsAlreadyPersonOwner(personId: String) extends StemmaError
+final case class UserIsAlreadyGraphOwner(graphId: String)   extends StemmaError
+
+final case class UnknownUser(id: String)   extends StemmaError
+final case class NoSuchGraphId(id: String) extends StemmaError
+
+final case class InvalidInviteToken() extends StemmaError
 
 object StemmaError extends Discriminated {
   implicit val encoder: Encoder[StemmaError] = deriveConfiguredEncoder[StemmaError]

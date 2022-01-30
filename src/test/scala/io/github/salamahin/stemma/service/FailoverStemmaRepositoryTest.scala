@@ -1,43 +1,38 @@
 package io.github.salamahin.stemma.service
 
+import gremlin.scala.TraversalSource
 import io.github.salamahin.stemma.domain._
-import io.github.salamahin.stemma.service.stemma.{STEMMA, StemmaService}
-import io.github.salamahin.stemma.service.storage.{STORAGE, localGraphsonFile}
-import zio.console.putStrLn
-import zio.test.Assertion._
+import UserService.USER
+import io.github.salamahin.stemma.service.GraphService.GRAPH
+import io.github.salamahin.stemma.service.OpsService.OPS
+import io.github.salamahin.stemma.service.SecretService.SECRET
+import io.github.salamahin.stemma.service.StemmaService.STEMMA
+import io.github.salamahin.stemma.tinkerpop.StemmaOperations
+import zio.test.Assertion.hasSameElements
 import zio.test._
-import zio.{ExitCode, IO, UIO, URIO, ZIO}
+import zio.{ULayer, ZIO, ZLayer}
 
 object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests with RenderStemma {
-  private val storageFromResouces = localGraphsonFile(getClass.getResource("/stemma.graphson").getFile)
+  private val failedToRemoveOps = ZLayer.succeed(new StemmaOperations {
+    override def removeFamily(ts: TraversalSource, id: String): Either[NoSuchFamilyId, Unit] = Left(NoSuchFamilyId(id))
+  })
 
-  private val failOnWriteStemmaLayer = ZIO
-    .environment[STEMMA]
-    .map { underlying =>
-      val service = underlying.get
+  private val layer: ULayer[GRAPH with OPS with SECRET] = tempGraph ++ failedToRemoveOps ++ hardcodedSecret
+  private val services = (ZIO.environment[STEMMA].map(_.get) zip ZIO.environment[USER].map(_.get))
+    .provideCustomLayer(layer >>> (StemmaService.live ++ UserService.live))
 
-      new StemmaService {
-        override def newFamily(family: FamilyDescription): IO[StemmaError, Family]                    = service.newFamily(family) <* ZIO.fail(IncompleteFamily())
-        override def updateFamily(familyId: Long, family: FamilyDescription): IO[StemmaError, Family] = service.updateFamily(familyId, family) <* ZIO.fail(IncompleteFamily())
-        override def removeFamily(familyId: Long): IO[NoSuchFamilyId, Unit]                           = service.removeFamily(familyId) <* ZIO.fail(NoSuchFamilyId(familyId))
-        override def removePerson(id: Long): IO[StemmaError, Unit]                                    = service.removePerson(id) <* ZIO.fail(IncompleteFamily())
-        override def updatePerson(id: Long, description: PersonDescription): IO[StemmaError, Unit]    = service.updatePerson(id, description) <* ZIO.fail(IncompleteFamily())
-        override def stemma(): UIO[Stemma]                                                            = service.stemma()
-      }
-    }
-    .toLayer
-
-  private val service = ZIO
-    .environment[STEMMA]
-    .map(_.get)
-    .provideCustomLayer(graph.newGraph >>> (storageFromResouces ++ stemma.basic) >+> failOnWriteStemmaLayer >>> stemma.durable)
 
   private val revertChangesOnFailure = testM("any change that modifies graph would be reverted on failure") {
     for {
-      failingStemma  <- service
-      _              <- failingStemma.newFamily(family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())
-      render(stemma) <- failingStemma.stemma()
-    } yield assert(stemma)(hasSameElements("(Jane, John) parentsOf (Jake, Jill)" :: Nil))
+      (s, a) <- services
+
+      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      graphId         <- s.createGraph(userId, "test graph")
+
+      Family(_, jamesId :: _ :: Nil, Nil) <- s.createFamily(userId, graphId, family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())
+      _                                   <- s.removePerson(userId, jamesId).catchAll(_ => ZIO.succeed())
+      render(stemma)                      <- s.stemma(userId, graphId)
+    } yield assert(stemma)(hasSameElements("(James, July) parentsOf ()" :: Nil))
   }
 
   override def spec = suite("StemmaService: corruption")(revertChangesOnFailure)

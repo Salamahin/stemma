@@ -4,7 +4,7 @@ import io.circe.{Decoder, Encoder}
 
 import java.time.LocalDate
 
-final case class Person(id: Long, name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate])
+final case class Person(id: String, name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate])
 
 object Person {
   import io.circe.generic.semiauto._
