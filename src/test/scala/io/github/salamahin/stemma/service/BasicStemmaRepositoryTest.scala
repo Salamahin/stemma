@@ -247,19 +247,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     } yield assertTrue(stemmaRequestErr == AccessToGraphDenied(graphId))
   }
 
-  private val cantAppendExistingPersonToFamilyIfNotPersonOwner = testM("cant attach a person to a family if not a person owner") {
-    for {
-      (s, a)              <- services
-      User(creatorId, _)  <- a.getOrCreateUser("user1@test.com")
-      User(accessorId, _) <- a.getOrCreateUser("user2@test.com")
-
-      graphId <- s.createGraph(creatorId, "my first graph")
-      _       <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
-
-    } yield assertTrue(false)
-  }
-
-  private val canChangeOwnershipInRecursiveManner = testM("abc") {
+  private val canChangeOwnershipInRecursiveManner = testM("ownership change affects spouses, their ancestors and children") {
     for {
       (s, a)              <- services
       User(creatorId, _)  <- a.getOrCreateUser("user1@test.com")
@@ -284,8 +272,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       Family(julyJakeFamilyId, julyId :: Nil, _)                   <- s.createFamily(creatorId, graphId, family(createJuly)(existing(jakeId)))
       Family(jamesJeffFamilyId, _, jeffId :: Nil)                  <- s.createFamily(creatorId, graphId, family(existing(jamesId))(createJeff))
 
-      chownEffect <- s.showChownEffect(creatorId, accessorId, jillId)
-
+      chownEffect <- s.describeChown(creatorId, accessorId, jillId)
     } yield assert(chownEffect.affectedPeople)(hasSameElements(jillId :: julyId :: jakeId :: jamesId :: jeffId :: Nil)) &&
       assert(chownEffect.affectedFamilies)(hasSameElements(jakeJillFamilyId :: julyJakeFamilyId :: jamesJeffFamilyId :: Nil))
   }
@@ -307,7 +294,6 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       cantUpdateFamilyIfNotAnOwner,
       cantRequestStemmaIfNotGraphOwner,
       whenUpdatingFamilyAllMembersShouldBelongToGraph,
-      cantAppendExistingPersonToFamilyIfNotPersonOwner,
       canChangeOwnershipInRecursiveManner
     )
 }

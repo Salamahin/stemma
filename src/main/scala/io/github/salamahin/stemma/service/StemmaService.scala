@@ -142,15 +142,24 @@ object StemmaService {
         stemma  <- if (isOwner) Right(ops.stemma(graph.traversal, graphId)) else Left(AccessToGraphDenied(graphId))
       } yield stemma)
 
-    def showChownEffect(userId: String, toUserId: String, targetPersonId: String) =
-      IO.fromEither(
-        transaction(graph)(ts =>
-          for {
-            isOwner <- ops.isPersonOwner(ts, userId, targetPersonId)
-            chown       <- if (isOwner) ops.listChownEffect(ts, targetPersonId, toUserId) else Left(AccessToPersonDenied(targetPersonId))
-          } yield chown
-        )
+    private def makeChown(ts: TraversalSource, userId: String, toUserId: String, targetPersonId: String) =
+      for {
+        isOwner <- ops.isPersonOwner(ts, userId, targetPersonId)
+        chown   <- if (isOwner) ops.listChownEffect(ts, targetPersonId, toUserId) else Left(AccessToPersonDenied(targetPersonId))
+      } yield chown
+
+    def describeChown(userId: String, toUserId: String, targetPersonId: String) =
+      IO.fromEither(transaction(graph)(ts => makeChown(ts, userId, toUserId, targetPersonId)))
+
+    def chown(userId: String, toUserId: String, targetPersonId: String) = IO.fromEither(
+      transaction(graph)(ts =>
+        for {
+          chown <- makeChown(ts, userId, toUserId, targetPersonId)
+          _     <- chown.affectedFamilies.map(fid => ops.resetFamilyOwner(ts, toUserId, fid)).sequence
+          _     <- chown.affectedPeople.map(pid => ops.resetPersonOwner(ts, toUserId, pid)).sequence
+        } yield ()
       )
+    )
   }
 
   type STEMMA = Has[StemmaService]

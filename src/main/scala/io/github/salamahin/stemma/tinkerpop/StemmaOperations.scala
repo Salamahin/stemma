@@ -6,7 +6,7 @@ import io.github.salamahin.stemma.tinkerpop.StemmaOperations._
 
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable
 
 class StemmaOperations {
   def listGraphs(ts: TraversalSource, ownerId: String): Either[UnknownUser, List[GraphDescription]] =
@@ -86,34 +86,27 @@ class StemmaOperations {
 
     newOwner
       .map { _ =>
-        val familyIds = ArrayBuffer.empty[String]
-        val personIds = ArrayBuffer.empty[String]
+        val familyIds = mutable.Set.empty[String]
+        val personIds = mutable.Set.empty[String]
 
-        val ssss = ts.V(startPersonId)
+        ts.V(startPersonId)
           .outE(relations.spouseOf)
           .otherV()
+          .sideEffect(family => familyIds += family.id().toString)
           .repeat { family =>
-
             val membersOfFamily = family
               .inE(relations.spouseOf, relations.childOf)
               .outV()
-              .sideEffect(person => {
-                personIds += person.id().toString
-              })
+              .sideEffect(person => personIds += person.id().toString)
+              .dedup()
 
-            val otherFamilies =
-              membersOfFamily
-                .outE(relations.spouseOf, relations.childOf)
-                .inV()
-                .sideEffect(family => {
-                  familyIds += family.id().toString
-                })
-
-            otherFamilies.dedup()
+            membersOfFamily
+              .outE(relations.spouseOf, relations.childOf)
+              .inV()
+              .simplePath()
+              .sideEffect(family => familyIds += family.id().toString)
           }
-          .path()
-
-        println(ssss.head())
+          .iterate()
 
         ChownEffect(familyIds.toList, personIds.toList)
       }
@@ -255,6 +248,19 @@ class StemmaOperations {
       UnknownUser(userId),
       NoSuchGraphId(graphId)
     )
+
+  private def removeOwnership(ts: TraversalSource, userId: String, targetId: String)(err: => StemmaError) = for {
+    person <- ts.V(targetId).headOption().toRight(err)
+    user   <- ts.V(userId).headOption().toRight(UnknownUser(userId))
+    _      = person.inE(relations.ownerOf).drop().iterate()
+    _      = ts.addE(relations.ownerOf).from(user).to(person).head()
+  } yield ()
+
+  def resetPersonOwner(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Unit] =
+    removeOwnership(ts, userId, personId)(NoSuchPersonId(personId))
+
+  def resetFamilyOwner(ts: TraversalSource, userId: String, familyId: String): Either[StemmaError, Unit] =
+    removeOwnership(ts, userId, familyId)(NoSuchFamilyId(familyId))
 }
 
 private object StemmaOperations {
