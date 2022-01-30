@@ -2,7 +2,6 @@ package io.github.salamahin.stemma.service
 
 import io.github.salamahin.stemma.domain
 import io.github.salamahin.stemma.domain.{ExistingPersonId, FamilyDescription, PersonDefinition, PersonDescription}
-import io.github.salamahin.stemma.domain.PersonDescription
 
 import java.time.LocalDate
 
@@ -17,6 +16,7 @@ trait Requests {
   val createJuly           = PersonDescription("July", None, None)
   val createJosh           = PersonDescription("Josh", None, None)
   val createJill           = PersonDescription("Jill", None, None)
+  val createJeff           = PersonDescription("Jeff", None, None)
   def existing(id: String) = ExistingPersonId(id)
 
   def family(parents: PersonDefinition*)(children: PersonDefinition*) = parents.toList match {

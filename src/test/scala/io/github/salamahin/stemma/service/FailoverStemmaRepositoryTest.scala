@@ -2,7 +2,7 @@ package io.github.salamahin.stemma.service
 
 import gremlin.scala.TraversalSource
 import io.github.salamahin.stemma.domain._
-import io.github.salamahin.stemma.service.AuthService.AUTH
+import UserService.USER
 import io.github.salamahin.stemma.service.GraphService.GRAPH
 import io.github.salamahin.stemma.service.OpsService.OPS
 import io.github.salamahin.stemma.service.SecretService.SECRET
@@ -18,8 +18,8 @@ object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests wi
   })
 
   private val layer: ULayer[GRAPH with OPS with SECRET] = tempGraph ++ failedToRemoveOps ++ hardcodedSecret
-  private val services = (ZIO.environment[STEMMA].map(_.get) zip ZIO.environment[AUTH].map(_.get))
-    .provideCustomLayer(layer >>> (StemmaService.live ++ AuthService.live))
+  private val services = (ZIO.environment[STEMMA].map(_.get) zip ZIO.environment[USER].map(_.get))
+    .provideCustomLayer(layer >>> (StemmaService.live ++ UserService.live))
 
 
   private val revertChangesOnFailure = testM("any change that modifies graph would be reverted on failure") {
@@ -29,9 +29,9 @@ object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests wi
       User(userId, _) <- a.getOrCreateUser("user@test.com")
       graphId         <- s.createGraph(userId, "test graph")
 
-      Family(_, jamesId :: _ :: Nil, Nil) <- s.createFamily(graphId, userId, family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())
-      _                                   <- s.removePerson(jamesId).catchAll(_ => ZIO.succeed())
-      render(stemma)                      <- s.stemma(graphId)
+      Family(_, jamesId :: _ :: Nil, Nil) <- s.createFamily(userId, graphId, family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())
+      _                                   <- s.removePerson(userId, jamesId).catchAll(_ => ZIO.succeed())
+      render(stemma)                      <- s.stemma(userId, graphId)
     } yield assert(stemma)(hasSameElements("(James, July) parentsOf ()" :: Nil))
   }
 

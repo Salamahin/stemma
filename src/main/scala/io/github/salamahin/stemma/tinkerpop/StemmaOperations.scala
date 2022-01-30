@@ -6,6 +6,7 @@ import io.github.salamahin.stemma.tinkerpop.StemmaOperations._
 
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import scala.collection.mutable.ArrayBuffer
 
 class StemmaOperations {
   def listGraphs(ts: TraversalSource, ownerId: String): Either[UnknownUser, List[GraphDescription]] =
@@ -80,29 +81,42 @@ class StemmaOperations {
     User(userId, email)
   }
 
-  def changeOwner(ts: TraversalSource, startPersonId: String, newOwnerId: String): Either[UnknownUser, Unit] = {
-    for {
-      newOwner <- ts.V(newOwnerId).headOption().toRight(UnknownUser(newOwnerId))
-      _ = ts
-        .V(startPersonId)
-        .outE(relations.spouseOf)
-        .otherV()
-        .repeat(_.outE(relations.spouseOf, relations.childOf).otherV())
-        .emit()
-        .map { family =>
-          family.inE(relations.ownerOf).drop().head()
-          newOwner.addEdge(relations.ownerOf, family)
-          family
-        }
-        .repeat(_.inE(relations.spouseOf, relations.childOf).otherV())
-        .emit()
-        .map { person =>
-          person.inE(relations.ownerOf).drop().head()
-          newOwner.addEdge(relations.ownerOf, person)
-        }
-        .iterate()
-    } yield ()
+  def listChownEffect(ts: TraversalSource, startPersonId: String, newOwnerId: String): Either[UnknownUser, ChownEffect] = {
+    val newOwner = ts.V(newOwnerId).headOption().toRight(UnknownUser(newOwnerId))
 
+    newOwner
+      .map { _ =>
+        val familyIds = ArrayBuffer.empty[String]
+        val personIds = ArrayBuffer.empty[String]
+
+        val ssss = ts.V(startPersonId)
+          .outE(relations.spouseOf)
+          .otherV()
+          .repeat { family =>
+
+            val membersOfFamily = family
+              .inE(relations.spouseOf, relations.childOf)
+              .outV()
+              .sideEffect(person => {
+                personIds += person.id().toString
+              })
+
+            val otherFamilies =
+              membersOfFamily
+                .outE(relations.spouseOf, relations.childOf)
+                .inV()
+                .sideEffect(family => {
+                  familyIds += family.id().toString
+                })
+
+            otherFamilies.dedup()
+          }
+          .path()
+
+        println(ssss.head())
+
+        ChownEffect(familyIds.toList, personIds.toList)
+      }
   }
 
   def newGraph(ts: TraversalSource, description: String): String = {
@@ -180,6 +194,8 @@ class StemmaOperations {
       .map { p =>
         val spouseOf = p.outE(relations.spouseOf).otherV().map(_.id().toString).toList()
         val childOf  = p.outE(relations.childOf).otherV().map(_.id().toString).headOption()
+        val ownerId  = p.inE(relations.ownerOf).otherV().map(_.id().toString).head()
+        val graphId  = p.property(keys.graphId).value()
 
         val personDescr = PersonDescription(
           p.property(personKeys.name).value(),
@@ -187,19 +203,20 @@ class StemmaOperations {
           p.property(personKeys.deathDate).toOption.map(LocalDate.parse)
         )
 
-        ExtendedPersonDescription(personDescr, childOf, spouseOf)
+        ExtendedPersonDescription(personDescr, childOf, spouseOf, graphId, ownerId)
       }
       .toRight(NoSuchPersonId(id))
   }
 
-  def describeFamily(ts: TraversalSource, id: String): Either[NoSuchFamilyId, Family] =
+  def describeFamily(ts: TraversalSource, id: String): Either[NoSuchFamilyId, ExtendedFamilyDescription] =
     ts.V(id)
       .headOption()
       .map { f =>
+        val graphId  = f.property(keys.graphId).value()
         val parents  = f.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
         val children = f.inE(relations.childOf).otherV().id().map(_.toString).toList()
 
-        Family(f.id().toString, parents, children)
+        ExtendedFamilyDescription(Family(f.id().toString, parents, children), graphId)
       }
       .toRight(NoSuchFamilyId(id))
 
@@ -210,27 +227,27 @@ class StemmaOperations {
       isOwner  = user.outE(relations.ownerOf).where(_.otherV().is(resource)).headOption().isDefined
     } yield isOwner
 
-  def isOwnerOfFamily(ts: TraversalSource, userId: String, familyId: String): Either[StemmaError, Boolean] =
+  def isFamilyOwner(ts: TraversalSource, userId: String, familyId: String): Either[StemmaError, Boolean] =
     isOwnerOf(ts, userId, familyId)(NoSuchFamilyId)
 
-  def isOwnerOfPerson(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Boolean] =
+  def isPersonOwner(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Boolean] =
     isOwnerOf(ts, userId, personId)(NoSuchFamilyId)
 
-  def isOwnerOfGraph(ts: TraversalSource, userId: String, graphId: String): Either[StemmaError, Boolean] =
+  def isGraphOwner(ts: TraversalSource, userId: String, graphId: String): Either[StemmaError, Boolean] =
     isOwnerOf(ts, userId, graphId)(NoSuchFamilyId)
 
   def makeFamilyOwner(ts: TraversalSource, userId: String, familyId: String): Either[StemmaError, Unit] =
     setRelation(ts, userId, familyId, relations.ownerOf)(
       UnknownUser(userId),
       NoSuchFamilyId(familyId),
-      thereAreNoOtherOwners(FamilyIsOwnedByDifferentUser(familyId))
+      thereAreNoOtherOwners(AccessToFamilyDenied(familyId))
     )
 
   def makePersonOwner(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Unit] =
     setRelation(ts, userId, personId, relations.ownerOf)(
       UnknownUser(userId),
       NoSuchPersonId(personId),
-      thereAreNoOtherOwners(PersonIsOwnedByDifferentUser(personId))
+      thereAreNoOtherOwners(AccessToPersonDenied(personId))
     )
 
   def makeGraphOwner(ts: TraversalSource, userId: String, graphId: String): Either[StemmaError, Unit] =

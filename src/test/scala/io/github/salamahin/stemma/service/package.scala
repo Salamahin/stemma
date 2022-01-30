@@ -2,7 +2,7 @@ package io.github.salamahin.stemma
 
 import gremlin.scala.ScalaGraph
 import io.github.salamahin.stemma.service.GraphService.{GRAPH, GraphService}
-import io.github.salamahin.stemma.service.SecretService.Secret
+import io.github.salamahin.stemma.service.SecretService.{SECRET, Secret}
 import org.apache.commons.configuration2.BaseConfiguration
 import org.umlg.sqlg.structure.SqlgGraph
 import zio.{Has, UIO, ULayer, ZIO, ZLayer, ZManaged}
@@ -10,7 +10,7 @@ import zio.{Has, UIO, ULayer, ZIO, ZLayer, ZManaged}
 import java.io.File
 
 package object service {
-  val hardcodedSecret = ZLayer.succeed(new Secret {
+  val hardcodedSecret: ULayer[SECRET] = ZLayer.succeed(new Secret {
     override val secret: String = "secret_string"
   })
 
