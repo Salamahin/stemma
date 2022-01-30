@@ -1,6 +1,6 @@
 package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.domain.Family
+import io.github.salamahin.stemma.domain.{Family, InviteToken}
 import io.github.salamahin.stemma.service.GraphService.GRAPH
 import io.github.salamahin.stemma.service.OpsService.OPS
 import io.github.salamahin.stemma.service.SecretService.SECRET
@@ -22,16 +22,17 @@ object UserServiceTest extends DefaultRunnableSpec with Requests with RenderStem
     } yield assertTrue(createdUser == foundUser)
   }
 
-  private val canCreateAnInvitationLink = testM("when user accepts invitation ownship of his families is changed") {
+  private val canCreateAnInvitationLink = testM("can create invite token") {
     for {
       (s, a)  <- services
       user1   <- a.getOrCreateUser("user@test.com")
       graphId <- s.createGraph(user1.userId, "my first graph")
 
-      Family(f1, janeId :: johnId :: Nil, joshId :: jillId :: Nil) <- s.createFamily(user1.userId, graphId, family(createJane, createJohn)(createJosh, createJill))
-      Family(f2, _ :: jakeId :: Nil, julyId :: Nil)                <- s.createFamily(user1.userId, graphId, family(existing(jillId), createJake)(createJuly))
+      Family(_, _, joshId :: _) <- s.createFamily(user1.userId, graphId, family(createJane, createJohn)(createJosh, createJill))
 
-    } yield assertTrue(???)
+      token        <- a.createInviteToken("invitee@test.com", joshId)
+      decodedToken <- a.decodeInviteToken(token)
+    } yield assertTrue(decodedToken == InviteToken("invitee@test.com", joshId))
   }
 
   override def spec = suite("UserServiceTest")(
