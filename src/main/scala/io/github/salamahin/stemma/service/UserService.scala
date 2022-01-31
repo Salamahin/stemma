@@ -70,5 +70,5 @@ object UserService {
     graph  <- ZIO.environment[GRAPH].map(_.get)
     secret <- ZIO.environment[SECRET].map(_.get)
     ops    <- ZIO.environment[OPS].map(_.get)
-  } yield new UserServiceImpl(secret.secret, graph.graph, ops)).toLayer
+  } yield new UserServiceImpl(secret.invitationSecret, graph.graph, ops)).toLayer
 }

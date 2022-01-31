@@ -7,17 +7,22 @@ import scala.util.Using
 
 object SecretService {
   trait Secret {
-    val secret: String
+    val invitationSecret: String
+    val googleApiSecret: String
   }
 
   type SECRET = Has[Secret]
 
-  val dockerSecret: TaskLayer[SECRET] = IO
-    .fromTry(Using(Source.fromFile("/docker/secret/invitation_secret"))(_.mkString))
-    .map(s =>
-      new Secret {
-        override val secret: String = s
-      }
-    )
-    .toLayer
+  val dockerSecret: TaskLayer[SECRET] = {
+    val invitationSecret = IO.fromTry(Using(Source.fromFile("/docker/secret/invitation_secret"))(_.mkString))
+    val googleApiSecret  = IO.fromTry(Using(Source.fromFile("/docker/secret/googleapi_secret"))(_.mkString))
+
+    (invitationSecret zip googleApiSecret).map {
+      case (invite, google) =>
+        new Secret {
+          override val invitationSecret: String = invite
+          override val googleApiSecret: String   = google
+        }
+    }.toLayer
+  }
 }

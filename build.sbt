@@ -26,6 +26,8 @@ libraryDependencies ++= Seq(
   "dev.zio"                     %% "zio-interop-cats"        % "2.2.0.1",
   "org.slf4j"                   % "slf4j-api"                % "2.0.0-alpha6",
   "ch.qos.logback"              % "logback-classic"          % "1.3.0-alpha12",
+  "com.google.api-client"       % "google-api-client"        % "1.33.1",
+  "com.google.http-client"      % "google-http-client-gson"  % "1.41.2",
   "com.softwaremill.sttp.tapir" %% "tapir-core"              % versions.tapirV,
   "com.softwaremill.sttp.tapir" %% "tapir-json-circe"        % versions.tapirV,
   "com.softwaremill.sttp.tapir" %% "tapir-zio-http4s-server" % versions.tapirV,

@@ -2,6 +2,7 @@ package io.github.salamahin.stemma.domain
 
 import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
 import io.circe.{Decoder, Encoder}
+import org.apache.commons.lang3.exception.ExceptionUtils
 
 sealed trait StemmaError
 final case class NoSuchPersonId(id: String)                                               extends StemmaError
@@ -15,6 +16,10 @@ final case class SpouseDoesNotBelongToFamily(familyId: String, personId: String)
 final case class IncompleteFamily()                                                       extends StemmaError
 final case class DuplicatedIds(duplicatedIds: Seq[String])                                extends StemmaError
 final case class UnknownError(message: String)                                            extends StemmaError
+
+object UnknownError {
+  def apply(th: Throwable): UnknownError = UnknownError(ExceptionUtils.getStackTrace(th))
+}
 
 final case class AccessToFamilyDenied(familyId: String)     extends StemmaError
 final case class AccessToPersonDenied(personId: String)     extends StemmaError
