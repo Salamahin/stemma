@@ -11,7 +11,9 @@ import java.io.File
 
 package object service {
   val hardcodedSecret: ULayer[SECRET] = ZLayer.succeed(new Secret {
-    override val secret: String = "secret_string"
+    override val invitationSecret: String = "secret_string"
+    override val googleApiSecret: String  = "secret_string"
+    override val postgresSecret: String   = "secret_string"
   })
 
   private val tempFile = ZManaged

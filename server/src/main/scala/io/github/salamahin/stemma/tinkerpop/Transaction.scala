@@ -15,7 +15,7 @@ object Transaction {
 
     Try(f(TraversalSource(tx.begin(): GraphTraversalSource)))
       .toEither
-      .leftMap(err => UnknownError(ExceptionUtils.getStackTrace(err)): StemmaError)
+      .leftMap(err => (UnknownError(err)): StemmaError)
       .flatten
       .bimap(
         err => {
