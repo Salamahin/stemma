@@ -1,6 +1,8 @@
 ThisBuild / scalaVersion := "2.13.8"
 ThisBuild / organization := "io.github.salamahin"
 
+lazy val `stemma-backend` = project in file("server")
+
 name := "stemma"
 version := "0.1.0-SNAPSHOT"
 
