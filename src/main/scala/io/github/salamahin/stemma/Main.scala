@@ -4,6 +4,7 @@ import io.github.salamahin.stemma.domain._
 import io.github.salamahin.stemma.service.OAuthService.OAUTH
 import io.github.salamahin.stemma.service.StemmaService.STEMMA
 import io.github.salamahin.stemma.service.UserService.USER
+import io.github.salamahin.stemma.service._
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.server.Router
 import org.http4s.server.middleware.Logger
@@ -126,7 +127,9 @@ object Main extends zio.App with Discriminated {
       Nil
 
   override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = {
-//    val deps = ((graph.newGraph >+> repo.repo) >>> (storage.localGraphsonFile("stemma.graphson") ++ stemma.basic)) >>> stemma.durable
+    val deps = (SecretService.dockerSecret ++ OpsService.live) >+>
+      GraphService.postgres >>>
+      (OAuthService.googleSignIn ++ UserService.live ++ StemmaService.live)
 
     val serviceRoutes = Logger.httpRoutes[STEMMA_TASK](logHeaders = true, logBody = true, _ => false, Some(putStrLn(_)))(
       ZHttp4sServerInterpreter().from(serviceEndpoints).toRoutes
@@ -143,18 +146,16 @@ object Main extends zio.App with Discriminated {
       ).orNotFound
     )
 
-//    BlazeServerBuilder[STEMMA_TASK]
-//      .bindHttp(8080, "localhost")
-//      .withHttpApp(httpApp)
-//      .resource
-//      .toManagedZIO
-//      .useForever
-//      .provideCustomLayer(deps)
-//      .foldCauseM(
-//        err => putStrLn(err.prettyPrint).exitCode,
-//        _ => ZIO.succeed(zio.ExitCode.success)
-//      )
-
-    ???
+    BlazeServerBuilder[STEMMA_TASK]
+      .bindHttp(8080, "localhost")
+      .withHttpApp(httpApp)
+      .resource
+      .toManagedZIO
+      .useForever
+      .provideCustomLayer(deps)
+      .foldCauseM(
+        err => putStrLn(err.prettyPrint).exitCode,
+        _ => ZIO.succeed(zio.ExitCode.success)
+      )
   }
 }

@@ -9,6 +9,7 @@ lazy val versions = new {
   val circeV  = "0.14.1"
   val zioV    = "1.0.13"
   val tapirV  = "0.20.0-M6"
+  val sqlgV   = "2.1.5"
 }
 
 scalacOptions ++= Seq("-deprecation", "-feature")
@@ -20,7 +21,8 @@ libraryDependencies ++= Seq(
   "io.circe"                    %% "circe-generic"           % versions.circeV,
   "io.circe"                    %% "circe-parser"            % versions.circeV,
   "io.circe"                    %% "circe-generic-extras"    % versions.circeV,
-  "org.umlg"                    % "sqlg-core"                % "2.1.5",
+  "org.umlg"                    % "sqlg-core"                % versions.sqlgV,
+  "org.umlg"                    % "sqlg-postgres-dialect"    % versions.sqlgV,
   "com.michaelpollmeier"        %% "gremlin-scala"           % "3.5.1.4",
   "dev.zio"                     %% "zio"                     % versions.zioV,
   "dev.zio"                     %% "zio-interop-cats"        % "2.2.0.1",
@@ -34,7 +36,7 @@ libraryDependencies ++= Seq(
   "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui-bundle" % versions.tapirV,
   "dev.zio"                     %% "zio-test"                % versions.zioV % Test,
   "dev.zio"                     %% "zio-test-sbt"            % versions.zioV % Test,
-  "org.umlg"                    % "sqlg-h2-dialect"          % "2.1.5" % Test
+  "org.umlg"                    % "sqlg-h2-dialect"          % versions.sqlgV % Test
 )
 
 testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")

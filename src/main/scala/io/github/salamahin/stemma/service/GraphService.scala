@@ -1,7 +1,10 @@
 package io.github.salamahin.stemma.service
 
 import gremlin.scala.ScalaGraph
-import zio.{Has, UIO, ULayer}
+import io.github.salamahin.stemma.service.SecretService.SECRET
+import org.apache.commons.configuration2.BaseConfiguration
+import org.umlg.sqlg.structure.SqlgGraph
+import zio.{Has, URLayer, ZIO}
 
 object GraphService {
   trait GraphService {
@@ -10,16 +13,24 @@ object GraphService {
 
   type GRAPH = Has[GraphService]
 
-  def newGraph: ULayer[GRAPH] = ???
-//    ZRef
-//      .make {
-//        import gremlin.scala._
-//        TinkerGraph.open().asScala()
-//      }
-//      .map { g =>
-//        new GraphService {
-//          override val graph: Ref[ScalaGraph] = g
-//        }
-//      }
-//      .toLayer
+  val postgres: URLayer[SECRET, GRAPH] = ZIO
+    .environment[SECRET]
+    .map(_.get)
+    .map(_.postgresSecret)
+    .map(secret => {
+      import gremlin.scala._
+      val config = new BaseConfiguration {
+        addPropertyDirect("jdbc.url", "jdbc:postgresql://localhost:5432/stemma")
+        addPropertyDirect("jdbc.username", "postgres")
+        addPropertyDirect("jdbc.password", secret)
+      }
+
+      new GraphService {
+        override val graph: ScalaGraph = {
+          val g: SqlgGraph = SqlgGraph.open(config)
+          g.asScala()
+        }
+      }
+    })
+    .toLayer
 }
