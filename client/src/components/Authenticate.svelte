@@ -8,7 +8,7 @@
         <h1>project stemma</h1>
             <div
                 class="g-signin2"
-                id="sigin"
+                id="siging"
                 data-longtitle="true"
                 data-onsuccess="onSignIn"
                 data-width="380"
@@ -31,7 +31,7 @@
         padding: 40px 60px;
     }
 
-    #siging {
+    :global(.abcRioButton) {
         margin: auto;
     }
 </style>
