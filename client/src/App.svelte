@@ -1,15 +1,9 @@
 <script lang="ts">
 	import Authenticate from "./components/Authenticate.svelte";
 	import Sidebar from "./components/Sidebar.svelte";
-
-	type User = {
-		token_id: string;
-		image_url: string;
-		name: string;
-	};
+	import type { User } from "./types/User";
 
 	let user: User = null;
-
 	function handeSignIn(event: CustomEvent<any>) {
 		user = {
 			token_id: event.detail.token_id as string,
@@ -20,11 +14,6 @@
 	function handleSignOut() {
 		user = null;
 	}
-
-	// let g1: Graph = { name: "Голощаповы", id: "123" };
-	// let g2: Graph = { name: "Сулеровы", id: "222" };
-	// let gg = [g1, g2];
-	// let selected_graph_id = "123";
 </script>
 
 <main>
@@ -36,8 +25,9 @@
 				google_client_id="892655929422-dcdrfg3o02637q2n5h8l1j20hlvm5mib"
 			/>
 		</div>
+	{:else}
+		<Sidebar {user} />
 	{/if}
-	<Sidebar />
 </main>
 
 <style>
