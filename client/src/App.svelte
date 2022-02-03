@@ -1,14 +1,24 @@
 <script lang="ts">
 	import Authenticate from "./components/Authenticate.svelte";
 	import Sidebar from "./components/Sidebar.svelte";
-	import type { Graph } from "./components/Sidebar.svelte";
 
-	let token_id: string;
+	type User = {
+		token_id: string;
+		image_url: string;
+		name: string;
+	};
+
+	let user: User = null;
+
 	function handeSignIn(event: CustomEvent<any>) {
-		token_id = event.detail as string;
+		user = {
+			token_id: event.detail.token_id as string,
+			image_url: event.detail.image_url as string,
+			name: event.detail.name as string,
+		};
 	}
 	function handleSignOut() {
-		token_id = null;
+		user = null;
 	}
 
 	// let g1: Graph = { name: "Голощаповы", id: "123" };
@@ -18,12 +28,12 @@
 </script>
 
 <main>
-	{#if !token_id}
+	{#if !user}
 		<div class="authenticate-holder">
 			<Authenticate
 				on:signIn={handeSignIn}
 				on:signOut={handleSignOut}
-				google_client_id={"892655929422-dcdrfg3o02637q2n5h8l1j20hlvm5mib"}
+				google_client_id="892655929422-dcdrfg3o02637q2n5h8l1j20hlvm5mib"
 			/>
 		</div>
 	{/if}

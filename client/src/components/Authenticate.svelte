@@ -3,35 +3,24 @@
 
     const dispatch = createEventDispatcher();
 
-    function dispatchSignIn(token) {
-        dispatch("signIn", token);
-    }
-
     export let google_client_id;
-    export function onSignOut() {
+    export function signOut() {
         let auth2 = gapi.auth2.getAuthInstance();
         auth2.signOut().then(() => dispatch("signOut"));
     }
 
-    window.onLoadCallback = () => {
-        let auth = gapi.auth2.getAuthInstance();
-        if (auth.isSignedIn.get()) {
-            dispatchSignIn(auth.id_token);
-        }
-    };
-
     window.onSignIn = (googleUser) => {
-        let profile = googleUser.getBasicProfile();
-        dispatchSignIn(googleUser.getAuthResponse().id_token);
+        var profile = googleUser.getBasicProfile();
+        dispatch("signIn", {
+            name: profile.getName(),
+            image_url: profile.getImageUrl(),
+            id_token: googleUser.getAuthResponse().id_token,
+        });
     };
 </script>
 
 <svelte:head>
-    <script
-        src="https://apis.google.com/js/platform.js?onload=onLoadCallback"
-        async
-        defer></script>
-
+    <script src="https://apis.google.com/js/platform.js" async defer></script>
     <meta name="google-signin-client_id" content={google_client_id} />
 </svelte:head>
 

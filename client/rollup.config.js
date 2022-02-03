@@ -52,7 +52,7 @@ export default {
 		css({ output: 'bundle.css' }),
 
 		copy({
-            targets: [
+			targets: [
 				{
 					src: "node_modules/bootstrap/dist/css/bootstrap.min.css",
 					dest: "public/vendor/bootstrap/css",
@@ -62,7 +62,7 @@ export default {
 					dest: "public/vendor/bootstrap/js",
 				}
 			]
-        }),
+		}),
 
 		// If you have external dependencies installed from
 		// npm, you'll most likely need these plugins. In
