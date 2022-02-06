@@ -14,7 +14,7 @@
         dispatch("signIn", {
             name: profile.getName(),
             image_url: profile.getImageUrl(),
-            id_token: googleUser.getAuthResponse().id_token,
+            id_token: googleUser.getAuthResponse().id_token
         });
     };
 </script>
@@ -39,7 +39,7 @@
 </div>
 
 <style>
-    h1 {
+    /* h1 {
         font-size: 4em;
         font-weight: 100;
         text-align: center;
@@ -54,5 +54,5 @@
 
     :global(.abcRioButton) {
         margin: auto;
-    }
+    } */
 </style>
