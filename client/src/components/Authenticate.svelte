@@ -1,26 +1,28 @@
 <script>
-    import { createEventDispatcher } from "svelte";
-
-    const dispatch = createEventDispatcher();
+    import { user } from "../User";
 
     export let google_client_id;
-    export function signOut() {
-        let auth2 = gapi.auth2.getAuthInstance();
-        auth2.signOut().then(() => dispatch("signOut"));
-    }
 
     window.onSignIn = (googleUser) => {
         var profile = googleUser.getBasicProfile();
-        dispatch("signIn", {
+        user.set({
             name: profile.getName(),
             image_url: profile.getImageUrl(),
-            id_token: googleUser.getAuthResponse().id_token
+            id_token: googleUser.getAuthResponse().id_token,
+        });
+    };
+
+    window.onLoadCallback = () => {
+        gapi.auth2.init().then(() => {
+            user.subscribe((newValue) => {
+                let auth = gapi.auth2.getAuthInstance();
+                if (!newValue && auth.isSignedIn) auth.signOut();
+            });
         });
     };
 </script>
 
 <svelte:head>
-    <script src="https://apis.google.com/js/platform.js" async defer></script>
     <meta name="google-signin-client_id" content={google_client_id} />
 </svelte:head>
 
@@ -29,7 +31,6 @@
         <h1>project stemma</h1>
         <div
             class="g-signin2"
-            id="siging"
             data-longtitle="true"
             data-onsuccess="onSignIn"
             data-width="380"
@@ -39,7 +40,7 @@
 </div>
 
 <style>
-    /* h1 {
+    h1 {
         font-size: 4em;
         font-weight: 100;
         text-align: center;
@@ -54,5 +55,5 @@
 
     :global(.abcRioButton) {
         margin: auto;
-    } */
+    }
 </style>

@@ -1,53 +1,42 @@
 <script lang="ts">
 	import Authenticate from "./components/Authenticate.svelte";
 	import Navbar from "./components/Navbar.svelte";
-	import type { User } from "./types/User";
+	import type { User } from "./User";
+	import { user } from "./User";
 
-	let auth;
-
-	let user: User = null;
-	function handeSignIn(event: CustomEvent<any>) {
-		user = {
-			token_id: event.detail.token_id as string,
-			image_url: event.detail.image_url as string,
-			name: event.detail.name as string,
-		};
-	}
-	function handleSignOut() {
-		user = null;
-	}
+	let signedInUser: User;
+	user.subscribe((u) => {
+		signedInUser = u;
+	});
 </script>
 
 <main>
-	{#if !user}
+	{#if !signedInUser}
 		<div class="authenticate-holder">
 			<Authenticate
-				bind:this={auth}
-				on:signIn={handeSignIn}
-				on:signOut={handleSignOut}
 				google_client_id="892655929422-dcdrfg3o02637q2n5h8l1j20hlvm5mib"
 			/>
 		</div>
 	{:else}
-		<Navbar {user} on:signOut={() => auth.signOut()} />
+		<Navbar user={signedInUser} on:signOut={() => user.set(null)} />
 	{/if}
 	<script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </main>
 
 <style>
-	/* main {
+	main {
 		background-image: url("/assets/bg.webp");
-		height: 100%;
 		background-position: center;
 		background-repeat: no-repeat;
 		background-size: cover;
-	} */
+		height: 100%;
+	}
 
-	/* .authenticate-holder {
+	.authenticate-holder {
 		display: flex;
 		justify-content: center;
 		align-items: center;
 		width: 100%;
-		height: 100%;
-	} */
+		min-height: 100%;
+	}
 </style>
