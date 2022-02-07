@@ -5,6 +5,10 @@
     export let user: User;
 
     const dispatch = createEventDispatcher();
+
+    function handleSignOut() {
+        dispatch("signOut");
+    }
 </script>
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -68,7 +72,7 @@
                     <img src={user.image_url} class="avatar" alt="Avatar" />
                     <a
                         class="nav-link text-secondary ms-2"
-                        on:click={() => dispatch("signOut")}
+                        on:click={handleSignOut}
                         href="javascript:void(0)">Выйти</a
                     >
                 </div>
