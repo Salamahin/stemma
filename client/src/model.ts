@@ -1,5 +1,5 @@
 export type User = {
-    token_id: string;
+    id_token: string;
     image_url: string;
     name: string;
 };
@@ -21,7 +21,7 @@ export class Model {
         this.endpoint = endpoint
         this.commonHeader = {
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'Authorization': `Bearer ${user.token_id}`
+            'Authorization': `Bearer ${user.id_token}`
         }
     }
 

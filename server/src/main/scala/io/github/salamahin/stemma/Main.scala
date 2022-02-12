@@ -46,7 +46,7 @@ object Main extends ZIOAppDefault {
 
   private val corsConfig = CorsConfig(
     anyOrigin = false,
-    allowedOrigins = origin => origin contains "aaa"
+    allowedOrigins = _ contains "localhost"
   )
 
   private val application = authenticate { user =>

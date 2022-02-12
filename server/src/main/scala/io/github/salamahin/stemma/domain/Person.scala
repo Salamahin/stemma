@@ -8,7 +8,5 @@ final case class Person(id: String, name: String, birthDate: Option[LocalDate], 
 
 object Person {
   import io.circe.generic.semiauto._
-
   implicit val encoder: Encoder[Person] = deriveEncoder[Person]
-  implicit val decoder: Decoder[Person] = deriveDecoder[Person]
 }

@@ -11,5 +11,4 @@ final case class PersonDescription(name: String, birthDate: Option[LocalDate], d
 
 object PersonDefinition extends Discriminated {
   implicit val encoder: Encoder[PersonDefinition] = deriveConfiguredEncoder[PersonDefinition]
-  implicit val decoder: Decoder[PersonDefinition] = deriveConfiguredDecoder[PersonDefinition]
 }

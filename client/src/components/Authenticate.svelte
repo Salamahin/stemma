@@ -1,17 +1,20 @@
 <script>
-    import { createEventDispatcher } from "svelte";
-    import { Circle2 } from "svelte-loading-spinners";
+    import {createEventDispatcher} from "svelte";
+    import {Circle2} from "svelte-loading-spinners";
 
     const dispatch = createEventDispatcher();
 
     export let google_client_id;
 
-    window.onSignIn = (googleUser) => {
-        var profile = googleUser.getBasicProfile();
+    window.onSignIn = () => {
+        let currentUser = gapi.auth2.getAuthInstance().currentUser.get();
+        let profile =  currentUser.getBasicProfile();
+        let token = currentUser.getAuthResponse().id_token;
+
         dispatch("signIn", {
             name: profile.getName(),
             image_url: profile.getImageUrl(),
-            id_token: googleUser.getAuthResponse().id_token,
+            id_token: token,
         });
     };
 
@@ -32,21 +35,21 @@
 </script>
 
 <svelte:head>
-    <meta name="google-signin-client_id" content={google_client_id} />
+    <meta name="google-signin-client_id" content={google_client_id}/>
 </svelte:head>
 
 <div class="main-container">
     <div>
         <h1>project stemma</h1>
         <div
-            class="g-signin2 {signInDisplayBlock}"
-            data-longtitle="true"
-            data-onsuccess="onSignIn"
-            data-width="380"
-            data-height="50"></div>
+                class="g-signin2 {signInDisplayBlock}"
+                data-longtitle="true"
+                data-onsuccess="onSignIn"
+                data-width="380"
+                data-height="50"></div>
         <div class={loadingSpinnerBlock}>
             <div class="d-flex w-100 justify-content-center">
-                <Circle2 />
+                <Circle2/>
             </div>
         </div>
     </div>
@@ -59,6 +62,7 @@
         text-align: center;
         margin: 0 0 30px 0;
     }
+
     .main-container {
         backdrop-filter: blur(4px) brightness(40%);
         color: ghostwhite;
