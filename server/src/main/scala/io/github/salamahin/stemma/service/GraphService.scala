@@ -1,20 +1,17 @@
 package io.github.salamahin.stemma.service
 
 import gremlin.scala.ScalaGraph
-import io.github.salamahin.stemma.service.SecretService.SECRET
 import org.apache.commons.configuration2.BaseConfiguration
 import org.umlg.sqlg.structure.SqlgGraph
-import zio.{Has, URLayer, ZIO}
+import zio.{URLayer, ZIO}
+
+trait GraphService {
+  val graph: ScalaGraph
+}
 
 object GraphService {
-  trait GraphService {
-    val graph: ScalaGraph
-  }
-
-  type GRAPH = Has[GraphService]
-
-  val postgres: URLayer[SECRET, GRAPH] = ZIO
-    .environment[SECRET]
+  val postgres: URLayer[Secrets, GraphService] = ZIO
+    .environment[Secrets]
     .map(_.get)
     .map(_.postgresSecret)
     .map(secret => {

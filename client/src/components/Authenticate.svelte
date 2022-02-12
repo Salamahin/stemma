@@ -43,8 +43,7 @@
             data-longtitle="true"
             data-onsuccess="onSignIn"
             data-width="380"
-            data-height="50"
-        />
+            data-height="50"></div>
         <div class={loadingSpinnerBlock}>
             <div class="d-flex w-100 justify-content-center">
                 <Circle2 />

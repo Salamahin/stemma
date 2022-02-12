@@ -2,7 +2,7 @@ package io.github.salamahin.stemma.domain
 
 import io.circe.{Decoder, Encoder}
 
-case class GraphDescription(id: String, description: String)
+case class GraphDescription(id: String, name: String)
 
 object GraphDescription {
   import io.circe.generic.semiauto._

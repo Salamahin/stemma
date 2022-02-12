@@ -2,11 +2,6 @@ package io.github.salamahin.stemma.service
 
 import gremlin.scala.TraversalSource
 import io.github.salamahin.stemma.domain._
-import UserService.USER
-import io.github.salamahin.stemma.service.GraphService.GRAPH
-import io.github.salamahin.stemma.service.OpsService.OPS
-import io.github.salamahin.stemma.service.SecretService.SECRET
-import io.github.salamahin.stemma.service.StemmaService.STEMMA
 import io.github.salamahin.stemma.tinkerpop.StemmaOperations
 import zio.test.Assertion.hasSameElements
 import zio.test._
@@ -17,12 +12,11 @@ object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests wi
     override def removeFamily(ts: TraversalSource, id: String): Either[NoSuchFamilyId, Unit] = Left(NoSuchFamilyId(id))
   })
 
-  private val layer: ULayer[GRAPH with OPS with SECRET] = tempGraph ++ failedToRemoveOps ++ hardcodedSecret
-  private val services = (ZIO.environment[STEMMA].map(_.get) zip ZIO.environment[USER].map(_.get))
+  private val layer: ULayer[GraphService with StemmaOperations with Secrets] = tempGraph ++ failedToRemoveOps ++ hardcodedSecret
+  private val services = (ZIO.environment[StemmaService].map(_.get) zip ZIO.environment[UserService].map(_.get))
     .provideCustomLayer(layer >>> (StemmaService.live ++ UserService.live))
 
-
-  private val revertChangesOnFailure = testM("any change that modifies graph would be reverted on failure") {
+  private val revertChangesOnFailure = test("any change that modifies graph would be reverted on failure") {
     for {
       (s, a) <- services
 

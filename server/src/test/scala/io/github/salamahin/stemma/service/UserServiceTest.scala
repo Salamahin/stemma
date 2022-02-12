@@ -1,20 +1,16 @@
 package io.github.salamahin.stemma.service
 
 import io.github.salamahin.stemma.domain.{Family, InviteToken}
-import io.github.salamahin.stemma.service.GraphService.GRAPH
-import io.github.salamahin.stemma.service.OpsService.OPS
-import io.github.salamahin.stemma.service.SecretService.SECRET
-import io.github.salamahin.stemma.service.StemmaService.STEMMA
-import io.github.salamahin.stemma.service.UserService.USER
+import io.github.salamahin.stemma.tinkerpop.StemmaOperations
 import zio.test._
 import zio.{ULayer, ZIO}
 
 object UserServiceTest extends DefaultRunnableSpec with Requests with RenderStemma {
-  private val layer: ULayer[GRAPH with OPS with SECRET] = tempGraph ++ OpsService.live ++ hardcodedSecret
-  private val services = (ZIO.environment[STEMMA].map(_.get) zip ZIO.environment[USER].map(_.get))
+  private val layer: ULayer[GraphService with StemmaOperations with Secrets] = tempGraph ++ OpsService.live ++ hardcodedSecret
+  private val services = (ZIO.environment[StemmaService].map(_.get) zip ZIO.environment[UserService].map(_.get))
     .provideCustomLayer(layer >>> (StemmaService.live ++ UserService.live))
 
-  private val canCreateUser = testM("can create or found a user") {
+  private val canCreateUser = test("can create or found a user") {
     for {
       (_, a)      <- services
       createdUser <- a.getOrCreateUser("user@test.com")
@@ -22,7 +18,7 @@ object UserServiceTest extends DefaultRunnableSpec with Requests with RenderStem
     } yield assertTrue(createdUser == foundUser)
   }
 
-  private val canCreateAnInvitationLink = testM("can create invite token") {
+  private val canCreateAnInvitationLink = test("can create invite token") {
     for {
       (s, a)  <- services
       user1   <- a.getOrCreateUser("user@test.com")

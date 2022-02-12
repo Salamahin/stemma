@@ -16,7 +16,7 @@ class StemmaOperations {
         .outE(relations.ownerOf)
         .otherV()
         .where(_.hasLabel(types.graph))
-        .map { v => GraphDescription(v.id().toString, v.property(Key[String]("description")).value()) }
+        .map { v => GraphDescription(v.id().toString, v.property(graphKeys.name).value()) }
         .toList()
     } yield graphs
 
@@ -114,7 +114,7 @@ class StemmaOperations {
 
   def newGraph(ts: TraversalSource, description: String): String = {
     val graph = ts.addV(types.graph).head()
-    graph.setProperty(graphKeys.description, description)
+    graph.setProperty(graphKeys.name, description)
     graph.id().toString
   }
 
@@ -304,7 +304,7 @@ private object StemmaOperations {
   }
 
   object graphKeys {
-    val description: Key[String] = Key[String]("description")
+    val name: Key[String] = Key[String]("name")
   }
 
   object types {
