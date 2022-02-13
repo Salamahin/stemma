@@ -1,5 +1,6 @@
 package io.github.salamahin.stemma.tinkerpop
 
+import com.typesafe.scalalogging.LazyLogging
 import gremlin.scala._
 import io.github.salamahin.stemma.domain._
 import io.github.salamahin.stemma.tinkerpop.StemmaOperations._
@@ -8,7 +9,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import scala.collection.mutable
 
-class StemmaOperations {
+class StemmaOperations extends LazyLogging {
   def listGraphs(ts: TraversalSource, ownerId: String): Either[UnknownUser, List[GraphDescription]] =
     for {
       owner <- ts.V(ownerId).headOption().toRight(UnknownUser(ownerId))
@@ -64,20 +65,22 @@ class StemmaOperations {
     family.id().toString
   }
 
-  def getOrCreateUser(ts: TraversalSource, email: String): User = {
+  def getOrCreateUser(ts: TraversalSource, email: Email): User = {
     val userId = ts
       .V()
       .hasLabel(types.user)
-      .has(userKeys.email, email)
+      .has(userKeys.email, email.email)
       .headOption()
       .getOrElse {
+        logger.debug(s"Making a new user for $email")
         val newUser = ts.addV(types.user).head()
-        newUser.setProperty(userKeys.email, email)
+        newUser.setProperty(userKeys.email, email.email)
         newUser
       }
       .id()
       .toString
 
+    logger.debug(s"User $email is associated with id $userId")
     User(userId, email)
   }
 

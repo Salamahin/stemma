@@ -3,7 +3,7 @@ package io.github.salamahin.stemma.service
 import com.typesafe.scalalogging.LazyLogging
 import gremlin.scala.ScalaGraph
 import io.circe.parser
-import io.github.salamahin.stemma.domain.{InvalidInviteToken, InviteToken, User}
+import io.github.salamahin.stemma.domain.{Email, InvalidInviteToken, InviteToken, User}
 import io.github.salamahin.stemma.tinkerpop.StemmaOperations
 import zio.{IO, UIO, URLayer, ZIO}
 
@@ -16,7 +16,7 @@ import javax.crypto.spec.SecretKeySpec
 trait UserService {
   def createInviteToken(inviteeEmail: String, associatedPersonId: String): UIO[String]
   def decodeInviteToken(token: String): IO[InvalidInviteToken, InviteToken]
-  def getOrCreateUser(email: String): UIO[User]
+  def getOrCreateUser(email: Email): UIO[User]
 }
 
 object UserService extends LazyLogging {
@@ -66,7 +66,7 @@ object UserService extends LazyLogging {
       new String(cipher.doFinal(Base64.getDecoder.decode(encryptedValue)))
     }
 
-    override def getOrCreateUser(email: String): UIO[User] = UIO {
+    override def getOrCreateUser(email: Email): UIO[User] = UIO {
       logger.debug(s"Get or create a new user with email $email")
       ops.getOrCreateUser(graph.traversal, email)
     }

@@ -26,7 +26,7 @@ export class Model {
     }
 
     async listGraphs() {
-        const response = await fetch(`${this.endpoint}/graphs`, {
+        const response = await fetch(`${this.endpoint}/graph`, {
             method: 'GET',
             headers: this.commonHeader
         });

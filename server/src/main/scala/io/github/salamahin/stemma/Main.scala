@@ -1,5 +1,6 @@
 package io.github.salamahin.stemma
 
+import com.typesafe.scalalogging.LazyLogging
 import io.github.salamahin.stemma.domain.{StemmaError, User}
 import io.github.salamahin.stemma.service._
 import zhttp.http.Middleware.cors
@@ -8,7 +9,7 @@ import zhttp.http.middleware.Cors.CorsConfig
 import zhttp.service.Server
 import zio.{Clock, Console, RIO, ZEnv, ZIO, ZIOAppArgs, ZIOAppDefault}
 
-object Main extends ZIOAppDefault {
+object Main extends ZIOAppDefault with LazyLogging {
 
   type STEMMA_ENV     = OAuthService with UserService with StemmaService with Console with Clock
   type STEMMA_TASK[A] = RIO[STEMMA_ENV, A]
@@ -22,7 +23,7 @@ object Main extends ZIOAppDefault {
       .fromFunctionZIO[Request] { request =>
         val parseToken = ZIO
           .fromOption {
-            request.headerValue("Authorization")
+            request.headerValue(HeaderNames.authorization)
           }
           .mapBoth(
             _ => HttpError.Forbidden(),
@@ -46,12 +47,13 @@ object Main extends ZIOAppDefault {
 
   private val corsConfig = CorsConfig(
     anyOrigin = false,
-    allowedOrigins = _ contains "localhost"
+    allowedOrigins = _ contains "localhost" //fixme configure?
   )
 
   private val application = authenticate { user =>
     Http.collectZIO[Request] {
       case Method.GET -> !! / "graph" =>
+        logger.info(s"User ${user.userId} asked for owned graphs")
         stemmaService
           .flatMap(_.listOwnedGraphs(user.userId))
           .mapBoth(
