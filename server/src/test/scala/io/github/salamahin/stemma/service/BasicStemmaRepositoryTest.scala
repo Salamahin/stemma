@@ -16,7 +16,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
       _ <- s.createFamily(userId, graphId, family(createJane, createJohn)(createJill, createJosh))
@@ -40,7 +40,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
       err <- s.createFamily(userId, graphId, family(createJohn)()).flip
@@ -51,7 +51,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
       err <- s.createFamily(userId, graphId, family()(createJill)).flip
@@ -62,7 +62,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
       Family(familyId, jamesId :: Nil, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJames)(createJill))
@@ -74,7 +74,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
       Family(firstFamilyId, _, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJames)(createJill))
@@ -86,7 +86,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
       Family(_, _, jillId :: _ :: Nil) <- s.createFamily(userId, graphId, family(createJane, createJohn)(createJill, createJames))
@@ -101,7 +101,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
       Family(_, jamesId :: Nil, _) <- s.createFamily(userId, graphId, family(createJames)(createJill))
@@ -115,7 +115,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
       Family(_, _, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJane)(createJill))
@@ -132,7 +132,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
       Family(_, janeId :: Nil, _) <- s.createFamily(userId, graphId, family(createJane)(createJill))
@@ -155,7 +155,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
       Family(familyId, _ :: johnId :: Nil, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJane, createJohn)(createJill))
@@ -170,7 +170,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
   private val usersHaveSeparateGraphs = test("users might have separated graphs") {
     for {
       (s, a)          <- services
-      User(userId, _) <- a.getOrCreateUser("user1@test.com")
+      User(userId, _) <- a.getOrCreateUser(Email("user1@test.com"))
 
       userGraphId1 <- s.createGraph(userId, "first graph")
       _            <- s.createFamily(userId, userGraphId1, family(createJane, createJohn)(createJosh, createJill))
@@ -190,8 +190,8 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
   private val cantUpdatePersonIfNotAnOwner = test("cant update or remove a person that dont own") {
     for {
       (s, a)              <- services
-      User(creatorId, _)  <- a.getOrCreateUser("user1@test.com")
-      User(accessorId, _) <- a.getOrCreateUser("user2@test.com")
+      User(creatorId, _)  <- a.getOrCreateUser(Email("user1@test.com"))
+      User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
       graphId                   <- s.createGraph(creatorId, "my first graph")
       Family(_, janeId :: _, _) <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
@@ -205,8 +205,8 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
   private val cantUpdateFamilyIfNotAnOwner = test("cant update or remove a family that dont own") {
     for {
       (s, a)              <- services
-      User(creatorId, _)  <- a.getOrCreateUser("user1@test.com")
-      User(accessorId, _) <- a.getOrCreateUser("user2@test.com")
+      User(creatorId, _)  <- a.getOrCreateUser(Email("user1@test.com"))
+      User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
       graphId                <- s.createGraph(creatorId, "my first graph")
       Family(familyId, _, _) <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
@@ -220,7 +220,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
   private val whenUpdatingFamilyAllMembersShouldBelongToGraph = test("when updating a family with existing person there should be no members of different graphs") {
     for {
       (s, a)          <- services
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
 
       graph1Id <- s.createGraph(userId, "my first graph")
       graph2Id <- s.createGraph(userId, "my second graph")
@@ -233,8 +233,8 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
   private val cantRequestStemmaIfNotGraphOwner = test("cant request stemma if not a graph owner") {
     for {
       (s, a)              <- services
-      User(creatorId, _)  <- a.getOrCreateUser("user1@test.com")
-      User(accessorId, _) <- a.getOrCreateUser("user2@test.com")
+      User(creatorId, _)  <- a.getOrCreateUser(Email("user1@test.com"))
+      User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
       graphId <- s.createGraph(creatorId, "my first graph")
       _       <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
@@ -246,8 +246,8 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
   private val canChangeOwnershipInRecursiveManner = test("ownership change affects spouses, their ancestors and children") {
     for {
       (s, a)              <- services
-      User(creatorId, _)  <- a.getOrCreateUser("user1@test.com")
-      User(accessorId, _) <- a.getOrCreateUser("user2@test.com")
+      User(creatorId, _)  <- a.getOrCreateUser(Email("user1@test.com"))
+      User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
       /*
          july             jane + john

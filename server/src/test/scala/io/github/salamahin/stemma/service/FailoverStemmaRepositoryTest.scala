@@ -20,7 +20,7 @@ object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests wi
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
       Family(_, jamesId :: _ :: Nil, Nil) <- s.createFamily(userId, graphId, family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())
