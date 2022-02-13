@@ -5,6 +5,7 @@ import gremlin.scala.ScalaGraph
 import io.circe.parser
 import io.github.salamahin.stemma.domain.{Email, InvalidInviteToken, InviteToken, User}
 import io.github.salamahin.stemma.tinkerpop.StemmaOperations
+import io.github.salamahin.stemma.tinkerpop.Transaction.transactionSafe
 import zio.{IO, UIO, URLayer, ZIO}
 
 import java.security.MessageDigest
@@ -68,7 +69,7 @@ object UserService extends LazyLogging {
 
     override def getOrCreateUser(email: Email): UIO[User] = UIO {
       logger.debug(s"Get or create a new user with email $email")
-      ops.getOrCreateUser(graph.traversal, email)
+      transactionSafe(graph) { tx => ops.getOrCreateUser(tx, email) }
     }
   }
 }

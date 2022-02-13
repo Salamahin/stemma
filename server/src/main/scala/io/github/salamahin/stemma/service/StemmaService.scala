@@ -119,25 +119,29 @@ class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
     } yield ()
   }
 
-  def removeFamily(userId: String, familyId: String) = IO.fromEither(
-    for {
-      isOwner <- ops.isFamilyOwner(graph.traversal, userId, familyId)
-      _       <- if (isOwner) ops.removeFamily(graph.traversal, familyId) else Left(AccessToFamilyDenied(familyId))
-    } yield ()
-  )
+  def removeFamily(userId: String, familyId: String) =
+    IO.fromEither(transaction(graph) { tx =>
+      for {
+        isOwner <- ops.isFamilyOwner(tx, userId, familyId)
+        _       <- if (isOwner) ops.removeFamily(tx, familyId) else Left(AccessToFamilyDenied(familyId))
+      } yield ()
+    })
 
-  def updatePerson(userId: String, personId: String, description: PersonDescription) = IO.fromEither(
-    for {
-      isOwner <- ops.isPersonOwner(graph.traversal, userId, personId)
-      _       <- if (isOwner) ops.updatePerson(graph.traversal, personId, description) else Left(AccessToPersonDenied(personId))
-    } yield ()
-  )
+  def updatePerson(userId: String, personId: String, description: PersonDescription) =
+    IO.fromEither(transaction(graph) { tx =>
+      for {
+        isOwner <- ops.isPersonOwner(tx, userId, personId)
+        _       <- if (isOwner) ops.updatePerson(tx, personId, description) else Left(AccessToPersonDenied(personId))
+      } yield ()
+    })
 
   def stemma(userId: String, graphId: String) =
-    IO.fromEither(for {
-      isOwner <- ops.isGraphOwner(graph.traversal, userId, graphId)
-      stemma  <- if (isOwner) Right(ops.stemma(graph.traversal, graphId)) else Left(AccessToGraphDenied(graphId))
-    } yield stemma)
+    IO.fromEither(transaction(graph) { tx =>
+      for {
+        isOwner <- ops.isGraphOwner(tx, userId, graphId)
+        stemma  <- if (isOwner) Right(ops.stemma(tx, graphId)) else Left(AccessToGraphDenied(graphId))
+      } yield stemma
+    })
 
   def describeChown(userId: String, toUserId: String, targetPersonId: String) =
     IO.fromEither(transaction(graph)(ts => makeChown(ts, userId, toUserId, targetPersonId)))

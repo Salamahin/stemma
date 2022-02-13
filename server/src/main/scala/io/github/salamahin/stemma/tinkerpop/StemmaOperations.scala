@@ -72,7 +72,7 @@ class StemmaOperations extends LazyLogging {
       .has(userKeys.email, email.email)
       .headOption()
       .getOrElse {
-        logger.debug(s"Making a new user for $email")
+        logger.debug(s"User with email $email is not found, creating a new one")
         val newUser = ts.addV(types.user).head()
         newUser.setProperty(userKeys.email, email.email)
         newUser
@@ -80,7 +80,7 @@ class StemmaOperations extends LazyLogging {
       .id()
       .toString
 
-    logger.debug(s"User $email is associated with id $userId")
+    logger.debug(s"User email $email is associated with id $userId")
     User(userId, email)
   }
 
