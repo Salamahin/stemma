@@ -1,10 +1,9 @@
 <script lang="ts">
     import Authenticate from "./components/Authenticate.svelte";
     import Navbar from "./components/Navbar.svelte";
-    import AddGraph, {forcePromptNewGraph, promptNewGraph} from './components/AddGraph.svelte'
-
-    import type {OwnedGraphs, User} from "./model.ts";
+    import AddGraph from './components/AddGraph.svelte'
     import {Model} from "./model.ts";
+    import type {OwnedGraphs, User} from "./model.ts";
 
     export let google_client_id;
     export let stemma_backend_url;
