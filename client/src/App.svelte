@@ -2,8 +2,8 @@
     import Authenticate from "./components/Authenticate.svelte";
     import Navbar from "./components/Navbar.svelte";
     import AddStemmaModal from './components/AddStemmaModal.svelte'
+    import type {OwnedStemmas, StemmaDescription, User} from "./model.ts";
     import {Model} from "./model.ts";
-    import type {OwnedStemmas, User} from "./model.ts";
 
     export let google_client_id;
     export let stemma_backend_url;
@@ -21,7 +21,7 @@
         image_url: "",
     };
     let signedIn = false;
-    let ownedStemmas: OwnedStemmas = {stemmas: []};
+    let ownedStemmas: StemmaDescription[] = [];
     let selectedStemma;
 
     //handlers
@@ -29,9 +29,9 @@
         user = event.detail as User;
         signedIn = true;
         model = new Model(stemma_backend_url, user);
-        model.listGraphs().then(stemmas => {
-            ownedStemmas = stemmas
-            if (ownedStemmas.stemmas.length == 0)
+        model.listStemmas().then(stemmas => {
+            ownedStemmas = stemmas.stemmas
+            if (ownedStemmas.length == 0)
                 addStemmaModal.forcePromptNewStemma()
         })
     }
@@ -43,10 +43,8 @@
 
     function handleNewStemma(event: CustomEvent<string>) {
         let name = event.detail
-        model.addGraph(name).then(stemma => {
-            ownedStemmas = {
-                stemmas: [...ownedStemmas.stemmas, stemma]
-            }
+        model.addStemma(name).then(stemma => {
+            ownedStemmas = [...ownedStemmas, stemma]
             navbarComponent.selectStemma(stemma);
         })
     }
@@ -67,17 +65,17 @@
     </div>
 
     <div class={workspaceDisplay}>
-        <Navbar {user} graphs={ownedStemmas}
+        <Navbar {user} stemmas={ownedStemmas}
                 bind:this={navbarComponent}
                 on:signOut={handleSignOut}
-                on:graphSelected={stemma => selectedStemma = stemma}
-                on:createNewGraph={() => addStemmaModal.promptNewStemma()}
+                on:stemmaSelected={stemma => selectedStemma = stemma}
+                on:createNewStemma={() => addStemmaModal.promptNewStemma()}
         />
     </div>
 
     <AddStemmaModal
             bind:this={addStemmaModal}
-            on:stemmajrtqAdded={handleNewStemma}
+            on:stemmaAdded={handleNewStemma}
     />
 
     <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>

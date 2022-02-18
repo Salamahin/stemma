@@ -1,9 +1,9 @@
 <script lang="ts">
     import {createEventDispatcher} from "svelte";
-    import type {OwnedStemmas, StemmaDescription, User} from "../model.ts";
+    import type {StemmaDescription, User} from "../model.ts";
 
     export let user: User;
-    export let stemmas: OwnedStemmas;
+    export let stemmas: StemmaDescription[];
     let selectedStemma: StemmaDescription;
 
     const dispatch = createEventDispatcher();
@@ -17,7 +17,7 @@
         selectedStemma = s
     }
 
-    $: if (!selectedStemma) selectedStemma = stemmas.stemmas[0];
+    $: if (!selectedStemma) selectedStemma = stemmas[0];
 </script>
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -50,22 +50,23 @@
                             data-bs-toggle="dropdown"
                             aria-expanded="false"
                     >
-                        {selectedStemma ? selectedStemma.name : "???"}
+                        {selectedStemma ? selectedStemma.name : "Родословные"}
                     </a>
                     <ul
                             class="dropdown-menu"
                             aria-labelledby="navbarDropdownMenuLink"
                     >
-                        {#each stemmas.stemmas as g}
+                        {#each stemmas as s}
                             <li><a class="dropdown-item" href="#"
-                                   on:click={() => handleStemmaSelection(g)}>{g.name}</a></li>
+                                   on:click={() => handleStemmaSelection(s)}>{s.name}</a></li>
                         {/each}
                         <li>
                             <hr class="dropdown-divider"/>
                         </li>
 
                         <li>
-                            <a class="dropdown-item" href="#" on:click={() => dispatch("createNewStemma")}>Новая родословная...</a>
+                            <a class="dropdown-item" href="#" on:click={() => dispatch("createNewStemma")}>Новая
+                                родословная...</a>
                         </li>
                     </ul>
                 </li>

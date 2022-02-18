@@ -43,7 +43,7 @@ export class Model {
         }
     }
 
-    async listGraphs() {
+    async listStemmas() {
         const response = await fetch(`${this.endpoint}/stemma`, {
             method: 'GET',
             headers: this.commonHeader
@@ -51,7 +51,7 @@ export class Model {
         return await this.parseResponse<OwnedStemmas>(response);
     }
 
-    async addGraph(name: string) {
+    async addStemma(name: string) {
         const response = await fetch(`${this.endpoint}/stemma`, {
             method: 'POST',
             headers: this.commonHeader,
@@ -69,7 +69,7 @@ export class Model {
             headers: this.commonHeader
         })
 
-        return await this.parseResponse<StemmaDescription>(response);
+        return await this.parseResponse<Stemma>(response);
     }
 
     private async parseResponse<T>(response: Response) {
