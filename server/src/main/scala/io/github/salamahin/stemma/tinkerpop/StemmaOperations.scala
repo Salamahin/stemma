@@ -31,7 +31,7 @@ class StemmaOperations extends LazyLogging {
         val birthDate = vertex.property(personKeys.birthDate).toOption.map(LocalDate.parse)
         val deathDate = vertex.property(personKeys.deathDate).toOption.map(LocalDate.parse)
 
-        Person(vertex.id().toString, name, birthDate, deathDate)
+        PersonDescription(vertex.id().toString, name, birthDate, deathDate)
       }
       .toList()
 
@@ -43,14 +43,14 @@ class StemmaOperations extends LazyLogging {
         val parents  = family.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
         val children = family.inE(relations.childOf).otherV().id().map(_.toString).toList()
 
-        Family(family.id().toString, parents, children)
+        FamilyDescription(family.id().toString, parents, children)
       }
       .toList()
 
     Stemma(people, families)
   }
 
-  def updatePerson(ts: TraversalSource, id: String, description: PersonDescription): Either[NoSuchPersonId, Unit] = {
+  def updatePerson(ts: TraversalSource, id: String, description: CreateNewPerson): Either[NoSuchPersonId, Unit] = {
     for {
       person <- ts.V(id).headOption().toRight(NoSuchPersonId(id))
       _      = person.setProperty(personKeys.name, description.name)
@@ -115,9 +115,9 @@ class StemmaOperations extends LazyLogging {
       }
   }
 
-  def newGraph(ts: TraversalSource, description: String): String = {
+  def newGraph(ts: TraversalSource, name: String): String = {
     val graph = ts.addV(types.graph).head()
-    graph.setProperty(graphKeys.name, description)
+    graph.setProperty(graphKeys.name, name)
     graph.id().toString
   }
 
@@ -142,7 +142,7 @@ class StemmaOperations extends LazyLogging {
             .toRight(noSuchRelation(familyId, personId))
     } yield ()
 
-  def newPerson(ts: TraversalSource, graphId: String, descr: PersonDescription): String = {
+  def newPerson(ts: TraversalSource, graphId: String, descr: CreateNewPerson): String = {
     val personVertex = ts.addV(types.person).head()
 
     personVertex.setProperty(personKeys.name, descr.name)
@@ -193,7 +193,7 @@ class StemmaOperations extends LazyLogging {
         val ownerId  = p.inE(relations.ownerOf).otherV().map(_.id().toString).head()
         val graphId  = p.property(keys.graphId).value()
 
-        val personDescr = PersonDescription(
+        val personDescr = CreateNewPerson(
           p.property(personKeys.name).value(),
           p.property(personKeys.birthDate).toOption.map(LocalDate.parse),
           p.property(personKeys.deathDate).toOption.map(LocalDate.parse)
@@ -212,7 +212,7 @@ class StemmaOperations extends LazyLogging {
         val parents  = f.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
         val children = f.inE(relations.childOf).otherV().id().map(_.toString).toList()
 
-        ExtendedFamilyDescription(Family(f.id().toString, parents, children), graphId)
+        ExtendedFamilyDescription(FamilyDescription(f.id().toString, parents, children), graphId)
       }
       .toRight(NoSuchFamilyId(id))
 
@@ -252,12 +252,13 @@ class StemmaOperations extends LazyLogging {
       NoSuchGraphId(graphId)
     )
 
-  private def removeOwnership(ts: TraversalSource, userId: String, targetId: String)(err: => StemmaError) = for {
-    person <- ts.V(targetId).headOption().toRight(err)
-    user   <- ts.V(userId).headOption().toRight(UnknownUser(userId))
-    _      = person.inE(relations.ownerOf).drop().iterate()
-    _      = ts.addE(relations.ownerOf).from(user).to(person).head()
-  } yield ()
+  private def removeOwnership(ts: TraversalSource, userId: String, targetId: String)(err: => StemmaError) =
+    for {
+      person <- ts.V(targetId).headOption().toRight(err)
+      user   <- ts.V(userId).headOption().toRight(UnknownUser(userId))
+      _      = person.inE(relations.ownerOf).drop().iterate()
+      _      = ts.addE(relations.ownerOf).from(user).to(person).head()
+    } yield ()
 
   def resetPersonOwner(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Unit] =
     removeOwnership(ts, userId, personId)(NoSuchPersonId(personId))

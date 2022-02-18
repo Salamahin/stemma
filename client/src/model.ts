@@ -29,19 +29,26 @@ export class Model {
         const response = await fetch(`${this.endpoint}/graph`, {
             method: 'GET',
             headers: this.commonHeader
-        });
-
-
-        console.log(response.body)
-
-        throw new Error("wtf")
-
-        // const body = new TextDecoder("utf-8").decode(response.body);
-
-        // if (!response.ok)
-        //     throw new Error(`Unexpected response: ${body}`)
-
-        // return JSON.parse(body) as OwnedGraphs;
+        })
+        return await this.parseResponse<OwnedGraphs>(response);
     }
 
+    async addGraph(name: String) {
+        const response = await fetch(`${this.endpoint}/graph`, {
+            method: 'POST',
+            headers: this.commonHeader,
+            body: JSON.stringify({
+                "name": name
+            })
+        })
+
+        return await this.parseResponse<Graph>(response);
+    }
+
+    private async parseResponse<T>(response: Response) {
+        const json = await response.json();
+        if (!response.ok)
+            throw new Error(`Unexpected response: ${json}`)
+        return json as T;
+    }
 }

@@ -10,24 +10,24 @@ class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
   import cats.syntax.apply._
   import cats.syntax.traverse._
 
-  def createGraph(userId: String, description: String) =
+  def createGraph(userId: String, name: String) =
     IO.fromEither(transaction(graph) { tx =>
-      val graphId = ops.newGraph(tx, description)
+      val graphId = ops.newGraph(tx, name)
       ops.makeGraphOwner(tx, userId, graphId).map(_ => graphId)
     })
 
-  def listOwnedGraphs(userId: String) = IO.fromEither(ops.listGraphs(graph.traversal, userId)).map(OwnedGraphs.apply)
+  def listOwnedGraphs(userId: String) = IO.fromEither(ops.listGraphs(graph.traversal, userId)).map(OwnedGraphsDescription.apply)
 
-  def createFamily(userId: String, graphId: String, family: FamilyDescription): IO[StemmaError, Family] = IO.fromEither(validateFamily(family) *> transaction(graph) { ts => createFamilyAndSetRelations(ts, graphId, userId, family) })
+  def createFamily(userId: String, graphId: String, family: CreateFamily): IO[StemmaError, FamilyDescription] = IO.fromEither(validateFamily(family) *> transaction(graph) { ts => createFamilyAndSetRelations(ts, graphId, userId, family) })
 
-  private def createFamilyAndSetRelations(ts: TraversalSource, graphId: String, ownerId: String, family: FamilyDescription) = {
-    val FamilyDescription(p1, p2, children) = family
+  private def createFamilyAndSetRelations(ts: TraversalSource, graphId: String, ownerId: String, family: CreateFamily) = {
+    val CreateFamily(p1, p2, children) = family
     val familyId                            = ops.newFamily(ts, graphId)
 
     ops.makeFamilyOwner(ts, ownerId, familyId) *> setFamilyRelations(ts, graphId, ownerId, familyId, (p1 ++ p2).toSeq, children)
   }
 
-  def updateFamily(userId: String, familyId: String, family: FamilyDescription): IO[StemmaError, Family] = IO.fromEither(
+  def updateFamily(userId: String, familyId: String, family: CreateFamily): IO[StemmaError, FamilyDescription] = IO.fromEither(
     transaction(graph)(ts =>
       for {
         isOwner <- ops.isFamilyOwner(ts, userId, familyId)
@@ -36,10 +36,10 @@ class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
     )
   )
 
-  private def resetFamilyRelations(ts: TraversalSource, ownerId: String, familyId: String, family: FamilyDescription) = {
-    val FamilyDescription(p1, p2, children) = family
+  private def resetFamilyRelations(ts: TraversalSource, ownerId: String, familyId: String, family: CreateFamily) = {
+    val CreateFamily(p1, p2, children) = family
     for {
-      ExtendedFamilyDescription(Family(_, oldParents, oldChildren), graphId) <- ops.describeFamily(ts, familyId)
+      ExtendedFamilyDescription(FamilyDescription(_, oldParents, oldChildren), graphId) <- ops.describeFamily(ts, familyId)
       _                                                                      <- oldParents.map(id => ops.removeSpouseRelation(ts, familyId, id)).sequence
       _                                                                      <- oldChildren.map(id => ops.removeChildRelation(ts, familyId, id)).sequence
 
@@ -50,14 +50,14 @@ class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
   private def setFamilyRelations(ts: TraversalSource, graphId: String, ownerId: String, familyId: String, parents: Seq[PersonDefinition], children: Seq[PersonDefinition]) = {
     def getOrCreatePerson(p: PersonDefinition) =
       p match {
-        case ExistingPersonId(id) =>
+        case ExistingPerson(id) =>
           for {
             descr <- ops.describePerson(ts, id)
             _     <- if (descr.graphId != graphId) Left(NoSuchPersonId(id)) else Right((): Unit)
             _     <- if (descr.owner != ownerId) Left(AccessToPersonDenied(id)) else Right((): Unit)
           } yield id
 
-        case p: PersonDescription =>
+        case p: CreateNewPerson =>
           val personId = ops.newPerson(ts, graphId, p)
           ops
             .makePersonOwner(ts, ownerId, personId)
@@ -69,18 +69,18 @@ class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
       childrenIds <- children.map(getOrCreatePerson).sequence
       _           <- parentIds.map(id => ops.makeSpouseRelation(ts, familyId, id)).sequence
       _           <- childrenIds.map(id => ops.makeChildRelation(ts, familyId, id)).sequence
-    } yield Family(familyId, parentIds.toList, childrenIds.toList)
+    } yield FamilyDescription(familyId, parentIds.toList, childrenIds.toList)
   }
 
-  private def validateFamily(f: FamilyDescription): Either[StemmaError, FamilyDescription] = {
-    def checkMembersCount(f: FamilyDescription) =
+  private def validateFamily(f: CreateFamily): Either[StemmaError, CreateFamily] = {
+    def checkMembersCount(f: CreateFamily) =
       if ((f.parent1 ++ f.parent2 ++ f.children).size <= 1) Left(IncompleteFamily(): StemmaError) else Right((): Unit)
 
-    def checkDuplicatedIds(f: FamilyDescription) = {
+    def checkDuplicatedIds(f: CreateFamily) = {
       def collectDuplicatedIds(people: Seq[PersonDefinition]) =
         people
           .collect {
-            case ExistingPersonId(id) => id
+            case ExistingPerson(id) => id
           }
           .groupBy(identity)
           .values
@@ -105,7 +105,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
   )
 
   private def removePersonAndDropEmptyFamilies(ts: TraversalSource, id: String) = {
-    def removeFamilyIfNotConnecting2Persons(family: Family) =
+    def removeFamilyIfNotConnecting2Persons(family: FamilyDescription) =
       if ((family.parents ++ family.children).size < 2) ops.removeFamily(ts, family.id) else Right((): Unit)
 
     for {
@@ -127,7 +127,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
       } yield ()
     })
 
-  def updatePerson(userId: String, personId: String, description: PersonDescription) =
+  def updatePerson(userId: String, personId: String, description: CreateNewPerson) =
     IO.fromEither(transaction(graph) { tx =>
       for {
         isOwner <- ops.isPersonOwner(tx, userId, personId)

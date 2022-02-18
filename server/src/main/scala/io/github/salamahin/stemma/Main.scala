@@ -1,15 +1,17 @@
 package io.github.salamahin.stemma
 
 import com.typesafe.scalalogging.LazyLogging
-import io.github.salamahin.stemma.domain.{StemmaError, User}
+import io.github.salamahin.stemma.domain._
 import io.github.salamahin.stemma.service._
 import zhttp.http.Middleware.cors
 import zhttp.http._
 import zhttp.http.middleware.Cors.CorsConfig
 import zhttp.service.Server
-import zio.{Clock, Console, RIO, ZEnv, ZIO, ZIOAppArgs, ZIOAppDefault}
+import zio.{Clock, Console, RIO, Task, ZEnv, ZIO, ZIOAppArgs, ZIOAppDefault}
 
 object Main extends ZIOAppDefault with LazyLogging {
+  import io.circe.parser.decode
+  import io.circe.syntax._
 
   type STEMMA_ENV     = OAuthService with UserService with StemmaService with Console with Clock
   type STEMMA_TASK[A] = RIO[STEMMA_ENV, A]
@@ -43,8 +45,6 @@ object Main extends ZIOAppDefault with LazyLogging {
       }
       .flatten
 
-  import io.circe.syntax._
-
   private val corsConfig = CorsConfig(
     anyOrigin = false,
     allowedOrigins = _ contains "localhost" //fixme configure?
@@ -56,6 +56,22 @@ object Main extends ZIOAppDefault with LazyLogging {
         logger.info(s"User ${user.userId} asked for owned graphs")
         stemmaService
           .flatMap(_.listOwnedGraphs(user.userId))
+          .mapBoth(
+            error => HttpError.BadRequest((error: StemmaError).asJson.noSpaces),
+            graphs => Response.json(graphs.asJson.noSpaces)
+          )
+
+      case req @ Method.POST -> !! / "graph" =>
+        logger.info(s"User ${user.userId} requested a new graph creation")
+
+        val newGraph: ZIO[StemmaService, StemmaError, GraphDescription] = for {
+          body      <- req.bodyAsString.mapError(err => UnknownError(err))
+          graphName <- Task.fromEither(decode[CreateGraph](body)).mapError(err => UnknownError(err))
+          s         <- stemmaService
+          graphId   <- s.createGraph(user.userId, graphName.name)
+        } yield GraphDescription(graphId, graphName.name)
+
+        newGraph
           .mapBoth(
             error => HttpError.BadRequest((error: StemmaError).asJson.noSpaces),
             graphs => Response.json(graphs.asJson.noSpaces)

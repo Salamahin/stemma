@@ -2,7 +2,7 @@ package io.github.salamahin.stemma.domain
 
 import io.circe.{Decoder, Encoder}
 
-final case class Stemma(people: List[Person], families: List[Family])
+final case class Stemma(people: List[PersonDescription], families: List[FamilyDescription])
 
 object Stemma {
   import io.circe.generic.semiauto._

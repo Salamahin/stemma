@@ -23,7 +23,7 @@ object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests wi
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
-      Family(_, jamesId :: _ :: Nil, Nil) <- s.createFamily(userId, graphId, family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())
+      FamilyDescription(_, jamesId :: _ :: Nil, Nil) <- s.createFamily(userId, graphId, family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())
       _                                   <- s.removePerson(userId, jamesId).catchAll(_ => ZIO.succeed())
       render(stemma)                      <- s.stemma(userId, graphId)
     } yield assert(stemma)(hasSameElements("(James, July) parentsOf ()" :: Nil))

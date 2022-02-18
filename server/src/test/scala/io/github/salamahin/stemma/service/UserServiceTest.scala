@@ -1,6 +1,6 @@
 package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.domain.{Email, Family, InviteToken}
+import io.github.salamahin.stemma.domain.{Email, FamilyDescription, InviteToken}
 import io.github.salamahin.stemma.tinkerpop.StemmaOperations
 import zio.test._
 import zio.{ULayer, ZIO}
@@ -24,7 +24,7 @@ object UserServiceTest extends DefaultRunnableSpec with Requests with RenderStem
       user1   <- a.getOrCreateUser(Email("user@test.com"))
       graphId <- s.createGraph(user1.userId, "my first graph")
 
-      Family(_, _, joshId :: _) <- s.createFamily(user1.userId, graphId, family(createJane, createJohn)(createJosh, createJill))
+      FamilyDescription(_, _, joshId :: _) <- s.createFamily(user1.userId, graphId, family(createJane, createJohn)(createJosh, createJill))
 
       token        <- a.createInviteToken("invitee@test.com", joshId)
       decodedToken <- a.decodeInviteToken(token)

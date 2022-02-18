@@ -1,32 +1,56 @@
 <script lang="ts">
     import Authenticate from "./components/Authenticate.svelte";
     import Navbar from "./components/Navbar.svelte";
-    import type {User} from "./model.ts";
+    import AddGraph, {forcePromptNewGraph, promptNewGraph} from './components/AddGraph.svelte'
+
+    import type {OwnedGraphs, User} from "./model.ts";
     import {Model} from "./model.ts";
 
     export let google_client_id;
     export let stemma_backend_url;
 
+    //components
+    let auth;
+    let addGraph;
+
+    //model
     let model: Model;
     let user: User = {
         name: "john doe",
-        token_id: "",
+        id_token: "",
         image_url: "",
     };
-
     let signedIn = false;
-    let auth;
+    let ownedGraphs: OwnedGraphs = {
+        graphs: []
+    };
 
+    //handlers
     function handleSignIn(event: CustomEvent) {
         user = event.detail as User;
         signedIn = true;
         model = new Model(stemma_backend_url, user);
-        console.log(model.listGraphs());
+        model.listGraphs().then(graphs => {
+            ownedGraphs = graphs
+            if(ownedGraphs.graphs.length == 0)
+                addGraph.forcePromptNewGraph()
+        })
     }
 
     function handleSignOut() {
         auth.signOut();
         signedIn = false;
+    }
+
+    function handleNewGraph(event: CustomEvent<string>) {
+        let name = event.detail
+        model.addGraph(name).then(graph => {
+           ownedGraphs = {
+               graphs:  [...ownedGraphs.graphs, graph]
+           }
+
+           console.log(ownedGraphs)
+        })
     }
 
     $: authenticateDisplay = !signedIn ? "d-block" : "d-none";
@@ -47,6 +71,12 @@
     <div class={workspaceDisplay}>
         <Navbar {user} on:signOut={handleSignOut}/>
     </div>
+
+    <AddGraph
+            bind:this={addGraph}
+            on:graphAdded={handleNewGraph}
+    />
+
     <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </main>
 

@@ -1,5 +1,5 @@
 package io.github.salamahin.stemma.tinkerpop
 
-import io.github.salamahin.stemma.domain.PersonDescription
+import io.github.salamahin.stemma.domain.CreateNewPerson
 
-final case class ExtendedPersonDescription(personDescription: PersonDescription, childOf: Option[String], spouseOf: List[String], graphId: String, owner: String)
+final case class ExtendedPersonDescription(personDescription: CreateNewPerson, childOf: Option[String], spouseOf: List[String], graphId: String, owner: String)

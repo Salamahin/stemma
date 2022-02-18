@@ -65,7 +65,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
-      Family(familyId, jamesId :: Nil, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJames)(createJill))
+      FamilyDescription(familyId, jamesId :: Nil, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJames)(createJill))
       err                                             <- s.updateFamily(userId, familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
     } yield assertTrue(err == DuplicatedIds(jamesId :: Nil))
   }
@@ -77,7 +77,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
-      Family(firstFamilyId, _, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJames)(createJill))
+      FamilyDescription(firstFamilyId, _, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJames)(createJill))
       err                                     <- s.createFamily(userId, graphId, family(createJane)(existing(jillId))).flip
     } yield assertTrue(err == ChildAlreadyBelongsToFamily(firstFamilyId, jillId))
   }
@@ -89,7 +89,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
-      Family(_, _, jillId :: _ :: Nil) <- s.createFamily(userId, graphId, family(createJane, createJohn)(createJill, createJames))
+      FamilyDescription(_, _, jillId :: _ :: Nil) <- s.createFamily(userId, graphId, family(createJane, createJohn)(createJill, createJames))
       _                                <- s.createFamily(userId, graphId, family(existing(jillId), createJosh)(createJake))
       _                                <- s.removePerson(userId, jillId)
 
@@ -104,7 +104,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
-      Family(_, jamesId :: Nil, _) <- s.createFamily(userId, graphId, family(createJames)(createJill))
+      FamilyDescription(_, jamesId :: Nil, _) <- s.createFamily(userId, graphId, family(createJames)(createJill))
       _                            <- s.createFamily(userId, graphId, family(existing(jamesId))(createJuly))
 
       render(families) <- s.stemma(userId, graphId)
@@ -118,7 +118,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
-      Family(_, _, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJane)(createJill))
+      FamilyDescription(_, _, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJane)(createJill))
       _                           <- s.createFamily(userId, graphId, family(existing(jillId))(createJuly))
       _                           <- s.createFamily(userId, graphId, family(existing(jillId))(createJames))
 
@@ -135,7 +135,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
-      Family(_, janeId :: Nil, _) <- s.createFamily(userId, graphId, family(createJane)(createJill))
+      FamilyDescription(_, janeId :: Nil, _) <- s.createFamily(userId, graphId, family(createJane)(createJill))
 
       _ <- s.updatePerson(userId, janeId, createJohn)
 
@@ -158,7 +158,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       graphId         <- s.createGraph(userId, "test graph")
 
-      Family(familyId, _ :: johnId :: Nil, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJane, createJohn)(createJill))
+      FamilyDescription(familyId, _ :: johnId :: Nil, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJane, createJohn)(createJill))
       _                                                   <- s.updateFamily(userId, familyId, family(createJuly, existing(johnId))(existing(jillId), createJames))
 
       st @ Stemma(people, _) <- s.stemma(userId, graphId)
@@ -178,7 +178,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       userGraphId2 <- s.createGraph(userId, "second graph")
       _            <- s.createFamily(userId, userGraphId2, family(createJake)(createJuly, createJames))
 
-      OwnedGraphs(graphs) <- s.listOwnedGraphs(userId)
+      OwnedGraphsDescription(graphs) <- s.listOwnedGraphs(userId)
 
       render(stemma1) <- s.stemma(userId, userGraphId1)
       render(stemma2) <- s.stemma(userId, userGraphId2)
@@ -194,7 +194,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
       graphId                   <- s.createGraph(creatorId, "my first graph")
-      Family(_, janeId :: _, _) <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
+      FamilyDescription(_, janeId :: _, _) <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
 
       personRemoveErr <- s.removePerson(accessorId, janeId).flip
       personUpdateErr <- s.updatePerson(accessorId, janeId, createJuly).flip
@@ -209,7 +209,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
       graphId                <- s.createGraph(creatorId, "my first graph")
-      Family(familyId, _, _) <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
+      FamilyDescription(familyId, _, _) <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
 
       familyRemoveErr <- s.removeFamily(accessorId, familyId).flip
       familyUpdateErr <- s.updateFamily(accessorId, familyId, family(createJames)(createJuly)).flip
@@ -225,7 +225,7 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       graph1Id <- s.createGraph(userId, "my first graph")
       graph2Id <- s.createGraph(userId, "my second graph")
 
-      Family(_, janeId :: johnId :: Nil, joshId :: jillId :: Nil) <- s.createFamily(userId, graph1Id, family(createJane, createJohn)(createJosh, createJill))
+      FamilyDescription(_, janeId :: johnId :: Nil, joshId :: jillId :: Nil) <- s.createFamily(userId, graph1Id, family(createJane, createJohn)(createJosh, createJill))
       familyCreationErr                                           <- s.createFamily(userId, graph2Id, family(existing(janeId), existing(johnId))(existing(joshId), existing(jillId))).flip
     } yield assertTrue(familyCreationErr == NoSuchPersonId(janeId))
   }
@@ -263,10 +263,10 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
        */
 
       graphId                                                      <- s.createGraph(creatorId, "my first graph")
-      Family(_, _, _ :: jillId :: Nil)                             <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
-      Family(jakeJillFamilyId, _ :: jakeId :: Nil, jamesId :: Nil) <- s.createFamily(creatorId, graphId, family(existing(jillId), createJake)(createJames))
-      Family(julyJakeFamilyId, julyId :: Nil, _)                   <- s.createFamily(creatorId, graphId, family(createJuly)(existing(jakeId)))
-      Family(jamesJeffFamilyId, _, jeffId :: Nil)                  <- s.createFamily(creatorId, graphId, family(existing(jamesId))(createJeff))
+      FamilyDescription(_, _, _ :: jillId :: Nil)                             <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
+      FamilyDescription(jakeJillFamilyId, _ :: jakeId :: Nil, jamesId :: Nil) <- s.createFamily(creatorId, graphId, family(existing(jillId), createJake)(createJames))
+      FamilyDescription(julyJakeFamilyId, julyId :: Nil, _)                   <- s.createFamily(creatorId, graphId, family(createJuly)(existing(jakeId)))
+      FamilyDescription(jamesJeffFamilyId, _, jeffId :: Nil)                  <- s.createFamily(creatorId, graphId, family(existing(jamesId))(createJeff))
 
       chownEffect <- s.describeChown(creatorId, accessorId, jillId)
     } yield assert(chownEffect.affectedPeople)(hasSameElements(jillId :: julyId :: jakeId :: jamesId :: jeffId :: Nil)) &&
