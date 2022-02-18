@@ -17,14 +17,14 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       (s, a) <- services
 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
-      graphId         <- s.createGraph(userId, "test graph")
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      _ <- s.createFamily(userId, graphId, family(createJane, createJohn)(createJill, createJosh))
-      _ <- s.createFamily(userId, graphId, family(createJohn)(createJosh))
-      _ <- s.createFamily(userId, graphId, family(createJane, createJohn)())
-      _ <- s.createFamily(userId, graphId, family()(createJane, createJohn))
+      _ <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill, createJosh))
+      _ <- s.createFamily(userId, stemmaId, family(createJohn)(createJosh))
+      _ <- s.createFamily(userId, stemmaId, family(createJane, createJohn)())
+      _ <- s.createFamily(userId, stemmaId, family()(createJane, createJohn))
 
-      render(families) <- s.stemma(userId, graphId)
+      render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families) {
       hasSameElements(
         "(Jane, John) parentsOf (Jill, Josh)" ::
@@ -41,9 +41,9 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       (s, a) <- services
 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
-      graphId         <- s.createGraph(userId, "test graph")
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      err <- s.createFamily(userId, graphId, family(createJohn)()).flip
+      err <- s.createFamily(userId, stemmaId, family(createJohn)()).flip
     } yield assertTrue(err == IncompleteFamily())
   }
 
@@ -52,9 +52,9 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       (s, a) <- services
 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
-      graphId         <- s.createGraph(userId, "test graph")
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      err <- s.createFamily(userId, graphId, family()(createJill)).flip
+      err <- s.createFamily(userId, stemmaId, family()(createJill)).flip
     } yield assertTrue(err == IncompleteFamily())
   }
 
@@ -63,10 +63,10 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       (s, a) <- services
 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
-      graphId         <- s.createGraph(userId, "test graph")
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(familyId, jamesId :: Nil, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJames)(createJill))
-      err                                             <- s.updateFamily(userId, familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
+      FamilyDescription(familyId, jamesId :: Nil, jillId :: Nil) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
+      err                                                        <- s.updateFamily(userId, familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
     } yield assertTrue(err == DuplicatedIds(jamesId :: Nil))
   }
 
@@ -75,10 +75,10 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       (s, a) <- services
 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
-      graphId         <- s.createGraph(userId, "test graph")
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(firstFamilyId, _, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJames)(createJill))
-      err                                     <- s.createFamily(userId, graphId, family(createJane)(existing(jillId))).flip
+      FamilyDescription(firstFamilyId, _, jillId :: Nil) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
+      err                                                <- s.createFamily(userId, stemmaId, family(createJane)(existing(jillId))).flip
     } yield assertTrue(err == ChildAlreadyBelongsToFamily(firstFamilyId, jillId))
   }
 
@@ -87,13 +87,13 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       (s, a) <- services
 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
-      graphId         <- s.createGraph(userId, "test graph")
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, _, jillId :: _ :: Nil) <- s.createFamily(userId, graphId, family(createJane, createJohn)(createJill, createJames))
-      _                                <- s.createFamily(userId, graphId, family(existing(jillId), createJosh)(createJake))
-      _                                <- s.removePerson(userId, jillId)
+      FamilyDescription(_, _, jillId :: _ :: Nil) <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill, createJames))
+      _                                           <- s.createFamily(userId, stemmaId, family(existing(jillId), createJosh)(createJake))
+      _                                           <- s.removePerson(userId, jillId)
 
-      render(families) <- s.stemma(userId, graphId)
+      render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families)(hasSameElements("(Jane, John) parentsOf (James)" :: "(Josh) parentsOf (Jake)" :: Nil))
   }
 
@@ -102,12 +102,12 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       (s, a) <- services
 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
-      graphId         <- s.createGraph(userId, "test graph")
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, jamesId :: Nil, _) <- s.createFamily(userId, graphId, family(createJames)(createJill))
-      _                            <- s.createFamily(userId, graphId, family(existing(jamesId))(createJuly))
+      FamilyDescription(_, jamesId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
+      _                                       <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJuly))
 
-      render(families) <- s.stemma(userId, graphId)
+      render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families)(hasSameElements("(James) parentsOf (Jill)" :: "(James) parentsOf (July)" :: Nil))
   }
 
@@ -116,15 +116,15 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       (s, a) <- services
 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
-      graphId         <- s.createGraph(userId, "test graph")
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, _, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJane)(createJill))
-      _                           <- s.createFamily(userId, graphId, family(existing(jillId))(createJuly))
-      _                           <- s.createFamily(userId, graphId, family(existing(jillId))(createJames))
+      FamilyDescription(_, _, jillId :: Nil) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
+      _                                      <- s.createFamily(userId, stemmaId, family(existing(jillId))(createJuly))
+      _                                      <- s.createFamily(userId, stemmaId, family(existing(jillId))(createJames))
 
       _ <- s.removePerson(userId, jillId)
 
-      Stemma(people, families) <- s.stemma(userId, graphId)
+      Stemma(people, families) <- s.stemma(userId, stemmaId)
     } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "July" :: "James" :: Nil))
   }
 
@@ -133,13 +133,13 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       (s, a) <- services
 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
-      graphId         <- s.createGraph(userId, "test graph")
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, janeId :: Nil, _) <- s.createFamily(userId, graphId, family(createJane)(createJill))
+      FamilyDescription(_, janeId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
 
       _ <- s.updatePerson(userId, janeId, createJohn)
 
-      st @ Stemma(people, _) <- s.stemma(userId, graphId)
+      st @ Stemma(people, _) <- s.stemma(userId, stemmaId)
       render(families)       = st
     } yield assertTrue(families == List("(John) parentsOf (Jill)")) && assertTrue(
       people.exists(p =>
@@ -156,33 +156,33 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       (s, a) <- services
 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
-      graphId         <- s.createGraph(userId, "test graph")
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(familyId, _ :: johnId :: Nil, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJane, createJohn)(createJill))
-      _                                                   <- s.updateFamily(userId, familyId, family(createJuly, existing(johnId))(existing(jillId), createJames))
+      FamilyDescription(familyId, _ :: johnId :: Nil, jillId :: Nil) <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill))
+      _                                                              <- s.updateFamily(userId, familyId, family(createJuly, existing(johnId))(existing(jillId), createJames))
 
-      st @ Stemma(people, _) <- s.stemma(userId, graphId)
+      st @ Stemma(people, _) <- s.stemma(userId, stemmaId)
       render(families)       = st
     } yield assertTrue(families == List("(John, July) parentsOf (James, Jill)")) &&
       assert(people.map(_.name))(hasSameElements("Jane" :: "John" :: "Jill" :: "July" :: "James" :: Nil))
   }
 
-  private val usersHaveSeparateGraphs = test("users might have separated graphs") {
+  private val usersHaveSeparateGraphs = test("users might have separated stemmas") {
     for {
       (s, a)          <- services
       User(userId, _) <- a.getOrCreateUser(Email("user1@test.com"))
 
-      userGraphId1 <- s.createGraph(userId, "first graph")
-      _            <- s.createFamily(userId, userGraphId1, family(createJane, createJohn)(createJosh, createJill))
+      userStemmaId1 <- s.createStemma(userId, "first stemma")
+      _             <- s.createFamily(userId, userStemmaId1, family(createJane, createJohn)(createJosh, createJill))
 
-      userGraphId2 <- s.createGraph(userId, "second graph")
-      _            <- s.createFamily(userId, userGraphId2, family(createJake)(createJuly, createJames))
+      userStemmaId2 <- s.createStemma(userId, "second stemma")
+      _             <- s.createFamily(userId, userStemmaId2, family(createJake)(createJuly, createJames))
 
-      OwnedGraphsDescription(graphs) <- s.listOwnedGraphs(userId)
+      OwnedStemmasDescription(stemmas) <- s.listOwnedStemmas(userId)
 
-      render(stemma1) <- s.stemma(userId, userGraphId1)
-      render(stemma2) <- s.stemma(userId, userGraphId2)
-    } yield assert(graphs)(hasSameElements(GraphDescription(userGraphId1, "first graph") :: GraphDescription(userGraphId2, "second graph") :: Nil)) &&
+      render(stemma1) <- s.stemma(userId, userStemmaId1)
+      render(stemma2) <- s.stemma(userId, userStemmaId2)
+    } yield assert(stemmas)(hasSameElements(StemmaDescription(userStemmaId1, "first stemma") :: StemmaDescription(userStemmaId2, "second stemma") :: Nil)) &&
       assert(stemma1)(hasSameElements("(Jane, John) parentsOf (Jill, Josh)" :: Nil)) &&
       assert(stemma2)(hasSameElements("(Jake) parentsOf (James, July)" :: Nil))
   }
@@ -193,8 +193,8 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       User(creatorId, _)  <- a.getOrCreateUser(Email("user1@test.com"))
       User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
-      graphId                   <- s.createGraph(creatorId, "my first graph")
-      FamilyDescription(_, janeId :: _, _) <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
+      stemmaId                             <- s.createStemma(creatorId, "my first stemma")
+      FamilyDescription(_, janeId :: _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
 
       personRemoveErr <- s.removePerson(accessorId, janeId).flip
       personUpdateErr <- s.updatePerson(accessorId, janeId, createJuly).flip
@@ -208,8 +208,8 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       User(creatorId, _)  <- a.getOrCreateUser(Email("user1@test.com"))
       User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
-      graphId                <- s.createGraph(creatorId, "my first graph")
-      FamilyDescription(familyId, _, _) <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
+      stemmaId                          <- s.createStemma(creatorId, "my first stemma")
+      FamilyDescription(familyId, _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
 
       familyRemoveErr <- s.removeFamily(accessorId, familyId).flip
       familyUpdateErr <- s.updateFamily(accessorId, familyId, family(createJames)(createJuly)).flip
@@ -217,30 +217,30 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       assertTrue(familyUpdateErr == AccessToFamilyDenied(familyId))
   }
 
-  private val whenUpdatingFamilyAllMembersShouldBelongToGraph = test("when updating a family with existing person there should be no members of different graphs") {
+  private val whenUpdatingFamilyAllMembersShouldBelongToGraph = test("when updating a family with existing person there should be no members of different stemmas") {
     for {
       (s, a)          <- services
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
 
-      graph1Id <- s.createGraph(userId, "my first graph")
-      graph2Id <- s.createGraph(userId, "my second graph")
+      stemma1Id <- s.createStemma(userId, "my first stemma")
+      stemma2Id <- s.createStemma(userId, "my second stemma")
 
-      FamilyDescription(_, janeId :: johnId :: Nil, joshId :: jillId :: Nil) <- s.createFamily(userId, graph1Id, family(createJane, createJohn)(createJosh, createJill))
-      familyCreationErr                                           <- s.createFamily(userId, graph2Id, family(existing(janeId), existing(johnId))(existing(joshId), existing(jillId))).flip
+      FamilyDescription(_, janeId :: johnId :: Nil, joshId :: jillId :: Nil) <- s.createFamily(userId, stemma1Id, family(createJane, createJohn)(createJosh, createJill))
+      familyCreationErr                                                      <- s.createFamily(userId, stemma2Id, family(existing(janeId), existing(johnId))(existing(joshId), existing(jillId))).flip
     } yield assertTrue(familyCreationErr == NoSuchPersonId(janeId))
   }
 
-  private val cantRequestStemmaIfNotGraphOwner = test("cant request stemma if not a graph owner") {
+  private val cantRequestStemmaIfNotGraphOwner = test("cant request stemma if not a stemma owner") {
     for {
       (s, a)              <- services
       User(creatorId, _)  <- a.getOrCreateUser(Email("user1@test.com"))
       User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
-      graphId <- s.createGraph(creatorId, "my first graph")
-      _       <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
+      stemmaId <- s.createStemma(creatorId, "my first stemma")
+      _        <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
 
-      stemmaRequestErr <- s.stemma(accessorId, graphId).flip
-    } yield assertTrue(stemmaRequestErr == AccessToGraphDenied(graphId))
+      stemmaRequestErr <- s.stemma(accessorId, stemmaId).flip
+    } yield assertTrue(stemmaRequestErr == AccessToStemmaDenied(stemmaId))
   }
 
   private val canChangeOwnershipInRecursiveManner = test("ownership change affects spouses, their ancestors and children") {
@@ -262,11 +262,11 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
        her spouses and children, and ancestors of her spouses
        */
 
-      graphId                                                      <- s.createGraph(creatorId, "my first graph")
-      FamilyDescription(_, _, _ :: jillId :: Nil)                             <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
-      FamilyDescription(jakeJillFamilyId, _ :: jakeId :: Nil, jamesId :: Nil) <- s.createFamily(creatorId, graphId, family(existing(jillId), createJake)(createJames))
-      FamilyDescription(julyJakeFamilyId, julyId :: Nil, _)                   <- s.createFamily(creatorId, graphId, family(createJuly)(existing(jakeId)))
-      FamilyDescription(jamesJeffFamilyId, _, jeffId :: Nil)                  <- s.createFamily(creatorId, graphId, family(existing(jamesId))(createJeff))
+      stemmaId                                                                <- s.createStemma(creatorId, "my first stemma")
+      FamilyDescription(_, _, _ :: jillId :: Nil)                             <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
+      FamilyDescription(jakeJillFamilyId, _ :: jakeId :: Nil, jamesId :: Nil) <- s.createFamily(creatorId, stemmaId, family(existing(jillId), createJake)(createJames))
+      FamilyDescription(julyJakeFamilyId, julyId :: Nil, _)                   <- s.createFamily(creatorId, stemmaId, family(createJuly)(existing(jakeId)))
+      FamilyDescription(jamesJeffFamilyId, _, jeffId :: Nil)                  <- s.createFamily(creatorId, stemmaId, family(existing(jamesId))(createJeff))
 
       chownEffect <- s.describeChown(creatorId, accessorId, jillId)
     } yield assert(chownEffect.affectedPeople)(hasSameElements(jillId :: julyId :: jakeId :: jamesId :: jeffId :: Nil)) &&

@@ -19,14 +19,14 @@ final case class UnknownError(cause: Throwable)                                 
 
 final case class AccessToFamilyDenied(familyId: String) extends StemmaError
 final case class AccessToPersonDenied(personId: String) extends StemmaError
-final case class AccessToGraphDenied(graphId: String)   extends StemmaError
+final case class AccessToStemmaDenied(stemmaId: String)   extends StemmaError
 
 final case class UserIsAlreadyFamilyOwner(familyId: String) extends StemmaError
 final case class UserIsAlreadyPersonOwner(personId: String) extends StemmaError
-final case class UserIsAlreadyGraphOwner(graphId: String)   extends StemmaError
+final case class UserIsAlreadyGraphOwner(stemmaId: String)   extends StemmaError
 
-final case class UnknownUser(id: String)   extends StemmaError
-final case class NoSuchGraphId(id: String) extends StemmaError
+final case class UnknownUser(id: String)    extends StemmaError
+final case class NoSuchStemmaId(id: String) extends StemmaError
 
 final case class InvalidInviteToken() extends StemmaError
 

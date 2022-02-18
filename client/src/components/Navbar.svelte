@@ -1,23 +1,23 @@
 <script lang="ts">
     import {createEventDispatcher} from "svelte";
-    import type {OwnedGraphs, Graph, User} from "../model.ts";
+    import type {OwnedStemmas, StemmaDescription, User} from "../model.ts";
 
     export let user: User;
-    export let graphs: OwnedGraphs;
-    let selectedGraph: Graph;
+    export let stemmas: OwnedStemmas;
+    let selectedStemma: StemmaDescription;
 
     const dispatch = createEventDispatcher();
 
-    function handleGraphSelection(g: Graph) {
-        selectedGraph = g;
-        dispatch("graphSelected", g)
+    function handleStemmaSelection(s: StemmaDescription) {
+        selectedStemma = s;
+        dispatch("stemmaSelected", s)
     }
 
-    export function selectGraph(g: Graph) {
-        selectedGraph = g
+    export function selectStemma(s: StemmaDescription) {
+        selectedStemma = s
     }
 
-    $: if (!selectedGraph) selectedGraph = graphs.graphs[0];
+    $: if (!selectedStemma) selectedStemma = stemmas.stemmas[0];
 </script>
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -50,22 +50,22 @@
                             data-bs-toggle="dropdown"
                             aria-expanded="false"
                     >
-                        {selectedGraph ? selectedGraph.name : "Graphs"}
+                        {selectedStemma ? selectedStemma.name : "???"}
                     </a>
                     <ul
                             class="dropdown-menu"
                             aria-labelledby="navbarDropdownMenuLink"
                     >
-                        {#each graphs.graphs as g}
+                        {#each stemmas.stemmas as g}
                             <li><a class="dropdown-item" href="#"
-                                   on:click={() => handleGraphSelection(g)}>{g.name}</a></li>
+                                   on:click={() => handleStemmaSelection(g)}>{g.name}</a></li>
                         {/each}
                         <li>
                             <hr class="dropdown-divider"/>
                         </li>
 
                         <li>
-                            <a class="dropdown-item" href="#" on:click={() => dispatch("createNewGraph")}>Новый граф...</a>
+                            <a class="dropdown-item" href="#" on:click={() => dispatch("createNewStemma")}>Новая родословная...</a>
                         </li>
                     </ul>
                 </li>

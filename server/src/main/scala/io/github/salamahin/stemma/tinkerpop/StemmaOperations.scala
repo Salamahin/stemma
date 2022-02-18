@@ -10,22 +10,22 @@ import java.time.format.DateTimeFormatter
 import scala.collection.mutable
 
 class StemmaOperations extends LazyLogging {
-  def listGraphs(ts: TraversalSource, ownerId: String): Either[UnknownUser, List[GraphDescription]] =
+  def listStemmas(ts: TraversalSource, ownerId: String): Either[UnknownUser, List[StemmaDescription]] =
     for {
       owner <- ts.V(ownerId).headOption().toRight(UnknownUser(ownerId))
-      graphs = owner
+      stemmas = owner
         .outE(relations.ownerOf)
         .otherV()
-        .where(_.hasLabel(types.graph))
-        .map { v => GraphDescription(v.id().toString, v.property(graphKeys.name).value()) }
+        .where(_.hasLabel(types.stemma))
+        .map { v => StemmaDescription(v.id().toString, v.property(stemmaKeys.name).value()) }
         .toList()
-    } yield graphs
+    } yield stemmas
 
-  def stemma(ts: TraversalSource, graphId: String): Stemma = {
+  def stemma(ts: TraversalSource, stemmaId: String): Stemma = {
     val people = ts
       .V()
       .hasLabel(types.person)
-      .has(keys.graphId, graphId)
+      .has(keys.stemmaId, stemmaId)
       .map { vertex =>
         val name      = vertex.property(personKeys.name).value()
         val birthDate = vertex.property(personKeys.birthDate).toOption.map(LocalDate.parse)
@@ -38,7 +38,7 @@ class StemmaOperations extends LazyLogging {
     val families = ts
       .V()
       .hasLabel(types.family)
-      .has(keys.graphId, graphId)
+      .has(keys.stemmaId, stemmaId)
       .map { family =>
         val parents  = family.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
         val children = family.inE(relations.childOf).otherV().id().map(_.toString).toList()
@@ -59,9 +59,9 @@ class StemmaOperations extends LazyLogging {
     } yield ()
   }
 
-  def newFamily(ts: TraversalSource, graphId: String): String = {
+  def newFamily(ts: TraversalSource, stemmaId: String): String = {
     val family = ts.addV(types.family).head()
-    family.setProperty(keys.graphId, graphId)
+    family.setProperty(keys.stemmaId, stemmaId)
     family.id().toString
   }
 
@@ -115,9 +115,9 @@ class StemmaOperations extends LazyLogging {
       }
   }
 
-  def newGraph(ts: TraversalSource, name: String): String = {
-    val graph = ts.addV(types.graph).head()
-    graph.setProperty(graphKeys.name, name)
+  def newStemma(ts: TraversalSource, name: String): String = {
+    val graph = ts.addV(types.stemma).head()
+    graph.setProperty(stemmaKeys.name, name)
     graph.id().toString
   }
 
@@ -142,11 +142,11 @@ class StemmaOperations extends LazyLogging {
             .toRight(noSuchRelation(familyId, personId))
     } yield ()
 
-  def newPerson(ts: TraversalSource, graphId: String, descr: CreateNewPerson): String = {
+  def newPerson(ts: TraversalSource, stemmaId: String, descr: CreateNewPerson): String = {
     val personVertex = ts.addV(types.person).head()
 
     personVertex.setProperty(personKeys.name, descr.name)
-    personVertex.setProperty(keys.graphId, graphId)
+    personVertex.setProperty(keys.stemmaId, stemmaId)
     descr.birthDate.map(dateFormat.format(_)) foreach (personVertex.setProperty(personKeys.birthDate, _))
     descr.deathDate.map(dateFormat.format(_)) foreach (personVertex.setProperty(personKeys.deathDate, _))
 
@@ -191,7 +191,7 @@ class StemmaOperations extends LazyLogging {
         val spouseOf = p.outE(relations.spouseOf).otherV().map(_.id().toString).toList()
         val childOf  = p.outE(relations.childOf).otherV().map(_.id().toString).headOption()
         val ownerId  = p.inE(relations.ownerOf).otherV().map(_.id().toString).head()
-        val graphId  = p.property(keys.graphId).value()
+        val stemmaId = p.property(keys.stemmaId).value()
 
         val personDescr = CreateNewPerson(
           p.property(personKeys.name).value(),
@@ -199,7 +199,7 @@ class StemmaOperations extends LazyLogging {
           p.property(personKeys.deathDate).toOption.map(LocalDate.parse)
         )
 
-        ExtendedPersonDescription(personDescr, childOf, spouseOf, graphId, ownerId)
+        ExtendedPersonDescription(personDescr, childOf, spouseOf, stemmaId, ownerId)
       }
       .toRight(NoSuchPersonId(id))
   }
@@ -208,11 +208,11 @@ class StemmaOperations extends LazyLogging {
     ts.V(id)
       .headOption()
       .map { f =>
-        val graphId  = f.property(keys.graphId).value()
+        val stemmaId = f.property(keys.stemmaId).value()
         val parents  = f.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
         val children = f.inE(relations.childOf).otherV().id().map(_.toString).toList()
 
-        ExtendedFamilyDescription(FamilyDescription(f.id().toString, parents, children), graphId)
+        ExtendedFamilyDescription(FamilyDescription(f.id().toString, parents, children), stemmaId)
       }
       .toRight(NoSuchFamilyId(id))
 
@@ -229,8 +229,8 @@ class StemmaOperations extends LazyLogging {
   def isPersonOwner(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Boolean] =
     isOwnerOf(ts, userId, personId)(NoSuchFamilyId)
 
-  def isGraphOwner(ts: TraversalSource, userId: String, graphId: String): Either[StemmaError, Boolean] =
-    isOwnerOf(ts, userId, graphId)(NoSuchFamilyId)
+  def isStemmaOwner(ts: TraversalSource, userId: String, stemmaId: String): Either[StemmaError, Boolean] =
+    isOwnerOf(ts, userId, stemmaId)(NoSuchFamilyId)
 
   def makeFamilyOwner(ts: TraversalSource, userId: String, familyId: String): Either[StemmaError, Unit] =
     setRelation(ts, userId, familyId, relations.ownerOf)(
@@ -246,10 +246,10 @@ class StemmaOperations extends LazyLogging {
       thereAreNoOtherOwners(AccessToPersonDenied(personId))
     )
 
-  def makeGraphOwner(ts: TraversalSource, userId: String, graphId: String): Either[StemmaError, Unit] =
-    setRelation(ts, userId, graphId, relations.ownerOf)(
+  def makeGraphOwner(ts: TraversalSource, userId: String, stemmaId: String): Either[StemmaError, Unit] =
+    setRelation(ts, userId, stemmaId, relations.ownerOf)(
       UnknownUser(userId),
-      NoSuchGraphId(graphId)
+      NoSuchStemmaId(stemmaId)
     )
 
   private def removeOwnership(ts: TraversalSource, userId: String, targetId: String)(err: => StemmaError) =
@@ -294,7 +294,7 @@ private object StemmaOperations {
   val dateFormat = DateTimeFormatter.ISO_DATE
 
   object keys {
-    val graphId: Key[String] = Key[String]("graphId")
+    val stemmaId: Key[String] = Key[String]("stemmaId")
   }
 
   object personKeys {
@@ -307,7 +307,7 @@ private object StemmaOperations {
     val email: Key[String] = Key[String]("email")
   }
 
-  object graphKeys {
+  object stemmaKeys {
     val name: Key[String] = Key[String]("name")
   }
 
@@ -315,7 +315,7 @@ private object StemmaOperations {
     val person = "person"
     val family = "family"
     val user   = "user"
-    val graph  = "graph"
+    val stemma = "stemma"
   }
 
   object relations {

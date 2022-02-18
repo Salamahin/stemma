@@ -16,16 +16,16 @@ object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests wi
   private val services = (ZIO.environment[StemmaService].map(_.get) zip ZIO.environment[UserService].map(_.get))
     .provideCustomLayer(layer >>> (StemmaService.live ++ UserService.live))
 
-  private val revertChangesOnFailure = test("any change that modifies graph would be reverted on failure") {
+  private val revertChangesOnFailure = test("any change that modifies stemma would be reverted on failure") {
     for {
       (s, a) <- services
 
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
-      graphId         <- s.createGraph(userId, "test graph")
+      stemmaId         <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, jamesId :: _ :: Nil, Nil) <- s.createFamily(userId, graphId, family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())
+      FamilyDescription(_, jamesId :: _ :: Nil, Nil) <- s.createFamily(userId, stemmaId, family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())
       _                                   <- s.removePerson(userId, jamesId).catchAll(_ => ZIO.succeed())
-      render(stemma)                      <- s.stemma(userId, graphId)
+      render(stemma)                      <- s.stemma(userId, stemmaId)
     } yield assert(stemma)(hasSameElements("(James, July) parentsOf ()" :: Nil))
   }
 

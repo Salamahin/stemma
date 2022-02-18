@@ -1,16 +1,16 @@
 <script lang="ts">
     import Authenticate from "./components/Authenticate.svelte";
-    import Navbar, {selectGraph} from "./components/Navbar.svelte";
-    import AddGraph from './components/AddGraph.svelte'
+    import Navbar from "./components/Navbar.svelte";
+    import AddStemmaModal from './components/AddStemmaModal.svelte'
     import {Model} from "./model.ts";
-    import type {OwnedGraphs, User} from "./model.ts";
+    import type {OwnedStemmas, User} from "./model.ts";
 
     export let google_client_id;
     export let stemma_backend_url;
 
     //components
     let authComponent;
-    let addGraphComponent;
+    let addStemmaModal;
     let navbarComponent;
 
     //model
@@ -21,18 +21,18 @@
         image_url: "",
     };
     let signedIn = false;
-    let ownedGraphs: OwnedGraphs = {graphs: []};
-    let selectedGraph;
+    let ownedStemmas: OwnedStemmas = {stemmas: []};
+    let selectedStemma;
 
     //handlers
     function handleSignIn(event: CustomEvent) {
         user = event.detail as User;
         signedIn = true;
         model = new Model(stemma_backend_url, user);
-        model.listGraphs().then(graphs => {
-            ownedGraphs = graphs
-            if (ownedGraphs.graphs.length == 0)
-                addGraphComponent.forcePromptNewGraph()
+        model.listGraphs().then(stemmas => {
+            ownedStemmas = stemmas
+            if (ownedStemmas.stemmas.length == 0)
+                addStemmaModal.forcePromptNewStemma()
         })
     }
 
@@ -41,13 +41,13 @@
         signedIn = false;
     }
 
-    function handleNewGraph(event: CustomEvent<string>) {
+    function handleNewStemma(event: CustomEvent<string>) {
         let name = event.detail
-        model.addGraph(name).then(graph => {
-            ownedGraphs = {
-                graphs: [...ownedGraphs.graphs, graph]
+        model.addGraph(name).then(stemma => {
+            ownedStemmas = {
+                stemmas: [...ownedStemmas.stemmas, stemma]
             }
-            navbarComponent.selectGraph(graph);
+            navbarComponent.selectStemma(stemma);
         })
     }
 
@@ -67,17 +67,17 @@
     </div>
 
     <div class={workspaceDisplay}>
-        <Navbar {user} graphs={ownedGraphs}
+        <Navbar {user} graphs={ownedStemmas}
                 bind:this={navbarComponent}
                 on:signOut={handleSignOut}
-                on:graphSelected={graph => selectedGraph = graph}
-                on:createNewGraph={() => addGraphComponent.promptNewGraph()}
+                on:graphSelected={stemma => selectedStemma = stemma}
+                on:createNewGraph={() => addStemmaModal.promptNewStemma()}
         />
     </div>
 
-    <AddGraph
-            bind:this={addGraphComponent}
-            on:graphAdded={handleNewGraph}
+    <AddStemmaModal
+            bind:this={addStemmaModal}
+            on:stemmajrtqAdded={handleNewStemma}
     />
 
     <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>

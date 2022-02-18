@@ -22,9 +22,9 @@ object UserServiceTest extends DefaultRunnableSpec with Requests with RenderStem
     for {
       (s, a)  <- services
       user1   <- a.getOrCreateUser(Email("user@test.com"))
-      graphId <- s.createGraph(user1.userId, "my first graph")
+      stemmaId <- s.createStemma(user1.userId, "my first stemma")
 
-      FamilyDescription(_, _, joshId :: _) <- s.createFamily(user1.userId, graphId, family(createJane, createJohn)(createJosh, createJill))
+      FamilyDescription(_, _, joshId :: _) <- s.createFamily(user1.userId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
 
       token        <- a.createInviteToken("invitee@test.com", joshId)
       decodedToken <- a.decodeInviteToken(token)
