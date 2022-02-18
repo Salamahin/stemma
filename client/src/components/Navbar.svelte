@@ -65,7 +65,7 @@
                         </li>
 
                         <li>
-                            <a class="dropdown-item" href="#" on:click={() => dispatch("createNewGraph")}>Создать...</a>
+                            <a class="dropdown-item" href="#" on:click={() => dispatch("createNewGraph")}>Новый граф...</a>
                         </li>
                     </ul>
                 </li>
