@@ -25,7 +25,7 @@
 
     export function promptNewGraph() {
         forceAdd = false;
-        modalEl.show();
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 </script>
 

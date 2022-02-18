@@ -1,6 +1,6 @@
 <script lang="ts">
     import Authenticate from "./components/Authenticate.svelte";
-    import Navbar from "./components/Navbar.svelte";
+    import Navbar, {selectGraph} from "./components/Navbar.svelte";
     import AddGraph from './components/AddGraph.svelte'
     import {Model} from "./model.ts";
     import type {OwnedGraphs, User} from "./model.ts";
@@ -9,8 +9,9 @@
     export let stemma_backend_url;
 
     //components
-    let auth;
-    let addGraph;
+    let authComponent;
+    let addGraphComponent;
+    let navbarComponent;
 
     //model
     let model: Model;
@@ -20,9 +21,8 @@
         image_url: "",
     };
     let signedIn = false;
-    let ownedGraphs: OwnedGraphs = {
-        graphs: []
-    };
+    let ownedGraphs: OwnedGraphs = {graphs: []};
+    let selectedGraph;
 
     //handlers
     function handleSignIn(event: CustomEvent) {
@@ -31,24 +31,23 @@
         model = new Model(stemma_backend_url, user);
         model.listGraphs().then(graphs => {
             ownedGraphs = graphs
-            if(ownedGraphs.graphs.length == 0)
-                addGraph.forcePromptNewGraph()
+            if (ownedGraphs.graphs.length == 0)
+                addGraphComponent.forcePromptNewGraph()
         })
     }
 
     function handleSignOut() {
-        auth.signOut();
+        authComponent.signOut();
         signedIn = false;
     }
 
     function handleNewGraph(event: CustomEvent<string>) {
         let name = event.detail
         model.addGraph(name).then(graph => {
-           ownedGraphs = {
-               graphs:  [...ownedGraphs.graphs, graph]
-           }
-
-           console.log(ownedGraphs)
+            ownedGraphs = {
+                graphs: [...ownedGraphs.graphs, graph]
+            }
+            navbarComponent.selectGraph(graph);
         })
     }
 
@@ -61,18 +60,23 @@
         <div class="authenticate-holder">
             <Authenticate
                     google_client_id={google_client_id}
-                    bind:this={auth}
+                    bind:this={authComponent}
                     on:signIn={handleSignIn}
             />
         </div>
     </div>
 
     <div class={workspaceDisplay}>
-        <Navbar {user} on:signOut={handleSignOut}/>
+        <Navbar {user} graphs={ownedGraphs}
+                bind:this={navbarComponent}
+                on:signOut={handleSignOut}
+                on:graphSelected={graph => selectedGraph = graph}
+                on:createNewGraph={() => addGraphComponent.promptNewGraph()}
+        />
     </div>
 
     <AddGraph
-            bind:this={addGraph}
+            bind:this={addGraphComponent}
             on:graphAdded={handleNewGraph}
     />
 

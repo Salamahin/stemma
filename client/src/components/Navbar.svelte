@@ -1,14 +1,23 @@
 <script lang="ts">
     import {createEventDispatcher} from "svelte";
-    import type {User} from "../model.ts";
+    import type {OwnedGraphs, Graph, User} from "../model.ts";
 
     export let user: User;
+    export let graphs: OwnedGraphs;
+    let selectedGraph: Graph;
 
     const dispatch = createEventDispatcher();
 
-    function handleSignOut() {
-        dispatch("signOut");
+    function handleGraphSelection(g: Graph) {
+        selectedGraph = g;
+        dispatch("graphSelected", g)
     }
+
+    export function selectGraph(g: Graph) {
+        selectedGraph = g
+    }
+
+    $: if (!selectedGraph) selectedGraph = graphs.graphs[0];
 </script>
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -41,25 +50,22 @@
                             data-bs-toggle="dropdown"
                             aria-expanded="false"
                     >
-                        Графы
+                        {selectedGraph ? selectedGraph.name : "Graphs"}
                     </a>
                     <ul
                             class="dropdown-menu"
                             aria-labelledby="navbarDropdownMenuLink"
                     >
-                        <li><a class="dropdown-item" href="#">Основной</a></li>
-                        <li><a class="dropdown-item" href="#">Романовы</a></li>
+                        {#each graphs.graphs as g}
+                            <li><a class="dropdown-item" href="#"
+                                   on:click={() => handleGraphSelection(g)}>{g.name}</a></li>
+                        {/each}
                         <li>
                             <hr class="dropdown-divider"/>
                         </li>
 
                         <li>
-                            <button
-                                    type="button"
-                                    class="dropdown-item btn btn-success"
-                            >Новый
-                            </button
-                            >
+                            <a class="dropdown-item" href="#" on:click={() => dispatch("createNewGraph")}>Создать...</a>
                         </li>
                     </ul>
                 </li>
@@ -75,7 +81,7 @@
                     <img src={user.image_url} class="avatar" alt="Avatar"/>
                     <a
                             class="nav-link text-secondary ms-2"
-                            on:click={handleSignOut}
+                            on:click={() => dispatch("signOut")}
                             href="#">Выйти</a
                     >
                 </div>
