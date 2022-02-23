@@ -5,8 +5,6 @@
 
     let personR = 20
     let familyR = 5
-    let personColor = "#6c7385"
-    let familyColor = "#3d3c3c"
 
     let stemmaS: Stemma = {
         families: [
@@ -92,41 +90,10 @@
             .attr("viewBox", [-width / 2, -height / 2, width, height])
             .attr("style", "max-width: 100%; height: auto; height: intrinsic;");
 
-        const defs = svg.append('defs');
-
-        defs.append('marker')
-            .attr('id', 'child-arrow')
-            .attr('viewBox', '0 0 10 6')
-            .attr('refX', 2 * familyR)
-            .attr('refY', 3)
-            .attr('markerWidth', 10)
-            .attr('markerHeight', 6)
-            .attr('markerUnits', 'userSpaceOnUse')
-            .attr('orient', 'auto')
-            .style('fill', personColor)
-            .append('path')
-            .attr('d', 'M 0 0 L 10 3 L 0 6 Z');
-
-        defs.append('marker')
-            .attr('id', 'spouse-arrow')
-            .attr('viewBox', '0 0 10 6')
-            .attr('refX', 2 * personR)
-            .attr('refY', 3)
-            .attr('markerWidth', 12)
-            .attr('markerHeight', 8)
-            .attr('markerUnits', 'userSpaceOnUse')
-            .attr('orient', 'auto')
-            .style('fill', familyColor)
-            .append('path')
-            .attr('d', 'M 0 0 L 10 3 L 0 6 Z');
-
         const link = svg.append("g")
             .attr("stroke", "#c7b7b7")
             .attr("stroke-width", 1.5)
             .attr("stroke-linecap", "round")
-            .attr('marker-end', d => {
-                d.type == "childOf"? 'url(#child-arrow)' : 'url(#spouse-arrow)'
-            })
             .selectAll("line")
             .data(links)
             .join("line");
