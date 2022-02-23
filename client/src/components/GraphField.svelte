@@ -3,7 +3,7 @@
     import {Stemma} from "../model";
     import {onMount} from 'svelte';
 
-    let personR = 20
+    let personR = 15
     let familyR = 5
 
     let stemmaS: Stemma = {
@@ -71,11 +71,9 @@
     ]
 
     function forceGraph(nodes, links) {
-
         const width = window.innerWidth,
             height = window.innerHeight;
 
-        // Construct the forces.
         const simulation = d3.forceSimulation(nodes)
             .force("link", d3.forceLink(links).id(node => node.id).distance(() => 100).strength(1.5))
             .force("collide", d3.forceCollide().radius(d => d.r * 20))
@@ -98,15 +96,31 @@
             .data(links)
             .join("line");
 
-        const node = svg.append("g")
-            .attr("fill", "red")
-            .attr("stroke", "#fff")
-            .attr("stroke-width", 5)
-            .selectAll("circle")
+        const vertexGroup = svg
+            .append("g")
+            .attr("class", "nodes");
+
+        const vertices = vertexGroup
+            .selectAll("g")
             .data(nodes)
-            .join("circle")
-            .attr("r", node => node.type == "person" ? personR : familyR)
-            .call(drag(simulation))
+            .join(
+                enter => enter.append("g"),
+                update => update,
+                exit => exit.remove()
+            )
+            .call(drag());
+
+        vertices
+            .append("circle")
+            .attr("fill", "red")
+            .attr("r", node => node.type == "person" ? personR : familyR);
+
+        vertices
+            .append("text")
+            .text(node => node.name)
+            .style("font-size", "15px")
+            .attr("dy", personR * 2)
+            .attr("dx", -personR);
 
         function ticked() {
             link
@@ -115,12 +129,11 @@
                 .attr("x2", d => d.target.x)
                 .attr("y2", d => d.target.y);
 
-            node
-                .attr("cx", d => d.x)
-                .attr("cy", d => d.y);
+            vertices
+                .attr("transform", d => "translate(" + d.x + "," + d.y + ")");
         }
 
-        function drag(simulation) {
+        function drag() {
             function dragstarted(event) {
                 if (!event.active) simulation.alphaTarget(0.3).restart();
                 event.subject.fx = event.subject.x;
