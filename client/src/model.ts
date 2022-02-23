@@ -1,8 +1,8 @@
 export type Person = {
     id: string;
     name: string;
-    birthDate: string;
-    deathDate: string;
+    birthDate?: string;
+    deathDate?: string;
 }
 
 export type Family = {

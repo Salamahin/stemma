@@ -2,6 +2,7 @@
     import Authenticate from "./components/Authenticate.svelte";
     import Navbar from "./components/Navbar.svelte";
     import AddStemmaModal from './components/AddStemmaModal.svelte'
+    import GraphField from './components/GraphField.svelte'
     import type {OwnedStemmas, StemmaDescription, User} from "./model.ts";
     import {Model} from "./model.ts";
 
@@ -77,6 +78,8 @@
             bind:this={addStemmaModal}
             on:stemmaAdded={handleNewStemma}
     />
+
+    <GraphField/>
 
     <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </main>
