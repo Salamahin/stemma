@@ -1,136 +1,192 @@
 <script lang="ts">
-    import * as d3 from 'd3'
-    import {Stemma} from "../model";
-    import {onMount} from 'svelte';
+    import * as d3 from "d3";
+    import { Stemma } from "../model";
+    import { onMount } from "svelte";
 
-    let personR = 15
-    let familyR = 5
+    let personR = 15;
+    let familyR = 5;
+    let relationsColor = "#18191a";
+    let childRelationWidth = 1;
+    let familyRelationWidth = 2;
 
     let stemmaS: Stemma = {
         families: [
             {
                 id: "f1",
                 parents: ["p1"],
-                children: ["p2", "p3"]
+                children: ["p2", "p3"],
             },
             {
                 id: "f2",
                 parents: ["p3", "p4"],
-                children: ["p5"]
-            }
+                children: ["p5"],
+            },
         ],
         people: [
             {
                 id: "p1",
-                name: "ivan"
+                name: "ivan",
             },
             {
                 id: "p2",
-                name: "tolya"
+                name: "tolya",
             },
             {
                 id: "p3",
-                name: "kolya"
+                name: "kolya",
             },
             {
                 id: "p4",
-                name: "masha"
+                name: "masha",
             },
             {
                 id: "p5",
-                name: "katya"
+                name: "katya",
             },
-        ]
-    }
+        ],
+    };
 
     let nodes = [
-        ...stemmaS.people.map(p => ({
+        ...stemmaS.people.map((p) => ({
             id: p.id,
             name: p.name,
-            type: "person"
+            type: "person",
         })),
-        ...stemmaS.families.map(f => ({
+        ...stemmaS.families.map((f) => ({
             id: f.id,
-            type: "family"
-        }))
-    ]
+            type: "family",
+        })),
+    ];
 
     let links = [
-        ...stemmaS.families.flatMap(f => f.children.map(c => ({
-            id: `${f.id}_${c}`,
-            source: f.id,
-            target: c,
-            type: "childOf"
-        }))),
-        ...stemmaS.families.flatMap(f => f.parents.map(p => ({
-            id: `${p}_${f.id}`,
-            source: p,
-            target: f.id,
-            type: "parentOf"
-        })))
-    ]
+        ...stemmaS.families.flatMap((f) =>
+            f.children.map((c) => ({
+                id: `${f.id}_${c}`,
+                source: f.id,
+                target: c,
+                type: "familyToChild",
+            }))
+        ),
+        ...stemmaS.families.flatMap((f) =>
+            f.parents.map((p) => ({
+                id: `${p}_${f.id}`,
+                source: p,
+                target: f.id,
+                type: "spouseToFamily",
+            }))
+        ),
+    ];
 
     function forceGraph(nodes, links) {
         const width = window.innerWidth,
             height = window.innerHeight;
 
-        const simulation = d3.forceSimulation(nodes)
-            .force("link", d3.forceLink(links).id(node => node.id).distance(() => 100).strength(1.5))
-            .force("collide", d3.forceCollide().radius(d => d.r * 20))
-            .force("repelForce", d3.forceManyBody().strength(-2500).distanceMin(85))
+        const simulation = d3
+            .forceSimulation(nodes)
+            .force(
+                "link",
+                d3
+                    .forceLink(links)
+                    .id((node) => node.id)
+                    .distance(() => 100)
+                    .strength(1.5)
+            )
+            .force(
+                "collide",
+                d3.forceCollide().radius((d) => d.r * 20)
+            )
+            .force(
+                "repelForce",
+                d3.forceManyBody().strength(-2500).distanceMin(85)
+            )
             .force("charge", d3.forceManyBody())
             .force("center", d3.forceCenter())
             .on("tick", ticked);
 
-        const svg = d3.select("#chart")
+        const svg = d3
+            .select("#chart")
             .attr("width", width)
             .attr("height", height)
             .attr("viewBox", [-width / 2, -height / 2, width, height])
             .attr("style", "max-width: 100%; height: auto; height: intrinsic;");
 
-        const link = svg.append("g")
-            .attr("stroke", "#c7b7b7")
-            .attr("stroke-width", 1.5)
-            .attr("stroke-linecap", "round")
+        const defs = svg.append("defs");
+        defs.append("marker")
+            .attr("id", "arrow-to-family")
+            .attr("viewBox", "0 0 10 6")
+            .attr("refX", 16)
+            .attr("refY", 3)
+            .attr("markerWidth", 10)
+            .attr("markerHeight", 6)
+            .attr("markerUnits", "userSpaceOnUse")
+            .attr("orient", "auto")
+            .style("fill", relationsColor)
+            .append("path")
+            .attr("d", "M 0 0 L 10 3 L 0 6 Z");
+
+        defs.append("marker")
+            .attr("id", "arrow-to-person")
+            .attr("viewBox", "0 0 10 6")
+            .attr("refX", 26)
+            .attr("refY", 3)
+            .attr("markerWidth", 10)
+            .attr("markerHeight", 6)
+            .attr("markerUnits", "userSpaceOnUse")
+            .attr("orient", "auto")
+            .style("fill", relationsColor)
+            .append("path")
+            .attr("d", "M 0 0 L 10 3 L 0 6 Z");
+
+        const link = svg
+            .append("g")
             .selectAll("line")
             .data(links)
-            .join("line");
+            .join("line")
+            .attr("stroke", "#c7b7b7")
+            .attr("stroke-width", (relation) =>
+                relation.type == "familyToChild"
+                    ? childRelationWidth + "px"
+                    : familyRelationWidth + "px"
+            )
+            .attr("marker-end", (relation) =>
+                relation.type == "familyToChild" ? "url(#arrow-to-person)" : "url(#arrow-to-family)"
+            );
+        // .attr("stroke-linecap", "round");
 
-        const vertexGroup = svg
-            .append("g")
-            .attr("class", "nodes");
+        const vertexGroup = svg.append("g").attr("class", "nodes");
 
         const vertices = vertexGroup
             .selectAll("g")
             .data(nodes)
             .join(
-                enter => enter.append("g"),
-                update => update,
-                exit => exit.remove()
+                (enter) => enter.append("g"),
+                (update) => update,
+                (exit) => exit.remove()
             )
             .call(drag());
 
         vertices
             .append("circle")
             .attr("fill", "red")
-            .attr("r", node => node.type == "person" ? personR : familyR);
+            .attr("r", (node) => (node.type == "person" ? personR : familyR));
 
         vertices
             .append("text")
-            .text(node => node.name)
+            .text((node) => node.name)
             .style("font-size", "15px")
             .attr("dy", personR * 2)
             .attr("dx", -personR);
 
         function ticked() {
-            link
-                .attr("x1", d => d.source.x)
-                .attr("y1", d => d.source.y)
-                .attr("x2", d => d.target.x)
-                .attr("y2", d => d.target.y);
+            link.attr("x1", (d) => d.source.x)
+                .attr("y1", (d) => d.source.y)
+                .attr("x2", (d) => d.target.x)
+                .attr("y2", (d) => d.target.y);
 
-            vertices
-                .attr("transform", d => "translate(" + d.x + "," + d.y + ")");
+            vertices.attr(
+                "transform",
+                (d) => "translate(" + d.x + "," + d.y + ")"
+            );
         }
 
         function drag() {
@@ -151,7 +207,8 @@
                 event.subject.fy = null;
             }
 
-            return d3.drag()
+            return d3
+                .drag()
                 .on("start", dragstarted)
                 .on("drag", dragged)
                 .on("end", dragended);
@@ -159,9 +216,8 @@
     }
 
     onMount(() => {
-        forceGraph(nodes, links)
-    })
-
+        forceGraph(nodes, links);
+    });
 
     /*
 
@@ -373,11 +429,9 @@
         }
 
      */
-
-
 </script>
 
-<svg id="chart"></svg>
+<svg id="chart" />
 
 <style>
     #chart {
