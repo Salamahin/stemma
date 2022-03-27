@@ -5,7 +5,7 @@
 
     let personR = 15;
     let familyR = 5;
-    let nodeColor = "#326f93"
+    let nodeColor = "#326f93";
     let relationsColor = "#18191a";
     let childRelationWidth = 0.5;
     let familyRelationWidth = 2.5;
@@ -70,72 +70,137 @@
         );
     }
 
-    function lineage(p: Person) {
-        function childrenIds(parentId: string) {
-            return stemmaS.families
-                .filter((f) => f.parents.includes(parentId))
-                .flatMap((f) => f.children);
-        }
+    type Generation = {
+        personId: string;
+        gen: number;
+    };
 
-        function parentIds(childId: string) {
-            return stemmaS.families
-                .filter((f) => f.children.includes(childId))
-                .flatMap((f) => f.parents);
-        }
+    let nodes = [];
+    let links = [];
 
+    // $: parentToChildren = new Map<string, string[]>(
+    //     stemmaS.families.flatMap((f) => f.parents.map((p) => [p, f.children]))
+    // );
+    // $: childrenToParents = new Map<string, string[]>(
+    //     stemmaS.families.flatMap((f) => f.children.map((p) => [p, f.parents]))
+    // );
+    // $: lineages = new Map<Person, Generation[]>(
+    //     stemmaS.people.map((p) => [p, lineage(p)])
+    // );
+    $: {
+        let parentToChildren = new Map<string, string[]>(
+            stemmaS.families.flatMap((f) =>
+                f.parents.map((p) => [p, f.children])
+            )
+        );
+
+        let childrenToParents = new Map<string, string[]>(
+            stemmaS.families.flatMap((f) =>
+                f.children.map((p) => [p, f.parents])
+            )
+        );
+
+        let lineages = stemmaS.people.map((p) =>
+            lineage(p, parentToChildren, childrenToParents)
+        );
+
+        let gens = lineages.flat().map((g) => g.gen);
+        let maxGeneration = Math.max(...gens);
+        let minGeneration = Math.min(...gens);
+
+        let correctedGenerations: Generation[][] = lineages.map((lgs) =>
+            lgs.map((generation) => ({
+                personId: generation.personId,
+                gen: generation.gen - Math.sign(minGeneration) * minGeneration,
+            }))
+        );
+
+        
+    }
+
+    // $: nodes = [
+    //     ...stemmaS.families.map((f) => ({
+    //         id: f.id,
+    //         type: "family",
+    //     })),
+    //     ...
+    // ];
+
+    function lineage(
+        p: Person,
+        parentToChildren: Map<string, string[]>,
+        childrenToParents: Map<string, string[]>
+    ) {
         function iter(
-            toLookUp: string[],
-            acc: string[],
-            next: (id: string) => string[]
-        ): string[] {
+            toLookUp: Generation[],
+            acc: Generation[],
+            next: (p: Generation) => Generation[]
+        ): Generation[] {
             if (!toLookUp.length) return acc;
 
             let [head, ...tail] = toLookUp;
-            let nextIds = next(head);
-            return iter(
-                [...nextIds, ...tail],
-                [head, ...nextIds, ...acc],
-                next
-            );
+            let nextGen = next(head);
+
+            return iter([...nextGen, ...tail], [head, ...acc], next);
         }
 
-        return [
-            ...iter([p.id], [], childrenIds),
-            ...iter([p.id], [], parentIds),
-        ];
+        let init: Generation = {
+            personId: p.id,
+            gen: 0,
+        };
+
+        function childrenOf(g: Generation): Generation[] {
+            return parentToChildren.get(g.personId).map((id) => ({
+                personId: id,
+                gen: g.gen + 1,
+            }));
+        }
+
+        function parentOf(g: Generation): Generation[] {
+            return childrenToParents.get(g.personId).map((id) => ({
+                personId: id,
+                gen: g.gen - 1,
+            }));
+        }
+
+        return [...iter([init], [], childrenOf), ...iter([init], [], parentOf)];
     }
 
-    let nodes = [
-        ...stemmaS.people.map((p) => ({
-            id: p.id,
-            name: p.name,
-            type: "person",
-        })),
-        ...stemmaS.families.map((f) => ({
-            id: f.id,
-            type: "family",
-            connects: [...f.children, ...f.parents],
-        })),
-    ];
+    function color(g: Generation) {
+        return d3.interpolatePlasma(person.generation / _max_generation);
+    }
 
-    let links = [
-        ...stemmaS.families.flatMap((f) =>
-            f.children.map((c) => ({
-                id: `${f.id}_${c}`,
-                source: f.id,
-                target: c,
-                type: "familyToChild",
-            }))
-        ),
-        ...stemmaS.families.flatMap((f) =>
-            f.parents.map((p) => ({
-                id: `${p}_${f.id}`,
-                source: p,
-                target: f.id,
-                type: "spouseToFamily",
-            }))
-        ),
-    ];
+    // let nodes = [
+    //     ...stemmaS.people.map((p) => ({
+    //         id: p.id,
+    //         name: p.name,
+    //         type: "person",
+    //     })),
+    //     ...stemmaS.families.map((f) => ({
+    //         id: f.id,
+    //         type: "family",
+    //         connects: [...f.children, ...f.parents],
+    //     })),
+    // ];
+
+    // let links = [
+    //     ...stemmaS.families.flatMap((f) =>
+    //         f.children.map((c) => ({
+    //             id: `${f.id}_${c}`,
+    //             source: f.id,
+    //             target: c,
+    //             type: "familyToChild",
+    //         }))
+    //     ),
+    //     ...stemmaS.families.flatMap((f) =>
+    //         f.parents.map((p) => ({
+    //             id: `${p}_${f.id}`,
+    //             source: p,
+    //             target: f.id,
+    //             type: "spouseToFamily",
+    //         }))
+    //     ),
+    // ];
 
     function forceGraph(nodes, links) {
         const width = window.innerWidth,
@@ -232,11 +297,18 @@
             .attr("r", (node) => (node.type == "person" ? personR : familyR))
             .on("click", (event, d) => {
                 if (d.type == "person") {
-                    let selectedLineage = lineage(d as Person);
-
+                    let selectedLineage = lineages.get(d as Person);
                     vertices.selectAll("circle").attr("fill", (d1) => {
-                        if (d1.type == "person" && selectedLineage.includes(d1.id)) return nodeColor;
-                        if (d1.type == "family" && intersects(d1.connects, selectedLineage).length) return nodeColor;
+                        if (
+                            d1.type == "person" &&
+                            selectedLineage.includes(d1.id)
+                        )
+                            return nodeColor;
+                        if (
+                            d1.type == "family" &&
+                            intersects(d1.connects, selectedLineage).length
+                        )
+                            return nodeColor;
 
                         return lightenColor(nodeColor, 66);
                     });
