@@ -1,6 +1,6 @@
 <script lang="ts">
     import * as d3 from "d3";
-    import { Stemma } from "../model";
+    import { Stemma, Person } from "../model";
     import { onMount } from "svelte";
 
     let personR = 15;
@@ -46,6 +46,41 @@
         ],
     };
 
+    function intersects<T>(arr1: T[], arr2: T[]): T[] {
+        return arr1.filter((value) => arr2.includes(value));
+    }
+
+    function lineage(p: Person) {
+        function childrenIds(parentId: string) {
+            return stemmaS.families
+                .filter((f) => f.parents.includes(parentId))
+                .flatMap((f) => f.children);
+        }
+
+        function parentIds(childId: string) {
+            return stemmaS.families
+                .filter((f) => f.children.includes(childId))
+                .flatMap((f) => f.parents);
+        }
+
+        function iter(
+            toLookUp: string[],
+            acc: string[],
+            next: (id: string) => string[]
+        ): string[] {
+            if (!toLookUp.length) return acc;
+
+            let [head, ...tail] = toLookUp;
+            let nextIds = next(head);
+            return iter([...nextIds, ...tail], [head, ...nextIds, ...acc], next);
+        }
+
+        return [
+            ...iter([p.id], [], childrenIds),
+            ...iter([p.id], [], parentIds),
+        ];
+    }
+
     let nodes = [
         ...stemmaS.people.map((p) => ({
             id: p.id,
@@ -55,6 +90,7 @@
         ...stemmaS.families.map((f) => ({
             id: f.id,
             type: "family",
+            connects: [...f.children, ...f.parents],
         })),
     ];
 
@@ -149,9 +185,10 @@
                     : familyRelationWidth + "px"
             )
             .attr("marker-end", (relation) =>
-                relation.type == "familyToChild" ? "url(#arrow-to-person)" : "url(#arrow-to-family)"
+                relation.type == "familyToChild"
+                    ? "url(#arrow-to-person)"
+                    : "url(#arrow-to-family)"
             );
-        // .attr("stroke-linecap", "round");
 
         const vertexGroup = svg.append("g").attr("class", "nodes");
 
@@ -168,7 +205,27 @@
         vertices
             .append("circle")
             .attr("fill", "red")
-            .attr("r", (node) => (node.type == "person" ? personR : familyR));
+            .attr("r", (node) => (node.type == "person" ? personR : familyR))
+            .on("click", (event, d) => {
+                if (d.type == "person") {
+                    let selectedLineage = lineage(d as Person);
+
+                    vertices.selectAll("circle").attr("fill", (d1) => {
+                        if (
+                            d1.type == "person" &&
+                            selectedLineage.includes(d1.id)
+                        )
+                            return "red";
+                        if (
+                            d1.type == "family" &&
+                            intersects(d1.connects, selectedLineage).length
+                        )
+                            return "red";
+
+                        return "pink";
+                    });
+                }
+            });
 
         vertices
             .append("text")
