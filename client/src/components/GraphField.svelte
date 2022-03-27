@@ -6,8 +6,8 @@
     let personR = 15;
     let familyR = 5;
     let relationsColor = "#18191a";
-    let childRelationWidth = 1;
-    let familyRelationWidth = 2;
+    let childRelationWidth = 0.5;
+    let familyRelationWidth = 2.5;
 
     let stemmaS: Stemma = {
         families: [
