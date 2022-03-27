@@ -5,6 +5,7 @@
 
     let personR = 15;
     let familyR = 5;
+    let nodeColor = "#326f93"
     let relationsColor = "#18191a";
     let childRelationWidth = 0.5;
     let familyRelationWidth = 2.5;
@@ -50,6 +51,25 @@
         return arr1.filter((value) => arr2.includes(value));
     }
 
+    function lightenColor(color: string, percent: number) {
+        var num = parseInt(color.replace("#", ""), 16),
+            amt = Math.round(2.55 * percent),
+            R = (num >> 16) + amt,
+            B = ((num >> 8) & 0x00ff) + amt,
+            G = (num & 0x0000ff) + amt;
+        return (
+            "#" +
+            (
+                0x1000000 +
+                (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+                (B < 255 ? (B < 1 ? 0 : B) : 255) * 0x100 +
+                (G < 255 ? (G < 1 ? 0 : G) : 255)
+            )
+                .toString(16)
+                .slice(1)
+        );
+    }
+
     function lineage(p: Person) {
         function childrenIds(parentId: string) {
             return stemmaS.families
@@ -72,7 +92,11 @@
 
             let [head, ...tail] = toLookUp;
             let nextIds = next(head);
-            return iter([...nextIds, ...tail], [head, ...nextIds, ...acc], next);
+            return iter(
+                [...nextIds, ...tail],
+                [head, ...nextIds, ...acc],
+                next
+            );
         }
 
         return [
@@ -204,25 +228,17 @@
 
         vertices
             .append("circle")
-            .attr("fill", "red")
+            .attr("fill", nodeColor)
             .attr("r", (node) => (node.type == "person" ? personR : familyR))
             .on("click", (event, d) => {
                 if (d.type == "person") {
                     let selectedLineage = lineage(d as Person);
 
                     vertices.selectAll("circle").attr("fill", (d1) => {
-                        if (
-                            d1.type == "person" &&
-                            selectedLineage.includes(d1.id)
-                        )
-                            return "red";
-                        if (
-                            d1.type == "family" &&
-                            intersects(d1.connects, selectedLineage).length
-                        )
-                            return "red";
+                        if (d1.type == "person" && selectedLineage.includes(d1.id)) return nodeColor;
+                        if (d1.type == "family" && intersects(d1.connects, selectedLineage).length) return nodeColor;
 
-                        return "pink";
+                        return lightenColor(nodeColor, 66);
                     });
                 }
             });
