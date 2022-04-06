@@ -78,15 +78,6 @@
     let nodes = [];
     let links = [];
 
-    // $: parentToChildren = new Map<string, string[]>(
-    //     stemmaS.families.flatMap((f) => f.parents.map((p) => [p, f.children]))
-    // );
-    // $: childrenToParents = new Map<string, string[]>(
-    //     stemmaS.families.flatMap((f) => f.children.map((p) => [p, f.parents]))
-    // );
-    // $: lineages = new Map<Person, Generation[]>(
-    //     stemmaS.people.map((p) => [p, lineage(p)])
-    // );
     $: {
         let parentToChildren = new Map<string, string[]>(
             stemmaS.families.flatMap((f) =>
