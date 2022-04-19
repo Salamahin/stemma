@@ -1,6 +1,7 @@
 <script lang="ts">
     import * as d3 from "d3";
     import { Stemma, Person } from "../model";
+    import { Lineage, Generation } from "../generation";
     import { onMount } from "svelte";
 
     let personR = 15;
@@ -70,128 +71,51 @@
         );
     }
 
-    type Generation = {
-        personId: string;
-        gen: number;
-    };
-
     let nodes = [];
     let links = [];
+    let lineages = new Map<string, Generation>();
+    let max_generation = 0
 
     $: {
-        let parentToChildren = new Map<string, string[]>(
-            stemmaS.families.flatMap((f) =>
-                f.parents.map((p) => [p, f.children])
-            )
-        );
+        nodes = [
+            ...stemmaS.people.map((p) => ({
+                id: p.id,
+                name: p.name,
+                type: "person",
+            })),
+            ...stemmaS.families.map((f) => ({
+                id: f.id,
+                type: "family",
+                connects: [...f.children, ...f.parents],
+            })),
+        ];
 
-        let childrenToParents = new Map<string, string[]>(
-            stemmaS.families.flatMap((f) =>
-                f.children.map((p) => [p, f.parents])
-            )
-        );
+        links = [
+            ...stemmaS.families.flatMap((f) =>
+                f.children.map((c) => ({
+                    id: `${f.id}_${c}`,
+                    source: f.id,
+                    target: c,
+                    type: "familyToChild",
+                }))
+            ),
+            ...stemmaS.families.flatMap((f) =>
+                f.parents.map((p) => ({
+                    id: `${p}_${f.id}`,
+                    source: p,
+                    target: f.id,
+                    type: "spouseToFamily",
+                }))
+            ),
+        ];
 
-        let lineages = stemmaS.people.map((p) =>
-            lineage(p, parentToChildren, childrenToParents)
-        );
-
-        let gens = lineages.flat().map((g) => g.gen);
-        let maxGeneration = Math.max(...gens);
-        let minGeneration = Math.min(...gens);
-
-        let correctedGenerations: Generation[][] = lineages.map((lgs) =>
-            lgs.map((generation) => ({
-                personId: generation.personId,
-                gen: generation.gen - Math.sign(minGeneration) * minGeneration,
-            }))
-        );
-
-        
-    }
-
-    // $: nodes = [
-    //     ...stemmaS.families.map((f) => ({
-    //         id: f.id,
-    //         type: "family",
-    //     })),
-    //     ...
-    // ];
-
-    function lineage(
-        p: Person,
-        parentToChildren: Map<string, string[]>,
-        childrenToParents: Map<string, string[]>
-    ) {
-        function iter(
-            toLookUp: Generation[],
-            acc: Generation[],
-            next: (p: Generation) => Generation[]
-        ): Generation[] {
-            if (!toLookUp.length) return acc;
-
-            let [head, ...tail] = toLookUp;
-            let nextGen = next(head);
-
-            return iter([...nextGen, ...tail], [head, ...acc], next);
-        }
-
-        let init: Generation = {
-            personId: p.id,
-            gen: 0,
-        };
-
-        function childrenOf(g: Generation): Generation[] {
-            return parentToChildren.get(g.personId).map((id) => ({
-                personId: id,
-                gen: g.gen + 1,
-            }));
-        }
-
-        function parentOf(g: Generation): Generation[] {
-            return childrenToParents.get(g.personId).map((id) => ({
-                personId: id,
-                gen: g.gen - 1,
-            }));
-        }
-
-        return [...iter([init], [], childrenOf), ...iter([init], [], parentOf)];
+        lineages = new Lineage(stemmaS).lineages()
+        max_generation = Math.max(...[...lineages.values()].map(p => p.generation))
     }
 
     function color(g: Generation) {
-        return d3.interpolatePlasma(person.generation / _max_generation);
+        return d3.interpolatePlasma(g.generation / max_generation);
     }
-
-    // let nodes = [
-    //     ...stemmaS.people.map((p) => ({
-    //         id: p.id,
-    //         name: p.name,
-    //         type: "person",
-    //     })),
-    //     ...stemmaS.families.map((f) => ({
-    //         id: f.id,
-    //         type: "family",
-    //         connects: [...f.children, ...f.parents],
-    //     })),
-    // ];
-
-    // let links = [
-    //     ...stemmaS.families.flatMap((f) =>
-    //         f.children.map((c) => ({
-    //             id: `${f.id}_${c}`,
-    //             source: f.id,
-    //             target: c,
-    //             type: "familyToChild",
-    //         }))
-    //     ),
-    //     ...stemmaS.families.flatMap((f) =>
-    //         f.parents.map((p) => ({
-    //             id: `${p}_${f.id}`,
-    //             source: p,
-    //             target: f.id,
-    //             type: "spouseToFamily",
-    //         }))
-    //     ),
-    // ];
 
     function forceGraph(nodes, links) {
         const width = window.innerWidth,

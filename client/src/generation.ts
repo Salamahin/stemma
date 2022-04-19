@@ -3,15 +3,15 @@ import { Stemma, Person } from "./model";
 export type Generation = {
     generation: number,
     relativies: string[]
-}
+};
 
 export class Lineage {
-    private s: Stemma
+    private stemma: Stemma
     private parentToChildren: Map<string, string[]>
     private childToParents: Map<string, string[]>
 
     constructor(stemma: Stemma) {
-        this.s = stemma
+        this.stemma = stemma
 
         this.parentToChildren = new Map<string, string[]>(
             stemma.families.flatMap((f) =>
@@ -32,27 +32,31 @@ export class Lineage {
     }
 
     private computeLineage(toLookUp: string[], acc: string[], relation: Map<string, string[]>): string[] {
+        'use strict';
+        console.log(toLookUp)
         if (!toLookUp.length) return acc;
 
         let [head, ...tail] = toLookUp;
-        let nextGen = relation.get(head);
+        let nextGen = relation.has(head) ? relation.get(head) : [];
 
         return this.computeLineage([...nextGen, ...tail], [head, ...acc], relation);
     }
 
     private lineage(p: Person): Generation {
-        let lg = [...this.computeLineage([p.id], [], this.parentToChildren), ...this.computeLineage([p.id], [], this.childToParents)];
-        let generation = this.computeGenerations(0, this.childToParents.get(p.id))
+        let dependees = this.computeLineage([p.id], [], this.parentToChildren)
+        let ancestors = this.computeLineage(this.childToParents.has(p.id) ? this.childToParents.get(p.id) : [], [], this.childToParents)
+
+        let generation = this.computeGenerations(0, this.childToParents.has(p.id) ? this.childToParents.get(p.id) : [])
 
         return {
             generation: generation,
-            relativies: lg
+            relativies: [...ancestors, ...dependees]
         }
     }
 
     lineages(): Map<string, Generation> {
         return new Map<string, Generation>(
-            this.s.people.map(p => [p.id, this.lineage(p)])
+            this.stemma.people.map(p => [p.id, this.lineage(p)])
         )
     }
 }
