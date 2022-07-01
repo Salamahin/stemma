@@ -38,23 +38,25 @@ export class Lineage {
 
     private computeLineage(personId: string, relation: Map<string, string[]>) {
         var foundRelatieves: Array<string> = []
-        var toLookUp = [personId]
-        var depth = 0
+        var toLookUp = [{ id: personId, depth: 0 }]
+        var maxDepth = 0
 
         while (toLookUp.length) {
             let [head, ...tail] = toLookUp
-            var nextGen: Array<string> = []
-            if (relation.has(head)) {
-                depth++
-                nextGen = relation.get(head)
+            var nextGen: Array<({ id: string, depth: number })> = []
+
+            if (relation.has(head.id)) {
+                let nextDepth = head.depth + 1
+                maxDepth = Math.max(maxDepth, nextDepth)
+                nextGen = relation.get(head.id).map(x => ({ id: x, depth: nextDepth }))
             }
 
             toLookUp = [...nextGen, ...tail]
-            foundRelatieves = [head, ...foundRelatieves]
+            foundRelatieves = [head.id, ...foundRelatieves]
         }
 
         return {
-            depth: depth,
+            depth: maxDepth,
             relativies: foundRelatieves
         }
     }
