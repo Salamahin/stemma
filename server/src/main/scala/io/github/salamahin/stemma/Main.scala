@@ -6,7 +6,7 @@ import io.github.salamahin.stemma.service._
 import zhttp.http.Middleware.cors
 import zhttp.http.middleware.Cors.CorsConfig
 import zhttp.service.Server
-import zio.{Clock, Console, RIO, ZEnv, ZIO, ZIOAppArgs, ZIOAppDefault}
+import zio.{Clock, Console, RIO, Scope, ZIO, ZIOAppArgs, ZIOAppDefault}
 
 object Main extends ZIOAppDefault with LazyLogging with WebApi with StemmaApi {
 
@@ -18,14 +18,16 @@ object Main extends ZIOAppDefault with LazyLogging with WebApi with StemmaApi {
     allowedOrigins = _ contains "localhost" //fixme configure?
   )
 
-  override def run: ZIO[ZEnv with ZIOAppArgs, Any, Any] = {
-    val layers = (Secrets.envSecrets ++ OpsService.live) >+>
-      GraphService.postgres >>>
-      (StemmaService.live ++ UserService.live ++ OAuthService.googleSignIn)
-
+  override def run: ZIO[Environment with ZIOAppArgs with Scope, Any, Any] = {
     Server
       .start(8090, stemmaApis @@ cors(corsConfig))
       .exitCode
-      .provideCustomLayer(layers)
+      .provide(
+        Secrets.envSecrets,
+        GraphService.postgres,
+        StemmaService.live,
+        UserService.live,
+        OAuthService.googleSignIn
+      )
   }
 }

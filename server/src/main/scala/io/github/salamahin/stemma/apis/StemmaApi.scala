@@ -3,7 +3,7 @@ package io.github.salamahin.stemma.apis
 import com.typesafe.scalalogging.LazyLogging
 import io.github.salamahin.stemma.domain.{CreateStemma, StemmaDescription, StemmaError, UnknownError}
 import zhttp.http._
-import zio.Task
+import zio.{Task, ZIO}
 
 trait StemmaApi {
   this: WebApi with LazyLogging =>
@@ -28,7 +28,7 @@ trait StemmaApi {
 
         val newGraph = for {
           body       <- req.bodyAsString.mapError(err => UnknownError(err))
-          stemmaName <- Task.fromEither(decode[CreateStemma](body)).mapError(err => UnknownError(err))
+          stemmaName <- ZIO.fromEither(decode[CreateStemma](body)).mapError(err => UnknownError(err))
           s          <- stemmaService
           stemmaId   <- s.createStemma(user.userId, stemmaName.name)
         } yield StemmaDescription(stemmaId, stemmaName.name)

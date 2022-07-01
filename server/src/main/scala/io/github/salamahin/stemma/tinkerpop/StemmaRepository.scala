@@ -3,13 +3,13 @@ package io.github.salamahin.stemma.tinkerpop
 import com.typesafe.scalalogging.LazyLogging
 import gremlin.scala._
 import io.github.salamahin.stemma.domain._
-import io.github.salamahin.stemma.tinkerpop.StemmaOperations._
+import io.github.salamahin.stemma.tinkerpop.StemmaRepository._
 
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import scala.collection.mutable
 
-class StemmaOperations extends LazyLogging {
+class StemmaRepository extends LazyLogging {
   def listStemmas(ts: TraversalSource, ownerId: String): Either[UnknownUser, List[StemmaDescription]] =
     for {
       owner <- ts.V(ownerId).headOption().toRight(UnknownUser(ownerId))
@@ -267,7 +267,7 @@ class StemmaOperations extends LazyLogging {
     removeOwnership(ts, userId, familyId)(NoSuchFamilyId(familyId))
 }
 
-private object StemmaOperations {
+private object StemmaRepository {
   trait RelationRules {
     def between(from: Vertex, to: Vertex): Either[StemmaError, Unit]
   }

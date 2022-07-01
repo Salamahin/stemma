@@ -3,31 +3,32 @@ package io.github.salamahin.stemma.service
 import gremlin.scala.{ScalaGraph, TraversalSource}
 import io.github.salamahin.stemma.domain._
 import io.github.salamahin.stemma.tinkerpop.Transaction._
-import io.github.salamahin.stemma.tinkerpop.{ExtendedFamilyDescription, StemmaOperations}
+import io.github.salamahin.stemma.tinkerpop.StemmaRepository
 import zio._
 
-class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
+class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
   import cats.syntax.apply._
   import cats.syntax.traverse._
 
   def createStemma(userId: String, name: String) =
-    IO.fromEither(transaction(graph) { tx =>
+    ZIO.fromEither(transaction(graph) { tx =>
       val stemmaId = ops.newStemma(tx, name)
       ops.makeGraphOwner(tx, userId, stemmaId).map(_ => stemmaId)
     })
 
-  def listOwnedStemmas(userId: String) = IO.fromEither(ops.listStemmas(graph.traversal, userId)).map(OwnedStemmasDescription.apply)
+  def listOwnedStemmas(userId: String) = ZIO.fromEither(ops.listStemmas(graph.traversal, userId)).map(OwnedStemmasDescription.apply)
 
-  def createFamily(userId: String, stemmaId: String, family: CreateFamily): IO[StemmaError, FamilyDescription] = IO.fromEither(validateFamily(family) *> transaction(graph) { ts => createFamilyAndSetRelations(ts, stemmaId, userId, family) })
+  def createFamily(userId: String, stemmaId: String, family: CreateFamily): IO[StemmaError, FamilyDescription] =
+    ZIO.fromEither(validateFamily(family) *> transaction(graph) { ts => createFamilyAndSetRelations(ts, stemmaId, userId, family) })
 
   private def createFamilyAndSetRelations(ts: TraversalSource, stemmaId: String, ownerId: String, family: CreateFamily) = {
     val CreateFamily(p1, p2, children) = family
-    val familyId                            = ops.newFamily(ts, stemmaId)
+    val familyId                       = ops.newFamily(ts, stemmaId)
 
     ops.makeFamilyOwner(ts, ownerId, familyId) *> setFamilyRelations(ts, stemmaId, ownerId, familyId, (p1 ++ p2).toSeq, children)
   }
 
-  def updateFamily(userId: String, familyId: String, family: CreateFamily): IO[StemmaError, FamilyDescription] = IO.fromEither(
+  def updateFamily(userId: String, familyId: String, family: CreateFamily): IO[StemmaError, FamilyDescription] = ZIO.fromEither(
     transaction(graph)(ts =>
       for {
         isOwner <- ops.isFamilyOwner(ts, userId, familyId)
@@ -40,8 +41,8 @@ class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
     val CreateFamily(p1, p2, children) = family
     for {
       ExtendedFamilyDescription(FamilyDescription(_, oldParents, oldChildren), stemmaId) <- ops.describeFamily(ts, familyId)
-      _                                                                      <- oldParents.map(id => ops.removeSpouseRelation(ts, familyId, id)).sequence
-      _                                                                      <- oldChildren.map(id => ops.removeChildRelation(ts, familyId, id)).sequence
+      _                                                                                  <- oldParents.map(id => ops.removeSpouseRelation(ts, familyId, id)).sequence
+      _                                                                                  <- oldChildren.map(id => ops.removeChildRelation(ts, familyId, id)).sequence
 
       updatedFamily <- setFamilyRelations(ts, stemmaId, ownerId, familyId, (p1 ++ p2).toSeq, children)
     } yield updatedFamily
@@ -95,7 +96,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
     (checkMembersCount(f) *> checkDuplicatedIds(f)).map(_ => f)
   }
 
-  def removePerson(userId: String, personId: String) = IO.fromEither(
+  def removePerson(userId: String, personId: String) = ZIO.fromEither(
     transaction(graph)(ts =>
       for {
         isOwner <- ops.isPersonOwner(ts, userId, personId)
@@ -120,7 +121,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
   }
 
   def removeFamily(userId: String, familyId: String) =
-    IO.fromEither(transaction(graph) { tx =>
+    ZIO.fromEither(transaction(graph) { tx =>
       for {
         isOwner <- ops.isFamilyOwner(tx, userId, familyId)
         _       <- if (isOwner) ops.removeFamily(tx, familyId) else Left(AccessToFamilyDenied(familyId))
@@ -128,7 +129,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
     })
 
   def updatePerson(userId: String, personId: String, description: CreateNewPerson) =
-    IO.fromEither(transaction(graph) { tx =>
+    ZIO.fromEither(transaction(graph) { tx =>
       for {
         isOwner <- ops.isPersonOwner(tx, userId, personId)
         _       <- if (isOwner) ops.updatePerson(tx, personId, description) else Left(AccessToPersonDenied(personId))
@@ -136,7 +137,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
     })
 
   def stemma(userId: String, stemmaId: String) =
-    IO.fromEither(transaction(graph) { tx =>
+    ZIO.fromEither(transaction(graph) { tx =>
       for {
         isOwner <- ops.isStemmaOwner(tx, userId, stemmaId)
         stemma  <- if (isOwner) Right(ops.stemma(tx, stemmaId)) else Left(AccessToStemmaDenied(stemmaId))
@@ -144,9 +145,9 @@ class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
     })
 
   def describeChown(userId: String, toUserId: String, targetPersonId: String) =
-    IO.fromEither(transaction(graph)(ts => makeChown(ts, userId, toUserId, targetPersonId)))
+    ZIO.fromEither(transaction(graph)(ts => makeChown(ts, userId, toUserId, targetPersonId)))
 
-  def chown(userId: String, toUserId: String, targetPersonId: String) = IO.fromEither(
+  def chown(userId: String, toUserId: String, targetPersonId: String) = ZIO.fromEither(
     transaction(graph)(ts =>
       for {
         chown <- makeChown(ts, userId, toUserId, targetPersonId)
@@ -164,8 +165,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaOperations) {
 }
 
 object StemmaService {
-  val live: URLayer[GraphService with StemmaOperations, StemmaService] = (for {
-    graph <- ZIO.environment[GraphService].map(_.get)
-    ops   <- ZIO.environment[StemmaOperations].map(_.get)
-  } yield new StemmaService(graph.graph, ops)).toLayer
+  val live: URLayer[GraphService, StemmaService] = ZLayer(for {
+    graph <- ZIO.service[GraphService]
+  } yield new StemmaService(graph.graph, new StemmaRepository))
 }

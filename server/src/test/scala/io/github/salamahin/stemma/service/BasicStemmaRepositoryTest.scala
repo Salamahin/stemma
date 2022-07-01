@@ -1,16 +1,13 @@
 package io.github.salamahin.stemma.service
 
 import io.github.salamahin.stemma.domain._
-import io.github.salamahin.stemma.tinkerpop.StemmaOperations
+import zio.ZIO
 import zio.test.Assertion.hasSameElements
-import zio.test.{DefaultRunnableSpec, _}
-import zio.{ULayer, ZIO}
+import zio.test._
 
-object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with RenderStemma {
-
-  private val layer: ULayer[GraphService with StemmaOperations with Secrets] = tempGraph ++ OpsService.live ++ hardcodedSecret
-  private val services = (ZIO.environment[StemmaService].map(_.get) zip ZIO.environment[UserService].map(_.get))
-    .provideCustomLayer(layer >>> (StemmaService.live ++ UserService.live))
+object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with RenderStemma {
+  private val services = (ZIO.service[StemmaService] zip ZIO.service[UserService])
+    .provide(tempGraph, hardcodedSecret, StemmaService.live, UserService.live)
 
   private val canCreateFamily = test("can create different family with both parents and several children") {
     for {

@@ -1,14 +1,13 @@
 package io.github.salamahin.stemma.service
 
 import io.github.salamahin.stemma.domain.{Email, FamilyDescription, InviteToken}
-import io.github.salamahin.stemma.tinkerpop.StemmaOperations
+import io.github.salamahin.stemma.tinkerpop.StemmaRepository
 import zio.test._
 import zio.{ULayer, ZIO}
 
-object UserServiceTest extends DefaultRunnableSpec with Requests with RenderStemma {
-  private val layer: ULayer[GraphService with StemmaOperations with Secrets] = tempGraph ++ OpsService.live ++ hardcodedSecret
+object UserServiceTest extends ZIOSpecDefault with Requests with RenderStemma {
   private val services = (ZIO.environment[StemmaService].map(_.get) zip ZIO.environment[UserService].map(_.get))
-    .provideCustomLayer(layer >>> (StemmaService.live ++ UserService.live))
+    .provide(tempGraph, hardcodedSecret, StemmaService.live, UserService.live)
 
   private val canCreateUser = test("can create or found a user") {
     for {
@@ -20,8 +19,8 @@ object UserServiceTest extends DefaultRunnableSpec with Requests with RenderStem
 
   private val canCreateAnInvitationLink = test("can create invite token") {
     for {
-      (s, a)  <- services
-      user1   <- a.getOrCreateUser(Email("user@test.com"))
+      (s, a)   <- services
+      user1    <- a.getOrCreateUser(Email("user@test.com"))
       stemmaId <- s.createStemma(user1.userId, "my first stemma")
 
       FamilyDescription(_, _, joshId :: _) <- s.createFamily(user1.userId, stemmaId, family(createJane, createJohn)(createJosh, createJill))

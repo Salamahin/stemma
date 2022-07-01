@@ -4,9 +4,9 @@ import com.typesafe.scalalogging.LazyLogging
 import gremlin.scala.ScalaGraph
 import io.circe.parser
 import io.github.salamahin.stemma.domain.{Email, InvalidInviteToken, InviteToken, User}
-import io.github.salamahin.stemma.tinkerpop.StemmaOperations
+import io.github.salamahin.stemma.tinkerpop.StemmaRepository
 import io.github.salamahin.stemma.tinkerpop.Transaction.transactionSafe
-import zio.{IO, UIO, URLayer, ZIO}
+import zio.{IO, UIO, URLayer, ZIO, ZLayer}
 
 import java.security.MessageDigest
 import java.util
@@ -22,14 +22,13 @@ trait UserService {
 
 object UserService extends LazyLogging {
 
-  val live: URLayer[StemmaOperations with Secrets with GraphService, UserService] = (for {
+  val live: URLayer[Secrets with GraphService, UserService] = ZLayer(for {
     graph  <- ZIO.environment[GraphService].map(_.get)
     secret <- ZIO.environment[Secrets].map(_.get)
-    ops    <- ZIO.environment[StemmaOperations].map(_.get)
-  } yield new UserServiceImpl(secret.invitationSecret, graph.graph, ops)).toLayer
+  } yield new UserServiceImpl(secret.invitationSecret, graph.graph, new StemmaRepository))
 
-  private class UserServiceImpl(secret: String, graph: ScalaGraph, ops: StemmaOperations) extends UserService {
-    override def createInviteToken(inviteeEmail: String, associatedPersonId: String): UIO[String] = UIO {
+  private class UserServiceImpl(secret: String, graph: ScalaGraph, ops: StemmaRepository) extends UserService {
+    override def createInviteToken(inviteeEmail: String, associatedPersonId: String): UIO[String] = ZIO.succeed {
       import io.circe.syntax._
 
       val token = InviteToken(inviteeEmail, associatedPersonId)
@@ -52,7 +51,7 @@ object UserService extends LazyLogging {
       new SecretKeySpec(keySpec, "AES")
     }
 
-    override def decodeInviteToken(token: String) = IO.fromEither {
+    override def decodeInviteToken(token: String) = ZIO.fromEither {
       import cats.syntax.bifunctor._
       parser
         .parse(decrypt(secret, token))
@@ -67,7 +66,7 @@ object UserService extends LazyLogging {
       new String(cipher.doFinal(Base64.getDecoder.decode(encryptedValue)))
     }
 
-    override def getOrCreateUser(email: Email): UIO[User] = UIO {
+    override def getOrCreateUser(email: Email): UIO[User] = ZIO.succeed {
       logger.debug(s"Get or create a new user with email $email")
       transactionSafe(graph) { tx => ops.getOrCreateUser(tx, email) }
     }
