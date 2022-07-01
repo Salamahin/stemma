@@ -1,6 +1,6 @@
 <script lang="ts">
-    import {createEventDispatcher} from "svelte";
-    import type {StemmaDescription, User} from "../model.ts";
+    import { createEventDispatcher } from "svelte";
+    import { StemmaDescription, User } from "../model";
 
     export let user: User;
     export let stemmas: StemmaDescription[];
@@ -10,11 +10,11 @@
 
     function handleStemmaSelection(s: StemmaDescription) {
         selectedStemma = s;
-        dispatch("stemmaSelected", s)
+        dispatch("stemmaSelected", s);
     }
 
     export function selectStemma(s: StemmaDescription) {
-        selectedStemma = s
+        selectedStemma = s;
     }
 
     $: if (!selectedStemma) selectedStemma = stemmas[0];
@@ -24,49 +24,59 @@
     <div class="container-fluid">
         <a class="navbar-brand" href="#">Stemma</a>
         <button
-                class="navbar-toggler"
-                type="button"
-                data-bs-toggle="collapse"
-                data-bs-target="#navbarTogglerDemo02"
-                aria-controls="navbarTogglerDemo02"
-                aria-expanded="false"
-                aria-label="Toggle navigation"
+            class="navbar-toggler"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#navbarTogglerDemo02"
+            aria-controls="navbarTogglerDemo02"
+            aria-expanded="false"
+            aria-label="Toggle navigation"
         >
-            <span class="navbar-toggler-icon"></span>
+            <span class="navbar-toggler-icon" />
         </button>
         <div class="collapse navbar-collapse" id="navbarTogglerDemo02">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                 <li class="nav-item">
                     <a class="nav-link active" aria-current="page" href="#"
-                    >Home</a
+                        >Home</a
                     >
                 </li>
                 <li class="nav-item dropdown">
                     <a
-                            class="nav-link dropdown-toggle"
-                            href="#"
-                            id="navbarDropdownMenuLink"
-                            role="button"
-                            data-bs-toggle="dropdown"
-                            aria-expanded="false"
+                        class="nav-link dropdown-toggle"
+                        href="#"
+                        id="navbarDropdownMenuLink"
+                        role="button"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
                     >
                         {selectedStemma ? selectedStemma.name : "Родословные"}
                     </a>
                     <ul
-                            class="dropdown-menu"
-                            aria-labelledby="navbarDropdownMenuLink"
+                        class="dropdown-menu"
+                        aria-labelledby="navbarDropdownMenuLink"
                     >
                         {#each stemmas as s}
-                            <li><a class="dropdown-item" href="#"
-                                   on:click={() => handleStemmaSelection(s)}>{s.name}</a></li>
+                            <li>
+                                <a
+                                    class="dropdown-item"
+                                    href="#"
+                                    on:click={() => handleStemmaSelection(s)}
+                                    >{s.name}</a
+                                >
+                            </li>
                         {/each}
                         <li>
-                            <hr class="dropdown-divider"/>
+                            <hr class="dropdown-divider" />
                         </li>
 
                         <li>
-                            <a class="dropdown-item" href="#" on:click={() => dispatch("createNewStemma")}>Новая
-                                родословная...</a>
+                            <a
+                                class="dropdown-item"
+                                href="#"
+                                on:click={() => dispatch("createNewStemma")}
+                                >Новая родословная...</a
+                            >
                         </li>
                     </ul>
                 </li>
@@ -79,11 +89,11 @@
             </ul>
             <div class="navbar-nav ml-auto">
                 <div class="nav-item d-flex">
-                    <img src={user.image_url} class="avatar" alt="Avatar"/>
+                    <img src={user.image_url} class="avatar" alt="Avatar" />
                     <a
-                            class="nav-link text-secondary ms-2"
-                            on:click={() => dispatch("signOut")}
-                            href="#">Выйти</a
+                        class="nav-link text-secondary ms-2"
+                        on:click={() => dispatch("signOut")}
+                        href="#">Выйти</a
                     >
                 </div>
             </div>

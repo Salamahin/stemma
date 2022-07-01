@@ -6,43 +6,46 @@
 
     let personR = 15;
     let familyR = 5;
-    let nodeColor = "#326f93";
+    let defaultNodeColor = "#326f93";
     let relationsColor = "#18191a";
     let childRelationWidth = 0.5;
     let familyRelationWidth = 2.5;
+
+    //TODO 
+    //export let families
 
     let stemmaS: Stemma = {
         families: [
             {
                 id: "f1",
-                parents: ["p1"],
-                children: ["p2", "p3"],
+                parents: ["ivan"],
+                children: ["tolya", "kolya"],
             },
             {
                 id: "f2",
-                parents: ["p3", "p4"],
-                children: ["p5"],
+                parents: ["kolya", "masha"],
+                children: ["katya"],
             },
         ],
         people: [
             {
-                id: "p1",
+                id: "ivan",
                 name: "ivan",
             },
             {
-                id: "p2",
+                id: "tolya",
                 name: "tolya",
             },
             {
-                id: "p3",
+                id: "kolya",
                 name: "kolya",
             },
             {
-                id: "p4",
+                id: "masha",
                 name: "masha",
             },
             {
-                id: "p5",
+                id: "katya",
                 name: "katya",
             },
         ],
@@ -52,24 +55,24 @@
         return arr1.filter((value) => arr2.includes(value));
     }
 
-    function lightenColor(color: string, percent: number) {
-        var num = parseInt(color.replace("#", ""), 16),
-            amt = Math.round(2.55 * percent),
-            R = (num >> 16) + amt,
-            B = ((num >> 8) & 0x00ff) + amt,
-            G = (num & 0x0000ff) + amt;
-        return (
-            "#" +
-            (
-                0x1000000 +
-                (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
-                (B < 255 ? (B < 1 ? 0 : B) : 255) * 0x100 +
-                (G < 255 ? (G < 1 ? 0 : G) : 255)
-            )
-                .toString(16)
-                .slice(1)
-        );
-    }
+    // function lightenColor(color: string, percent: number) {
+    //     var num = parseInt(color.replace("#", ""), 16),
+    //         amt = Math.round(2.55 * percent),
+    //         R = (num >> 16) + amt,
+    //         B = ((num >> 8) & 0x00ff) + amt,
+    //         G = (num & 0x0000ff) + amt;
+    //     return (
+    //         "#" +
+    //         (
+    //             0x1000000 +
+    //             (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+    //             (B < 255 ? (B < 1 ? 0 : B) : 255) * 0x100 +
+    //             (G < 255 ? (G < 1 ? 0 : G) : 255)
+    //         )
+    //             .toString(16)
+    //             .slice(1)
+    //     );
+    // }
 
     let nodes = [];
     let links = [];
@@ -113,8 +116,13 @@
         max_generation = Math.max(...[...lineages.values()].map(p => p.generation))
     }
 
-    function color(g: Generation) {
-        return d3.interpolatePlasma(g.generation / max_generation);
+    function getNodeColor(node) {
+        return node.type == "person" ? d3.interpolatePlasma(lineages.get(node.id).generation / max_generation) : defaultNodeColor
+    }
+
+    function getNodeColorOnHover(node, hoveredNode) {
+        let selectedLineage = lineages.get(hoveredNode.id);
+        return getNodeColor(node)
     }
 
     function forceGraph(nodes, links) {
@@ -128,7 +136,7 @@
                 d3
                     .forceLink(links)
                     .id((node) => node.id)
-                    .distance(() => 100)
+                    .distance(100)
                     .strength(1.5)
             )
             .force(
@@ -208,27 +216,21 @@
 
         vertices
             .append("circle")
-            .attr("fill", nodeColor)
+            .attr("fill", (node) => getNodeColor(node))
             .attr("r", (node) => (node.type == "person" ? personR : familyR))
-            .on("click", (event, d) => {
+            .on("mouseenter", (event, d) => {
+                console.log("mouse enter")
                 if (d.type == "person") {
-                    let selectedLineage = lineages.get(d as Person);
+                    let selectedLineage = lineages.get(d.id);
                     vertices.selectAll("circle").attr("fill", (d1) => {
-                        if (
-                            d1.type == "person" &&
-                            selectedLineage.includes(d1.id)
-                        )
-                            return nodeColor;
-                        if (
-                            d1.type == "family" &&
-                            intersects(d1.connects, selectedLineage).length
-                        )
-                            return nodeColor;
-
-                        return lightenColor(nodeColor, 66);
+                        return selectedLineage.relativies.has(d1.id) ? getNodeColor(d1) : getHiddenNodeColor(d1);
                     });
                 }
-            });
+            })
+            .on("mouseleave", (event, node) => {
+                console.log("mouse leave")
+                return getNodeColor(node)
+            })
 
         vertices
             .append("text")

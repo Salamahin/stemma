@@ -1,10 +1,9 @@
 <script lang="ts">
-    import Authenticate from ".../components/Authenticate.svelte";
-    import Navbar from ".../components/Navbar.svelte";
-    import AddStemmaModal from '.../components/AddStemmaModal.svelte'
-    import GraphField from '.../components/GraphField.svelte'
-    import type {OwnedStemmas, StemmaDescription, User} from "./model.ts";
-    import {Model} from "./model.ts";
+    import Authenticate from "./components/Authenticate.svelte";
+    import Navbar from "./components/Navbar.svelte";
+    import AddStemmaModal from "./components/AddStemmaModal.svelte";
+    import GraphField from "./components/GraphField.svelte";
+    import { Model, StemmaDescription, User } from "./model";
 
     export let google_client_id;
     export let stemma_backend_url;
@@ -30,11 +29,10 @@
         user = event.detail as User;
         signedIn = true;
         model = new Model(stemma_backend_url, user);
-        model.listStemmas().then(stemmas => {
-            ownedStemmas = stemmas.stemmas
-            if (ownedStemmas.length == 0)
-                addStemmaModal.forcePromptNewStemma()
-        })
+        model.listStemmas().then((stemmas) => {
+            ownedStemmas = stemmas.stemmas;
+            if (ownedStemmas.length == 0) addStemmaModal.forcePromptNewStemma();
+        });
     }
 
     function handleSignOut() {
@@ -43,11 +41,11 @@
     }
 
     function handleNewStemma(event: CustomEvent<string>) {
-        let name = event.detail
-        model.addStemma(name).then(stemma => {
-            ownedStemmas = [...ownedStemmas, stemma]
+        let name = event.detail;
+        model.addStemma(name).then((stemma) => {
+            ownedStemmas = [...ownedStemmas, stemma];
             navbarComponent.selectStemma(stemma);
-        })
+        });
     }
 
     $: authenticateDisplay = !signedIn ? "d-block" : "d-none";
@@ -58,28 +56,30 @@
     <div class="authenticate-bg {authenticateDisplay}">
         <div class="authenticate-holder">
             <Authenticate
-                    google_client_id={google_client_id}
-                    bind:this={authComponent}
-                    on:signIn={handleSignIn}
+                {google_client_id}
+                bind:this={authComponent}
+                on:signIn={handleSignIn}
             />
         </div>
     </div>
 
     <div class={workspaceDisplay}>
-        <Navbar {user} stemmas={ownedStemmas}
-                bind:this={navbarComponent}
-                on:signOut={handleSignOut}
-                on:stemmaSelected={stemma => selectedStemma = stemma}
-                on:createNewStemma={() => addStemmaModal.promptNewStemma()}
+        <Navbar
+            {user}
+            stemmas={ownedStemmas}
+            bind:this={navbarComponent}
+            on:signOut={handleSignOut}
+            on:stemmaSelected={(stemma) => (selectedStemma = stemma)}
+            on:createNewStemma={() => addStemmaModal.promptNewStemma()}
         />
     </div>
 
     <AddStemmaModal
-            bind:this={addStemmaModal}
-            on:stemmaAdded={handleNewStemma}
+        bind:this={addStemmaModal}
+        on:stemmaAdded={handleNewStemma}
     />
 
-    <GraphField/>
+    <GraphField />
 
     <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </main>
