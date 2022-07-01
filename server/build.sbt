@@ -1,6 +1,6 @@
 lazy val versions = new {
   val circeV = "0.14.2"
-  val zioV   = "2.0.0"
+  val zioV   = "2.0.0-RC6"
   val sqlgV  = "2.1.6"
 }
 

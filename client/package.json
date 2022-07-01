@@ -17,6 +17,7 @@
     "bootstrap-icons": "^1.8.0",
     "googleapis": "^94.0.0",
     "d3": "^7.3.0",
+    "jest": "^28.1.2",
     "rollup": "^2.3.4",
     "rollup-plugin-copy": "^3.4.0",
     "rollup-plugin-css-only": "^3.1.0",

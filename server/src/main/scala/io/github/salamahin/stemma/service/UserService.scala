@@ -23,8 +23,8 @@ trait UserService {
 object UserService extends LazyLogging {
 
   val live: URLayer[Secrets with GraphService, UserService] = ZLayer(for {
-    graph  <- ZIO.environment[GraphService].map(_.get)
-    secret <- ZIO.environment[Secrets].map(_.get)
+    graph  <- ZIO.service[GraphService]
+    secret <- ZIO.service[Secrets]
   } yield new UserServiceImpl(secret.invitationSecret, graph.graph, new StemmaRepository))
 
   private class UserServiceImpl(secret: String, graph: ScalaGraph, ops: StemmaRepository) extends UserService {

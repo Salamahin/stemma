@@ -14,7 +14,7 @@ object FailoverStemmaRepositoryTest extends ZIOSpecDefault with Requests with Re
 
   private val stemmaService = ZLayer(ZIO.service[GraphService].map(g => new StemmaService(g.graph, failedToRemoveRepo)))
 
-  private val services = (ZIO.environment[StemmaService].map(_.get) zip ZIO.environment[UserService].map(_.get))
+  private val services = (ZIO.service[StemmaService] zip ZIO.service[UserService])
     .provide(tempGraph, hardcodedSecret, stemmaService, UserService.live)
 
   private val revertChangesOnFailure = test("any change that modifies stemma would be reverted on failure") {

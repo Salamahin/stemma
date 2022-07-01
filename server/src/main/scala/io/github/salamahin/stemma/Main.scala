@@ -1,18 +1,14 @@
 package io.github.salamahin.stemma
 
 import com.typesafe.scalalogging.LazyLogging
-import io.github.salamahin.stemma.apis.{StemmaApi, WebApi}
+import io.github.salamahin.stemma.apis.{StemmaApi, OAuth}
 import io.github.salamahin.stemma.service._
 import zhttp.http.Middleware.cors
 import zhttp.http.middleware.Cors.CorsConfig
 import zhttp.service.Server
-import zio.{Clock, Console, RIO, Scope, ZIO, ZIOAppArgs, ZIOAppDefault}
+import zio.{ExitCode, Scope, ZIO, ZIOAppArgs, ZIOAppDefault}
 
-object Main extends ZIOAppDefault with LazyLogging with WebApi with StemmaApi {
-
-  type STEMMA_ENV     = OAuthService with UserService with StemmaService with Console with Clock
-  type STEMMA_TASK[A] = RIO[STEMMA_ENV, A]
-
+object Main extends ZIOAppDefault with LazyLogging {
   private val corsConfig = CorsConfig(
     anyOrigin = false,
     allowedOrigins = _ contains "localhost" //fixme configure?
@@ -20,7 +16,7 @@ object Main extends ZIOAppDefault with LazyLogging with WebApi with StemmaApi {
 
   override def run: ZIO[Environment with ZIOAppArgs with Scope, Any, Any] = {
     Server
-      .start(8090, stemmaApis @@ cors(corsConfig))
+      .start(8090, OAuth.authenticate(StemmaApi.api) @@ cors(corsConfig))
       .exitCode
       .provide(
         Secrets.envSecrets,
@@ -28,6 +24,10 @@ object Main extends ZIOAppDefault with LazyLogging with WebApi with StemmaApi {
         StemmaService.live,
         UserService.live,
         OAuthService.googleSignIn
+      )
+      .foldCause(
+        failure => { logger.error(s"Unexpected failure:\n${failure.prettyPrint}"); ExitCode.failure },
+        _ => { logger.info("bb gl hf"); ExitCode.success; }
       )
   }
 }

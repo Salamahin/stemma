@@ -33,7 +33,6 @@ export class Lineage {
 
     private computeLineage(toLookUp: string[], acc: string[], relation: Map<string, string[]>): string[] {
         'use strict';
-        console.log(toLookUp)
         if (!toLookUp.length) return acc;
 
         let [head, ...tail] = toLookUp;

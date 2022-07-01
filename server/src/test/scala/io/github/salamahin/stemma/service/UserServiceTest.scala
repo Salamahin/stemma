@@ -6,7 +6,7 @@ import zio.test._
 import zio.{ULayer, ZIO}
 
 object UserServiceTest extends ZIOSpecDefault with Requests with RenderStemma {
-  private val services = (ZIO.environment[StemmaService].map(_.get) zip ZIO.environment[UserService].map(_.get))
+  private val services = (ZIO.service[StemmaService] zip ZIO.service[UserService])
     .provide(tempGraph, hardcodedSecret, StemmaService.live, UserService.live)
 
   private val canCreateUser = test("can create or found a user") {
