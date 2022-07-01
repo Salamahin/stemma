@@ -2,7 +2,7 @@ import { Stemma, Person } from "./model";
 
 export type Generation = {
     generation: number,
-    relativies: string[]
+    relativies: Set<string>
 };
 
 export class Lineage {
@@ -26,30 +26,48 @@ export class Lineage {
         );
     }
 
-    private computeGenerations(generation: number, parents: string[]): number {
-        if (!parents.length) return generation
-        return this.computeGenerations(generation + 1, parents.flatMap(p => this.childToParents.get(p)))
+    private computeGenerations(parents: string[]): number {
+        var generation = 0
+        while (parents.length) {
+            generation++
+            parents = parents.flatMap(p => this.childToParents.get(p))
+        }
+
+        return generation
     }
 
-    private computeLineage(toLookUp: string[], acc: string[], relation: Map<string, string[]>): string[] {
-        'use strict';
-        if (!toLookUp.length) return acc;
+    private computeLineage(personId: string, relation: Map<string, string[]>) {
+        var foundRelatieves: Array<string> = []
+        var toLookUp = [personId]
+        var depth = 0
 
-        let [head, ...tail] = toLookUp;
-        let nextGen = relation.has(head) ? relation.get(head) : [];
+        while (toLookUp.length) {
+            let [head, ...tail] = toLookUp
+            var nextGen: Array<string> = []
+            if (relation.has(head)) {
+                depth++
+                nextGen = relation.get(head)
+            }
 
-        return this.computeLineage([...nextGen, ...tail], [head, ...acc], relation);
+            toLookUp = [...nextGen, ...tail]
+            foundRelatieves = [head, ...foundRelatieves]
+        }
+
+        return {
+            depth: depth,
+            relativies: foundRelatieves
+        }
     }
 
     private lineage(p: Person): Generation {
-        let dependees = this.computeLineage([p.id], [], this.parentToChildren)
-        let ancestors = this.computeLineage(this.childToParents.has(p.id) ? this.childToParents.get(p.id) : [], [], this.childToParents)
+        let dependees = this.computeLineage(p.id, this.parentToChildren)
+        let ancestors = this.computeLineage(p.id, this.childToParents)
 
-        let generation = this.computeGenerations(0, this.childToParents.has(p.id) ? this.childToParents.get(p.id) : [])
+        let generation = ancestors.depth
 
         return {
             generation: generation,
-            relativies: [...ancestors, ...dependees]
+            relativies: new Set([...ancestors.relativies, ...dependees.relativies])
         }
     }
 
