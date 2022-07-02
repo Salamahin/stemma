@@ -24,3 +24,6 @@ libraryDependencies ++= Seq(
   "com.google.http-client"     % "google-http-client-gson" % "1.42.0",
   "org.umlg"                   % "sqlg-h2-dialect"         % versions.sqlgV % Test
 )
+
+addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1")
+addCompilerPlugin("org.typelevel" % "kind-projector"      % "0.13.2" cross CrossVersion.full)
