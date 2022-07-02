@@ -84,7 +84,11 @@
                     <a class="nav-link" href="#">О проекте</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="#">Помощь</a>
+                    <form class="form-inline">
+                        <button class="btn btn-danger" type="button"
+                            >Создать</button
+                        >
+                    </form>
                 </li>
             </ul>
             <div class="navbar-nav ml-auto">
