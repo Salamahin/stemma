@@ -5,13 +5,18 @@
     import { onMount } from "svelte";
 
     let personR = 15;
+    let hoveredPersonR = 20;
     let familyR = 5;
-    let defaultNodeColor = "#326f93";
-    let relationsColor = "#18191a";
-    let childRelationWidth = 0.5;
-    let familyRelationWidth = 2.5;
 
-    //TODO 
+    let defaultFamilyColor = "#326f93";
+    let shadedNodeColor = "#d3d3d3";
+
+    let relationsColor = "#181818";
+
+    let childRelationWidth = 0.5;
+    let familyRelationWidth = 2.0;
+
+    //TODO
     //export let families
 
     let stemmaS: Stemma = {
@@ -51,33 +56,10 @@
         ],
     };
 
-    function intersects<T>(arr1: T[], arr2: T[]): T[] {
-        return arr1.filter((value) => arr2.includes(value));
-    }
-
-    // function lightenColor(color: string, percent: number) {
-    //     var num = parseInt(color.replace("#", ""), 16),
-    //         amt = Math.round(2.55 * percent),
-    //         R = (num >> 16) + amt,
-    //         B = ((num >> 8) & 0x00ff) + amt,
-    //         G = (num & 0x0000ff) + amt;
-    //     return (
-    //         "#" +
-    //         (
-    //             0x1000000 +
-    //             (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
-    //             (B < 255 ? (B < 1 ? 0 : B) : 255) * 0x100 +
-    //             (G < 255 ? (G < 1 ? 0 : G) : 255)
-    //         )
-    //             .toString(16)
-    //             .slice(1)
-    //     );
-    // }
-
     let nodes = [];
     let links = [];
     let lineages = new Map<string, Generation>();
-    let max_generation = 0
+    let max_generation = 0;
 
     $: {
         nodes = [
@@ -112,17 +94,18 @@
             ),
         ];
 
-        lineages = new Lineage(stemmaS).lineages()
-        max_generation = Math.max(...[...lineages.values()].map(p => p.generation))
+        lineages = new Lineage(stemmaS).lineages();
+        max_generation = Math.max(
+            ...[...lineages.values()].map((p) => p.generation)
+        );
     }
 
     function getNodeColor(node) {
-        return node.type == "person" ? d3.interpolatePlasma(lineages.get(node.id).generation / max_generation) : defaultNodeColor
-    }
-
-    function getNodeColorOnHover(node, hoveredNode) {
-        let selectedLineage = lineages.get(hoveredNode.id);
-        return getNodeColor(node)
+        return node.type == "person"
+            ? d3.interpolatePlasma(
+                  lineages.get(node.id).generation / max_generation
+              )
+            : defaultFamilyColor;
     }
 
     function forceGraph(nodes, links) {
@@ -218,19 +201,35 @@
             .append("circle")
             .attr("fill", (node) => getNodeColor(node))
             .attr("r", (node) => (node.type == "person" ? personR : familyR))
-            .on("mouseenter", (event, d) => {
-                console.log("mouse enter")
-                if (d.type == "person") {
-                    let selectedLineage = lineages.get(d.id);
-                    vertices.selectAll("circle").attr("fill", (d1) => {
-                        return selectedLineage.relativies.has(d1.id) ? getNodeColor(d1) : getHiddenNodeColor(d1);
-                    });
+            .on("mouseenter", (event, node) => {
+                if (node.type == "person") {
+                    let selectedLineage = lineages.get(node.id);
+
+                    let nodes = vertices.selectAll("circle");
+
+                    nodes
+                        .filter((t) => t.type == "person")
+                        .filter((t) => !selectedLineage.relativies.has(t.id))
+                        .attr("fill", shadedNodeColor);
+
+                    nodes
+                        .filter((t) => t.type == "family")
+                        .filter((t) => !selectedLineage.families.has(t.id))
+                        .attr("fill", shadedNodeColor);
+
+                    nodes
+                        .filter((t) => t.id == node.id)
+                        .attr("r", hoveredPersonR);
                 }
             })
-            .on("mouseleave", (event, node) => {
-                console.log("mouse leave")
-                return getNodeColor(node)
-            })
+            .on("mouseleave", (_event, _node) => {
+                vertices
+                    .selectAll("circle")
+                    .attr("fill", (node) => getNodeColor(node))
+                    .attr("r", (node) =>
+                        node.type == "person" ? personR : familyR
+                    );
+            });
 
         vertices
             .append("text")

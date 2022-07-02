@@ -5,13 +5,13 @@ import { Stemma } from './model';
 /*
     JJ family:
 
-    joseph
+    joseph (f5)
          \
-         july             jane + john 
+         july (f3)        jane + john (f1)
              \           /           \
-              jake + jill             josh
+              jake + jill (f2)        josh
                          \
-                          james 
+                          james (f4)
                                \
                                 jeff
 */
@@ -42,7 +42,8 @@ test('Jane is the first in her lineage and is a direct relative of Josh, Jill, J
     let lineages = new Lineage(jjFamily).lineages()
     expect(lineages.get("Jane")).toEqual({
         generation: 0,
-        relativies: new Set(["Jane", "Jeff", "James", "Jill", "Josh"])
+        relativies: new Set(["Jane", "Jeff", "James", "Jill", "Josh"]),
+        families: new Set(["f1", "f2", "f4"])
     })
 });
 
@@ -50,14 +51,17 @@ test("July is the second in her lineage and is a direct relative of Joseph, Jake
     let lineages = new Lineage(jjFamily).lineages()
     expect(lineages.get("July")).toEqual({
         generation: 1,
-        relativies: new Set(["July", "Jake", "James", "Jeff", "Joseph"])
+        relativies: new Set(["July", "Jake", "James", "Jeff", "Joseph"]),
+        families: new Set([ "f5", "f4", "f2", "f3" ])
     })
 });
 
 test("Generation is selected as max known generations count", () => {
     let lineages = new Lineage(jjFamily).lineages()
+    let xx = lineages.get("Jeff")
     expect(lineages.get("Jeff")).toEqual({
         generation: 4, //Joseph's bloodline
-        relativies: new Set(["July", "Jake", "Joseph", "Jill", "James", "Jane", "John", "Jeff"])
+        relativies: new Set(["July", "Jake", "Joseph", "Jill", "James", "Jane", "John", "Jeff"]),
+        families: new Set(["f1", "f2", "f3", "f4", "f5"])
     })
 })
