@@ -2,6 +2,7 @@
     import Authenticate from "./components/Authenticate.svelte";
     import Navbar from "./components/Navbar.svelte";
     import AddStemmaModal from "./components/AddStemmaModal.svelte";
+    import AddFamilyModal from "./components/AddFamilyModal.svelte";
     import GraphField from "./components/GraphField.svelte";
     import { Model, StemmaDescription, User } from "./model";
 
@@ -11,6 +12,7 @@
     //components
     let authComponent;
     let addStemmaModal;
+    let addFamilyModal;
     let navbarComponent;
 
     //model
@@ -31,7 +33,7 @@
         model = new Model(stemma_backend_url, user);
         model.listStemmas().then((stemmas) => {
             ownedStemmas = stemmas.stemmas;
-            if (ownedStemmas.length == 0) addStemmaModal.forcePromptNewStemma();
+            if (ownedStemmas.length == 0) addStemmaModal.promptNewStemma(true);
         });
     }
 
@@ -70,13 +72,18 @@
             bind:this={navbarComponent}
             on:signOut={handleSignOut}
             on:stemmaSelected={(stemma) => (selectedStemma = stemma)}
-            on:createNewStemma={() => addStemmaModal.promptNewStemma()}
+            on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
+            on:createNewFamily={() => addFamilyModal.promptNewFamily()}
         />
     </div>
 
     <AddStemmaModal
         bind:this={addStemmaModal}
         on:stemmaAdded={handleNewStemma}
+    />
+
+    <AddFamilyModal
+        bind:this={addFamilyModal}
     />
 
     <GraphField />

@@ -279,7 +279,6 @@
     onMount(() => {
         forceGraph(nodes, links);
     });
-
 </script>
 
 <svg id="chart" />

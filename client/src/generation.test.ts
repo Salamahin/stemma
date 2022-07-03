@@ -52,7 +52,7 @@ test("July is the second in her lineage and is a direct relative of Joseph, Jake
     expect(lineages.get("July")).toEqual({
         generation: 1,
         relativies: new Set(["July", "Jake", "James", "Jeff", "Joseph"]),
-        families: new Set([ "f5", "f4", "f2", "f3" ])
+        families: new Set(["f5", "f4", "f2", "f3"])
     })
 });
 

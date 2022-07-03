@@ -1,6 +1,6 @@
 <script>
-    import {createEventDispatcher} from "svelte";
-    import {Circle2} from "svelte-loading-spinners";
+    import { createEventDispatcher } from "svelte";
+    import { Circle2 } from "svelte-loading-spinners";
 
     const dispatch = createEventDispatcher();
 
@@ -8,7 +8,7 @@
 
     window.onSignIn = () => {
         let currentUser = gapi.auth2.getAuthInstance().currentUser.get();
-        let profile =  currentUser.getBasicProfile();
+        let profile = currentUser.getBasicProfile();
         let token = currentUser.getAuthResponse().id_token;
 
         dispatch("signIn", {
@@ -35,21 +35,22 @@
 </script>
 
 <svelte:head>
-    <meta name="google-signin-client_id" content={google_client_id}/>
+    <meta name="google-signin-client_id" content={google_client_id} />
 </svelte:head>
 
 <div class="main-container">
     <div>
         <h1>project stemma</h1>
         <div
-                class="g-signin2 {signInDisplayBlock}"
-                data-longtitle="true"
-                data-onsuccess="onSignIn"
-                data-width="380"
-                data-height="50"></div>
+            class="g-signin2 {signInDisplayBlock}"
+            data-longtitle="true"
+            data-onsuccess="onSignIn"
+            data-width="380"
+            data-height="50"
+        />
         <div class={loadingSpinnerBlock}>
             <div class="d-flex w-100 justify-content-center">
-                <Circle2/>
+                <Circle2 />
             </div>
         </div>
     </div>

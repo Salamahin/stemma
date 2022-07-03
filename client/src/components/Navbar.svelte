@@ -85,7 +85,10 @@
                 </li>
                 <li class="nav-item">
                     <form class="form-inline">
-                        <button class="btn btn-danger" type="button"
+                        <button
+                            class="btn btn-danger"
+                            type="button"
+                            on:click={() => dispatch("createNewFamily")}
                             >Создать</button
                         >
                     </form>
