@@ -64,3 +64,45 @@ test("Generation is selected as max known generations count", () => {
         families: new Set(["f1", "f2", "f3", "f4", "f5"])
     })
 })
+
+test("lineage takes into account all children from all families", () => {
+    let mashaFamily = {
+        families: [
+            { id: "f1", parents: ["masha", "katya"], children: ["petya"] },
+            { id: "f2", parents: ["masha", "dasha"], children: ["lena"] },
+        ],
+        people: [
+            { id: "masha", name: "masha" },
+            { id: "katya", name: "katya" },
+            { id: "petya", name: "petya" },
+            { id: "dasha", name: "dasha" },
+            { id: "lena", name: "lena" },
+        ],
+    }
+
+    let lineages = new Lineage(mashaFamily).lineages()
+    expect(lineages.get("masha")).toEqual({
+        generation: 0, 
+        relativies: new Set(["masha", "petya", "lena"]),
+        families: new Set(["f1", "f2"])
+    })
+})
+
+test("lineage skips empty families", () => {
+    let mashaFamily = {
+        families: [
+            { id: "f1", parents: ["masha", "katya"], children: [] },
+        ],
+        people: [
+            { id: "masha", name: "masha" },
+            { id: "katya", name: "katya" }
+        ],
+    }
+
+    let lineages = new Lineage(mashaFamily).lineages()
+    expect(lineages.get("masha")).toEqual({
+        generation: 0,
+        relativies: new Set(["masha"]),
+        families: new Set([])
+    })
+})

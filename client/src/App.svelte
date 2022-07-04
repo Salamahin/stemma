@@ -3,8 +3,8 @@
     import Navbar from "./components/Navbar.svelte";
     import AddStemmaModal from "./components/AddStemmaModal.svelte";
     import AddFamilyModal from "./components/AddFamilyModal.svelte";
-    import GraphField from "./components/FullStemma.svelte";
-    import { Model, StemmaDescription, User } from "./model";
+    import FullStemma from "./components/FullStemma.svelte";
+    import { Model, StemmaDescription, User, Stemma } from "./model";
 
     export let google_client_id;
     export let stemma_backend_url;
@@ -24,7 +24,7 @@
     };
     let signedIn = false;
     let ownedStemmas: StemmaDescription[] = [];
-    let selectedStemma;
+    let selectedStemma: Stemma;
 
     //handlers
     function handleSignIn(event: CustomEvent) {
@@ -52,6 +52,24 @@
 
     $: authenticateDisplay = !signedIn ? "d-block" : "d-none";
     $: workspaceDisplay = signedIn ? "d-block" : "d-none";
+    $: selectedStemma = {
+        families: [
+            { id: "f1", parents: ["petya"], children: ["ivan1"] },
+            { id: "f2", parents: ["kolya", "masha"], children: ["katya"] },
+            { id: "f3", parents: ["katya", "dasha"], children: ["ivan2"] },
+            { id: "f4", parents: ["katya", "ivan1"], children: ["lena"] },
+        ],
+        people: [
+            { id: "ivan1", name: "ivan" },
+            { id: "ivan2", name: "ivan" },
+            { id: "kolya", name: "kolya" },
+            { id: "masha", name: "masha" },
+            { id: "katya", name: "katya" },
+            { id: "petya", name: "petya" },
+            { id: "dasha", name: "dasha" },
+            { id: "lena", name: "lena" },
+        ],
+    };
 </script>
 
 <main>
@@ -67,7 +85,9 @@
             stemmas={ownedStemmas}
             bind:this={navbarComponent}
             on:signOut={handleSignOut}
-            on:stemmaSelected={(stemma) => (selectedStemma = stemma)}
+            on:stemmaSelected={(stemma) => {
+                // selectedStemma = stemma; //FIXME uncomment
+            }}
             on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
             on:createNewFamily={() => addFamilyModal.promptNewFamily()}
         />
@@ -77,7 +97,7 @@
 
     <AddFamilyModal bind:this={addFamilyModal} />
 
-    <GraphField />
+    <FullStemma bind:stemma={selectedStemma} />
 
     <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </main>

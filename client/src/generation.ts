@@ -16,28 +16,39 @@ type GenerationDescription = {
     depth: number
 }
 
+
 export class Lineage {
     private stemma: Stemma
-    private parentToChildren: Map<string, FamilyDescription>
-    private childToParents: Map<string, FamilyDescription>
+    private parentToChildren: Map<string, FamilyDescription[]>
+    private childToParents: Map<string, FamilyDescription[]>
+
+    private groupByKey<K, V>(array: Array<readonly [K, V]>) {
+        return array.reduce((store, item) => {
+            var key = item[0]
+            if (!store.has(key)) {
+                store.set(key, [item[1]])
+            } else {
+                store.get(key).push(item[1])
+            }
+            return store
+        }, new Map<K, V[]>())
+    }
 
     constructor(stemma: Stemma) {
         this.stemma = stemma
 
-        this.parentToChildren = new Map<string, FamilyDescription>(
-            stemma.families.flatMap((f) =>
-                f.parents.map((p) => [p, ({ familyId: f.id, members: f.children })])
-            )
-        );
+        this.parentToChildren = new Map(this.groupByKey(stemma.families.flatMap((f) => {
+            if(f.children.length) return f.parents.map((p) => [p, ({ familyId: f.id, members: f.children })])
+            else return []
+        })))
 
-        this.childToParents = new Map<string, FamilyDescription>(
-            stemma.families.flatMap((f) =>
-                f.children.map((p) => [p, ({ familyId: f.id, members: f.parents })])
-            )
-        );
+        this.childToParents = new Map(this.groupByKey(stemma.families.flatMap((f) => {
+            if(f.parents.length) return f.children.map((p) => [p, ({ familyId: f.id, members: f.parents })])
+            else return []
+        })))
     }
 
-    private computeLineage(personId: string, relation: Map<string, FamilyDescription>) {
+    private computeLineage(personId: string, relation: Map<string, FamilyDescription[]>) {
         var foundRelatieves: string[] = []
         var foundFamilies: string[] = []
         var toLookUp = [{ personId: personId, depth: 0 }]
@@ -52,8 +63,8 @@ export class Lineage {
                 let descr = relation.get(head.personId)
 
                 maxDepth = Math.max(maxDepth, nextDepth)
-                nextGen = descr.members.map(personId => ({ personId: personId, depth: nextDepth }))
-                foundFamilies = [descr.familyId, ...foundFamilies]
+                nextGen = descr.flatMap(x => x.members).map(personId => ({ personId: personId, depth: nextDepth }))
+                foundFamilies = [...descr.map(x => x.familyId), ...foundFamilies]
             }
 
             toLookUp = [...nextGen, ...tail]

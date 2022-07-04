@@ -1,6 +1,6 @@
 <script lang="ts">
     import * as d3 from "d3";
-    import { Stemma, Person } from "../model";
+    import { Stemma } from "../model";
     import { Lineage, Generation } from "../generation";
     import { onMount } from "svelte";
 
@@ -19,42 +19,7 @@
     //TODO
     //export let families
 
-    let stemmaS: Stemma = {
-        families: [
-            {
-                id: "f1",
-                parents: ["ivan"],
-                children: ["tolya", "kolya"],
-            },
-            {
-                id: "f2",
-                parents: ["kolya", "masha"],
-                children: ["katya"],
-            },
-        ],
-        people: [
-            {
-                id: "ivan",
-                name: "ivan",
-            },
-            {
-                id: "tolya",
-                name: "tolya",
-            },
-            {
-                id: "kolya",
-                name: "kolya",
-            },
-            {
-                id: "masha",
-                name: "masha",
-            },
-            {
-                id: "katya",
-                name: "katya",
-            },
-        ],
-    };
+    export let stemma: Stemma;
 
     let nodes = [];
     let links = [];
@@ -63,12 +28,12 @@
 
     $: {
         nodes = [
-            ...stemmaS.people.map((p) => ({
+            ...stemma.people.map((p) => ({
                 id: p.id,
                 name: p.name,
                 type: "person",
             })),
-            ...stemmaS.families.map((f) => ({
+            ...stemma.families.map((f) => ({
                 id: f.id,
                 type: "family",
                 connects: [...f.children, ...f.parents],
@@ -76,7 +41,7 @@
         ];
 
         links = [
-            ...stemmaS.families.flatMap((f) =>
+            ...stemma.families.flatMap((f) =>
                 f.children.map((c) => ({
                     id: `${f.id}_${c}`,
                     source: f.id,
@@ -84,7 +49,7 @@
                     type: "familyToChild",
                 }))
             ),
-            ...stemmaS.families.flatMap((f) =>
+            ...stemma.families.flatMap((f) =>
                 f.parents.map((p) => ({
                     id: `${p}_${f.id}`,
                     source: p,
@@ -94,7 +59,7 @@
             ),
         ];
 
-        lineages = new Lineage(stemmaS).lineages();
+        lineages = new Lineage(stemma).lineages();
         max_generation = Math.max(...[...lineages.values()].map((p) => p.generation));
     }
 
@@ -120,7 +85,7 @@
                 "collide",
                 d3.forceCollide().radius((d) => d.r * 20)
             )
-            .force("repelForce", d3.forceManyBody().strength(-2500).distanceMin(85))
+            .force("repelForce", d3.forceManyBody().strength(-150).distanceMin(20))
             .force("charge", d3.forceManyBody())
             .force("center", d3.forceCenter())
             .on("tick", ticked);

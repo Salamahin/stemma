@@ -7,10 +7,7 @@ module.exports = {
         "**/?(*.)+(spec|test).+(ts|tsx|js)"
     ],
     "transform": {
-        "^.+\\.(ts|tsx)$": "ts-jest",
-        '^.+\\.svelte$': ['svelte-jester', {
-            preprocess: true,
-        }]
+        "^.+\\.(ts|tsx)$": "ts-jest"
     },
     moduleFileExtensions: ['js', 'ts', 'svelte'],
     "testEnvironment": "jsdom"
