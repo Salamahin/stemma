@@ -20,7 +20,7 @@
     //export let families
 
     let stemmaS: Stemma = {
-        families: [ 
+        families: [
             {
                 id: "f1",
                 parents: ["ivan"],
