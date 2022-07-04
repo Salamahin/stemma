@@ -23,31 +23,9 @@
                 >
                 <td><input class="form-control" type="date" /></td>
                 <td><input class="form-control" type="date" /></td>
-            </tr>
-            <tr>
-                <td
-                    ><input
-                        type="text"
-                        class="form-control"
-                        placeholder="Иванова Василиса Павловна"
-                    /></td
-                >
-                <td><input class="form-control" type="date" /></td>
-                <td><input class="form-control" type="date" /></td>
-                <td
-                    ><div
-                        class="btn-group"
-                        role="group"
-                        aria-label="Basic example"
-                    >
-                        <button type="button" class="btn btn-primary"
-                            >&#60 Предыдушее</button
-                        >
-                        <button type="button" class="btn btn-primary"
-                            >Следущее &#62</button
-                        >
-                    </div></td
-                >
+                <td>
+                    <button type="button" class="btn btn-outline-primary">Следующее &raquo;</button>
+                </td>
             </tr>
         </tbody>
     </table>
