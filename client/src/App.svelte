@@ -3,7 +3,7 @@
     import Navbar from "./components/Navbar.svelte";
     import AddStemmaModal from "./components/AddStemmaModal.svelte";
     import AddFamilyModal from "./components/AddFamilyModal.svelte";
-    import GraphField from "./components/GraphField.svelte";
+    import GraphField from "./components/FullStemma.svelte";
     import { Model, StemmaDescription, User } from "./model";
 
     export let google_client_id;

@@ -2,6 +2,7 @@
     import isEqual from "lodash.isequal";
     import { createEventDispatcher } from "svelte";
     import { NewPerson, StoredPerson } from "../model";
+    import autocomplete from "autocompleter";
 
     const dispatch = createEventDispatcher();
     export let maxPeopleCount: number;
@@ -37,28 +38,31 @@
 
     class NonEmptyPersonSelection implements PersonSelection {
         private selected: number;
-        private variants: (NewPerson | StoredPerson)[];
+        private stored: StoredPerson[];
+        private newP: NewPerson;
 
         constructor(pd: NewPerson) {
             this.selected = 0;
-            this.variants = [pd];
+            this.newP = pd;
+            this.stored = [];
         }
 
         current(): NewPerson | StoredPerson {
-            return this.variants[this.selected];
+            if (this.selected == 0) return this.newP;
+            return this.stored[this.selected - 1];
         }
 
         hasMore(): boolean {
-            return this.variants.length > 1;
+            return this.stored.length > 1;
         }
 
         next(): NewPerson | StoredPerson {
-            if (this.selected++ > this.variants.length) this.selected = 0;
-            return this.variants[this.selected];
+            if (this.selected++ >= this.stored.length) this.selected = 0;
+            return this.current();
         }
 
         replace(variants: StoredPerson[]) {
-            this.variants = [this.current(), ...variants];
+            this.stored = variants;
             this.selected = 0;
             return this;
         }
