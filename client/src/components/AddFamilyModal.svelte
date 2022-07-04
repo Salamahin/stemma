@@ -1,6 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
     import { onMount } from "svelte";
+    import AddPeopleComponent from "./AddPeopleComponent.svelte";
 
     const dispatch = createEventDispatcher();
 
@@ -34,73 +35,7 @@
             </div>
             <div class="modal-body">
                 <p class="fs-5 text-center">Родители</p>
-
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th scope="col">Имя</th>
-                            <th scope="col">Дата рождения</th>
-                            <th scope="col">Дата смерти</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><input
-                                type="text"
-                                class="form-control"
-                                placeholder="Иванов Виталий Валерьевич"
-                                aria-label="Имя первого родителя"
-                            /></td>
-                            <td><input
-                                class="form-control"
-                                type="date"
-                            /></td>
-                            <td><input
-                                class="form-control"
-                                type="date"
-                            /></td>
-                        </tr>
-                        <tr>
-                            <td><input
-                                type="text"
-                                class="form-control"
-                                placeholder="Иванов Виталий Валерьевич"
-                                aria-label="Имя первого родителя"
-                            /></td>
-                            <td><input
-                                class="form-control"
-                                type="date"
-                            /></td>
-                            <td><input
-                                class="form-control"
-                                type="date"
-                            /></td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <p class="fs-5 mt-4 mb-2 text-center">Дети</p>
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th scope="col">Имя</th>
-                            <th scope="col">Дата рождения</th>
-                            <th scope="col">Дата смерти</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Голощапов Сергей Георгиевич</td>
-                            <td>29.08.1961</td>
-                            <td></td>
-                        </tr>
-                        <tr>
-                            <td>Голощапова Евгения Анатольевна</td>
-                            <td>08.09.1963</td>
-                            <td></td>
-                        </tr>
-                    </tbody>
-                </table>
+                <AddPeopleComponent maxPeopleCount={2} />
             </div>
             <div class="modal-footer">
                 <button
