@@ -95,7 +95,7 @@
 
     <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={handleNewStemma} />
 
-    <AddFamilyModal bind:this={addFamilyModal} />
+    <AddFamilyModal bind:this={addFamilyModal} bind:stemma={selectedStemma} />
 
     <FullStemma bind:stemma={selectedStemma} />
 

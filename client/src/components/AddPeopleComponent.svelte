@@ -1,7 +1,12 @@
+<script context="module" lang="ts">
+    import { NewPerson, StoredPerson } from "../model";
+
+    export type PersonChangedEvent = { index: number; descr: NewPerson };
+</script>
+
 <script lang="ts">
     import isEqual from "lodash.isequal";
     import { createEventDispatcher } from "svelte";
-    import { NewPerson, StoredPerson } from "../model";
 
     const dispatch = createEventDispatcher();
     export let maxPeopleCount: number;
@@ -85,7 +90,7 @@
 
         selectedPeople = nonEmptySelections.length < maxPeopleCount ? [...nonEmptySelections, new EmptyPersonSelection()] : nonEmptySelections;
 
-        dispatch("personChanged", { index: personIndex, descr: newP });
+        dispatch("personChanged", { index: personIndex, descr: newP } as PersonChangedEvent);
     }
 
     export function propose(personIndex: number, descr: StoredPerson[]) {
