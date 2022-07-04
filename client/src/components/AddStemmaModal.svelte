@@ -38,41 +38,20 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addStemmaLabel">
-                    Добавить новую родословную
-                </h5>
+                <h5 class="modal-title" id="addStemmaLabel">Добавить новую родословную</h5>
                 {#if !forceAdd}
-                    <button
-                        type="button"
-                        class="btn-close"
-                        data-bs-dismiss="modal"
-                        aria-label="Close"
-                    />
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
                 {/if}
             </div>
             <div class="modal-body">
-                <label for="stemmaNameInput" class="form-label"
-                    >Название родословной</label
-                >
-                <input
-                    class="form-control"
-                    id="stemmaNameInput"
-                    bind:this={input}
-                />
+                <label for="stemmaNameInput" class="form-label">Название родословной</label>
+                <input class="form-control" id="stemmaNameInput" bind:this={input} />
             </div>
             <div class="modal-footer">
                 {#if !forceAdd}
-                    <button
-                        type="button"
-                        class="btn btn-secondary"
-                        data-bs-dismiss="modal">Отмена</button
-                    >
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
                 {/if}
-                <button
-                    type="button"
-                    class="btn btn-primary"
-                    on:click={handleAddStemmaClick}>Добавить</button
-                >
+                <button type="button" class="btn btn-primary" on:click={handleAddStemmaClick}>Добавить</button>
             </div>
         </div>
     </div>
