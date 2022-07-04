@@ -2,7 +2,6 @@
     import isEqual from "lodash.isequal";
     import { createEventDispatcher } from "svelte";
     import { NewPerson, StoredPerson } from "../model";
-    import autocomplete from "autocompleter";
 
     const dispatch = createEventDispatcher();
     export let maxPeopleCount: number;
