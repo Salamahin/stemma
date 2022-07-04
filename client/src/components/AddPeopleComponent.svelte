@@ -110,7 +110,6 @@
                         <input
                             type="text"
                             class="form-control"
-                            placeholder="Иванов Виталий Валерьевич"
                             value={ps.current().name}
                             id={"person_name_" + i}
                             on:input={(e) =>
