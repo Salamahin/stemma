@@ -40,14 +40,7 @@
                     <a class="nav-link active" aria-current="page" href="#">Home</a>
                 </li>
                 <li class="nav-item dropdown">
-                    <a
-                        class="nav-link dropdown-toggle"
-                        href="#"
-                        id="navbarDropdownMenuLink"
-                        role="button"
-                        data-bs-toggle="dropdown"
-                        aria-expanded="false"
-                    >
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         {selectedStemma ? selectedStemma.name : "Родословные"}
                     </a>
                     <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
@@ -61,8 +54,7 @@
                         </li>
 
                         <li>
-                            <a class="dropdown-item" href="#" on:click={() => dispatch("createNewStemma")}>Новая родословная...</a
-                            >
+                            <a class="dropdown-item" href="#" on:click={() => dispatch("createNewStemma")}>Новая родословная...</a>
                         </li>
                     </ul>
                 </li>

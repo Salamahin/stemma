@@ -58,7 +58,6 @@ test("July is the second in her lineage and is a direct relative of Joseph, Jake
 
 test("Generation is selected as max known generations count", () => {
     let lineages = new Lineage(jjFamily).lineages()
-    let xx = lineages.get("Jeff")
     expect(lineages.get("Jeff")).toEqual({
         generation: 4, //Joseph's bloodline
         relativies: new Set(["July", "Jake", "Joseph", "Jill", "James", "Jane", "John", "Jeff"]),

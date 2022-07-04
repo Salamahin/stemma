@@ -41,13 +41,7 @@
 <div class="main-container">
     <div>
         <h1>project stemma</h1>
-        <div
-            class="g-signin2 {signInDisplayBlock}"
-            data-longtitle="true"
-            data-onsuccess="onSignIn"
-            data-width="380"
-            data-height="50"
-        />
+        <div class="g-signin2 {signInDisplayBlock}" data-longtitle="true" data-onsuccess="onSignIn" data-width="380" data-height="50" />
         <div class={loadingSpinnerBlock}>
             <div class="d-flex w-100 justify-content-center">
                 <Circle2 />

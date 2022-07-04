@@ -26,28 +26,15 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="addFamlilyLabel">Добавить семью</h5>
-                <button
-                    type="button"
-                    class="btn-close"
-                    data-bs-dismiss="modal"
-                    aria-label="Close"
-                />
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
             </div>
             <div class="modal-body">
                 <p class="fs-5 text-center">Родители</p>
                 <AddPeopleComponent maxPeopleCount={2} />
             </div>
             <div class="modal-footer">
-                <button
-                    type="button"
-                    class="btn btn-secondary"
-                    data-bs-dismiss="modal">Отмена</button
-                >
-                <button
-                    type="button"
-                    class="btn btn-primary"
-                    on:click={() => promptNewFamily()}>Добавить</button
-                >
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" on:click={() => promptNewFamily()}>Добавить</button>
             </div>
         </div>
     </div>

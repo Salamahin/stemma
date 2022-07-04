@@ -57,11 +57,7 @@
 <main>
     <div class="authenticate-bg {authenticateDisplay}">
         <div class="authenticate-holder">
-            <Authenticate
-                {google_client_id}
-                bind:this={authComponent}
-                on:signIn={handleSignIn}
-            />
+            <Authenticate {google_client_id} bind:this={authComponent} on:signIn={handleSignIn} />
         </div>
     </div>
 
@@ -77,14 +73,9 @@
         />
     </div>
 
-    <AddStemmaModal
-        bind:this={addStemmaModal}
-        on:stemmaAdded={handleNewStemma}
-    />
+    <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={handleNewStemma} />
 
-    <AddFamilyModal
-        bind:this={addFamilyModal}
-    />
+    <AddFamilyModal bind:this={addFamilyModal} />
 
     <GraphField />
 

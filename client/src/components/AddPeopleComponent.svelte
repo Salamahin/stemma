@@ -1,9 +1,11 @@
 <script lang="ts">
     import isEqual from "lodash.isequal";
+    import { createEventDispatcher } from "svelte";
 
+    const dispatch = createEventDispatcher();
     export let maxPeopleCount: number;
 
-    class PersonDescription {
+    export class PersonDescription {
         name: string;
         birthDate: string;
         deathDate: string;
@@ -17,16 +19,80 @@
 
     let nullPerson = new PersonDescription("", "", "");
 
-    let people: PersonDescription[] = [nullPerson];
+    interface PersonSelection {
+        current(): PersonDescription;
+        hasMore(): boolean;
+        isEmpty(): boolean;
+        replace(variants: PersonDescription[]): PersonSelection;
+    }
+
+    class EmptyPersonSelection implements PersonSelection {
+        replace(variants: PersonDescription[]) {
+            return this;
+        }
+
+        hasMore(): boolean {
+            return false;
+        }
+        current(): PersonDescription {
+            return nullPerson;
+        }
+        isEmpty() {
+            return true;
+        }
+    }
+
+    class NonEmptyPersonSelection implements PersonSelection {
+        private selected: number;
+        private variants: PersonDescription[];
+
+        constructor(pd: PersonDescription) {
+            this.selected = 0;
+            this.variants = [pd];
+        }
+
+        current(): PersonDescription {
+            return this.variants[this.selected];
+        }
+
+        hasMore(): boolean {
+            return this.variants.length > 1;
+        }
+
+        next(): PersonDescription {
+            if (this.selected++ > this.variants.length) this.selected = 0;
+            return this.variants[this.selected];
+        }
+
+        replace(variants: PersonDescription[]) {
+            this.variants = [this.current(), ...variants];
+            this.selected = 0;
+            return this;
+        }
+
+        isEmpty() {
+            return false;
+        }
+    }
+
+    let selectedPeople: PersonSelection[] = [new EmptyPersonSelection()];
 
     function onPersonChanged(personIndex: number, name: string, birthDate: string, deathDate: string) {
         let newP = new PersonDescription(name, birthDate, deathDate);
-        console.log(newP);
-        console.log(personIndex);
 
-        people[personIndex] = newP;
-        let nonEmptyPeople = people.filter((p) => !isEqual(p, nullPerson));
-        people = nonEmptyPeople.length < maxPeopleCount ? [...nonEmptyPeople, nullPerson] : nonEmptyPeople;
+        selectedPeople[personIndex] = isEqual(newP, nullPerson) ? new EmptyPersonSelection() : new NonEmptyPersonSelection(newP);
+        let nonEmptySelections = selectedPeople.filter((selection) => !selection.isEmpty());
+
+        selectedPeople = nonEmptySelections.length < maxPeopleCount ? [...nonEmptySelections, new EmptyPersonSelection()] : nonEmptySelections;
+
+        dispatch(
+            "descriptionAdded",
+            nonEmptySelections.map((selection) => selection.current())
+        );
+    }
+
+    export function propose(personIndex: number, descr: PersonDescription[]) {
+        selectedPeople[personIndex] = selectedPeople[personIndex].replace(descr);
     }
 </script>
 
@@ -41,14 +107,14 @@
             </tr>
         </thead>
         <tbody>
-            {#each people as person, i}
+            {#each selectedPeople as ps, i}
                 <tr>
                     <td>
                         <input
                             type="text"
                             class="form-control"
                             placeholder="Иванов Виталий Валерьевич"
-                            value={person.name}
+                            value={ps.current().name}
                             id={"person_name_" + i}
                             on:input={(e) =>
                                 onPersonChanged(
@@ -63,7 +129,7 @@
                         <input
                             class="form-control"
                             type="date"
-                            value={person.birthDate}
+                            value={ps.current().birthDate}
                             id={"person_birthDate_" + i}
                             on:input={(e) =>
                                 onPersonChanged(
@@ -78,7 +144,7 @@
                         <input
                             class="form-control"
                             type="date"
-                            value="{person.deathDate},"
+                            value="{ps.current().deathDate},"
                             id={"person_deathDate_" + i}
                             on:input={(e) =>
                                 onPersonChanged(
@@ -90,7 +156,9 @@
                         />
                     </td>
                     <td>
-                        <button type="button" class="btn btn-outline-primary disabled">Следующее &raquo;</button>
+                        <button type="button" class="btn btn-outline-primary {ps.hasMore() ? '' : 'disabled'}" on:click={dispatch("next", i)}
+                            >Следующее &raquo;</button
+                        >
                     </td>
                 </tr>
             {/each}

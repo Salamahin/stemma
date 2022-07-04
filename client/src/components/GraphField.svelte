@@ -99,9 +99,7 @@
     }
 
     function getNodeColor(node) {
-        return node.type == "person"
-            ? d3.interpolatePlasma(lineages.get(node.id).generation / max_generation)
-            : defaultFamilyColor;
+        return node.type == "person" ? d3.interpolatePlasma(lineages.get(node.id).generation / max_generation) : defaultFamilyColor;
     }
 
     function forceGraph(nodes, links) {
@@ -167,12 +165,8 @@
             .data(links)
             .join("line")
             .attr("stroke", "#c7b7b7")
-            .attr("stroke-width", (relation) =>
-                relation.type == "familyToChild" ? childRelationWidth + "px" : familyRelationWidth + "px"
-            )
-            .attr("marker-end", (relation) =>
-                relation.type == "familyToChild" ? "url(#arrow-to-person)" : "url(#arrow-to-family)"
-            );
+            .attr("stroke-width", (relation) => (relation.type == "familyToChild" ? childRelationWidth + "px" : familyRelationWidth + "px"))
+            .attr("marker-end", (relation) => (relation.type == "familyToChild" ? "url(#arrow-to-person)" : "url(#arrow-to-family)"));
 
         const vertexGroup = svg.append("g").attr("class", "nodes");
 
