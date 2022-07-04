@@ -1,4 +1,10 @@
-export type Person = {
+export type NewPerson = {
+    name: string;
+    birthDate?: string;
+    deathDate?: string;
+}
+
+export type StoredPerson = {
     id: string;
     name: string;
     birthDate?: string;
@@ -12,7 +18,7 @@ export type Family = {
 }
 
 export type Stemma = {
-    people: Person[];
+    people: StoredPerson[];
     families: Family[];
 }
 

@@ -1,4 +1,4 @@
-import { Stemma, Person } from "./model";
+import { Stemma, StoredPerson } from "./model";
 
 export type Generation = {
     generation: number,
@@ -67,7 +67,7 @@ export class Lineage {
         }
     }
 
-    private lineage(p: Person): Generation {
+    private lineage(p: StoredPerson): Generation {
         let dependees = this.computeLineage(p.id, this.parentToChildren)
         let ancestors = this.computeLineage(p.id, this.childToParents)
 

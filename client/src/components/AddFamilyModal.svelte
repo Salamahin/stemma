@@ -31,6 +31,8 @@
             <div class="modal-body">
                 <p class="fs-5 text-center">Родители</p>
                 <AddPeopleComponent maxPeopleCount={2} />
+                <p class="fs-5 text-center mt-5">Дети</p>
+                <AddPeopleComponent maxPeopleCount={20} />
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>

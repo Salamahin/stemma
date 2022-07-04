@@ -1,40 +1,33 @@
 <script lang="ts">
     import isEqual from "lodash.isequal";
     import { createEventDispatcher } from "svelte";
+    import { NewPerson, StoredPerson } from "../model";
 
     const dispatch = createEventDispatcher();
     export let maxPeopleCount: number;
 
-    export class PersonDescription {
-        name: string;
-        birthDate: string;
-        deathDate: string;
-
-        constructor(name, birhtDate, deathDate) {
-            this.name = name;
-            this.birthDate = birhtDate;
-            this.deathDate = deathDate;
-        }
-    }
-
-    let nullPerson = new PersonDescription("", "", "");
+    let nullPerson: NewPerson = {
+        name: "",
+        birthDate: "",
+        deathDate: "",
+    };
 
     interface PersonSelection {
-        current(): PersonDescription;
+        current(): NewPerson | StoredPerson;
         hasMore(): boolean;
         isEmpty(): boolean;
-        replace(variants: PersonDescription[]): PersonSelection;
+        replace(variants: StoredPerson[]): PersonSelection;
     }
 
     class EmptyPersonSelection implements PersonSelection {
-        replace(variants: PersonDescription[]) {
+        replace(variants: StoredPerson[]) {
             return this;
         }
 
         hasMore(): boolean {
             return false;
         }
-        current(): PersonDescription {
+        current(): NewPerson | StoredPerson {
             return nullPerson;
         }
         isEmpty() {
@@ -44,14 +37,14 @@
 
     class NonEmptyPersonSelection implements PersonSelection {
         private selected: number;
-        private variants: PersonDescription[];
+        private variants: (NewPerson | StoredPerson)[];
 
-        constructor(pd: PersonDescription) {
+        constructor(pd: NewPerson) {
             this.selected = 0;
             this.variants = [pd];
         }
 
-        current(): PersonDescription {
+        current(): NewPerson | StoredPerson {
             return this.variants[this.selected];
         }
 
@@ -59,12 +52,12 @@
             return this.variants.length > 1;
         }
 
-        next(): PersonDescription {
+        next(): NewPerson | StoredPerson {
             if (this.selected++ > this.variants.length) this.selected = 0;
             return this.variants[this.selected];
         }
 
-        replace(variants: PersonDescription[]) {
+        replace(variants: StoredPerson[]) {
             this.variants = [this.current(), ...variants];
             this.selected = 0;
             return this;
@@ -78,20 +71,21 @@
     let selectedPeople: PersonSelection[] = [new EmptyPersonSelection()];
 
     function onPersonChanged(personIndex: number, name: string, birthDate: string, deathDate: string) {
-        let newP = new PersonDescription(name, birthDate, deathDate);
+        let newP = {
+            name: name,
+            birthDate: birthDate,
+            deathDate: deathDate,
+        };
 
         selectedPeople[personIndex] = isEqual(newP, nullPerson) ? new EmptyPersonSelection() : new NonEmptyPersonSelection(newP);
         let nonEmptySelections = selectedPeople.filter((selection) => !selection.isEmpty());
 
         selectedPeople = nonEmptySelections.length < maxPeopleCount ? [...nonEmptySelections, new EmptyPersonSelection()] : nonEmptySelections;
 
-        dispatch(
-            "descriptionAdded",
-            nonEmptySelections.map((selection) => selection.current())
-        );
+        dispatch("personChanged", { index: personIndex, descr: newP });
     }
 
-    export function propose(personIndex: number, descr: PersonDescription[]) {
+    export function propose(personIndex: number, descr: StoredPerson[]) {
         selectedPeople[personIndex] = selectedPeople[personIndex].replace(descr);
     }
 </script>
