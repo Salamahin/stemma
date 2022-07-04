@@ -95,16 +95,12 @@
         ];
 
         lineages = new Lineage(stemmaS).lineages();
-        max_generation = Math.max(
-            ...[...lineages.values()].map((p) => p.generation)
-        );
+        max_generation = Math.max(...[...lineages.values()].map((p) => p.generation));
     }
 
     function getNodeColor(node) {
         return node.type == "person"
-            ? d3.interpolatePlasma(
-                  lineages.get(node.id).generation / max_generation
-              )
+            ? d3.interpolatePlasma(lineages.get(node.id).generation / max_generation)
             : defaultFamilyColor;
     }
 
@@ -126,10 +122,7 @@
                 "collide",
                 d3.forceCollide().radius((d) => d.r * 20)
             )
-            .force(
-                "repelForce",
-                d3.forceManyBody().strength(-2500).distanceMin(85)
-            )
+            .force("repelForce", d3.forceManyBody().strength(-2500).distanceMin(85))
             .force("charge", d3.forceManyBody())
             .force("center", d3.forceCenter())
             .on("tick", ticked);
@@ -175,14 +168,10 @@
             .join("line")
             .attr("stroke", "#c7b7b7")
             .attr("stroke-width", (relation) =>
-                relation.type == "familyToChild"
-                    ? childRelationWidth + "px"
-                    : familyRelationWidth + "px"
+                relation.type == "familyToChild" ? childRelationWidth + "px" : familyRelationWidth + "px"
             )
             .attr("marker-end", (relation) =>
-                relation.type == "familyToChild"
-                    ? "url(#arrow-to-person)"
-                    : "url(#arrow-to-family)"
+                relation.type == "familyToChild" ? "url(#arrow-to-person)" : "url(#arrow-to-family)"
             );
 
         const vertexGroup = svg.append("g").attr("class", "nodes");
@@ -217,18 +206,14 @@
                         .filter((t) => !selectedLineage.families.has(t.id))
                         .attr("fill", shadedNodeColor);
 
-                    nodes
-                        .filter((t) => t.id == node.id)
-                        .attr("r", hoveredPersonR);
+                    nodes.filter((t) => t.id == node.id).attr("r", hoveredPersonR);
                 }
             })
             .on("mouseleave", (_event, _node) => {
                 vertices
                     .selectAll("circle")
                     .attr("fill", (node) => getNodeColor(node))
-                    .attr("r", (node) =>
-                        node.type == "person" ? personR : familyR
-                    );
+                    .attr("r", (node) => (node.type == "person" ? personR : familyR));
             });
 
         vertices
@@ -244,10 +229,7 @@
                 .attr("x2", (d) => d.target.x)
                 .attr("y2", (d) => d.target.y);
 
-            vertices.attr(
-                "transform",
-                (d) => "translate(" + d.x + "," + d.y + ")"
-            );
+            vertices.attr("transform", (d) => "translate(" + d.x + "," + d.y + ")");
         }
 
         function drag() {
@@ -268,11 +250,7 @@
                 event.subject.fy = null;
             }
 
-            return d3
-                .drag()
-                .on("start", dragstarted)
-                .on("drag", dragged)
-                .on("end", dragended);
+            return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
         }
     }
 
