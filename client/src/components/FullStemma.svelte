@@ -19,7 +19,7 @@
     export let stemma: Stemma;
 
     let nodes = [];
-    let links = [];
+    let relations = [];
     let lineages = new Map<string, Generation>();
     let max_generation = 0;
 
@@ -37,7 +37,7 @@
             })),
         ];
 
-        links = [
+        relations = [
             ...stemma.families.flatMap((f) =>
                 f.children.map((c) => ({
                     id: `${f.id}_${c}`,
@@ -163,6 +163,26 @@
                         .attr("fill", shadedNodeColor);
 
                     nodes.filter((t) => t.id == node.id).attr("r", hoveredPersonR);
+
+                    svg.selectAll("line")
+                        .filter((t) => {
+                            let relatesToSelectedFamilies = selectedLineage.families.has(t.source.id) || selectedLineage.families.has(t.target.id);
+                            let relatesToSelectedPeople = selectedLineage.relativies.has(t.source.id) || selectedLineage.relativies.has(t.target.id);
+
+                            let related = relatesToSelectedFamilies && relatesToSelectedPeople;
+                            return !related;
+                        })
+                        .attr("stroke", "#c7b7b7")
+                        .attr("stroke-width", "0.1px")
+                        .attr("marker-end", null);
+
+                    vertexGroup
+                        .selectAll("g")
+                        .filter((node) => {
+                            return !selectedLineage.relativies.has(node.id);
+                        })
+                        .selectAll("text")
+                        .style("fill", shadedNodeColor);
                 }
             })
             .on("mouseleave", (_event, _node) => {
@@ -170,6 +190,13 @@
                     .selectAll("circle")
                     .attr("fill", (node) => getNodeColor(node))
                     .attr("r", (node) => (node.type == "person" ? personR : familyR));
+
+                svg.selectAll("line")
+                    .attr("stroke", "#c7b7b7")
+                    .attr("stroke-width", (relation) => (relation.type == "familyToChild" ? childRelationWidth + "px" : familyRelationWidth + "px"))
+                    .attr("marker-end", (relation) => (relation.type == "familyToChild" ? "url(#arrow-to-person)" : "url(#arrow-to-family)"));
+
+                svg.selectAll("text").style("fill", null);
             });
 
         vertices
@@ -177,7 +204,8 @@
             .text((node) => node.name)
             .style("font-size", "15px")
             .attr("dy", personR * 2)
-            .attr("dx", -personR);
+            .attr("dx", -personR)
+            .attr("relatedId", (node) => node.id);
 
         function ticked() {
             link.attr("x1", (d) => d.source.x)
@@ -211,7 +239,7 @@
     }
 
     onMount(() => {
-        forceGraph(nodes, links);
+        forceGraph(nodes, relations);
     });
 </script>
 
