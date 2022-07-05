@@ -97,7 +97,7 @@
                 <th scope="col">Имя</th>
                 <th scope="col">Дата рождения</th>
                 <th scope="col">Дата смерти</th>
-                <th scope="col">Выбор тезки</th>
+                <th scope="col">Tезки</th>
             </tr>
         </thead>
         <tbody>
@@ -131,6 +131,7 @@
                                     e.target.value,
                                     document.getElementById("person_deathDate_" + i).value
                                 )}
+                            readonly={"id" in person.current() ? true : null}
                         />
                     </td>
                     <td>
@@ -146,6 +147,7 @@
                                     document.getElementById("person_birthDate_" + i).value,
                                     e.target.value
                                 )}
+                            readonly={"id" in person.current() ? true : null}
                         />
                     </td>
                     <td style="min-width: 120px;">
