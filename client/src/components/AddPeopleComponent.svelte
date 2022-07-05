@@ -1,15 +1,12 @@
-<script context="module" lang="ts">
-    import { NewPerson, StoredPerson } from "../model";
-
-    export type PersonChangedEvent = { index: number; descr: NewPerson };
-</script>
-
 <script lang="ts">
+    import { NewPerson, Stemma, StoredPerson } from "../model";
     import isEqual from "lodash.isequal";
     import { createEventDispatcher } from "svelte";
 
     const dispatch = createEventDispatcher();
+
     export let maxPeopleCount: number;
+    export let stemma: Stemma;
 
     let nullPerson: NewPerson = {
         name: "",
@@ -17,66 +14,42 @@
         deathDate: "",
     };
 
-    interface PersonSelection {
-        current(): NewPerson | StoredPerson;
-        hasMore(): boolean;
-        isEmpty(): boolean;
-        replace(variants: StoredPerson[]): PersonSelection;
-    }
+    class PersonSelector {
+        private _newP: NewPerson;
+        private _namesakes: StoredPerson[];
+        private _current: NewPerson | StoredPerson;
 
-    class EmptyPersonSelection implements PersonSelection {
-        replace(variants: StoredPerson[]) {
-            return this;
-        }
-
-        hasMore(): boolean {
-            return false;
-        }
-        current(): NewPerson | StoredPerson {
-            return nullPerson;
-        }
-        isEmpty() {
-            return true;
-        }
-    }
-
-    class NonEmptyPersonSelection implements PersonSelection {
-        private selected: number;
-        private stored: StoredPerson[];
-        private newP: NewPerson;
-
-        constructor(pd: NewPerson) {
-            this.selected = 0;
-            this.newP = pd;
-            this.stored = [];
+        constructor(newP: NewPerson, namesakes: StoredPerson[]) {
+            this._newP = newP;
+            this._current = newP;
+            this._namesakes = namesakes;
         }
 
         current(): NewPerson | StoredPerson {
-            if (this.selected == 0) return this.newP;
-            return this.stored[this.selected - 1];
+            return this._current;
         }
 
-        hasMore(): boolean {
-            return this.stored.length > 1;
-        }
-
-        next(): NewPerson | StoredPerson {
-            if (this.selected++ >= this.stored.length) this.selected = 0;
-            return this.current();
-        }
-
-        replace(variants: StoredPerson[]) {
-            this.stored = variants;
-            this.selected = 0;
+        select(n: StoredPerson) {
+            this._current = n;
             return this;
         }
 
-        isEmpty() {
-            return false;
+        reset() {
+            this._current = this._newP;
+            return this;
+        }
+
+        namesakes(): StoredPerson[] {
+            return this._namesakes;
+        }
+
+        isEmpty(): boolean {
+            return isEqual(this._newP, nullPerson);
         }
     }
 
-    let selectedPeople: PersonSelection[] = [new EmptyPersonSelection()];
+    let selectedPeople: PersonSelector[] = [new PersonSelector(nullPerson, [])];
+    let namesakesDescr: string[] = [""];
 
     function onPersonChanged(personIndex: number, name: string, birthDate: string, deathDate: string) {
         let newP = {
@@ -85,37 +58,56 @@
             deathDate: deathDate,
         };
 
-        selectedPeople[personIndex] = isEqual(newP, nullPerson) ? new EmptyPersonSelection() : new NonEmptyPersonSelection(newP);
-        let nonEmptySelections = selectedPeople.filter((selection) => !selection.isEmpty());
+        let namesakes = stemma.people.filter((p) => p.name == newP.name);
 
-        selectedPeople = nonEmptySelections.length < maxPeopleCount ? [...nonEmptySelections, new EmptyPersonSelection()] : nonEmptySelections;
+        let newPs = new PersonSelector(newP, namesakes);
+        selectedPeople[personIndex] = newPs;
 
-        dispatch("personChanged", { index: personIndex, descr: newP } as PersonChangedEvent);
+        selectedPeople = [...selectedPeople.filter((p) => !p.isEmpty()), new PersonSelector(nullPerson, [])];
     }
 
-    export function propose(personIndex: number, descr: StoredPerson[]) {
-        selectedPeople[personIndex] = selectedPeople[personIndex].replace(descr);
+    function fullDescription(ns: StoredPerson) {
+        let selectedPersonId = ns.id;
+
+        let idToName = new Map(stemma.people.map((p) => [p.id, p.name]));
+
+        let parents = stemma.families.filter((f) => f.children.includes(selectedPersonId)).flatMap((f) => f.parents);
+        let children = stemma.families.filter((f) => f.parents.includes(selectedPersonId)).flatMap((f) => f.children);
+
+        let parentsNames = parents.length ? `, родители: ${parents.map((pId) => idToName.get(pId)).join(",")}` : "";
+        let childrenNames = children.length ? `, дети: ${children.map((pId) => idToName.get(pId)).join(",")}` : "";
+
+        return `[${ns.id}] ${ns.name}${parentsNames}${childrenNames}`;
     }
+
+    function shortDescription(ns: StoredPerson) {
+        return `[${ns.id}]`;
+    }
+
+    $: namesakesDescr = selectedPeople.map((x) => {
+        let s = x.current();
+        return "id" in s ? shortDescription(s) : "Новый";
+    });
 </script>
 
 <div>
-    <table class="table">
+    <table class="table table-sm">
         <thead>
             <tr>
                 <th scope="col">Имя</th>
                 <th scope="col">Дата рождения</th>
                 <th scope="col">Дата смерти</th>
-                <th scope="col">Выбор древа</th>
+                <th scope="col">Выбор тезки</th>
             </tr>
         </thead>
         <tbody>
-            {#each selectedPeople as ps, i}
+            {#each selectedPeople as person, i}
                 <tr>
                     <td>
                         <input
                             type="text"
                             class="form-control"
-                            value={ps.current().name}
+                            value={person.current().name}
                             id={"person_name_" + i}
                             on:input={(e) =>
                                 onPersonChanged(
@@ -130,7 +122,7 @@
                         <input
                             class="form-control"
                             type="date"
-                            value={ps.current().birthDate}
+                            value={person.current().birthDate}
                             id={"person_birthDate_" + i}
                             on:input={(e) =>
                                 onPersonChanged(
@@ -145,7 +137,7 @@
                         <input
                             class="form-control"
                             type="date"
-                            value="{ps.current().deathDate},"
+                            value="{person.current().deathDate},"
                             id={"person_deathDate_" + i}
                             on:input={(e) =>
                                 onPersonChanged(
@@ -156,10 +148,22 @@
                                 )}
                         />
                     </td>
-                    <td>
-                        <button type="button" class="btn btn-outline-primary {ps.hasMore() ? '' : 'disabled'}" on:click={dispatch("next", i)}
-                            >Следующее &raquo;</button
-                        >
+                    <td style="min-width: 120px;">
+                        <div class="btn-group dropstart {person.namesakes().length ? '' : 'visually-hidden'}" style="width:100%">
+                            <button type="button" class="btn btn-danger dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                {namesakesDescr[i]}
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#" on:click={(e) => (selectedPeople[i] = selectedPeople[i].reset())}>Новый</a></li>
+                                {#each person.namesakes() as namesake}
+                                    <li>
+                                        <a class="dropdown-item" href="#" on:click={(e) => (selectedPeople[i] = selectedPeople[i].select(namesake))}
+                                            >{fullDescription(namesake)}</a
+                                        >
+                                    </li>
+                                {/each}
+                            </ul>
+                        </div>
                     </td>
                 </tr>
             {/each}

@@ -16,9 +16,6 @@
     let childRelationWidth = 0.5;
     let familyRelationWidth = 2.0;
 
-    //TODO
-    //export let families
-
     export let stemma: Stemma;
 
     let nodes = [];

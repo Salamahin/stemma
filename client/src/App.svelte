@@ -65,9 +65,9 @@
             { id: "kolya", name: "kolya" },
             { id: "masha", name: "masha" },
             { id: "katya", name: "katya" },
-            { id: "petya", name: "petya" },
-            { id: "dasha", name: "dasha" },
-            { id: "lena", name: "lena" },
+            { id: "petya", name: "petya aaaaaaaaaaaaaa" },
+            { id: "dasha", name: "dasha aaaaaaaaaaaaaa" },
+            { id: "lena", name: "lena bbbbbbbbbbbbbbbb" },
         ],
     };
 </script>

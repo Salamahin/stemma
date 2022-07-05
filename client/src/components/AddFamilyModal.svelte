@@ -1,7 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    import { onMount } from "svelte";
-    import AddPeopleComponent, { PersonChangedEvent } from "./AddPeopleComponent.svelte";
+    import AddPeopleComponent from "./AddPeopleComponent.svelte";
     import { Stemma } from "../model";
 
     const dispatch = createEventDispatcher();
@@ -9,11 +8,6 @@
     let modalEl;
     let parentsEl;
     let childrenEl;
-
-    function onPersonChanged(event: PersonChangedEvent, el) {
-        let peopleWithSameName = stemma.people.filter((p) => p.name == event.descr.name);
-        if (peopleWithSameName.length) el.propose(event.index, peopleWithSameName);
-    }
 
     export let stemma: Stemma;
     export function promptNewFamily() {
@@ -39,9 +33,9 @@
             </div>
             <div class="modal-body">
                 <p class="fs-5 text-center">Родители</p>
-                <AddPeopleComponent maxPeopleCount={2} on:personChanged={(e) => onPersonChanged(e.detail, parentsEl)} bind:this={parentsEl} />
+                <AddPeopleComponent maxPeopleCount={2} bind:stemma bind:this={parentsEl} />
                 <p class="fs-5 text-center mt-5">Дети</p>
-                <AddPeopleComponent maxPeopleCount={20} on:personChanged={(e) => onPersonChanged(e.detail, childrenEl)} bind:this={childrenEl} />
+                <AddPeopleComponent maxPeopleCount={20} bind:stemma bind:this={childrenEl} />
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
