@@ -51,6 +51,10 @@
     let selectedPeople: PersonSelector[] = [new PersonSelector(nullPerson, [])];
     let namesakesDescr: string[] = [""];
 
+    export function selected() {
+        return selectedPeople.filter((p) => !p.isEmpty()).map((p) => p.current());
+    }
+
     function onPersonChanged(personIndex: number, name: string, birthDate: string, deathDate: string) {
         let newP = {
             name: name,
@@ -63,8 +67,8 @@
         let newPs = new PersonSelector(newP, namesakes);
         selectedPeople[personIndex] = newPs;
 
-        let nonEmptySelectors = selectedPeople.filter((p) => !p.isEmpty())
-        let nullSelector = nonEmptySelectors.length < maxPeopleCount ? [new PersonSelector(nullPerson, [])] : []
+        let nonEmptySelectors = selectedPeople.filter((p) => !p.isEmpty());
+        let nullSelector = nonEmptySelectors.length < maxPeopleCount ? [new PersonSelector(nullPerson, [])] : [];
 
         selectedPeople = [...nonEmptySelectors, ...nullSelector];
     }

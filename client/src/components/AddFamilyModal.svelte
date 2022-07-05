@@ -1,3 +1,12 @@
+<script context="module" lang="ts">
+    import { NewPerson, StoredPerson } from "../model";
+
+    export type CreateFamily = {
+        parents: (NewPerson | StoredPerson)[];
+        children: (NewPerson | StoredPerson)[];
+    };
+</script>
+
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
     import AddPeopleComponent from "./AddPeopleComponent.svelte";
@@ -11,7 +20,8 @@
 
     export let stemma: Stemma;
     export function promptNewFamily() {
-        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        dispatch("familyAdded", { parents: parentsEl.selected(), children: childrenEl.selected() } as CreateFamily);
     }
 </script>
 

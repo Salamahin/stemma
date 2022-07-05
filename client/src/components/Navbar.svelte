@@ -3,21 +3,12 @@
     import { StemmaDescription, User } from "../model";
 
     export let user: User;
-    export let stemmas: StemmaDescription[];
-    let selectedStemma: StemmaDescription;
+    export let ownedStemmasDescriptions: StemmaDescription[];
+    export let selectedStemmaDescription: StemmaDescription;
 
     const dispatch = createEventDispatcher();
 
-    function handleStemmaSelection(s: StemmaDescription) {
-        selectedStemma = s;
-        dispatch("stemmaSelected", s);
-    }
-
-    export function selectStemma(s: StemmaDescription) {
-        selectedStemma = s;
-    }
-
-    $: if (!selectedStemma) selectedStemma = stemmas[0];
+    $: if (!selectedStemmaDescription && ownedStemmasDescriptions.length) selectedStemmaDescription = ownedStemmasDescriptions[0];
 </script>
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -41,12 +32,12 @@
                 </li>
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        {selectedStemma ? selectedStemma.name : "Родословные"}
+                        {selectedStemmaDescription ? selectedStemmaDescription.name : "Родословные"}
                     </a>
                     <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
-                        {#each stemmas as s}
+                        {#each ownedStemmasDescriptions as s}
                             <li>
-                                <a class="dropdown-item" href="#" on:click={() => handleStemmaSelection(s)}>{s.name}</a>
+                                <a class="dropdown-item" href="#" on:click={() => (selectedStemmaDescription = s)}>{s.name}</a>
                             </li>
                         {/each}
                         <li>

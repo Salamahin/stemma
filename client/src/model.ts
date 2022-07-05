@@ -57,8 +57,30 @@ export class Model {
         return await this.parseResponse<OwnedStemmas>(response);
     }
 
+    async getStemma(stemmaId: string) {
+        const response = await fetch(encodeURI(`${this.endpoint}/stemma/${stemmaId}`), {
+            method: 'GET',
+            headers: this.commonHeader
+        })
+        return await this.parseResponse<Stemma>(response);
+    }
+
+    async createFamily(stemmaId: string, parents: (NewPerson | StoredPerson)[], children: (NewPerson | StoredPerson)[]) {
+        const response = await fetch(encodeURI(`${this.endpoint}/stemma/${stemmaId}/family`), {
+            method: 'POST',
+            headers: this.commonHeader,
+            body: JSON.stringify({
+                "parent1": parents.length > 0 ? parents[0] : null,
+                "parent2": parents.length > 1 ? parents[1] : null,
+                "children": children
+            })
+        })
+
+        return await this.parseResponse<StemmaDescription>(response);
+    }
+
     async addStemma(name: string) {
-        const response = await fetch(`${this.endpoint}/stemma`, {
+        const response = await fetch(encodeURI(`${this.endpoint}/stemma`), {
             method: 'POST',
             headers: this.commonHeader,
             body: JSON.stringify({
@@ -67,15 +89,6 @@ export class Model {
         })
 
         return await this.parseResponse<StemmaDescription>(response);
-    }
-
-    async getStemma(stemmaId: string) {
-        const response = await fetch(`${this.endpoint}/stemma/${stemmaId}`, {
-            method: 'GET',
-            headers: this.commonHeader
-        })
-
-        return await this.parseResponse<Stemma>(response);
     }
 
     private async parseResponse<T>(response: Response) {

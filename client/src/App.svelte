@@ -2,7 +2,7 @@
     import Authenticate from "./components/Authenticate.svelte";
     import Navbar from "./components/Navbar.svelte";
     import AddStemmaModal from "./components/AddStemmaModal.svelte";
-    import AddFamilyModal from "./components/AddFamilyModal.svelte";
+    import AddFamilyModal, { CreateFamily } from "./components/AddFamilyModal.svelte";
     import FullStemma from "./components/FullStemma.svelte";
     import { Model, StemmaDescription, User, Stemma } from "./model";
 
@@ -13,18 +13,19 @@
     let authComponent;
     let addStemmaModal;
     let addFamilyModal;
-    let navbarComponent;
 
-    //model
     let model: Model;
     let user: User = {
         name: "john doe",
         id_token: "",
         image_url: "",
     };
+
     let signedIn = false;
-    let ownedStemmas: StemmaDescription[] = [];
-    let selectedStemma: Stemma;
+
+    let ownedStemmasDescriptions: StemmaDescription[] = [];
+    let selectedStemmaDescription: StemmaDescription;
+    let selectedStemma: Stemma = { people: [], families: [] };
 
     //handlers
     function handleSignIn(event: CustomEvent) {
@@ -32,8 +33,8 @@
         signedIn = true;
         model = new Model(stemma_backend_url, user);
         model.listStemmas().then((stemmas) => {
-            ownedStemmas = stemmas.stemmas;
-            if (ownedStemmas.length == 0) addStemmaModal.promptNewStemma(true);
+            ownedStemmasDescriptions = stemmas.stemmas;
+            if (ownedStemmasDescriptions.length == 0) addStemmaModal.promptNewStemma(true);
         });
     }
 
@@ -44,50 +45,34 @@
 
     function handleNewStemma(event: CustomEvent<string>) {
         let name = event.detail;
-        model.addStemma(name).then((stemma) => {
-            ownedStemmas = [...ownedStemmas, stemma];
-            navbarComponent.selectStemma(stemma);
+        model.addStemma(name).then((newStemmaDescription) => {
+            ownedStemmasDescriptions = [...ownedStemmasDescriptions, newStemmaDescription];
+            selectedStemmaDescription = newStemmaDescription;
         });
     }
 
-    $: authenticateDisplay = !signedIn ? "d-block" : "d-none";
-    $: workspaceDisplay = signedIn ? "d-block" : "d-none";
-    $: selectedStemma = {
-        families: [
-            { id: "f1", parents: ["petya"], children: ["ivan1"] },
-            { id: "f2", parents: ["kolya", "masha"], children: ["katya"] },
-            { id: "f3", parents: ["katya", "dasha"], children: ["ivan2"] },
-            { id: "f4", parents: ["katya", "ivan1"], children: ["lena"] },
-        ],
-        people: [
-            { id: "ivan1", name: "ivan" },
-            { id: "ivan2", name: "ivan" },
-            { id: "kolya", name: "kolya" },
-            { id: "masha", name: "masha" },
-            { id: "katya", name: "katya" },
-            { id: "petya", name: "petya aaaaaaaaaaaaaa" },
-            { id: "dasha", name: "dasha aaaaaaaaaaaaaa" },
-            { id: "lena", name: "lena bbbbbbbbbbbbbbbb" },
-        ],
-    };
+    function handleNewFamilyCreation(event: CustomEvent<CreateFamily>) {
+        model.createFamily(selectedStemmaDescription.id, event.detail.parents, event.detail.children).then((stemma) => {});
+    }
+
+    $: {
+        if (selectedStemmaDescription) model.getStemma(selectedStemmaDescription.id).then((s) => (selectedStemma = s));
+    }
 </script>
 
 <main>
-    <div class="authenticate-bg {authenticateDisplay}">
+    <div class="authenticate-bg {!signedIn ? 'd-block' : 'd-none'}">
         <div class="authenticate-holder">
             <Authenticate {google_client_id} bind:this={authComponent} on:signIn={handleSignIn} />
         </div>
     </div>
 
-    <div class={workspaceDisplay}>
+    <div class={signedIn ? "d-block" : "d-none"}>
         <Navbar
             {user}
-            stemmas={ownedStemmas}
-            bind:this={navbarComponent}
+            bind:ownedStemmasDescriptions
+            bind:selectedStemmaDescription
             on:signOut={handleSignOut}
-            on:stemmaSelected={(stemma) => {
-                // selectedStemma = stemma; //FIXME uncomment
-            }}
             on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
             on:createNewFamily={() => addFamilyModal.promptNewFamily()}
         />

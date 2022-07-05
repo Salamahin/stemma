@@ -1,7 +1,7 @@
 package io.github.salamahin.stemma.domain
 
-import io.circe.Encoder
-import io.circe.generic.extras.semiauto.deriveConfiguredEncoder
+import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
+import io.circe.{Decoder, Encoder}
 
 import java.time.LocalDate
 
@@ -11,4 +11,5 @@ final case class CreateNewPerson(name: String, birthDate: Option[LocalDate], dea
 
 object PersonDefinition extends Discriminated {
   implicit val encoder: Encoder[PersonDefinition] = deriveConfiguredEncoder[PersonDefinition]
+  implicit val decoder: Decoder[PersonDefinition] = deriveConfiguredDecoder[PersonDefinition]
 }
