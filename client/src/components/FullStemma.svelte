@@ -65,8 +65,8 @@
     }
 
     function forceGraph(nodes, links) {
-        const width = window.innerWidth,
-            height = window.innerHeight;
+        const width = window.innerWidth - 200,
+            height = window.innerHeight - 200;
 
         const simulation = d3
             .forceSimulation(nodes)
@@ -243,11 +243,6 @@
     });
 </script>
 
-<svg id="chart" />
-
-<style>
-    #chart {
-        width: 100%;
-        height: 100%;
-    }
-</style>
+<div id="outer">
+    <svg id="chart" class="w-100"/>
+</div>
