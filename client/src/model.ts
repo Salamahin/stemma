@@ -58,7 +58,7 @@ export class Model {
     }
 
     async getStemma(stemmaId: string) {
-        const response = await fetch(encodeURI(`${this.endpoint}/stemma/${stemmaId}`), {
+        const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}`, {
             method: 'GET',
             headers: this.commonHeader
         })
@@ -66,7 +66,7 @@ export class Model {
     }
 
     async createFamily(stemmaId: string, parents: (NewPerson | StoredPerson)[], children: (NewPerson | StoredPerson)[]) {
-        const response = await fetch(encodeURI(`${this.endpoint}/stemma/${stemmaId}/family`), {
+        const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/family`, {
             method: 'POST',
             headers: this.commonHeader,
             body: JSON.stringify({
@@ -76,11 +76,11 @@ export class Model {
             })
         })
 
-        return await this.parseResponse<StemmaDescription>(response);
+        return await this.parseResponse<Stemma>(response);
     }
 
     async addStemma(name: string) {
-        const response = await fetch(encodeURI(`${this.endpoint}/stemma`), {
+        const response = await fetch(`${this.endpoint}/stemma`, {
             method: 'POST',
             headers: this.commonHeader,
             body: JSON.stringify({

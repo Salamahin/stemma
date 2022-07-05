@@ -20,7 +20,11 @@
 
     export let stemma: Stemma;
     export function promptNewFamily() {
-        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+    
+    function familyCreated() {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
         dispatch("familyAdded", { parents: parentsEl.selected(), children: childrenEl.selected() } as CreateFamily);
     }
 </script>
@@ -49,7 +53,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary" on:click={() => promptNewFamily()}>Добавить</button>
+                <button type="button" class="btn btn-primary" on:click={() => familyCreated()}>Добавить</button>
             </div>
         </div>
     </div>

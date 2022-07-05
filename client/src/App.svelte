@@ -52,7 +52,7 @@
     }
 
     function handleNewFamilyCreation(event: CustomEvent<CreateFamily>) {
-        model.createFamily(selectedStemmaDescription.id, event.detail.parents, event.detail.children).then((stemma) => {});
+        model.createFamily(selectedStemmaDescription.id, event.detail.parents, event.detail.children).then((s) => (selectedStemma = s));
     }
 
     $: {
@@ -80,7 +80,7 @@
 
     <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={handleNewStemma} />
 
-    <AddFamilyModal bind:this={addFamilyModal} bind:stemma={selectedStemma} />
+    <AddFamilyModal bind:this={addFamilyModal} bind:stemma={selectedStemma} on:familyAdded={(e) => handleNewFamilyCreation(e)} />
 
     <FullStemma bind:stemma={selectedStemma} />
 

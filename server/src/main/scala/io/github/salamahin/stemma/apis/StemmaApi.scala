@@ -17,41 +17,45 @@ object StemmaApi extends LazyLogging {
     def unapply(param: String) = Some(URLDecoder.decode(param, "UTF-8"))
   }
 
-  private def jsonify[R, T: Encoder](effect: ZIO[R, StemmaError, T]) = {
-    effect.mapBoth(
-      error => HttpError.BadRequest((error: StemmaError).asJson.noSpaces),
-      stemmas => Response.json(stemmas.asJson.noSpaces)
-    )
+  implicit class StemmaOperationSyntax[R, T: Encoder](effect: ZIO[R, StemmaError, T]) {
+    def toResponse() =
+      effect
+        .mapError(err => { logger.error(s"Service error: $err"); err })
+        .mapBoth(
+          error => HttpError.BadRequest((error: StemmaError).asJson.noSpaces),
+          stemmas => Response.json(stemmas.asJson.noSpaces)
+        )
   }
 
   def api(user: User) =
     Http.collectZIO[Request] {
       case Method.GET -> !! / "stemma" =>
         logger.info(s"User ${user.userId} asked for owned stemmas")
-
-        jsonify {
-          ZIO
-            .service[StemmaService]
-            .flatMap(_.listOwnedStemmas(user.userId))
-        }
+        ZIO
+          .service[StemmaService]
+          .flatMap(_.listOwnedStemmas(user.userId))
+          .toResponse()
 
       case req @ Method.POST -> !! / "stemma" =>
         logger.info(s"User ${user.userId} requested a new stemma creation")
-
-        val newGraph = for {
+        (for {
           body       <- req.bodyAsString.mapError(err => UnknownError(err))
           stemmaName <- ZIO.fromEither(decode[CreateStemma](body)).mapError(err => UnknownError(err))
           s          <- ZIO.service[StemmaService]
           stemmaId   <- s.createStemma(user.userId, stemmaName.name)
           _          = logger.debug(s"User ${user.userId} created a new stemma with id = $stemmaId, name = $stemmaName")
-        } yield StemmaDescription(stemmaId, stemmaName.name)
+        } yield StemmaDescription(stemmaId, stemmaName.name)).toResponse()
 
-        jsonify(newGraph)
+      case Method.GET -> !! / "stemma" / queryParam(stemmaId) =>
+        logger.info(s"User ${user.userId} requested stemma data with stemmaId = $stemmaId")
+        ZIO
+          .service[StemmaService]
+          .flatMap(_.stemma(user.userId, stemmaId))
+          .toResponse()
 
-      case req @ Method.POST -> !! / "stemma" / queryParam(stemmaId) =>
+      case req @ Method.POST -> !! / "stemma" / queryParam(stemmaId) / "family" =>
         logger.info(s"User ${user.userId} requested a new family creation")
-
-        val updatedGraph = for {
+        (for {
           body     <- req.bodyAsString.mapError(err => UnknownError(err))
           family   <- ZIO.fromEither(decode[CreateFamily](body)).mapError(err => UnknownError(err))
           s        <- ZIO.service[StemmaService]
@@ -59,8 +63,6 @@ object StemmaApi extends LazyLogging {
           _        = logger.debug(s"User ${user.userId} created a new family with id = $familyId")
 
           stemma <- s.stemma(user.userId, stemmaId)
-        } yield stemma
-
-        jsonify(updatedGraph)
+        } yield stemma).toResponse()
     }
 }

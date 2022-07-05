@@ -1,7 +1,7 @@
 package io.github.salamahin.stemma
 
 import com.typesafe.scalalogging.LazyLogging
-import io.github.salamahin.stemma.apis.{StemmaApi, OAuth}
+import io.github.salamahin.stemma.apis.{OAuth, StemmaApi}
 import io.github.salamahin.stemma.service._
 import zhttp.http.Middleware.cors
 import zhttp.http.middleware.Cors.CorsConfig

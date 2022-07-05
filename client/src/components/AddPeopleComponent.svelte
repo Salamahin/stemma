@@ -1,17 +1,14 @@
 <script lang="ts">
     import { NewPerson, Stemma, StoredPerson } from "../model";
     import isEqual from "lodash.isequal";
-    import { createEventDispatcher } from "svelte";
-
-    const dispatch = createEventDispatcher();
 
     export let maxPeopleCount: number;
     export let stemma: Stemma;
 
     let nullPerson: NewPerson = {
         name: "",
-        birthDate: "",
-        deathDate: "",
+        birthDate: null,
+        deathDate: null,
     };
 
     class PersonSelector {
@@ -55,11 +52,15 @@
         return selectedPeople.filter((p) => !p.isEmpty()).map((p) => p.current());
     }
 
+    function isEmpty(str: string) {
+        return !str || str.length === 0;
+    }
+
     function onPersonChanged(personIndex: number, name: string, birthDate: string, deathDate: string) {
         let newP = {
             name: name,
-            birthDate: birthDate,
-            deathDate: deathDate,
+            birthDate: isEmpty(birthDate) ? null : birthDate,
+            deathDate: isEmpty(deathDate) ? null : deathDate,
         };
 
         let namesakes = stemma.people.filter((p) => p.name == newP.name);
