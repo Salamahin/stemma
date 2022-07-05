@@ -63,7 +63,10 @@
         let newPs = new PersonSelector(newP, namesakes);
         selectedPeople[personIndex] = newPs;
 
-        selectedPeople = [...selectedPeople.filter((p) => !p.isEmpty()), new PersonSelector(nullPerson, [])];
+        let nonEmptySelectors = selectedPeople.filter((p) => !p.isEmpty())
+        let nullSelector = nonEmptySelectors.length < maxPeopleCount ? [new PersonSelector(nullPerson, [])] : []
+
+        selectedPeople = [...nonEmptySelectors, ...nullSelector];
     }
 
     function fullDescription(ns: StoredPerson) {
@@ -91,7 +94,7 @@
 </script>
 
 <div>
-    <table class="table table-sm">
+    <table class="table">
         <thead>
             <tr>
                 <th scope="col">Имя</th>
