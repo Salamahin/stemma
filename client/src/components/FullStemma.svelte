@@ -86,7 +86,7 @@
                 "collide",
                 d3.forceCollide().radius((d) => d.r * 20)
             )
-            .force("repelForce", d3.forceManyBody())
+            .force("repelForce", d3.forceManyBody().strength(-300).distanceMin(20).distanceMax(200))
             .force("charge", d3.forceManyBody())
             .force("center", d3.forceCenter())
             .on("tick", () => {
