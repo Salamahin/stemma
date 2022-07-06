@@ -18,14 +18,21 @@
     let parentsEl;
     let childrenEl;
 
+    let selectedParents: (NewPerson | StoredPerson)[] = [];
+    let selectedChildren: (NewPerson | StoredPerson)[] = [];
+
     export let stemma: Stemma;
     export function promptNewFamily() {
+        parentsEl.reset();
+        childrenEl.reset();
+        selectedParents = [];
+        selectedChildren = [];
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
     function familyCreated() {
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-        dispatch("familyAdded", { parents: parentsEl.selected(), children: childrenEl.selected() } as CreateFamily);
+        dispatch("familyAdded", { parents: selectedParents, children: selectedChildren } as CreateFamily);
     }
 </script>
 
@@ -47,13 +54,15 @@
             </div>
             <div class="modal-body">
                 <p class="fs-5 text-center">Родители</p>
-                <AddPeopleComponent maxPeopleCount={2} bind:stemma bind:this={parentsEl} />
+                <AddPeopleComponent maxPeopleCount={2} bind:stemma bind:this={parentsEl} on:selectionChanged={(e) => (selectedParents = e.detail)} />
                 <p class="fs-5 text-center mt-5">Дети</p>
-                <AddPeopleComponent maxPeopleCount={20} bind:stemma bind:this={childrenEl} />
+                <AddPeopleComponent maxPeopleCount={20} bind:stemma bind:this={childrenEl} on:selectionChanged={(e) => (selectedChildren = e.detail)} />
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary" on:click={() => familyCreated()}>Добавить</button>
+                <button type="button" class="btn btn-primary" on:click={() => familyCreated()} disabled={selectedParents.length + selectedChildren.length < 2}
+                    >Добавить</button
+                >
             </div>
         </div>
     </div>

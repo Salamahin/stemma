@@ -1,9 +1,12 @@
 <script lang="ts">
     import { NewPerson, Stemma, StoredPerson } from "../model";
     import isEqual from "lodash.isequal";
+    import { createEventDispatcher } from "svelte";
 
     export let maxPeopleCount: number;
     export let stemma: Stemma;
+
+    const dispatch = createEventDispatcher();
 
     let nullPerson: NewPerson = {
         name: "",
@@ -45,11 +48,11 @@
         }
     }
 
-    let selectedPeople: PersonSelector[] = [new PersonSelector(nullPerson, [])];
+    let selectors: PersonSelector[] = [new PersonSelector(nullPerson, [])];
     let namesakesDescr: string[] = [""];
 
-    export function selected() {
-        return selectedPeople.filter((p) => !p.isEmpty()).map((p) => p.current());
+    export function reset() {
+        selectors = [new PersonSelector(nullPerson, [])];
     }
 
     function isEmpty(str: string) {
@@ -66,12 +69,13 @@
         let namesakes = stemma.people.filter((p) => p.name == newP.name);
 
         let newPs = new PersonSelector(newP, namesakes);
-        selectedPeople[personIndex] = newPs;
+        selectors[personIndex] = newPs;
 
-        let nonEmptySelectors = selectedPeople.filter((p) => !p.isEmpty());
+        let nonEmptySelectors = selectors.filter((p) => !p.isEmpty());
         let nullSelector = nonEmptySelectors.length < maxPeopleCount ? [new PersonSelector(nullPerson, [])] : [];
 
-        selectedPeople = [...nonEmptySelectors, ...nullSelector];
+        selectors = [...nonEmptySelectors, ...nullSelector];
+        dispatch("selectionChanged", nonEmptySelectors.map((p) => p.current()))
     }
 
     function fullDescription(ns: StoredPerson) {
@@ -92,7 +96,7 @@
         return `[${ns.id}]`;
     }
 
-    $: namesakesDescr = selectedPeople.map((x) => {
+    $: namesakesDescr = selectors.map((x) => {
         let s = x.current();
         return "id" in s ? shortDescription(s) : "Новый";
     });
@@ -109,7 +113,7 @@
             </tr>
         </thead>
         <tbody>
-            {#each selectedPeople as person, i}
+            {#each selectors as person, i}
                 <tr>
                     <td>
                         <input
@@ -164,10 +168,10 @@
                                 {namesakesDescr[i]}
                             </button>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="#" on:click={(e) => (selectedPeople[i] = selectedPeople[i].reset())}>Новый</a></li>
+                                <li><a class="dropdown-item" href="#" on:click={(e) => (selectors[i] = selectors[i].reset())}>Новый</a></li>
                                 {#each person.namesakes() as namesake}
                                     <li>
-                                        <a class="dropdown-item" href="#" on:click={(e) => (selectedPeople[i] = selectedPeople[i].select(namesake))}
+                                        <a class="dropdown-item" href="#" on:click={(e) => (selectors[i] = selectors[i].select(namesake))}
                                             >{fullDescription(namesake)}</a
                                         >
                                     </li>
