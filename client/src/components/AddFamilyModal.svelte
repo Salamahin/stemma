@@ -22,9 +22,9 @@
     export function promptNewFamily() {
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
-    
+
     function familyCreated() {
-        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
         dispatch("familyAdded", { parents: parentsEl.selected(), children: childrenEl.selected() } as CreateFamily);
     }
 </script>

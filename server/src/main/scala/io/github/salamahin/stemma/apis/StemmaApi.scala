@@ -60,7 +60,7 @@ object StemmaApi extends LazyLogging {
           family   <- ZIO.fromEither(decode[CreateFamily](body)).mapError(err => UnknownError(err))
           s        <- ZIO.service[StemmaService]
           familyId <- s.createFamily(user.userId, stemmaId, family)
-          _        = logger.debug(s"User ${user.userId} created a new family with id = $familyId")
+          _        = logger.debug(s"User ${user.userId} created a new family with descr = $familyId")
 
           stemma <- s.stemma(user.userId, stemmaId)
         } yield stemma).toResponse()

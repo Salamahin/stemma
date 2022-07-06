@@ -23,6 +23,10 @@
     let lineages = new Map<string, Generation>();
     let max_generation = 0;
 
+    let svg;
+    let vertexGroup;
+    let lineGroup;
+
     $: {
         nodes = [
             ...stemma.people.map((p) => ({
@@ -33,7 +37,6 @@
             ...stemma.families.map((f) => ({
                 id: f.id,
                 type: "family",
-                connects: [...f.children, ...f.parents],
             })),
         ];
 
@@ -58,22 +61,108 @@
 
         lineages = new Lineage(stemma).lineages();
         max_generation = Math.max(...[...lineages.values()].map((p) => p.generation));
+
+        forceGraph(nodes, relations);
     }
 
     function getNodeColor(node) {
         return node.type == "person" ? d3.interpolatePlasma(lineages.get(node.id).generation / max_generation) : defaultFamilyColor;
     }
 
-    function forceGraph(nodes, links) {
-        const width = window.innerWidth - 200,
-            height = window.innerHeight - 200;
+    function forceGraph(nodes, relations) {
+        if (!nodes.length) return;
 
-        const simulation = d3
+        svg.selectAll("line")
+            .data(relations, (r) => r.id)
+            .join(
+                (enter) => enter.append("line"),
+                (update) => update,
+                (exit) => exit.remove()
+            )
+            .attr("stroke", "#c7b7b7")
+            .attr("stroke-width", (relation) => (relation.type == "familyToChild" ? childRelationWidth + "px" : familyRelationWidth + "px"))
+            .attr("marker-end", (relation) => (relation.type == "familyToChild" ? "url(#arrow-to-person)" : "url(#arrow-to-family)"));
+
+        svg.selectAll("g")
+            .data(nodes, (n) => n.id)
+            .join(
+                (enter) => {
+                    let g = enter.append("g");
+                    g.append("circle");
+                    g.append("text");
+                },
+                (update) => {
+                    // let g = update.append("g");
+                    // g.append("circle");
+                    // g.append("text");
+                },
+                (exit) => exit.remove()
+            );
+
+        svg.selectAll("text")
+            .text((node) => node.name)
+            .style("font-size", "15px")
+            .attr("dy", personR * 2)
+            .attr("dx", -personR);
+
+        svg.selectAll("circle")
+            .attr("fill", (node) => getNodeColor(node))
+            .attr("r", (node) => (node.type == "person" ? personR : familyR))
+            .on("mouseenter", (event, node) => {
+                if (node.type == "person") {
+                    let selectedLineage = lineages.get(node.id);
+
+                    let circles = svg.selectAll("circle");
+
+                    circles
+                        .filter((t) => t.type == "person")
+                        .filter((t) => !selectedLineage.relativies.has(t.id))
+                        .attr("fill", shadedNodeColor);
+
+                    circles
+                        .filter((t) => t.type == "family")
+                        .filter((t) => !selectedLineage.families.has(t.id))
+                        .attr("fill", shadedNodeColor);
+
+                    circles.filter((t) => t.id == node.id).attr("r", hoveredPersonR);
+
+                    svg.selectAll("line")
+                        .filter((t) => {
+                            let relatesToSelectedFamilies = selectedLineage.families.has(t.source.id) || selectedLineage.families.has(t.target.id);
+                            let relatesToSelectedPeople = selectedLineage.relativies.has(t.source.id) || selectedLineage.relativies.has(t.target.id);
+
+                            let related = relatesToSelectedFamilies && relatesToSelectedPeople;
+                            return !related;
+                        })
+                        .attr("stroke", "#c7b7b7")
+                        .attr("stroke-width", "0.1px")
+                        .attr("marker-end", null);
+
+                    svg.selectAll("g")
+                        .filter((node) => !selectedLineage.relativies.has(node.id))
+                        .select("text")
+                        .style("fill", shadedNodeColor);
+                }
+            })
+            .on("mouseleave", (_event, _node) => {
+                svg.selectAll("circle")
+                    .attr("fill", (node) => getNodeColor(node))
+                    .attr("r", (node) => (node.type == "person" ? personR : familyR));
+
+                svg.selectAll("line")
+                    .attr("stroke", "#c7b7b7")
+                    .attr("stroke-width", (relation) => (relation.type == "familyToChild" ? childRelationWidth + "px" : familyRelationWidth + "px"))
+                    .attr("marker-end", (relation) => (relation.type == "familyToChild" ? "url(#arrow-to-person)" : "url(#arrow-to-family)"));
+
+                svg.selectAll("text").style("fill", null);
+            });
+
+        let simulation = d3
             .forceSimulation(nodes)
             .force(
                 "link",
                 d3
-                    .forceLink(links)
+                    .forceLink(relations)
                     .id((node) => node.id)
                     .distance(100)
                     .strength(1.5)
@@ -82,12 +171,48 @@
                 "collide",
                 d3.forceCollide().radius((d) => d.r * 20)
             )
-            .force("repelForce", d3.forceManyBody().strength(-300).distanceMin(20))
+            .force("repelForce", d3.forceManyBody())
             .force("charge", d3.forceManyBody())
             .force("center", d3.forceCenter())
-            .on("tick", ticked);
+            .on("tick", () => {
+                svg.selectAll("line")
+                    .attr("x1", (d) => d.source.x)
+                    .attr("y1", (d) => d.source.y)
+                    .attr("x2", (d) => d.target.x)
+                    .attr("y2", (d) => d.target.y);
 
-        const svg = d3
+                svg.selectAll("g").attr("transform", (d) => "translate(" + d.x + "," + d.y + ")");
+            });
+
+        function drag() {
+            function dragstarted(event) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                event.subject.fx = event.subject.x;
+                event.subject.fy = event.subject.y;
+            }
+
+            function dragged(event) {
+                event.subject.fx = event.x;
+                event.subject.fy = event.y;
+            }
+
+            function dragended(event) {
+                if (!event.active) simulation.alphaTarget(0);
+                event.subject.fx = null;
+                event.subject.fy = null;
+            }
+
+            return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
+        }
+
+        svg.selectAll("circle").call(drag());
+    }
+
+    onMount(() => {
+        const width = window.innerWidth - 200,
+            height = window.innerHeight - 200;
+
+        svg = d3
             .select("#chart")
             .attr("width", width)
             .attr("height", height)
@@ -120,129 +245,9 @@
             .style("fill", relationsColor)
             .append("path")
             .attr("d", "M 0 0 L 10 3 L 0 6 Z");
-
-        const link = svg
-            .append("g")
-            .selectAll("line")
-            .data(links)
-            .join("line")
-            .attr("stroke", "#c7b7b7")
-            .attr("stroke-width", (relation) => (relation.type == "familyToChild" ? childRelationWidth + "px" : familyRelationWidth + "px"))
-            .attr("marker-end", (relation) => (relation.type == "familyToChild" ? "url(#arrow-to-person)" : "url(#arrow-to-family)"));
-
-        const vertexGroup = svg.append("g").attr("class", "nodes");
-
-        const vertices = vertexGroup
-            .selectAll("g")
-            .data(nodes)
-            .join(
-                (enter) => enter.append("g"),
-                (update) => update,
-                (exit) => exit.remove()
-            )
-            .call(drag());
-
-        vertices
-            .append("circle")
-            .attr("fill", (node) => getNodeColor(node))
-            .attr("r", (node) => (node.type == "person" ? personR : familyR))
-            .on("mouseenter", (event, node) => {
-                if (node.type == "person") {
-                    let selectedLineage = lineages.get(node.id);
-
-                    let nodes = vertices.selectAll("circle");
-
-                    nodes
-                        .filter((t) => t.type == "person")
-                        .filter((t) => !selectedLineage.relativies.has(t.id))
-                        .attr("fill", shadedNodeColor);
-
-                    nodes
-                        .filter((t) => t.type == "family")
-                        .filter((t) => !selectedLineage.families.has(t.id))
-                        .attr("fill", shadedNodeColor);
-
-                    nodes.filter((t) => t.id == node.id).attr("r", hoveredPersonR);
-
-                    svg.selectAll("line")
-                        .filter((t) => {
-                            let relatesToSelectedFamilies = selectedLineage.families.has(t.source.id) || selectedLineage.families.has(t.target.id);
-                            let relatesToSelectedPeople = selectedLineage.relativies.has(t.source.id) || selectedLineage.relativies.has(t.target.id);
-
-                            let related = relatesToSelectedFamilies && relatesToSelectedPeople;
-                            return !related;
-                        })
-                        .attr("stroke", "#c7b7b7")
-                        .attr("stroke-width", "0.1px")
-                        .attr("marker-end", null);
-
-                    vertexGroup
-                        .selectAll("g")
-                        .filter((node) => {
-                            return !selectedLineage.relativies.has(node.id);
-                        })
-                        .selectAll("text")
-                        .style("fill", shadedNodeColor);
-                }
-            })
-            .on("mouseleave", (_event, _node) => {
-                vertices
-                    .selectAll("circle")
-                    .attr("fill", (node) => getNodeColor(node))
-                    .attr("r", (node) => (node.type == "person" ? personR : familyR));
-
-                svg.selectAll("line")
-                    .attr("stroke", "#c7b7b7")
-                    .attr("stroke-width", (relation) => (relation.type == "familyToChild" ? childRelationWidth + "px" : familyRelationWidth + "px"))
-                    .attr("marker-end", (relation) => (relation.type == "familyToChild" ? "url(#arrow-to-person)" : "url(#arrow-to-family)"));
-
-                svg.selectAll("text").style("fill", null);
-            });
-
-        vertices
-            .append("text")
-            .text((node) => node.name)
-            .style("font-size", "15px")
-            .attr("dy", personR * 2)
-            .attr("dx", -personR)
-            .attr("relatedId", (node) => node.id);
-
-        function ticked() {
-            link.attr("x1", (d) => d.source.x)
-                .attr("y1", (d) => d.source.y)
-                .attr("x2", (d) => d.target.x)
-                .attr("y2", (d) => d.target.y);
-
-            vertices.attr("transform", (d) => "translate(" + d.x + "," + d.y + ")");
-        }
-
-        function drag() {
-            function dragstarted(event) {
-                if (!event.active) simulation.alphaTarget(0.3).restart();
-                event.subject.fx = event.subject.x;
-                event.subject.fy = event.subject.y;
-            }
-
-            function dragged(event) {
-                event.subject.fx = event.x;
-                event.subject.fy = event.y;
-            }
-
-            function dragended(event) {
-                if (!event.active) simulation.alphaTarget(0);
-                event.subject.fx = null;
-                event.subject.fy = null;
-            }
-
-            return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
-        }
-    }
-
-    onMount(() => {
-        forceGraph(nodes, relations);
     });
 </script>
 
 <div id="outer">
-    <svg id="chart" class="w-100"/>
+    <svg id="chart" class="w-100" />
 </div>
