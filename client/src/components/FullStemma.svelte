@@ -72,91 +72,6 @@
     function forceGraph(nodes, relations) {
         if (!nodes.length) return;
 
-        svg.selectAll("line")
-            .data(relations, (r) => r.id)
-            .join(
-                (enter) => enter.append("line"),
-                (update) => update,
-                (exit) => exit.remove()
-            )
-            .attr("stroke", "#c7b7b7")
-            .attr("stroke-width", (relation) => (relation.type == "familyToChild" ? childRelationWidth + "px" : familyRelationWidth + "px"))
-            .attr("marker-end", (relation) => (relation.type == "familyToChild" ? "url(#arrow-to-person)" : "url(#arrow-to-family)"));
-
-        svg.selectAll("g")
-            .data(nodes, (n) => n.id)
-            .join(
-                (enter) => {
-                    let g = enter.append("g");
-                    g.append("circle");
-                    g.append("text");
-                },
-                (update) => {
-                    // let g = update.append("g");
-                    // g.append("circle");
-                    // g.append("text");
-                },
-                (exit) => exit.remove()
-            );
-
-        svg.selectAll("text")
-            .text((node) => node.name)
-            .style("font-size", "15px")
-            .attr("dy", personR * 2)
-            .attr("dx", -personR);
-
-        svg.selectAll("circle")
-            .attr("fill", (node) => getNodeColor(node))
-            .attr("r", (node) => (node.type == "person" ? personR : familyR))
-            .on("mouseenter", (event, node) => {
-                if (node.type == "person") {
-                    let selectedLineage = lineages.get(node.id);
-
-                    let circles = svg.selectAll("circle");
-
-                    circles
-                        .filter((t) => t.type == "person")
-                        .filter((t) => !selectedLineage.relativies.has(t.id))
-                        .attr("fill", shadedNodeColor);
-
-                    circles
-                        .filter((t) => t.type == "family")
-                        .filter((t) => !selectedLineage.families.has(t.id))
-                        .attr("fill", shadedNodeColor);
-
-                    circles.filter((t) => t.id == node.id).attr("r", hoveredPersonR);
-
-                    svg.selectAll("line")
-                        .filter((t) => {
-                            let relatesToSelectedFamilies = selectedLineage.families.has(t.source.id) || selectedLineage.families.has(t.target.id);
-                            let relatesToSelectedPeople = selectedLineage.relativies.has(t.source.id) || selectedLineage.relativies.has(t.target.id);
-
-                            let related = relatesToSelectedFamilies && relatesToSelectedPeople;
-                            return !related;
-                        })
-                        .attr("stroke", "#c7b7b7")
-                        .attr("stroke-width", "0.1px")
-                        .attr("marker-end", null);
-
-                    svg.selectAll("g")
-                        .filter((node) => !selectedLineage.relativies.has(node.id))
-                        .select("text")
-                        .style("fill", shadedNodeColor);
-                }
-            })
-            .on("mouseleave", (_event, _node) => {
-                svg.selectAll("circle")
-                    .attr("fill", (node) => getNodeColor(node))
-                    .attr("r", (node) => (node.type == "person" ? personR : familyR));
-
-                svg.selectAll("line")
-                    .attr("stroke", "#c7b7b7")
-                    .attr("stroke-width", (relation) => (relation.type == "familyToChild" ? childRelationWidth + "px" : familyRelationWidth + "px"))
-                    .attr("marker-end", (relation) => (relation.type == "familyToChild" ? "url(#arrow-to-person)" : "url(#arrow-to-family)"));
-
-                svg.selectAll("text").style("fill", null);
-            });
-
         let simulation = d3
             .forceSimulation(nodes)
             .force(
@@ -205,7 +120,93 @@
             return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
         }
 
-        svg.selectAll("circle").call(drag());
+        svg.selectAll("line")
+            .data(relations, (r) => r.id)
+            .join(
+                (enter) => enter.append("line").lower(),
+                (update) => update,
+                (exit) => exit.remove()
+            )
+            .attr("stroke", "#c7b7b7")
+            .attr("stroke-width", (relation) => (relation.type == "familyToChild" ? childRelationWidth + "px" : familyRelationWidth + "px"))
+            .attr("marker-end", (relation) => (relation.type == "familyToChild" ? "url(#arrow-to-person)" : "url(#arrow-to-family)"));
+
+        svg.selectAll("g")
+            .data(nodes, (n) => n.id)
+            .join(
+                (enter) => {
+                    let g = enter.append("g");
+                    g.append("circle");
+                    g.append("text");
+                },
+                (update) => {
+                    // let g = update.append("g");
+                    // g.append("circle");
+                    // g.append("text");
+                },
+                (exit) => exit.remove()
+            );
+
+        svg.selectAll("text")
+            .raise()
+            .text((node) => node.name)
+            .style("font-size", "15px")
+            .attr("dy", personR * 2)
+            .attr("dx", -personR);
+
+        svg.selectAll("circle")
+            .attr("fill", (node) => getNodeColor(node))
+            .attr("r", (node) => (node.type == "person" ? personR : familyR))
+            .on("mouseenter", (event, node) => {
+                if (node.type == "person") {
+                    let selectedLineage = lineages.get(node.id);
+
+                    svg.selectAll("line")
+                        .filter((t) => {
+                            let relatesToSelectedFamilies = selectedLineage.families.has(t.source.id) || selectedLineage.families.has(t.target.id);
+                            let relatesToSelectedPeople = selectedLineage.relativies.has(t.source.id) || selectedLineage.relativies.has(t.target.id);
+
+                            let related = relatesToSelectedFamilies && relatesToSelectedPeople;
+                            return !related;
+                        })
+                        .attr("stroke", "#c7b7b7")
+                        .attr("stroke-width", "0.1px")
+                        .attr("marker-end", null);
+
+                    let circles = svg.selectAll("circle");
+
+                    circles
+                        .filter((t) => t.type == "person")
+                        .filter((t) => !selectedLineage.relativies.has(t.id))
+                        .attr("fill", shadedNodeColor);
+
+                    circles
+                        .filter((t) => t.type == "family")
+                        .filter((t) => !selectedLineage.families.has(t.id))
+                        .attr("fill", shadedNodeColor);
+
+                    circles.filter((t) => t.id == node.id).attr("r", hoveredPersonR);
+
+                    svg.selectAll("g")
+                        .filter((node) => !selectedLineage.relativies.has(node.id))
+                        .select("text")
+                        .style("fill", shadedNodeColor);
+                }
+            })
+            .on("mouseleave", (_event, _node) => {
+                svg.selectAll("line")
+                    .attr("stroke", "#c7b7b7")
+                    .attr("stroke-width", (relation) => (relation.type == "familyToChild" ? childRelationWidth + "px" : familyRelationWidth + "px"))
+                    .attr("marker-end", (relation) => (relation.type == "familyToChild" ? "url(#arrow-to-person)" : "url(#arrow-to-family)"));
+
+                svg.selectAll("circle")
+                    .attr("fill", (node) => getNodeColor(node))
+                    .attr("r", (node) => (node.type == "person" ? personR : familyR));
+
+                svg.selectAll("text").style("fill", null);
+            });
+
+        svg.selectAll("g").call(drag());
     }
 
     onMount(() => {
