@@ -1,5 +1,6 @@
 <script context="module" lang="ts">
     import { NewPerson, StoredPerson } from "../model";
+    import * as bootstrap from "bootstrap";
 
     export type CreateFamily = {
         parents: (NewPerson | StoredPerson)[];
@@ -9,7 +10,7 @@
 
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    import AddPeopleComponent from "./AddPeopleComponent.svelte";
+    import AddPeopleComponent from "./AddPeopleControl.svelte";
     import { Stemma } from "../model";
 
     const dispatch = createEventDispatcher();

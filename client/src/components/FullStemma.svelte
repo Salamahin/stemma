@@ -1,8 +1,13 @@
 <script lang="ts">
     import * as d3 from "d3";
-    import { Stemma } from "../model";
+    import { Stemma, StoredPerson } from "../model";
     import { Lineage, Generation } from "../generation";
     import { onMount } from "svelte";
+    import PersonSelectionModal from "./PersonSelectionModal.svelte";
+    import * as bootstrap from "bootstrap";
+
+    let personSelectionEl;
+    let selectedPerson: StoredPerson;
 
     let personR = 15;
     let hoveredPersonR = 20;
@@ -77,13 +82,14 @@
                 d3.forceLink(relations).id((node) => node.id)
             )
 
-        .force("x", d3.forceX(window.innerWidth / 2).strength(0.5))
-        .force("y", d3.forceY(window.innerHeight / 2).strength(0.5))
-        .force('center', d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2))
-        .force("collide", d3.forceCollide().radius(d => d.r * 20))
-        .force("repelForce", d3.forceManyBody().strength(-2500).distanceMin(85))
-
-
+            .force("x", d3.forceX(window.innerWidth / 2).strength(0.5))
+            .force("y", d3.forceY(window.innerHeight / 2).strength(0.5))
+            .force("center", d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2))
+            .force(
+                "collide",
+                d3.forceCollide().radius((d) => d.r * 20)
+            )
+            .force("repelForce", d3.forceManyBody().strength(-2500).distanceMin(85))
             .on("tick", () => {
                 svg.selectAll("line")
                     .attr("x1", (d) => d.source.x)
@@ -204,20 +210,17 @@
                     .attr("r", (node) => (node.type == "person" ? personR : familyR));
 
                 svg.selectAll("text").style("fill", null);
-            });
+            })
+            .on("click", (event, node) => {
+                selectedPerson = stemma.people.find(p => p.id == node.id)
+                bootstrap.Modal.getOrCreateInstance(personSelectionEl).show();
+            })
 
         svg.select("g.main").selectAll("g").call(drag());
     }
 
     onMount(() => {
-        const width = 1000,
-            height = 1000;
-
         svg = d3.select("#chart");
-        // .attr("width", width)
-        // .attr("height", height)
-        // .attr("viewBox", [-width / 2, -height / 2, width, height])
-        // .attr("style", "max-width: 100%; height: auto");
 
         const defs = svg.append("defs");
         defs.append("marker")
@@ -250,11 +253,11 @@
 
         svg.call(
             d3.zoom().on("zoom", (e) => {
-                console.log("zoom!");
                 d3.select("g.main").attr("transform", e.transform);
             })
         );
     });
 </script>
 
+<PersonSelectionModal bind:this={personSelectionEl} bind:selectedPerson />
 <svg id="chart" class="w-100 p-3" style="height: 800px;" />

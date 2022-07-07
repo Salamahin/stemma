@@ -1,6 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
     import { onMount } from "svelte";
+    import * as bootstrap from "bootstrap";
 
     const dispatch = createEventDispatcher();
 

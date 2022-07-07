@@ -56,9 +56,10 @@
     }
 
     $: {
-        if (selectedStemmaDescription) model.getStemma(selectedStemmaDescription.id).then((s) => {
-            selectedStemma = s
-        });
+        if (selectedStemmaDescription)
+            model.getStemma(selectedStemmaDescription.id).then((s) => {
+                selectedStemma = s;
+            });
     }
 </script>
 
