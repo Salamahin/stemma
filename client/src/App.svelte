@@ -3,6 +3,7 @@
     import Navbar from "./components/Navbar.svelte";
     import AddStemmaModal from "./components/AddStemmaModal.svelte";
     import AddFamilyModal, { CreateFamily } from "./components/AddFamilyModal.svelte";
+    import PersonSelectionModal from "./components/PersonSelectionModal.svelte";
     import FullStemma from "./components/FullStemma.svelte";
     import { Model, StemmaDescription, User, Stemma } from "./model";
 
@@ -13,6 +14,7 @@
     let authComponent;
     let addStemmaModal;
     let addFamilyModal;
+    let personSelectionModal;
 
     let model: Model;
     let user: User = {
@@ -85,7 +87,9 @@
 
     <AddFamilyModal bind:this={addFamilyModal} bind:stemma={selectedStemma} on:familyAdded={(e) => handleNewFamilyCreation(e)} />
 
-    <FullStemma bind:stemma={selectedStemma} />
+    <PersonSelectionModal bind:this={personSelectionModal} />
+
+    <FullStemma bind:stemma={selectedStemma} on:personSelected={(e) => personSelectionModal.showPersonDetails(e.detail)} />
 
     <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </main>

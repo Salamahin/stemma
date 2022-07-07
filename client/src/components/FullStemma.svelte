@@ -3,11 +3,10 @@
     import { Stemma, StoredPerson } from "../model";
     import { Lineage, Generation } from "../generation";
     import { onMount } from "svelte";
-    import PersonSelectionModal from "./PersonSelectionModal.svelte";
     import * as bootstrap from "bootstrap";
+    import { createEventDispatcher } from "svelte";
 
-    let personSelectionEl;
-    let selectedPerson: StoredPerson;
+    const dispatch = createEventDispatcher();
 
     let personR = 15;
     let hoveredPersonR = 20;
@@ -22,6 +21,9 @@
     let familyRelationWidth = 2.0;
 
     export let stemma: Stemma;
+    function personSelected(p: StoredPerson) {
+        dispatch("personSelected", p)
+    }
 
     let nodes = [];
     let relations = [];
@@ -212,8 +214,8 @@
                 svg.selectAll("text").style("fill", null);
             })
             .on("click", (event, node) => {
-                selectedPerson = stemma.people.find(p => p.id == node.id)
-                bootstrap.Modal.getOrCreateInstance(personSelectionEl).show();
+                let selectedPerson = stemma.people.find(p => p.id == node.id)
+                personSelected(selectedPerson)
             })
 
         svg.select("g.main").selectAll("g").call(drag());
@@ -259,5 +261,4 @@
     });
 </script>
 
-<PersonSelectionModal bind:this={personSelectionEl} bind:selectedPerson />
 <svg id="chart" class="w-100 p-3" style="height: 800px;" />
