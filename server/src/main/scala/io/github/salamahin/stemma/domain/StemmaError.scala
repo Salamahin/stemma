@@ -1,5 +1,6 @@
 package io.github.salamahin.stemma.domain
 
+import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto.deriveConfiguredEncoder
 import io.circe.{Encoder, Json}
 import org.apache.commons.lang3.exception.ExceptionUtils
@@ -29,6 +30,10 @@ final case class UnknownUser(id: String)    extends StemmaError
 final case class NoSuchStemmaId(id: String) extends StemmaError
 
 final case class InvalidInviteToken() extends StemmaError
+
+trait Discriminated {
+  implicit val circeConfig = Configuration.default.withDiscriminator("type")
+}
 
 object StemmaError extends Discriminated {
   implicit val encoder: Encoder[StemmaError] = deriveConfiguredEncoder[StemmaError]

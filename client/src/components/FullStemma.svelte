@@ -24,8 +24,6 @@
     let max_generation = 0;
 
     let svg;
-    let vertexGroup;
-    let lineGroup;
 
     $: {
         nodes = [
@@ -62,33 +60,30 @@
         lineages = new Lineage(stemma).lineages();
         max_generation = Math.max(...[...lineages.values()].map((p) => p.generation));
 
-        forceGraph(nodes, relations);
+        updateGraph(nodes, relations);
     }
 
     function getNodeColor(node) {
         return node.type == "person" ? d3.interpolatePlasma(lineages.get(node.id).generation / max_generation) : defaultFamilyColor;
     }
 
-    function forceGraph(nodes, relations) {
+    function updateGraph(nodes, relations) {
         if (!nodes.length) return;
 
         let simulation = d3
             .forceSimulation(nodes)
             .force(
                 "link",
-                d3
-                    .forceLink(relations)
-                    .id((node) => node.id)
-                    .distance(100)
-                    .strength(1.5)
+                d3.forceLink(relations).id((node) => node.id)
             )
-            .force(
-                "collide",
-                d3.forceCollide().radius((d) => d.r * 20)
-            )
-            .force("repelForce", d3.forceManyBody())
-            .force("charge", d3.forceManyBody())
-            .force("center", d3.forceCenter())
+
+        .force("x", d3.forceX(window.innerWidth / 2).strength(0.5))
+        .force("y", d3.forceY(window.innerHeight / 2).strength(0.5))
+        .force('center', d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2))
+        .force("collide", d3.forceCollide().radius(d => d.r * 20))
+        .force("repelForce", d3.forceManyBody().strength(-2500).distanceMin(85))
+
+
             .on("tick", () => {
                 svg.selectAll("line")
                     .attr("x1", (d) => d.source.x)
@@ -96,7 +91,9 @@
                     .attr("x2", (d) => d.target.x)
                     .attr("y2", (d) => d.target.y);
 
-                svg.selectAll("g").attr("transform", (d) => "translate(" + d.x + "," + d.y + ")");
+                svg.select("g.main")
+                    .selectAll("g")
+                    .attr("transform", (d) => "translate(" + d.x + "," + d.y + ")");
             });
 
         function drag() {
@@ -120,7 +117,8 @@
             return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
         }
 
-        svg.selectAll("line")
+        svg.select("g.main")
+            .selectAll("line")
             .data(relations, (r) => r.id)
             .join(
                 (enter) => enter.append("line").lower(),
@@ -131,7 +129,8 @@
             .attr("stroke-width", (relation) => (relation.type == "familyToChild" ? childRelationWidth + "px" : familyRelationWidth + "px"))
             .attr("marker-end", (relation) => (relation.type == "familyToChild" ? "url(#arrow-to-person)" : "url(#arrow-to-family)"));
 
-        svg.selectAll("g")
+        svg.select("g.main")
+            .selectAll("g")
             .data(nodes, (n) => n.id)
             .join(
                 (enter) => {
@@ -187,7 +186,8 @@
 
                     circles.filter((t) => t.id == node.id).attr("r", hoveredPersonR);
 
-                    svg.selectAll("g")
+                    svg.select("g.main")
+                        .selectAll("g")
                         .filter((node) => !selectedLineage.relativies.has(node.id))
                         .select("text")
                         .style("fill", shadedNodeColor);
@@ -206,19 +206,18 @@
                 svg.selectAll("text").style("fill", null);
             });
 
-        svg.selectAll("g").call(drag());
+        svg.select("g.main").selectAll("g").call(drag());
     }
 
     onMount(() => {
-        const width = window.innerWidth - 200,
-            height = window.innerHeight - 200;
+        const width = 1000,
+            height = 1000;
 
-        svg = d3
-            .select("#chart")
-            .attr("width", width)
-            .attr("height", height)
-            .attr("viewBox", [-width / 2, -height / 2, width, height])
-            .attr("style", "max-width: 100%; height: auto; height: intrinsic;");
+        svg = d3.select("#chart");
+        // .attr("width", width)
+        // .attr("height", height)
+        // .attr("viewBox", [-width / 2, -height / 2, width, height])
+        // .attr("style", "max-width: 100%; height: auto");
 
         const defs = svg.append("defs");
         defs.append("marker")
@@ -246,9 +245,16 @@
             .style("fill", relationsColor)
             .append("path")
             .attr("d", "M 0 0 L 10 3 L 0 6 Z");
+
+        svg.append("g").attr("class", "main");
+
+        svg.call(
+            d3.zoom().on("zoom", (e) => {
+                console.log("zoom!");
+                d3.select("g.main").attr("transform", e.transform);
+            })
+        );
     });
 </script>
 
-<div id="outer">
-    <svg id="chart" class="w-100" />
-</div>
+<svg id="chart" class="w-100 p-3" style="height: 800px;" />
