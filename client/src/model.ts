@@ -9,6 +9,7 @@ export type StoredPerson = {
     name: string;
     birthDate?: string;
     deathDate?: string;
+    bio?: string;
 }
 
 export type Family = {

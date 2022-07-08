@@ -19,22 +19,19 @@
     let parentsEl;
     let childrenEl;
 
-    let selectedParents: (NewPerson | StoredPerson)[] = [];
-    let selectedChildren: (NewPerson | StoredPerson)[] = [];
-
     export let stemma: Stemma;
     export function promptNewFamily() {
         parentsEl.reset();
         childrenEl.reset();
-        selectedParents = [];
-        selectedChildren = [];
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
     function familyCreated() {
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-        dispatch("familyAdded", { parents: selectedParents, children: selectedChildren } as CreateFamily);
+        dispatch("familyAdded", { parents: parentsEl.selected(), children: childrenEl.selected() } as CreateFamily);
     }
+
+    let selectedParentsCount, selectedChildrenCount;
 </script>
 
 <div
@@ -55,13 +52,13 @@
             </div>
             <div class="modal-body">
                 <p class="fs-5 text-center">Родители</p>
-                <AddPeopleComponent maxPeopleCount={2} bind:stemma bind:this={parentsEl} on:selectionChanged={(e) => (selectedParents = e.detail)} />
+                <AddPeopleComponent maxPeopleCount={2} bind:stemma bind:this={parentsEl} bind:selectedPersonCount={selectedParentsCount} />
                 <p class="fs-5 text-center mt-5">Дети</p>
-                <AddPeopleComponent maxPeopleCount={20} bind:stemma bind:this={childrenEl} on:selectionChanged={(e) => (selectedChildren = e.detail)} />
+                <AddPeopleComponent maxPeopleCount={20} bind:stemma bind:this={childrenEl} bind:selectedPersonCount={selectedChildrenCount} />
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary" on:click={() => familyCreated()} disabled={selectedParents.length + selectedChildren.length < 2}
+                <button type="button" class="btn btn-primary" on:click={() => familyCreated()} disabled={selectedParentsCount + selectedChildrenCount < 2}
                     >Добавить</button
                 >
             </div>

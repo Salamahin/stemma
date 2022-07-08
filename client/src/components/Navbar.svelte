@@ -59,7 +59,6 @@
                 </li>
             </ul>
             <div class="navbar-nav ml-auto">
-                <input class="form-control me-2" type="search" placeholder="Поиск" aria-label="Search">
                 <div class="nav-item d-flex">
                     <img src={user.image_url} class="avatar" alt="Avatar" />
                     <a class="nav-link text-secondary ms-2" on:click={() => dispatch("signOut")} href="#">Выйти</a>
