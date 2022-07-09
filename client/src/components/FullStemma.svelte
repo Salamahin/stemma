@@ -3,7 +3,6 @@
     import { Stemma, StoredPerson } from "../model";
     import { Lineage, Generation } from "../generation";
     import { onMount } from "svelte";
-    import * as bootstrap from "bootstrap";
     import { createEventDispatcher } from "svelte";
 
     const dispatch = createEventDispatcher();

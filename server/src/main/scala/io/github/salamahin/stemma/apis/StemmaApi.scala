@@ -2,7 +2,7 @@ package io.github.salamahin.stemma.apis
 
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.Encoder
-import io.github.salamahin.stemma.domain.{CreateFamily, CreateStemma, StemmaDescription, StemmaError, UnknownError, User}
+import io.github.salamahin.stemma.domain.{CreateFamily, CreateNewPerson, CreateStemma, StemmaDescription, StemmaError, UnknownError, User}
 import io.github.salamahin.stemma.service.StemmaService
 import zhttp.http._
 import zio.ZIO
@@ -23,7 +23,7 @@ object StemmaApi extends LazyLogging {
         .mapError(err => { logger.error(s"Service error: $err"); err })
         .mapBoth(
           error => HttpError.BadRequest((error: StemmaError).asJson.noSpaces),
-          stemmas => Response.json(stemmas.asJson.noSpaces)
+          result => Response.json(result.asJson.noSpaces)
         )
   }
 
@@ -52,6 +52,24 @@ object StemmaApi extends LazyLogging {
           .service[StemmaService]
           .flatMap(_.stemma(user.userId, stemmaId))
           .toResponse()
+
+      case Method.DELETE -> !! / "stemma" / queryParam(stemmaId) / "person" / queryParam(personId) =>
+        logger.info(s"User ${user.userId} requested to remove a person with id = $personId")
+        (for {
+          s      <- ZIO.service[StemmaService]
+          _      <- s.removePerson(user.userId, personId)
+          stemma <- s.stemma(user.userId, stemmaId)
+        } yield stemma).toResponse()
+
+      case req @ Method.PUT -> !! / "stemma" / queryParam(stemmaId) / "person" / queryParam(personId) =>
+        logger.info(s"User ${user.userId} requested to update a person with id = $personId")
+        (for {
+          s           <- ZIO.service[StemmaService]
+          body        <- req.bodyAsString.mapError(err => UnknownError(err))
+          personDescr <- ZIO.fromEither(decode[CreateNewPerson](body)).mapError(err => UnknownError(err))
+          _           <- s.updatePerson(user.userId, personId, personDescr)
+          stemma      <- s.stemma(user.userId, stemmaId)
+        } yield stemma).toResponse()
 
       case req @ Method.POST -> !! / "stemma" / queryParam(stemmaId) / "family" =>
         logger.info(s"User ${user.userId} requested a new family creation")

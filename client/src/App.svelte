@@ -3,7 +3,7 @@
     import Navbar from "./components/Navbar.svelte";
     import AddStemmaModal from "./components/AddStemmaModal.svelte";
     import AddFamilyModal, { CreateFamily } from "./components/AddFamilyModal.svelte";
-    import PersonSelectionModal from "./components/PersonSelectionModal.svelte";
+    import PersonSelectionModal, { UpdatePerson } from "./components/PersonSelectionModal.svelte";
     import FullStemma from "./components/FullStemma.svelte";
     import { Model, StemmaDescription, User, Stemma } from "./model";
 
@@ -55,6 +55,15 @@
         model.createFamily(selectedStemmaDescription.id, event.detail.parents, event.detail.children).then((s) => (selectedStemma = s));
     }
 
+    function hadlePersonUpdated(event: CustomEvent<UpdatePerson>) {
+        console.log(event.detail)
+        model.updatePerson(selectedStemmaDescription.id, event.detail.id, event.detail.descirption).then((s) => (selectedStemma = s));
+    }
+
+    function handlePersonRemoved(event: CustomEvent<string>) {
+        model.removePerson(selectedStemmaDescription.id, event.detail).then((s) => (selectedStemma = s));
+    }
+
     $: {
         if (selectedStemmaDescription)
             model.getStemma(selectedStemmaDescription.id).then((s) => {
@@ -85,7 +94,7 @@
 
     <AddFamilyModal bind:this={addFamilyModal} bind:stemma={selectedStemma} on:familyAdded={(e) => handleNewFamilyCreation(e)} />
 
-    <PersonSelectionModal bind:this={personSelectionModal} />
+    <PersonSelectionModal bind:this={personSelectionModal} on:personRemoved={(e) => handlePersonRemoved(e)} on:personUpdated={(e) => hadlePersonUpdated(e)} />
 
     <FullStemma bind:stemma={selectedStemma} on:personSelected={(e) => personSelectionModal.showPersonDetails(e.detail)} />
 

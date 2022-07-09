@@ -101,7 +101,7 @@ object OldStemmaParser extends ZIOAppDefault {
         oldToNewId
           .get(pid)
           .map(ExistingPerson)
-          .getOrElse(CreateNewPerson(oldIdToPersonName(pid), None, None))
+          .getOrElse(CreateNewPerson(oldIdToPersonName(pid), None, None, None))
       )
 
     val children = f
@@ -110,7 +110,7 @@ object OldStemmaParser extends ZIOAppDefault {
         oldToNewId
           .get(cid)
           .map(ExistingPerson)
-          .getOrElse(CreateNewPerson(oldIdToPersonName(cid), None, None))
+          .getOrElse(CreateNewPerson(oldIdToPersonName(cid), None, None, None))
       )
 
     val p1 = parents.headOption

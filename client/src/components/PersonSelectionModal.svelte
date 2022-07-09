@@ -1,5 +1,13 @@
+<script context="module" lang="ts">
+    import { StoredPerson, NewPerson } from "../model";
+
+    export type UpdatePerson = {
+        id: string;
+        descirption: NewPerson;
+    };
+</script>
+
 <script lang="ts">
-    import { StoredPerson } from "../model";
     import * as bootstrap from "bootstrap";
     import { createEventDispatcher } from "svelte";
 
@@ -13,15 +21,13 @@
         deathDate: "",
     };
 
-    function personUpdated(p: StoredPerson) {
-        selectedPerson = null;
-        dispatch("personSelected", p);
+    function personUpdated(descr: NewPerson) {
+        dispatch("personUpdated", { id: selectedPerson.id, description: descr });
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     }
 
-    function personRemoved(p: StoredPerson) {
-        selectedPerson = null;
-        dispatch("personRemoved", p);
+    function personRemoved() {
+        dispatch("personRemoved", selectedPerson.id);
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     }
 
@@ -31,7 +37,7 @@
     }
 </script>
 
-<div class="modal fade" id="personDetailsModal"  tabindex="-1" aria-hidden="true" bind:this={modalEl}>
+<div class="modal fade" id="personDetailsModal" tabindex="-1" aria-hidden="true" bind:this={modalEl}>
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -53,17 +59,27 @@
                 </div>
                 <div class="mb-3">
                     <label for="personDeathDate" class="form-label">Био</label>
-                    <textarea class="form-control" rows="6">{selectedPerson.bio ? selectedPerson.bio : ""}</textarea>
+                    <textarea class="form-control" rows="6" id="personBioInput">{selectedPerson.bio ? selectedPerson.bio : ""}</textarea>
                 </div>
                 <div class="mb-3 form-switch">
-                    <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault">
+                    <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault" />
                     <label class="form-check-label" for="flexSwitchCheckDefault">Закрепить ветку прямых родственников</label>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-danger me-auto" on:click={() => personUpdated(null)}>Удалить</button>
+                <button type="button" class="btn btn-danger me-auto" on:click={() => personRemoved()}>Удалить</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary" on:click={() => personUpdated(null)}>Сохранить</button>
+                <button
+                    type="button"
+                    class="btn btn-primary"
+                    on:click={() =>
+                        personUpdated({
+                            name: document.getElementById("personNameInput").value,
+                            birthDate: document.getElementById("personBirthDateInput").value,
+                            deathDate: document.getElementById("personDeathDateInput").value,
+                            bio: document.getElementById("personBioInput").value,
+                        })}>Сохранить</button
+                >
             </div>
         </div>
     </div>

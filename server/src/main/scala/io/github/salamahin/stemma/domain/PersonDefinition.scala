@@ -5,8 +5,8 @@ import io.circe.{Decoder, Encoder}
 import java.time.LocalDate
 
 sealed trait PersonDefinition
-final case class ExistingPerson(id: String)                                                                extends PersonDefinition
-final case class CreateNewPerson(name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate]) extends PersonDefinition
+final case class ExistingPerson(id: String)                                                                                     extends PersonDefinition
+final case class CreateNewPerson(name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate], bio: Option[String]) extends PersonDefinition
 
 object PersonDefinition {
   import cats.syntax.functor._
@@ -19,8 +19,8 @@ object PersonDefinition {
   implicit val cnpDecoder: Decoder[CreateNewPerson] = deriveDecoder[CreateNewPerson]
 
   implicit val encoder: Encoder[PersonDefinition] = Encoder.instance {
-    case ep @ ExistingPerson(_)         => ep.asJson
-    case cnp @ CreateNewPerson(_, _, _) => cnp.asJson
+    case ep @ ExistingPerson(_)            => ep.asJson
+    case cnp @ CreateNewPerson(_, _, _, _) => cnp.asJson
   }
 
   implicit val decoder: Decoder[PersonDefinition] = Decoder[ExistingPerson].widen or Decoder[CreateNewPerson].widen

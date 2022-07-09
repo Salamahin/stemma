@@ -33,8 +33,9 @@ class StemmaRepository extends LazyLogging {
         val name      = vertex.property(personKeys.name).value()
         val birthDate = vertex.property(personKeys.birthDate).toOption.map(LocalDate.parse)
         val deathDate = vertex.property(personKeys.deathDate).toOption.map(LocalDate.parse)
+        val bio = vertex.property(personKeys.bio).toOption
 
-        PersonDescription(vertex.id().toString, name, birthDate, deathDate)
+        PersonDescription(vertex.id().toString, name, birthDate, deathDate, bio)
       }
       .toList()
 
@@ -59,6 +60,7 @@ class StemmaRepository extends LazyLogging {
       _      = person.setProperty(personKeys.name, description.name)
       _      = description.birthDate.map(_.toString).foreach(person.setProperty(personKeys.birthDate, _))
       _      = description.deathDate.map(_.toString).foreach(person.setProperty(personKeys.deathDate, _))
+      _      = description.bio.foreach(person.setProperty(personKeys.bio, _))
     } yield ()
   }
 
@@ -152,6 +154,7 @@ class StemmaRepository extends LazyLogging {
     personVertex.setProperty(keys.stemmaId, stemmaId)
     descr.birthDate.map(dateFormat.format(_)) foreach (personVertex.setProperty(personKeys.birthDate, _))
     descr.deathDate.map(dateFormat.format(_)) foreach (personVertex.setProperty(personKeys.deathDate, _))
+    descr.bio foreach (personVertex.setProperty(personKeys.bio, _))
 
     personVertex.id().toString
   }
@@ -199,7 +202,8 @@ class StemmaRepository extends LazyLogging {
         val personDescr = CreateNewPerson(
           p.property(personKeys.name).value(),
           p.property(personKeys.birthDate).toOption.map(LocalDate.parse),
-          p.property(personKeys.deathDate).toOption.map(LocalDate.parse)
+          p.property(personKeys.deathDate).toOption.map(LocalDate.parse),
+          p.property(personKeys.bio).toOption
         )
 
         ExtendedPersonDescription(personDescr, childOf, spouseOf, stemmaId, ownerId)
@@ -304,6 +308,7 @@ private object StemmaRepository {
     val name: Key[String]      = Key[String]("name")
     val birthDate: Key[String] = Key[String]("birthDate")
     val deathDate: Key[String] = Key[String]("deathDate")
+    val bio: Key[String]       = Key[String]("bio")
   }
 
   object userKeys {

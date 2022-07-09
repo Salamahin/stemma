@@ -2,6 +2,7 @@ export type NewPerson = {
     name: string;
     birthDate?: string;
     deathDate?: string;
+    bio?: string
 }
 
 export type StoredPerson = {
@@ -90,6 +91,25 @@ export class Model {
         })
 
         return await this.parseResponse<StemmaDescription>(response);
+    }
+
+    async removePerson(stemmaId: string, personId: string) {
+        const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/person/${encodeURIComponent(personId)}`, {
+            method: 'DELETE',
+            headers: this.commonHeader
+        })
+
+        return await this.parseResponse<Stemma>(response);
+    }
+
+    async updatePerson(stemmaId: string, personId: string, descr: NewPerson) {
+        const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/person/${encodeURIComponent(personId)}`, {
+            method: 'PUT',
+            headers: this.commonHeader,
+            body: JSON.stringify(descr)
+        })
+
+        return await this.parseResponse<Stemma>(response);
     }
 
     private async parseResponse<T>(response: Response) {
