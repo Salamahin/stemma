@@ -20,7 +20,6 @@
     "bootstrap": "^5.1.3",
     "bootstrap-icons": "^1.8.0",
     "d3": "^7.3.0",
-    "googleapis": "^94.0.0",
     "jest": "^28.1.2",
     "jest-environment-jsdom": "^28.1.2",
     "rollup": "^2.3.4",
@@ -39,6 +38,7 @@
     "typescript": "^4.7.4"
   },
   "dependencies": {
+    "jwt-decode": "^3.1.2",
     "lodash.isequal": "^4.5.0",
     "sirv-cli": "^2.0.0"
   }

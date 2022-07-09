@@ -10,7 +10,6 @@
     export let google_client_id;
     export let stemma_backend_url;
 
-    //components
     let authComponent;
     let addStemmaModal;
     let addFamilyModal;
@@ -29,7 +28,6 @@
     let selectedStemmaDescription: StemmaDescription;
     let selectedStemma: Stemma = { people: [], families: [] };
 
-    //handlers
     function handleSignIn(event: CustomEvent) {
         user = event.detail as User;
         signedIn = true;
@@ -37,6 +35,7 @@
         model.listStemmas().then((stemmas) => {
             ownedStemmasDescriptions = stemmas.stemmas;
             if (ownedStemmasDescriptions.length == 0) addStemmaModal.promptNewStemma(true);
+            console.log(ownedStemmasDescriptions)
         });
     }
 

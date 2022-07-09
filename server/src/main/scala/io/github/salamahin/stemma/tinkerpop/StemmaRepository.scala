@@ -10,8 +10,8 @@ import java.time.format.DateTimeFormatter
 import scala.collection.mutable
 
 class StemmaRepository extends LazyLogging {
-  def listStemmas(ts: TraversalSource, ownerId: String): Either[UnknownUser, List[StemmaDescription]] =
-    for {
+  def listStemmas(ts: TraversalSource, ownerId: String): Either[UnknownUser, List[StemmaDescription]] = {
+    val xx = for {
       owner <- ts.V(ownerId).headOption().toRight(UnknownUser(ownerId))
       stemmas = owner
         .outE(relations.ownerOf)
@@ -20,6 +20,9 @@ class StemmaRepository extends LazyLogging {
         .map { v => StemmaDescription(v.id().toString, v.property(stemmaKeys.name).value()) }
         .toList()
     } yield stemmas
+
+    xx
+  }
 
   def stemma(ts: TraversalSource, stemmaId: String): Stemma = {
     val people = ts

@@ -1,37 +1,36 @@
 <script>
     import { createEventDispatcher } from "svelte";
     import { Circle2 } from "svelte-loading-spinners";
+    import jwt_decode from "jwt-decode";
 
     const dispatch = createEventDispatcher();
 
     export let google_client_id;
 
-    window.onSignIn = () => {
-        let currentUser = gapi.auth2.getAuthInstance().currentUser.get();
-        let profile = currentUser.getBasicProfile();
-        let token = currentUser.getAuthResponse().id_token;
+    window.onload = function () {
+        google.accounts.id.initialize({
+            client_id: google_client_id,
+            callback: handleCredentialResponse,
+        });
+        google.accounts.id.prompt();
+    };
+
+    function handleCredentialResponse(response) {
+        console.log(response);
+        let decoded = jwt_decode(response.credential);
+        console.log(decoded);
 
         dispatch("signIn", {
-            name: profile.getName(),
-            image_url: profile.getImageUrl(),
-            id_token: token,
+            name: decoded.given_name,
+            image_url: decoded.picture,
+            id_token: response.credential,
         });
-    };
-
-    let authInited = false;
-    window.onLoadCallback = () => {
-        gapi.load("auth2", function () {
-            authInited = true;
-        });
-    };
+    }
 
     export function signOut() {
         let auth = gapi.auth2.getAuthInstance();
         auth.signOut();
     }
-
-    $: signInDisplayBlock = authInited ? "d-block" : "d-none";
-    $: loadingSpinnerBlock = authInited ? "d-none" : "d-block";
 </script>
 
 <svelte:head>
@@ -41,11 +40,11 @@
 <div class="main-container">
     <div>
         <h1>project stemma</h1>
-        <div class="g-signin2 {signInDisplayBlock}" data-longtitle="true" data-onsuccess="onSignIn" data-width="380" data-height="50" />
-        <div class={loadingSpinnerBlock}>
+        <div class="d-flex justify-content-center">
             <div class="d-flex w-100 justify-content-center">
                 <Circle2 />
             </div>
+            <div class="g_id_signin" data-type="standard" />
         </div>
     </div>
 </div>
