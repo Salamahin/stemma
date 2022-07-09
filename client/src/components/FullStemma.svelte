@@ -75,7 +75,7 @@
     }
 
     function updateGraph(nodes, relations) {
-        if (!nodes.length) return;
+        if(!svg) return;
 
         let simulation = d3
             .forceSimulation(nodes)

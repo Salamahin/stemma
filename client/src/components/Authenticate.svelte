@@ -40,9 +40,6 @@
     <div>
         <h1>project stemma</h1>
         <div class="d-flex justify-content-center">
-            <div class="d-flex w-100 justify-content-center">
-                <Circle2 />
-            </div>
             <div class="g_id_signin" data-type="standard" />
         </div>
     </div>
@@ -54,6 +51,7 @@
         font-weight: 100;
         text-align: center;
         margin: 0 0 30px 0;
+        color: ghostwhite;
     }
 
     .main-container {
