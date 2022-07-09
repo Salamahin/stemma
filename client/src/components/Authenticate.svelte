@@ -11,14 +11,13 @@
         google.accounts.id.initialize({
             client_id: google_client_id,
             callback: handleCredentialResponse,
+            auto_select: true
         });
         google.accounts.id.prompt();
     };
 
     function handleCredentialResponse(response) {
-        console.log(response);
         let decoded = jwt_decode(response.credential);
-        console.log(decoded);
 
         dispatch("signIn", {
             name: decoded.given_name,

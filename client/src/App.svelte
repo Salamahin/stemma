@@ -35,7 +35,6 @@
         model.listStemmas().then((stemmas) => {
             ownedStemmasDescriptions = stemmas.stemmas;
             if (ownedStemmasDescriptions.length == 0) addStemmaModal.promptNewStemma(true);
-            console.log(ownedStemmasDescriptions)
         });
     }
 
