@@ -2,6 +2,7 @@
     import { NewPerson, Stemma, StoredPerson } from "../model";
     import isEqual from "lodash.isequal";
     import { createEventDispatcher } from "svelte";
+    import Select from 'svelte-select';
 
     export let maxPeopleCount: number;
     export let stemma: Stemma;
@@ -88,10 +89,10 @@
         let parents = stemma.families.filter((f) => f.children.includes(selectedPersonId)).flatMap((f) => f.parents);
         let children = stemma.families.filter((f) => f.parents.includes(selectedPersonId)).flatMap((f) => f.children);
 
-        let parentsNames = parents.length ? `, родители: ${parents.map((pId) => idToName.get(pId)).join(", ")}` : "";
-        let childrenNames = children.length ? `, дети: ${children.map((pId) => idToName.get(pId)).join(", ")}` : "";
+        let parentsNames = parents.length ? [`родители: ${parents.map((pId) => idToName.get(pId)).join(", ")}`] : [];
+        let childrenNames = children.length ? [`дети: ${children.map((pId) => idToName.get(pId)).join(", ")}`] : [];
 
-        return `[${ns.id}] ${ns.name}${parentsNames}${childrenNames}`;
+        return `[${ns.id}] ${[...parentsNames, ...childrenNames].join(", ")}`;
     }
 
     function shortDescription(ns: StoredPerson) {
