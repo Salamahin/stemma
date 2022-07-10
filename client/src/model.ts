@@ -106,7 +106,12 @@ export class Model {
         const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/person/${encodeURIComponent(personId)}`, {
             method: 'PUT',
             headers: this.commonHeader,
-            body: JSON.stringify(descr)
+            body: JSON.stringify(({
+                name: descr.name,
+                birthDate: descr.birthDate ? descr.birthDate : null,
+                deathDate: descr.deathDate ? descr.deathDate : null,
+                bio: descr.bio ? descr.bio : null
+            }))
         })
 
         return await this.parseResponse<Stemma>(response);

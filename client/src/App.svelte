@@ -56,8 +56,7 @@
     }
 
     function hadlePersonUpdated(event: CustomEvent<UpdatePerson>) {
-        console.log(event.detail)
-        model.updatePerson(selectedStemmaDescription.id, event.detail.id, event.detail.descirption).then((s) => (selectedStemma = s));
+        model.updatePerson(selectedStemmaDescription.id, event.detail.id, event.detail.description).then((s) => (selectedStemma = s));
     }
 
     function handlePersonRemoved(event: CustomEvent<string>) {

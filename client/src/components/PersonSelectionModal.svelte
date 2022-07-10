@@ -3,7 +3,7 @@
 
     export type UpdatePerson = {
         id: string;
-        descirption: NewPerson;
+        description: NewPerson;
     };
 </script>
 
@@ -22,7 +22,7 @@
     };
 
     function personUpdated(descr: NewPerson) {
-        dispatch("personUpdated", { id: selectedPerson.id, description: descr });
+        dispatch("personUpdated", ({ id: selectedPerson.id, description: descr }));
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     }
 
@@ -72,13 +72,14 @@
                 <button
                     type="button"
                     class="btn btn-primary"
-                    on:click={() =>
+                    on:click={() => {
                         personUpdated({
                             name: document.getElementById("personNameInput").value,
                             birthDate: document.getElementById("personBirthDateInput").value,
                             deathDate: document.getElementById("personDeathDateInput").value,
                             bio: document.getElementById("personBioInput").value,
-                        })}>Сохранить</button
+                        });
+                    }}>Сохранить</button
                 >
             </div>
         </div>

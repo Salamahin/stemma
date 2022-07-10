@@ -21,7 +21,7 @@
 
     export let stemma: Stemma;
     function personSelected(p: StoredPerson) {
-        dispatch("personSelected", p)
+        dispatch("personSelected", p);
     }
 
     let nodes = [];
@@ -74,7 +74,7 @@
     }
 
     function updateGraph(nodes, relations) {
-        if(!svg) return;
+        if (!svg) return;
 
         let simulation = d3
             .forceSimulation(nodes)
@@ -146,9 +146,7 @@
                     g.append("text");
                 },
                 (update) => {
-                    // let g = update.append("g");
-                    // g.append("circle");
-                    // g.append("text");
+                    update.select("text").text((node) => node.name);
                 },
                 (exit) => exit.remove()
             );
@@ -213,9 +211,9 @@
                 svg.selectAll("text").style("fill", null);
             })
             .on("click", (event, node) => {
-                let selectedPerson = stemma.people.find(p => p.id == node.id)
-                personSelected(selectedPerson)
-            })
+                let selectedPerson = stemma.people.find((p) => p.id == node.id);
+                personSelected(selectedPerson);
+            });
 
         svg.select("g.main").selectAll("g").call(drag());
     }
