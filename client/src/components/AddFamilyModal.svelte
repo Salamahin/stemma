@@ -10,8 +10,9 @@
 
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    import AddPeopleComponent from "./AddPeopleControl.svelte";
+    import AddPeopleComponent from "./AddPeopleComponent.svelte";
     import { Stemma } from "../model";
+    import { Lineage } from "../generation";
 
     const dispatch = createEventDispatcher();
 
@@ -20,9 +21,11 @@
     let childrenEl;
 
     export let stemma: Stemma;
+    export let lineage: Lineage;
+
     export function promptNewFamily() {
-        parentsEl.reset();
-        childrenEl.reset();
+        // parentsEl.reset();
+        // childrenEl.reset();
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
@@ -52,9 +55,9 @@
             </div>
             <div class="modal-body">
                 <p class="fs-5 text-center">Родители</p>
-                <AddPeopleComponent maxPeopleCount={2} bind:stemma bind:this={parentsEl} bind:selectedPersonCount={selectedParentsCount} />
+                <AddPeopleComponent maxPeopleCount={2} bind:stemma bind:lineage bind:this={parentsEl} />
                 <p class="fs-5 text-center mt-5">Дети</p>
-                <AddPeopleComponent maxPeopleCount={20} bind:stemma bind:this={childrenEl} bind:selectedPersonCount={selectedChildrenCount} />
+                <AddPeopleComponent maxPeopleCount={20} bind:stemma bind:lineage bind:this={childrenEl} />
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>

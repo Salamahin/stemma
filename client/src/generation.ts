@@ -21,6 +21,8 @@ export class Lineage {
     private stemma: Stemma
     private parentToChildren: Map<string, FamilyDescription[]>
     private childToParents: Map<string, FamilyDescription[]>
+    private _names: Map<string, string>
+    private _namesakes: Map<string, string[]>
 
     private groupByKey<K, V>(array: Array<readonly [K, V]>) {
         return array.reduce((store, item) => {
@@ -38,14 +40,17 @@ export class Lineage {
         this.stemma = stemma
 
         this.parentToChildren = new Map(this.groupByKey(stemma.families.flatMap((f) => {
-            if(f.children.length) return f.parents.map((p) => [p, ({ familyId: f.id, members: f.children })])
+            if (f.children.length) return f.parents.map((p) => [p, ({ familyId: f.id, members: f.children })])
             else return []
         })))
 
         this.childToParents = new Map(this.groupByKey(stemma.families.flatMap((f) => {
-            if(f.parents.length) return f.children.map((p) => [p, ({ familyId: f.id, members: f.parents })])
+            if (f.parents.length) return f.children.map((p) => [p, ({ familyId: f.id, members: f.parents })])
             else return []
         })))
+
+        this._names = new Map(stemma.people.map(p => [p.id, p.name]))
+        this._namesakes = new Map(this.groupByKey(stemma.people.map(p => [p.name, p.id])))
     }
 
     private computeLineage(personId: string, relation: Map<string, FamilyDescription[]>) {
@@ -95,5 +100,21 @@ export class Lineage {
         return new Map<string, Generation>(
             this.stemma.people.map(p => [p.id, this.lineage(p)])
         )
+    }
+
+    parents(child: string) {
+        return this.childToParents.get(child).flatMap(x => x.members)
+    }
+
+    children(child: string) {
+        return this.parentToChildren.get(child).flatMap(x => x.members)
+    }
+
+    name(p: string) {
+        return this._names.get(p)
+    }
+
+    namesakes(p: string) {
+        return this._namesakes.has(p) ? this._namesakes.get(p) : []
     }
 }

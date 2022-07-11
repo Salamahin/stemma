@@ -25,11 +25,6 @@
             id_token: response.credential,
         });
     }
-
-    export function signOut() {
-        let auth = gapi.auth2.getAuthInstance();
-        auth.signOut();
-    }
 </script>
 
 <svelte:head>

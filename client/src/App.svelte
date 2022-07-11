@@ -6,11 +6,11 @@
     import PersonSelectionModal, { UpdatePerson } from "./components/PersonSelectionModal.svelte";
     import FullStemma from "./components/FullStemma.svelte";
     import { Model, StemmaDescription, User, Stemma } from "./model";
+    import { Lineage } from "./generation";
 
     export let google_client_id;
     export let stemma_backend_url;
 
-    let authComponent;
     let addStemmaModal;
     let addFamilyModal;
     let personSelectionModal;
@@ -27,6 +27,7 @@
     let ownedStemmasDescriptions: StemmaDescription[] = [];
     let selectedStemmaDescription: StemmaDescription;
     let selectedStemma: Stemma = { people: [], families: [] };
+    let lineage: Lineage;
 
     function handleSignIn(event: CustomEvent) {
         user = event.detail as User;
@@ -36,11 +37,6 @@
             ownedStemmasDescriptions = stemmas.stemmas;
             if (ownedStemmasDescriptions.length == 0) addStemmaModal.promptNewStemma(true);
         });
-    }
-
-    function handleSignOut() {
-        authComponent.signOut();
-        signedIn = false;
     }
 
     function handleNewStemma(event: CustomEvent<string>) {
@@ -68,13 +64,15 @@
             model.getStemma(selectedStemmaDescription.id).then((s) => {
                 selectedStemma = s;
             });
+
+        // lineage = new Lineage(selectedStemma);
     }
 </script>
 
 <main>
     <div class="authenticate-bg {!signedIn ? 'd-block' : 'd-none'}">
         <div class="authenticate-holder">
-            <Authenticate {google_client_id} bind:this={authComponent} on:signIn={handleSignIn} />
+            <Authenticate {google_client_id} on:signIn={handleSignIn} />
         </div>
     </div>
 
@@ -83,7 +81,6 @@
             {user}
             bind:ownedStemmasDescriptions
             bind:selectedStemmaDescription
-            on:signOut={handleSignOut}
             on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
             on:createNewFamily={() => addFamilyModal.promptNewFamily()}
         />
@@ -91,7 +88,12 @@
 
     <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={handleNewStemma} />
 
-    <AddFamilyModal bind:this={addFamilyModal} bind:stemma={selectedStemma} on:familyAdded={(e) => handleNewFamilyCreation(e)} />
+    <AddFamilyModal
+        bind:this={addFamilyModal}
+        stemma={selectedStemma}
+        lineage={new Lineage(selectedStemma)}
+        on:familyAdded={(e) => handleNewFamilyCreation(e)}
+    />
 
     <PersonSelectionModal bind:this={personSelectionModal} on:personRemoved={(e) => handlePersonRemoved(e)} on:personUpdated={(e) => hadlePersonUpdated(e)} />
 

@@ -61,7 +61,6 @@
             <div class="navbar-nav ml-auto">
                 <div class="nav-item d-flex">
                     <img src={user.image_url} class="avatar" alt="Avatar" />
-                    <a class="nav-link text-secondary ms-2" on:click={() => dispatch("signOut")} href="#">Выйти</a>
                 </div>
             </div>
         </div>
