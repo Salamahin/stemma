@@ -20,7 +20,7 @@
     let familyRelationWidth = 2.0;
 
     export let stemma: Stemma;
-    export let stemmaIndex: StemmaIndex
+    export let stemmaIndex: StemmaIndex;
 
     function personSelected(p: StoredPerson) {
         dispatch("personSelected", p);
@@ -66,15 +66,20 @@
         updateGraph(nodes, relations);
     }
 
+    function getNodeColor(node) {
+            if (node.type == "person") {
+                let d = stemmaIndex.lineage(node.id).generation / stemmaIndex.maxGeneration();
+                console.log(stemmaIndex.maxGeneration())
+                // console.log(stemmaIndex.lineage(node.id).generation)
+                // console.log(d)
+                return d3.interpolatePlasma(d);
+            } else {
+                return defaultFamilyColor;
+            }
+        }
+
     function updateGraph(nodes, relations) {
         if (!svg) return;
-
-        let lineages = stemmaIndex.lineages();
-        let maxGeneration = Math.max(...[...lineages.values()].map((p) => p.generation));
-
-        function getNodeColor(node) {
-            return node.type == "person" ? d3.interpolatePlasma(lineages.get(node.id).generation / maxGeneration) : defaultFamilyColor;
-        }
 
         let simulation = d3
             .forceSimulation(nodes)
@@ -163,7 +168,7 @@
             .attr("r", (node) => (node.type == "person" ? personR : familyR))
             .on("mouseenter", (event, node) => {
                 if (node.type == "person") {
-                    let selectedLineage = lineages.get(node.id);
+                    let selectedLineage = stemmaIndex.lineage(node.id);
 
                     svg.selectAll("line")
                         .filter((t) => {

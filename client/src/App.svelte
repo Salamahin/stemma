@@ -68,6 +68,8 @@
 
     $: {
         stemmaIndex = new StemmaIndex(selectedStemma);
+        console.log("updated!");
+        console.log(stemmaIndex.maxGeneration());
     }
 </script>
 

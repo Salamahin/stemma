@@ -24,6 +24,8 @@ export class StemmaIndex {
     private _names: Map<string, string>
     private _people: Map<string, StoredPerson>
     private _namesakes: Map<string, string[]>
+    private _lineage: Map<string, Generation>
+    private _maxGeneration: number
 
     private groupByKey<K, V>(array: Array<readonly [K, V]>) {
         return array.reduce((store, item) => {
@@ -53,6 +55,14 @@ export class StemmaIndex {
         this._names = new Map(stemma.people.map(p => [p.id, p.name]))
         this._namesakes = new Map(this.groupByKey(stemma.people.map(p => [p.name, p.id])))
         this._people = new Map(stemma.people.map(p => [p.id, p]))
+        this._lineage = new Map<string, Generation>(
+            this.stemma.people.map(p => [p.id, this.buildLineage(p)])
+        )
+
+        let xxx1 = [...this._lineage.values()].map(p => p.generation)
+
+        console.log(xxx1)
+        this._maxGeneration = Math.max(...xxx1);
     }
 
     private computeLineage(personId: string, relation: Map<string, FamilyDescription[]>) {
@@ -85,7 +95,7 @@ export class StemmaIndex {
         }
     }
 
-    private lineage(p: StoredPerson): Generation {
+    private buildLineage(p: StoredPerson): Generation {
         let dependees = this.computeLineage(p.id, this.parentToChildren)
         let ancestors = this.computeLineage(p.id, this.childToParents)
 
@@ -98,29 +108,31 @@ export class StemmaIndex {
         }
     }
 
-    lineages(): Map<string, Generation> {
-        return new Map<string, Generation>(
-            this.stemma.people.map(p => [p.id, this.lineage(p)])
-        )
+    lineage(personId: string): Generation {
+        return this._lineage.get(personId)
     }
 
-    parents(child: string) {
-        return this.childToParents.get(child).flatMap(x => x.members)
+    parents(childId: string) {
+        return this.childToParents.get(childId).flatMap(x => x.members)
     }
 
-    children(child: string) {
-        return this.parentToChildren.get(child).flatMap(x => x.members)
+    children(parentId: string) {
+        return this.parentToChildren.get(parentId).flatMap(x => x.members)
     }
 
-    name(p: string) {
-        return this._names.get(p)
+    name(personId: string) {
+        return this._names.get(personId)
     }
 
-    namesakes(p: string) {
-        return this._namesakes.has(p) ? this._namesakes.get(p) : []
+    namesakes(personName: string) {
+        return this._namesakes.has(personName) ? this._namesakes.get(personName) : []
     }
 
-    get(p: string) {
-        return this._people.get(p)
+    get(personId: string) {
+        return this._people.get(personId)
+    }
+
+    maxGeneration() {
+        return this._maxGeneration
     }
 }
