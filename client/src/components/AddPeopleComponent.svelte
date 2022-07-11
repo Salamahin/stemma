@@ -6,17 +6,15 @@
 </script>
 
 <script lang="ts">
-    import isEqual from "lodash.isequal";
-    import clone from "lodash.clone";
     import { createEventDispatcher } from "svelte";
-    import { Lineage } from "../generation";
+    import { StemmaIndex } from "../stemmaIndex";
     import ClearIcon from "./ClearIconTranslated.svelte";
 
     const dispatch = createEventDispatcher();
 
     export let maxPeopleCount: number;
     export let stemma: Stemma;
-    export let lineage: Lineage;
+    export let stemmaIndex: StemmaIndex;
 
     let selectedNames: string[] = [""];
     let namesakes: string[][] = [[]];
@@ -29,7 +27,7 @@
 
     function updateName(personIndex: number, name: string) {
         selectedNames[personIndex] = name;
-        namesakes[personIndex] = lineage.namesakes(name);
+        namesakes[personIndex] = stemmaIndex.namesakes(name);
         idChanged(personIndex, namesakes[personIndex][0]);
     }
 
@@ -40,7 +38,7 @@
             selectedBirthDays[personIndex] = "";
             selectedDeathDays[personIndex] = "";
         } else {
-            let sp = lineage.get(value);
+            let sp = stemmaIndex.get(value);
             selectedBirthDays[personIndex] = sp.birthDate;
             selectedDeathDays[personIndex] = sp.deathDate;
         }
@@ -77,8 +75,6 @@
         selectedDeathDays = [...filteredDeathDays];
         selectedIds = [...filteredIds];
         namesakes = [...filteredNamesakes];
-
-        console.log(selectedIds)
     }
 </script>
 

@@ -1,6 +1,5 @@
 <script>
     import { createEventDispatcher } from "svelte";
-    import { Circle2 } from "svelte-loading-spinners";
     import jwt_decode from "jwt-decode";
 
     const dispatch = createEventDispatcher();

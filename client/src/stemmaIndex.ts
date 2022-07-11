@@ -17,7 +17,7 @@ type GenerationDescription = {
 }
 
 
-export class Lineage {
+export class StemmaIndex {
     private stemma: Stemma
     private parentToChildren: Map<string, FamilyDescription[]>
     private childToParents: Map<string, FamilyDescription[]>

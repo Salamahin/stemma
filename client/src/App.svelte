@@ -6,7 +6,7 @@
     import PersonSelectionModal, { UpdatePerson } from "./components/PersonSelectionModal.svelte";
     import FullStemma from "./components/FullStemma.svelte";
     import { Model, StemmaDescription, User, Stemma } from "./model";
-    import { Lineage } from "./generation";
+    import { StemmaIndex } from "./stemmaIndex";
 
     export let google_client_id;
     export let stemma_backend_url;
@@ -27,7 +27,7 @@
     let ownedStemmasDescriptions: StemmaDescription[] = [];
     let selectedStemmaDescription: StemmaDescription;
     let selectedStemma: Stemma = { people: [], families: [] };
-    let lineage: Lineage;
+    let stemmaIndex: StemmaIndex;
 
     function handleSignIn(event: CustomEvent) {
         user = event.detail as User;
@@ -64,8 +64,10 @@
             model.getStemma(selectedStemmaDescription.id).then((s) => {
                 selectedStemma = s;
             });
+    }
 
-        // lineage = new Lineage(selectedStemma);
+    $: {
+        stemmaIndex = new StemmaIndex(selectedStemma);
     }
 </script>
 
@@ -88,16 +90,11 @@
 
     <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={handleNewStemma} />
 
-    <AddFamilyModal
-        bind:this={addFamilyModal}
-        stemma={selectedStemma}
-        lineage={new Lineage(selectedStemma)}
-        on:familyAdded={(e) => handleNewFamilyCreation(e)}
-    />
+    <AddFamilyModal bind:this={addFamilyModal} stemma={selectedStemma} {stemmaIndex} on:familyAdded={(e) => handleNewFamilyCreation(e)} />
 
     <PersonSelectionModal bind:this={personSelectionModal} on:personRemoved={(e) => handlePersonRemoved(e)} on:personUpdated={(e) => hadlePersonUpdated(e)} />
 
-    <FullStemma bind:stemma={selectedStemma} on:personSelected={(e) => personSelectionModal.showPersonDetails(e.detail)} />
+    <FullStemma stemma={selectedStemma} {stemmaIndex} on:personSelected={(e) => personSelectionModal.showPersonDetails(e.detail)} />
 
     <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </main>

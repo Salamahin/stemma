@@ -1,5 +1,5 @@
-import { Generation } from './generation'
-import { Lineage } from './generation'
+import { Generation } from './stemmaIndex'
+import { StemmaIndex } from './stemmaIndex'
 import { Stemma } from './model';
 
 /*
@@ -39,7 +39,7 @@ let jjFamily: Stemma = {
 }
 
 test('Jane is the first in her lineage and is a direct relative of Josh, Jill, James and Jeff', () => {
-    let lineages = new Lineage(jjFamily).lineages()
+    let lineages = new StemmaIndex(jjFamily).lineages()
     expect(lineages.get("Jane")).toEqual({
         generation: 0,
         relativies: new Set(["Jane", "Jeff", "James", "Jill", "Josh"]),
@@ -48,7 +48,7 @@ test('Jane is the first in her lineage and is a direct relative of Josh, Jill, J
 });
 
 test("July is the second in her lineage and is a direct relative of Joseph, Jake, James and Jeff", () => {
-    let lineages = new Lineage(jjFamily).lineages()
+    let lineages = new StemmaIndex(jjFamily).lineages()
     expect(lineages.get("July")).toEqual({
         generation: 1,
         relativies: new Set(["July", "Jake", "James", "Jeff", "Joseph"]),
@@ -57,7 +57,7 @@ test("July is the second in her lineage and is a direct relative of Joseph, Jake
 });
 
 test("Generation is selected as max known generations count", () => {
-    let lineages = new Lineage(jjFamily).lineages()
+    let lineages = new StemmaIndex(jjFamily).lineages()
     expect(lineages.get("Jeff")).toEqual({
         generation: 4, //Joseph's bloodline
         relativies: new Set(["July", "Jake", "Joseph", "Jill", "James", "Jane", "John", "Jeff"]),
@@ -80,7 +80,7 @@ test("lineage takes into account all children from all families", () => {
         ],
     }
 
-    let lineages = new Lineage(mashaFamily).lineages()
+    let lineages = new StemmaIndex(mashaFamily).lineages()
     expect(lineages.get("masha")).toEqual({
         generation: 0, 
         relativies: new Set(["masha", "petya", "lena"]),
@@ -99,7 +99,7 @@ test("lineage skips empty families", () => {
         ],
     }
 
-    let lineages = new Lineage(mashaFamily).lineages()
+    let lineages = new StemmaIndex(mashaFamily).lineages()
     expect(lineages.get("masha")).toEqual({
         generation: 0,
         relativies: new Set(["masha"]),

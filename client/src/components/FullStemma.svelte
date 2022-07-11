@@ -1,7 +1,7 @@
 <script lang="ts">
     import * as d3 from "d3";
     import { Stemma, StoredPerson } from "../model";
-    import { Lineage, Generation } from "../generation";
+    import { Generation, StemmaIndex } from "../stemmaIndex";
     import { onMount } from "svelte";
     import { createEventDispatcher } from "svelte";
 
@@ -20,14 +20,14 @@
     let familyRelationWidth = 2.0;
 
     export let stemma: Stemma;
+    export let stemmaIndex: StemmaIndex
+
     function personSelected(p: StoredPerson) {
         dispatch("personSelected", p);
     }
 
     let nodes = [];
     let relations = [];
-    let lineages = new Map<string, Generation>();
-    let max_generation = 0;
 
     let svg;
 
@@ -63,18 +63,18 @@
             ),
         ];
 
-        lineages = new Lineage(stemma).lineages();
-        max_generation = Math.max(...[...lineages.values()].map((p) => p.generation));
-
         updateGraph(nodes, relations);
-    }
-
-    function getNodeColor(node) {
-        return node.type == "person" ? d3.interpolatePlasma(lineages.get(node.id).generation / max_generation) : defaultFamilyColor;
     }
 
     function updateGraph(nodes, relations) {
         if (!svg) return;
+
+        let lineages = stemmaIndex.lineages();
+        let maxGeneration = Math.max(...[...lineages.values()].map((p) => p.generation));
+
+        function getNodeColor(node) {
+            return node.type == "person" ? d3.interpolatePlasma(lineages.get(node.id).generation / maxGeneration) : defaultFamilyColor;
+        }
 
         let simulation = d3
             .forceSimulation(nodes)
