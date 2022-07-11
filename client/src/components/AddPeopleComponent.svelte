@@ -18,71 +18,68 @@
     export let stemma: Stemma;
     export let lineage: Lineage;
 
-    let nullPerson: NewPerson = {
-        name: "",
-        birthDate: "",
-        deathDate: "",
-    };
-
-    let selectedPeople: (NewPerson | StoredPerson)[] = [nullPerson];
-    let selectedPeopleCount = 0;
+    let selectedNames: string[] = [""];
+    let namesakes: string[][] = [[]];
+    let selectedIds: string[] = [""];
+    let selectedBirthDays: string[] = [""];
+    let selectedDeathDays: string[] = [""];
 
     let peopleNames: string[] = [];
     let clearIcon = ClearIcon;
 
-    function clearPerson(personIndex: number) {
-        selectedPeople[personIndex] = clone(nullPerson);
-        if (--selectedPeopleCount == 1) selectedPeople = [...selectedPeople, nullPerson];
-    }
-
     function updateName(personIndex: number, name: string) {
-        let person = clone(selectedPeople[personIndex]);
-        person.name = name;
-        selectedPeople[personIndex] = person;
-
-        if (++selectedPeopleCount < maxPeopleCount) selectedPeople = [...selectedPeople, nullPerson];
+        selectedNames[personIndex] = name;
+        namesakes[personIndex] = lineage.namesakes(name);
+        idChanged(personIndex, namesakes[personIndex][0]);
     }
 
-    function updateId(personIndex: number, id?: string) {
-        console.log("update id")
-        console.log(number)
-        let person = clone(selectedPeople[personIndex]);
+    function idChanged(personIndex: number, value: string) {
+        selectedIds[personIndex] = value;
 
-        if (!id || !id.length)
-            person = {
-                name: person.name,
-                birthDate: person.birthDate,
-                deathDate: person.deathDate,
-            };
-        else
-            person = {
-                id: id,
-                name: person.name,
-                birthDate: person.birthDate,
-                deathDate: person.deathDate,
-            };
-
-        selectedPeople[personIndex] = person;
-    }
-
-    function updateBirthDate(personIndex: number, value?: string) {
-        let person = clone(selectedPeople[personIndex]);
-        person.birthDate = value;
-        selectedPeople[personIndex] = person;
-    }
-
-    function updateDeathDate(personIndex: number, value?: string) {
-        let person = clone(selectedPeople[personIndex]);
-        person.deathDate = value;
-        selectedPeople[personIndex] = person;
-    }
-
-    function shouldShow(sp: NewPerson | StoredPerson, idx: number) {
-        let show = (!isEqual(sp, nullPerson) && idx < selectedPeople.length) || (idx == selectedPeople.length - 1 && selectedPeopleCount < maxPeopleCount);
-        return show;
+        if (!value || value.length == 0) {
+            selectedBirthDays[personIndex] = "";
+            selectedDeathDays[personIndex] = "";
+        } else {
+            let sp = lineage.get(value);
+            selectedBirthDays[personIndex] = sp.birthDate;
+            selectedDeathDays[personIndex] = sp.deathDate;
+        }
     }
 
     $: peopleNames = [...new Set(stemma.people.map((p) => p.name))];
+    $: {
+        let filteredNames: string[] = [];
+        let filteredBirthDays: string[] = [];
+        let filteredDeathDays: string[] = [];
+        let filteredIds: string[] = [];
+        let filteredNamesakes: string[][] = [];
+
+        for (let i = 0; i < selectedNames.length; i++) {
+            if (selectedNames[i].length != 0) {
+                filteredNames.push(selectedNames[i]);
+                filteredBirthDays.push(selectedBirthDays[i]);
+                filteredDeathDays.push(selectedDeathDays[i]);
+                filteredIds.push(selectedIds[i]);
+                filteredNamesakes.push(namesakes[i]);
+            }
+        }
+
+        if (filteredNames.length < maxPeopleCount) {
+            filteredNames.push("");
+            filteredBirthDays.push("");
+            filteredDeathDays.push("");
+            filteredIds.push("");
+            filteredNamesakes.push([]);
+        }
+
+        selectedNames = [...filteredNames];
+        selectedBirthDays = [...filteredBirthDays];
+        selectedDeathDays = [...filteredDeathDays];
+        selectedIds = [...filteredIds];
+        namesakes = [...filteredNamesakes];
+
+        console.log(selectedIds)
+    }
 </script>
 
 <div>
@@ -96,48 +93,51 @@
             </tr>
         </thead>
         <tbody>
-            {#each selectedPeople as sp, i}
-                <!-- unfortunately for some reason dynamical removal of the Select component is not working properly. So there is an ugly hack
-            that would constantly increasy selectedPeople accumulator until it eventyally contains non null members
-            constant adding-removing would have a linear overhead, but i wont expect a family of such size -->
-                {#if shouldShow(sp, i)}
-                    <tr>
-                        <td style="min-width:300px">
-                            <Select
-                                items={peopleNames}
-                                isCreatable={true}
-                                isClearable={true}
-                                placeholder="Имя..."
-                                on:select={(e) => updateName(i, e.detail.value)}
-                                on:clear={() => clearPerson(i)}
-                                listAutoWidth={false}
-                                containerStyles="height:38px"
-                                ClearIcon={clearIcon}
-                                getOptionLabel={(option, filterText) => {
-                                    return option.isCreator ? `Совпадений не найдено` : option["label"];
-                                }}
-                                hideEmptyState={true}
-                            />
-                        </td>
-                        <td>
-                            <select class="form-select" aria-label="namesake select" on:change={(e) => updateId(i, e.detail)}>
-                                <option value={null}>Новый</option>
-                                <optgroup label="Существующий">
-                                    {#each lineage.namesakes(sp.name) as ns, nsIdx}
-                                        <option value={ns} selected={nsIdx == 0 ? true : false}>{ns}</option>
-                                    {/each}
-                                    <option>Выбрать...</option>
-                                </optgroup>
-                            </select>
-                        </td>
-                        <td>
-                            <input class="form-control" type="date" value={sp.birthDate} on:input={(e) => updateBirthDate(i, e.detail)} disabled={"id" in sp} />
-                        </td>
-                        <td>
-                            <input class="form-control" type="date" value={sp.birthDate} on:input={(e) => updateDeathDate(i, e.detail)} disabled={"id" in sp} />
-                        </td>
-                    </tr>
-                {/if}
+            {#each selectedNames as name, i}
+                <tr>
+                    <td style="min-width:300px">
+                        <Select
+                            value={name}
+                            items={peopleNames}
+                            isCreatable={true}
+                            isClearable={true}
+                            placeholder="Имя..."
+                            on:select={(e) => updateName(i, e.detail.value)}
+                            on:clear={() => updateName(i, "")}
+                            listAutoWidth={false}
+                            containerStyles="height:38px"
+                            ClearIcon={clearIcon}
+                            getOptionLabel={(option, filterText) => {
+                                return option.isCreator ? `Совпадений не найдено` : option["label"];
+                            }}
+                            hideEmptyState={true}
+                        />
+                    </td>
+                    <td>
+                        <select
+                            id={`id_selector_${i}`}
+                            class="form-select"
+                            aria-label="namesake select"
+                            on:change={() => idChanged(i, document.getElementById(`id_selector_${i}`).value)}
+                            disabled={selectedNames[i] === ""}
+                            value={selectedIds[i]}
+                        >
+                            <option value={""}>Новый</option>
+                            <optgroup label="Существующий">
+                                {#each namesakes[i] as ns, nsIdx}
+                                    <option value={ns} selected={nsIdx == 0 ? true : false}>{ns}</option>
+                                {/each}
+                                <option>Выбрать...</option>
+                            </optgroup>
+                        </select>
+                    </td>
+                    <td>
+                        <input class="form-control" type="date" value={selectedBirthDays[i]} disabled={selectedIds[i] === ""} />
+                    </td>
+                    <td>
+                        <input class="form-control" type="date" value={selectedDeathDays[i]} disabled={selectedIds[i] === ""} />
+                    </td>
+                </tr>
             {/each}
         </tbody>
     </table>

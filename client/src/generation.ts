@@ -22,6 +22,7 @@ export class Lineage {
     private parentToChildren: Map<string, FamilyDescription[]>
     private childToParents: Map<string, FamilyDescription[]>
     private _names: Map<string, string>
+    private _people: Map<string, StoredPerson>
     private _namesakes: Map<string, string[]>
 
     private groupByKey<K, V>(array: Array<readonly [K, V]>) {
@@ -51,6 +52,7 @@ export class Lineage {
 
         this._names = new Map(stemma.people.map(p => [p.id, p.name]))
         this._namesakes = new Map(this.groupByKey(stemma.people.map(p => [p.name, p.id])))
+        this._people = new Map(stemma.people.map(p => [p.id, p]))
     }
 
     private computeLineage(personId: string, relation: Map<string, FamilyDescription[]>) {
@@ -116,5 +118,9 @@ export class Lineage {
 
     namesakes(p: string) {
         return this._namesakes.has(p) ? this._namesakes.get(p) : []
+    }
+
+    get(p: string) {
+        return this._people.get(p)
     }
 }
