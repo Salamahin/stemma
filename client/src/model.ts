@@ -69,8 +69,8 @@ export class Model {
 
     async createFamily(stemmaId: string, parents: (NewPerson | StoredPerson)[], children: (NewPerson | StoredPerson)[]) {
         let request = {
-            "parent1": parents.length > 0 ? parents[0] : null,
-            "parent2": parents.length > 1 ? parents[1] : null,
+            "parent1": parents.length > 0 ? this.sanitize(parents[0]) : null,
+            "parent2": parents.length > 1 ? this.sanitize(parents[1]) : null,
             "children": children.map(c => this.sanitize(c))
         }
 
