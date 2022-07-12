@@ -10,9 +10,10 @@
 
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    import AddPeopleComponent from "./AddPeopleComponent.svelte";
+    import AddPeopleComponent, { PersonChoice } from "./AddPeopleComponent.svelte";
     import { Stemma } from "../model";
     import { StemmaIndex } from "../stemmaIndex";
+    import { RestrictiveSelectionController, SelectionController } from "../selectionController";
 
     const dispatch = createEventDispatcher();
 
@@ -23,18 +24,61 @@
     let parents;
     let children;
 
+    let promptingParentId = -1;
+    let promptingChildId = -1;
+
     export let stemma: Stemma;
     export let stemmaIndex: StemmaIndex;
+    export let selectionController: SelectionController;
+    let oldSelectionController: SelectionController;
 
     export function promptNewFamily() {
         parentsEl.reset();
         childrenEl.reset();
+
+        promptingParentId = -1;
+        promptingChildId = -1;
+
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    export function awaitsPersonSelection() {
+        return promptingParentId >= 0 || promptingChildId >= 0;
     }
 
     function familyCreated() {
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
         dispatch("familyAdded", { parents: parentsEl.selected(), children: childrenEl.selected() } as CreateFamily);
+    }
+
+    function promptParentSelection(event: PersonChoice) {
+        promptingParentId = event.index;
+        promtPersonSelection(event);
+    }
+
+    function promptChildSelection(event: PersonChoice) {
+        promptingChildId = event.index;
+        promtPersonSelection(event);
+    }
+
+    function promtPersonSelection(event: PersonChoice) {
+        let allChildren = event.personIds.flatMap((id) => stemmaIndex.parents(id));
+        let allParents = event.personIds.flatMap((id) => stemmaIndex.children(id));
+        let allFamilies = event.personIds.flatMap((id) => [...stemmaIndex.families(id)]);
+
+        oldSelectionController = selectionController;
+        selectionController = new RestrictiveSelectionController([...event.personIds, ...allChildren, ...allParents], allFamilies, event.personIds);
+
+        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+    }
+
+    export function personSelected(person: StoredPerson) {
+        selectionController = oldSelectionController
+
+        if (promptingParentId >= 0) parentsEl.set(promptingParentId, person);
+        else if (promptingChildId >= 0) childrenEl.set(promptingChildId, person);
+
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
     let selectedParentsCount, selectedChildrenCount;
@@ -63,9 +107,23 @@
             </div>
             <div class="modal-body">
                 <p class="fs-5 text-center">Родители</p>
-                <AddPeopleComponent maxPeopleCount={2} bind:stemma bind:stemmaIndex bind:this={parentsEl} on:selected={(e) => (parents = e.detail)} />
+                <AddPeopleComponent
+                    maxPeopleCount={2}
+                    bind:stemma
+                    bind:stemmaIndex
+                    bind:this={parentsEl}
+                    on:selected={(e) => (parents = e.detail)}
+                    on:choose={(e) => promptParentSelection(e.detail)}
+                />
                 <p class="fs-5 text-center mt-5">Дети</p>
-                <AddPeopleComponent maxPeopleCount={20} bind:stemma bind:stemmaIndex bind:this={childrenEl} on:selected={(e) => (children = e.detail)} />
+                <AddPeopleComponent
+                    maxPeopleCount={20}
+                    bind:stemma
+                    bind:stemmaIndex
+                    bind:this={childrenEl}
+                    on:selected={(e) => (children = e.detail)}
+                    on:choose={(e) => promptChildSelection(e.detail)}
+                />
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>

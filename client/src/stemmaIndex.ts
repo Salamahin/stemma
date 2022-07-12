@@ -109,11 +109,25 @@ export class StemmaIndex {
     }
 
     parents(childId: string) {
-        return this.childToParents.get(childId).flatMap(x => x.members)
+        let ps = this.childToParents.get(childId)
+        if (ps) return ps.flatMap(x => x.members)
+        else return []
     }
 
     children(parentId: string) {
-        return this.parentToChildren.get(parentId).flatMap(x => x.members)
+        let cs = this.parentToChildren.get(parentId)
+        if (cs) return cs.flatMap(x => x.members)
+        return []
+    }
+
+    families(memberId: string) {
+        let cs = this.childToParents.get(memberId)
+        let ps = this.parentToChildren.get(memberId)
+
+        let csf = cs ? cs.map(f => f.familyId) : []
+        let psf = ps ? ps.map(f => f.familyId) : []
+
+        return [...csf, ...psf]
     }
 
     name(personId: string) {

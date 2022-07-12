@@ -5,9 +5,9 @@
     import AddFamilyModal, { CreateFamily } from "./components/AddFamilyModal.svelte";
     import PersonSelectionModal, { UpdatePerson } from "./components/PersonSelectionModal.svelte";
     import FullStemma from "./components/FullStemma.svelte";
-    import { Model, StemmaDescription, User, Stemma } from "./model";
+    import { Model, StemmaDescription, User, Stemma, StoredPerson } from "./model";
     import { StemmaIndex } from "./stemmaIndex";
-    import { SelectEverythingController, StackedSelectionController } from "./selectionController";
+    import { ComposableSelectionController, SelectionController } from "./selectionController";
 
     export let google_client_id;
     export let stemma_backend_url;
@@ -29,7 +29,7 @@
     let selectedStemmaDescription: StemmaDescription;
     let selectedStemma: Stemma = { people: [], families: [] };
     let stemmaIndex: StemmaIndex;
-    let selectionController = new StackedSelectionController(new SelectEverythingController());
+    let selectionController: SelectionController = new ComposableSelectionController();
 
     function handleSignIn(event: CustomEvent) {
         user = event.detail as User;
@@ -61,6 +61,11 @@
         model.removePerson(selectedStemmaDescription.id, event.detail).then((s) => (selectedStemma = s));
     }
 
+    function handlePersonSelection(event: CustomEvent<StoredPerson>) {
+        if (addFamilyModal.awaitsPersonSelection()) addFamilyModal.personSelected(event.detail);
+        else personSelectionModal.showPersonDetails(event.detail);
+    }
+
     $: {
         if (selectedStemmaDescription)
             model.getStemma(selectedStemmaDescription.id).then((s) => {
@@ -68,9 +73,7 @@
             });
     }
 
-    $: {
-        stemmaIndex = new StemmaIndex(selectedStemma);
-    }
+    $: stemmaIndex = new StemmaIndex(selectedStemma);
 </script>
 
 <main>
@@ -92,11 +95,17 @@
 
     <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={handleNewStemma} />
 
-    <AddFamilyModal bind:this={addFamilyModal} stemma={selectedStemma} {stemmaIndex} on:familyAdded={(e) => handleNewFamilyCreation(e)} />
+    <AddFamilyModal
+        bind:this={addFamilyModal}
+        stemma={selectedStemma}
+        {stemmaIndex}
+        bind:selectionController
+        on:familyAdded={(e) => handleNewFamilyCreation(e)}
+    />
 
     <PersonSelectionModal bind:this={personSelectionModal} on:personRemoved={(e) => handlePersonRemoved(e)} on:personUpdated={(e) => hadlePersonUpdated(e)} />
 
-    <FullStemma stemma={selectedStemma} {stemmaIndex} {selectionController} on:personSelected={(e) => personSelectionModal.showPersonDetails(e.detail)} />
+    <FullStemma stemma={selectedStemma} {stemmaIndex} bind:selectionController on:personSelected={(e) => handlePersonSelection(e)} />
 
     <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </main>

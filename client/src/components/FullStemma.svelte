@@ -1,15 +1,15 @@
 <script lang="ts">
     import * as d3 from "d3";
-    import { Stemma, StoredPerson } from "../model";
+    import { Stemma } from "../model";
     import { StemmaIndex } from "../stemmaIndex";
     import { onMount } from "svelte";
     import { createEventDispatcher } from "svelte";
-    import { LineageSelectionController, StackedSelectionController } from "../selectionController";
+    import { GenerationSelection, SelectionController } from "../selectionController";
 
     const dispatch = createEventDispatcher();
 
     let personR = 15;
-    let hoveredPersonR = 20;
+    let hoveredPersonR = 25;
     let familyR = 5;
 
     let defaultFamilyColor = "#326f93";
@@ -24,7 +24,7 @@
 
     export let stemma: Stemma;
     export let stemmaIndex: StemmaIndex;
-    export let selectionController: StackedSelectionController;
+    export let selectionController: SelectionController;
 
     let nodes = [];
     let relations = [];
@@ -66,13 +66,65 @@
         updateGraph(nodes, relations);
     }
 
-    function getNodeColor(node) {
-        if (node.type == "person") {
-            let d = stemmaIndex.lineage(node.id).generation / stemmaIndex.maxGeneration();
-            return d3.interpolatePlasma(d);
-        } else {
-            return defaultFamilyColor;
+    // $: {
+    //     if (svg) highlight();
+    // }
+
+    function highlight() {
+        function getNodeColor(node) {
+            if (node.type == "person") {
+                let d = stemmaIndex.lineage(node.id).generation / stemmaIndex.maxGeneration();
+                return d3.interpolatePlasma(d);
+            } else {
+                return defaultFamilyColor;
+            }
         }
+
+        function lineHighlighted(line) {
+            let relatesToSelectedFamilies = selectionController.familyIsHighlighted(line.source.id) || selectionController.familyIsHighlighted(line.target.id);
+            let relatesToSelectedPeople = selectionController.personIsHighlighted(line.source.id) || selectionController.personIsHighlighted(line.target.id);
+
+            return relatesToSelectedFamilies && relatesToSelectedPeople;
+        }
+
+        function lineFill(line) {
+            if (!lineHighlighted(line)) return shadedRelationColor;
+            else return relationsColor;
+        }
+
+        function lineWidth(line) {
+            if (!lineHighlighted(line)) return shadedRelationWidth;
+            else if (line.type == "familyToChild") return childRelationWidth;
+            else return familyRelationWidth;
+        }
+
+        function markerEnd(line) {
+            if (!lineHighlighted(line)) return null;
+            else if (line.type == "familyToChild") return "url(#arrow-to-person)";
+            else return "url(#arrow-to-family)";
+        }
+
+        svg.selectAll("line")
+            .attr("stroke", (line) => lineFill(line))
+            .attr("stroke-width", (line) => lineWidth(line))
+            .attr("marker-end", (line) => markerEnd(line));
+
+        let circles = svg.selectAll("circle");
+
+        circles
+            .filter((t) => t.type == "person")
+            .attr("fill", (node) => (selectionController.personIsHighlighted(node.id) ? getNodeColor(node) : shadedNodeColor))
+            .attr("r", personR);
+
+        circles
+            .filter((t) => t.type == "family")
+            .attr("fill", (node) => (selectionController.familyIsHighlighted(node.id) ? defaultFamilyColor : shadedNodeColor))
+            .attr("r", familyR);
+
+        svg.select("g.main")
+            .selectAll("g")
+            .select("text")
+            .style("fill", (node) => (selectionController.personIsHighlighted(node.id) ? null : shadedNodeColor));
     }
 
     function updateGraph(nodes, relations) {
@@ -80,11 +132,17 @@
 
         let simulation = d3
             .forceSimulation(nodes)
-            .force("link", d3.forceLink(relations).id((node) => node.id))
+            .force(
+                "link",
+                d3.forceLink(relations).id((node) => node.id)
+            )
             .force("x", d3.forceX(window.innerWidth / 2).strength(0.2))
             .force("y", d3.forceY(window.innerHeight / 2).strength(0.2))
             .force("center", d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2))
-            .force("collide", d3.forceCollide().radius((d) => d.r * 20))
+            .force(
+                "collide",
+                d3.forceCollide().radius((d) => d.r * 20)
+            )
             .force("repelForce", d3.forceManyBody().strength(-1500).distanceMin(85))
             .on("tick", () => {
                 svg.selectAll("line")
@@ -119,52 +177,6 @@
             return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
         }
 
-        function highlight() {
-            function lineHighlighted(line) {
-                let relatesToSelectedFamilies = selectionController.familyIsSelected(line.source.id) || selectionController.familyIsSelected(line.target.id);
-                let relatesToSelectedPeople = selectionController.personIsSelected(line.source.id) || selectionController.personIsSelected(line.target.id);
-
-                return relatesToSelectedFamilies && relatesToSelectedPeople;
-            }
-
-            function lineFill(line) {
-                if (!lineHighlighted(line)) return shadedRelationColor;
-                else return relationsColor;
-            }
-
-            function lineWidth(line) {
-                if (!lineHighlighted(line)) return shadedRelationWidth;
-                else if (line.type == "familyToChild") return childRelationWidth;
-                else return familyRelationWidth;
-            }
-
-            function markerEnd(line) {
-                if (!lineHighlighted(line)) return null;
-                else if (line.type == "familyToChild") return "url(#arrow-to-person)";
-                else return "url(#arrow-to-family)";
-            }
-
-            svg.selectAll("line")
-                .attr("stroke", (line) => lineFill(line))
-                .attr("stroke-width", (line) => lineWidth(line))
-                .attr("marker-end", (line) => markerEnd(line));
-
-            let circles = svg.selectAll("circle");
-
-            circles
-                .filter((t) => t.type == "person")
-                .attr("fill", (node) => (selectionController.personIsSelected(node.id) ? getNodeColor(node) : shadedNodeColor));
-
-            circles
-                .filter((t) => t.type == "family")
-                .attr("fill", (node) => (selectionController.familyIsSelected(node.id) ? defaultFamilyColor : shadedNodeColor));
-
-            svg.select("g.main")
-                .selectAll("g")
-                .select("text")
-                .style("fill", (node) => (selectionController.personIsSelected(node.id) ? null : shadedNodeColor));
-        }
-
         svg.select("g.main")
             .selectAll("line")
             .data(relations, (r) => r.id)
@@ -197,30 +209,26 @@
             .attr("dx", -personR);
 
         svg.selectAll("circle")
-            .attr("fill", (node) => getNodeColor(node))
-            .attr("r", (node) => (node.type == "person" ? personR : familyR))
             .on("mouseenter", (event, node) => {
-                if (node.type == "person") {
-                    selectionController.push(new LineageSelectionController(stemmaIndex, node.id));
+                console.log(selectionController.personIsInteractive(node.id));
+                if (node.type == "person" && selectionController.personIsInteractive(node.id)) {
+                    selectionController = selectionController.add(node.id, new GenerationSelection(stemmaIndex, node.id));
 
                     svg.selectAll("circle")
-                        .filter((t) => t.id == node.id)
+                        .filter((n) => n.id == node.id)
                         .attr("r", hoveredPersonR);
 
-                    highlight();
+                    // highlight();
                 }
             })
             .on("mouseleave", (_event, node) => {
                 if (node.type == "person") {
-                    selectionController.pop();
-
-                    svg.selectAll("circle").attr("r", (node) => (node.type == "person" ? personR : familyR));
-
+                    selectionController = selectionController.remove(node.id);
                     highlight();
                 }
             })
             .on("click", (event, node) => {
-                if (selectionController.personIsSelected(node.id)) {
+                if (selectionController.personIsInteractive(node.id)) {
                     let selectedPerson = stemmaIndex.get(node.id);
                     dispatch("personSelected", selectedPerson);
                 }

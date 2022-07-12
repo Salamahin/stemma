@@ -1,112 +1,99 @@
+import { throws } from "assert";
 import { StoredPerson } from "./model";
 import { Generation, StemmaIndex } from "./stemmaIndex";
 
-export interface SelectionController {
-    personIsSelected(personId: string): boolean
-    familyIsSelected(familyId: string): boolean
+export interface Selection {
+    personIsHighlighted(personId: string): boolean
+    familyIsHighlighted(familyId: string): boolean
+    personIsInteractive(personId: string): boolean
 }
 
-class SelectNothingController implements SelectionController {
-    personIsSelected(personId: string): boolean {
-        return false
-    }
-    familyIsSelected(familyId: string): boolean {
-        return false
-    }
+export interface SelectionController extends Selection {
+    add(key: string, otherController: Selection): SelectionController
+    remove(key: string): SelectionController
 }
 
-export class SelectEverythingController implements SelectionController {
-    personIsSelected(personId: string): boolean {
-        return true
-    }
-    familyIsSelected(familyId: string): boolean {
-        return true
-    }
-}
+export class ComposableSelectionController implements SelectionController {
+    private controllers: Map<string, Selection>
 
-function compose(left: SelectionController, right: SelectionController) {
-    return new class implements SelectionController {
-        personIsSelected(personId: string): boolean {
-            return left.personIsSelected(personId) || right.personIsSelected(personId)
-        }
-
-        familyIsSelected(familyId: string): boolean {
-            return left.familyIsSelected(familyId) || right.familyIsSelected(familyId)
-        }
-    }
-}
-
-export function composeAllSelectionControllers(controllers: SelectionController[]) {
-    return controllers.reduce((prev, current) => compose(prev, current), new SelectNothingController())
-}
-
-export class SimpleSelectionController implements SelectionController {
-    private peopleIds: Set<string>
-    private familyIds: Set<string>
-
-    constructor(peopleIdsToSelect: string[], familyIdsToSelect: string[]) {
-        this.peopleIds = new Set(peopleIdsToSelect)
-        this.familyIds = new Set(familyIdsToSelect)
+    constructor() {
+        this.controllers = new Map()
     }
 
-    personIsSelected(personId: string) {
-        return this.peopleIds.has(personId)
+    personIsHighlighted(personId: string): boolean {
+        if (!this.controllers.size) return true;
+        return [...this.controllers.values()].reduce((acc, next) => acc || next.personIsHighlighted(personId), false)
     }
 
-    familyIsSelected(familyId: string) {
-        return this.familyIds.has(familyId)
+    familyIsHighlighted(familyId: string): boolean {
+        if (!this.controllers.size) return true;
+        return [...this.controllers.values()].reduce((acc, next) => acc || next.familyIsHighlighted(familyId), false)
+    }
+
+    personIsInteractive(personId: string): boolean {
+        if (!this.controllers.size) return true;
+        return [...this.controllers.values()].reduce((acc, next) => acc || next.personIsInteractive(personId), false)
+    }
+
+    add(key: string, otherController: SelectionController): SelectionController {
+        this.controllers.set(key, otherController)
+        return this
+    }
+
+    remove(key: string): SelectionController {
+        this.controllers.delete(key)
+        return this
     }
 }
 
-export class LineageSelectionController implements SelectionController {
+export class RestrictiveSelectionController implements SelectionController {
+    private peopleIdsToHightlight: Set<string>
+    private familyIdsToHightlight: Set<string>
+    private peopleIdsToInteract: Set<string>
+
+    constructor(peopleIdsToHighlight: string[], familyIdsToHighlight: string[], peopleIdsToInteract: string[]) {
+        this.peopleIdsToHightlight = new Set(peopleIdsToHighlight)
+        this.familyIdsToHightlight = new Set(familyIdsToHighlight)
+        this.peopleIdsToInteract = new Set(peopleIdsToInteract)
+    }
+
+    personIsInteractive(personId: string): boolean {
+        return this.peopleIdsToInteract.has(personId);
+    }
+
+    add(key: string, otherController: SelectionController): SelectionController {
+        return this;
+    }
+
+    remove(key: string): SelectionController {
+        return this;
+    }
+
+    personIsHighlighted(personId: string) {
+        return this.peopleIdsToHightlight.has(personId)
+    }
+
+    familyIsHighlighted(familyId: string) {
+        return this.familyIdsToHightlight.has(familyId)
+    }
+}
+
+export class GenerationSelection implements Selection {
     private generation: Generation
 
     constructor(index: StemmaIndex, personId: string) {
         this.generation = index.lineage(personId)
     }
 
-    personIsSelected(personId: string): boolean {
+    personIsHighlighted(personId: string): boolean {
         return this.generation.relativies.has(personId)
     }
 
-    familyIsSelected(familyId: string): boolean {
+    familyIsHighlighted(familyId: string): boolean {
         return this.generation.families.has(familyId)
     }
-}
 
-export class StackedSelectionController implements SelectionController {
-    private underlying: SelectionController[]
-    private locked: boolean
-
-    constructor(initial: SelectionController) {
-        this.underlying = [initial]
-        this.locked = false
+    personIsInteractive(personId: string): boolean {
+        return this.generation.relativies.has(personId)
     }
-
-    lock() {
-        this.locked = true
-    }
-
-    unlock() {
-        this.locked = false
-    }
-
-    push(contoller: SelectionController) {
-        if (!this.locked) this.underlying = [contoller, ...this.underlying]
-    }
-
-    pop() {
-        if (!this.locked) this.underlying = this.underlying.slice(1, this.underlying.length)
-    }
-
-    personIsSelected(personId: string): boolean {
-        let head = this.underlying[0]
-        return head.personIsSelected(personId)
-    }
-
-    familyIsSelected(familyId: string): boolean {
-        let head = this.underlying[0]
-        return head.familyIsSelected(familyId)
-    }
-
 }
