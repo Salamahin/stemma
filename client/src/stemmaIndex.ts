@@ -58,11 +58,7 @@ export class StemmaIndex {
         this._lineage = new Map<string, Generation>(
             this.stemma.people.map(p => [p.id, this.buildLineage(p)])
         )
-
-        let xxx1 = [...this._lineage.values()].map(p => p.generation)
-
-        console.log(xxx1)
-        this._maxGeneration = Math.max(...xxx1);
+        this._maxGeneration = Math.max(...[...this._lineage.values()].map(p => p.generation));
     }
 
     private computeLineage(personId: string, relation: Map<string, FamilyDescription[]>) {

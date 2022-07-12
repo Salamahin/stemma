@@ -7,6 +7,7 @@
     import FullStemma from "./components/FullStemma.svelte";
     import { Model, StemmaDescription, User, Stemma } from "./model";
     import { StemmaIndex } from "./stemmaIndex";
+    import { SelectEverythingController, StackedSelectionController } from "./selectionController";
 
     export let google_client_id;
     export let stemma_backend_url;
@@ -28,6 +29,7 @@
     let selectedStemmaDescription: StemmaDescription;
     let selectedStemma: Stemma = { people: [], families: [] };
     let stemmaIndex: StemmaIndex;
+    let selectionController = new StackedSelectionController(new SelectEverythingController());
 
     function handleSignIn(event: CustomEvent) {
         user = event.detail as User;
@@ -68,8 +70,6 @@
 
     $: {
         stemmaIndex = new StemmaIndex(selectedStemma);
-        console.log("updated!");
-        console.log(stemmaIndex.maxGeneration());
     }
 </script>
 
@@ -96,7 +96,7 @@
 
     <PersonSelectionModal bind:this={personSelectionModal} on:personRemoved={(e) => handlePersonRemoved(e)} on:personUpdated={(e) => hadlePersonUpdated(e)} />
 
-    <FullStemma stemma={selectedStemma} {stemmaIndex} on:personSelected={(e) => personSelectionModal.showPersonDetails(e.detail)} />
+    <FullStemma stemma={selectedStemma} {stemmaIndex} {selectionController} on:personSelected={(e) => personSelectionModal.showPersonDetails(e.detail)} />
 
     <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </main>

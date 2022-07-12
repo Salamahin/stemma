@@ -4,34 +4,28 @@ import { Generation, StemmaIndex } from "./stemmaIndex";
 export interface SelectionController {
     personIsSelected(personId: string): boolean
     familyIsSelected(familyId: string): boolean
-    connected(personId: string, familyId: string): boolean
 }
 
-class NoOpSelectionController implements SelectionController {
+class SelectNothingController implements SelectionController {
     personIsSelected(personId: string): boolean {
         return false
     }
     familyIsSelected(familyId: string): boolean {
         return false
     }
-    connected(personId: string, familyId: string): boolean {
-        return false
-    }
-
 }
 
-abstract class SelectionControllerImpl implements SelectionController {
-    abstract personIsSelected(personId: string): boolean
-
-    abstract familyIsSelected(familyId: string): boolean
-
-    connected(personId: string, familyId: string): boolean {
-        return this.personIsSelected(personId) && this.familyIsSelected(familyId)
+export class SelectEverythingController implements SelectionController {
+    personIsSelected(personId: string): boolean {
+        return true
+    }
+    familyIsSelected(familyId: string): boolean {
+        return true
     }
 }
 
 function compose(left: SelectionController, right: SelectionController) {
-    return new class extends SelectionControllerImpl {
+    return new class implements SelectionController {
         personIsSelected(personId: string): boolean {
             return left.personIsSelected(personId) || right.personIsSelected(personId)
         }
@@ -43,15 +37,14 @@ function compose(left: SelectionController, right: SelectionController) {
 }
 
 export function composeAllSelectionControllers(controllers: SelectionController[]) {
-    return controllers.reduce((prev, current) => compose(prev, current), new NoOpSelectionController())
+    return controllers.reduce((prev, current) => compose(prev, current), new SelectNothingController())
 }
 
-export class SimpleSelectionController extends SelectionControllerImpl {
+export class SimpleSelectionController implements SelectionController {
     private peopleIds: Set<string>
     private familyIds: Set<string>
 
     constructor(peopleIdsToSelect: string[], familyIdsToSelect: string[]) {
-        super()
         this.peopleIds = new Set(peopleIdsToSelect)
         this.familyIds = new Set(familyIdsToSelect)
     }
@@ -65,11 +58,10 @@ export class SimpleSelectionController extends SelectionControllerImpl {
     }
 }
 
-export class LineageSelectionController extends SelectionControllerImpl {
+export class LineageSelectionController implements SelectionController {
     private generation: Generation
 
     constructor(index: StemmaIndex, personId: string) {
-        super()
         this.generation = index.lineage(personId)
     }
 
@@ -80,4 +72,33 @@ export class LineageSelectionController extends SelectionControllerImpl {
     familyIsSelected(familyId: string): boolean {
         return this.generation.families.has(familyId)
     }
+}
+
+export class StackedSelectionController implements SelectionController {
+    private underlying: SelectionController[]
+
+    constructor(initial: SelectionController) {
+        this.underlying = [initial]
+    }
+
+    push(contoller: SelectionController) {
+        this.underlying = [contoller, ...this.underlying]
+        console.log(this.underlying)
+    }
+
+    pop() {
+        this.underlying = this.underlying.slice(1, this.underlying.length)
+        console.log(this.underlying)
+    }
+
+    personIsSelected(personId: string): boolean {
+        let head = this.underlying[0]
+        return head.personIsSelected(personId)
+    }
+
+    familyIsSelected(familyId: string): boolean {
+        let head = this.underlying[0]
+        return head.familyIsSelected(familyId)
+    }
+
 }
