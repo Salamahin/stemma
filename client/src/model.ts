@@ -68,14 +68,18 @@ export class Model {
     }
 
     async createFamily(stemmaId: string, parents: (NewPerson | StoredPerson)[], children: (NewPerson | StoredPerson)[]) {
+        let request = {
+            "parent1": parents.length > 0 ? parents[0] : null,
+            "parent2": parents.length > 1 ? parents[1] : null,
+            "children": children.map(c => this.sanitize(c))
+        }
+
+        console.log(JSON.stringify(request))
+
         const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/family`, {
             method: 'POST',
             headers: this.commonHeader,
-            body: JSON.stringify({
-                "parent1": parents.length > 0 ? parents[0] : null,
-                "parent2": parents.length > 1 ? parents[1] : null,
-                "children": children
-            })
+            body: JSON.stringify(request)
         })
 
         return await this.parseResponse<Stemma>(response);
@@ -122,5 +126,9 @@ export class Model {
         if (!response.ok)
             throw new Error(`Unexpected response: ${json}`)
         return json as T;
+    }
+
+    private sanitize(obj) {
+        return Object.fromEntries(Object.entries(obj).filter(([_, v]) => v != null && v != ""))
     }
 }

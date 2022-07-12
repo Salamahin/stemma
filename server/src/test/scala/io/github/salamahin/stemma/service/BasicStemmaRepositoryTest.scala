@@ -55,6 +55,33 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
     } yield assertTrue(err == IncompleteFamily())
   }
 
+  private val appendChildrenToFullExistingFamily = test("when family description contains existing parents that already have a full family then children appended to that family") {
+    for {
+      (s, a)          <- services
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      stemmaId        <- s.createStemma(userId, "test stemma")
+
+      FamilyDescription(_, jamesId :: _, _)       <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
+      FamilyDescription(_, _ :: jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(existing(jamesId), createJill)(createJohn))
+      _                                           <- s.createFamily(userId, stemmaId, family(existing(jamesId), existing(jillId))(createJosh))
+
+      render(families) <- s.stemma(userId, stemmaId)
+    } yield assert(families)(hasSameElements("(James, Jill) parentsOf (John, Josh)" :: "(James) parentsOf (Jane)" :: Nil))
+  }
+
+  private val appendChildrenToIncompleteExistingFamily = test("when family description contains a single parent then newely added with same single parent appended to that family") {
+    for {
+      (s, a)          <- services
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      stemmaId        <- s.createStemma(userId, "test stemma")
+
+      FamilyDescription(_, jamesId :: _, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
+      _                                     <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJohn))
+
+      render(families) <- s.stemma(userId, stemmaId)
+    } yield assert(families)(hasSameElements("(James) parentsOf (Jane, John)" :: Nil))
+  }
+
   private val duplicatedIdsForbidden = test("cant update a family when there are duplicated ids in members") {
     for {
       (s, a) <- services
@@ -287,6 +314,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       cantUpdateFamilyIfNotAnOwner,
       cantRequestStemmaIfNotGraphOwner,
       whenUpdatingFamilyAllMembersShouldBelongToGraph,
-      canChangeOwnershipInRecursiveManner
+      canChangeOwnershipInRecursiveManner,
+      appendChildrenToFullExistingFamily,
+      appendChildrenToIncompleteExistingFamily
     )
 }

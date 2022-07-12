@@ -66,9 +66,9 @@
         updateGraph(nodes, relations);
     }
 
-    // $: {
-    //     if (svg) highlight();
-    // }
+    $: {
+        if (svg && selectionController) highlight();
+    }
 
     function highlight() {
         function getNodeColor(node) {
@@ -210,25 +210,23 @@
 
         svg.selectAll("circle")
             .on("mouseenter", (event, node) => {
-                console.log(selectionController.personIsInteractive(node.id));
-                if (node.type == "person" && selectionController.personIsInteractive(node.id)) {
-                    selectionController = selectionController.add(node.id, new GenerationSelection(stemmaIndex, node.id));
+                if (node.type == "person" && selectionController.personIsHighlighted(node.id)) {
+                    selectionController.add(node.id, new GenerationSelection(stemmaIndex, node.id));
+                    highlight()
 
                     svg.selectAll("circle")
                         .filter((n) => n.id == node.id)
                         .attr("r", hoveredPersonR);
-
-                    // highlight();
                 }
             })
             .on("mouseleave", (_event, node) => {
                 if (node.type == "person") {
-                    selectionController = selectionController.remove(node.id);
-                    highlight();
+                    selectionController.remove(node.id);
+                    highlight()
                 }
             })
             .on("click", (event, node) => {
-                if (selectionController.personIsInteractive(node.id)) {
+                if (selectionController.personIsHighlighted(node.id)) {
                     let selectedPerson = stemmaIndex.get(node.id);
                     dispatch("personSelected", selectedPerson);
                 }

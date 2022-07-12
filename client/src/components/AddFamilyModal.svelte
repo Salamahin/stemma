@@ -24,6 +24,8 @@
     let parents;
     let children;
 
+    let selectedParentsCount, selectedChildrenCount;
+
     let promptingParentId = -1;
     let promptingChildId = -1;
 
@@ -33,12 +35,7 @@
     let oldSelectionController: SelectionController;
 
     export function promptNewFamily() {
-        parentsEl.reset();
-        childrenEl.reset();
-
-        promptingParentId = -1;
-        promptingChildId = -1;
-
+        reset();
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
@@ -46,9 +43,17 @@
         return promptingParentId >= 0 || promptingChildId >= 0;
     }
 
+    function reset() {
+        parentsEl.reset();
+        childrenEl.reset();
+
+        promptingParentId = -1;
+        promptingChildId = -1;
+    }
+
     function familyCreated() {
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-        dispatch("familyAdded", { parents: parentsEl.selected(), children: childrenEl.selected() } as CreateFamily);
+        dispatch("familyAdded", { parents: parents, children: children } as CreateFamily);
     }
 
     function promptParentSelection(event: PersonChoice) {
@@ -62,26 +67,20 @@
     }
 
     function promtPersonSelection(event: PersonChoice) {
-        let allChildren = event.personIds.flatMap((id) => stemmaIndex.parents(id));
-        let allParents = event.personIds.flatMap((id) => stemmaIndex.children(id));
-        let allFamilies = event.personIds.flatMap((id) => [...stemmaIndex.families(id)]);
-
         oldSelectionController = selectionController;
-        selectionController = new RestrictiveSelectionController([...event.personIds, ...allChildren, ...allParents], allFamilies, event.personIds);
+        selectionController = new RestrictiveSelectionController(event.personIds);
 
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     }
 
     export function personSelected(person: StoredPerson) {
-        selectionController = oldSelectionController
+        selectionController = oldSelectionController;
 
         if (promptingParentId >= 0) parentsEl.set(promptingParentId, person);
         else if (promptingChildId >= 0) childrenEl.set(promptingChildId, person);
 
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
-
-    let selectedParentsCount, selectedChildrenCount;
 
     $: {
         selectedParentsCount = parents ? parents.length : 0;
@@ -103,7 +102,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="addFamlilyLabel">Добавить семью</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" on:click={(e) => reset()} />
             </div>
             <div class="modal-body">
                 <p class="fs-5 text-center">Родители</p>
@@ -126,7 +125,7 @@
                 />
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" on:click={(e) => reset()}>Отмена</button>
                 <button type="button" class="btn btn-primary" on:click={() => familyCreated()} disabled={selectedParentsCount + selectedChildrenCount < 2}
                     >Добавить</button
                 >

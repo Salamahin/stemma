@@ -94,9 +94,10 @@
         let pd = personDetails[personIndex];
 
         let namesakes = stemmaIndex.namesakes(name);
+        let selectAppendinx = namesakes.length > 1 ? [SelectId] : []
 
         pd.name = name;
-        pd.namesakes = [NewId, ...stemmaIndex.namesakes(name).map((id) => createId(id)), SelectId];
+        pd.namesakes = [NewId, ...stemmaIndex.namesakes(name).map((id) => createId(id)), ...selectAppendinx];
 
         idChanged(pd, personIndex, namesakes.length ? pd.namesakes[1] : pd.namesakes[0]);
     }
@@ -124,9 +125,9 @@
     $: peopleNames = [...new Set(stemma.people.map((p) => p.name))];
     $: {
         let clearedPersonDetails = personDetails.filter((pd) => !pd.isEmpty());
-        if (clearedPersonDetails.length < maxPeopleCount) clearedPersonDetails = [...clearedPersonDetails, new PersonDetails()];
+        let appendix = clearedPersonDetails.length < maxPeopleCount ? [new PersonDetails()] : [] 
 
-        personDetails = [...clearedPersonDetails];
+        personDetails = [...clearedPersonDetails, ...appendix];
 
         dispatch(
             "selected",
@@ -161,7 +162,7 @@
                             containerStyles="height:38px"
                             ClearIcon={clearIcon}
                             getOptionLabel={(option, filterText) => {
-                                return option.isCreator ? `Совпадений не найдено` : option["label"];
+                                return option.isCreator ? `Нажмите Enter для подтверждения` : option["label"];
                             }}
                             hideEmptyState={true}
                         />
@@ -176,26 +177,9 @@
                             on:select={(e) => idChanged(pd, i, e.detail)}
                             containerStyles="height:38px"
                             listAutoWidth={false}
-                            indicatorSvg='<svg width="100%" height="100%" viewBox="0 0 20 20" focusable="false" aria-hidden="true" transform="translate(0, -6)"> <path d="M4.516 7.548c0.436-0.446 1.043-0.481 1.576 0l3.908 3.747 3.908-3.747c0.533-0.481 1.141-0.446 1.574 0 0.436 0.445 0.408 1.197 0 1.615-0.406 0.418-4.695 4.502-4.695 4.502-0.217 0.223-0.502 0.335-0.787 0.335s-0.57-0.112-0.789-0.335c0 0-4.287-4.084-4.695-4.502s-0.436-1.17 0-1.615z" /> </svg>'
+                            isDisabled={pd.namesakes.length == 1}
+                            indicatorSvg={'<svg width="100%" height="100%" viewBox="0 0 20 20" focusable="false" aria-hidden="true" transform="translate(0, -6)"> <path d="M4.516 7.548c0.436-0.446 1.043-0.481 1.576 0l3.908 3.747 3.908-3.747c0.533-0.481 1.141-0.446 1.574 0 0.436 0.445 0.408 1.197 0 1.615-0.406 0.418-4.695 4.502-4.695 4.502-0.217 0.223-0.502 0.335-0.787 0.335s-0.57-0.112-0.789-0.335c0 0-4.287-4.084-4.695-4.502s-0.436-1.17 0-1.615z" /> </svg>'}
                         />
-                        <!-- <select
-                            id={`id_selector_${i}`}
-                            class="form-select"
-                            aria-label="namesake select"
-                            on:change={() => idChanged(pd, i, document.getElementById(`id_selector_${i}`).value)}
-                            value={JSON.stringify({ select: false, id: pd.id })}
-                            disabled={pd.isEmpty()}
-                        >
-                            <option value={JSON.stringify({ select: false, id: "" })}>Новый</option>
-                            {#if pd.namesakes.length}
-                                <optgroup label="Существующий">
-                                    {#each pd.namesakes as ns}
-                                        <option value={JSON.stringify({ select: false, id: ns })} selected={pd.id === ns}>{ns}</option>
-                                    {/each}
-                                    <option value={JSON.stringify({ select: true, id: "" })}>Выбрать...</option>
-                                </optgroup>
-                            {/if}
-                        </select> -->
                     </td>
                     <td>
                         <input class="form-control" type="date" value={pd.birthDate} disabled={!pd.isNew() || pd.isEmpty()} />

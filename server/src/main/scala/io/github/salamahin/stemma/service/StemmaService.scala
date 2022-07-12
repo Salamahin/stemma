@@ -2,8 +2,8 @@ package io.github.salamahin.stemma.service
 
 import gremlin.scala.{ScalaGraph, TraversalSource}
 import io.github.salamahin.stemma.domain._
-import io.github.salamahin.stemma.tinkerpop.Transaction._
 import io.github.salamahin.stemma.tinkerpop.StemmaRepository
+import io.github.salamahin.stemma.tinkerpop.Transaction._
 import zio._
 
 class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
@@ -23,7 +23,13 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
 
   private def createFamilyAndSetRelations(ts: TraversalSource, stemmaId: String, ownerId: String, family: CreateFamily) = {
     val CreateFamily(p1, p2, children) = family
-    val familyId                       = ops.newFamily(ts, stemmaId)
+
+    val familyId = ((p1, p2) match {
+      case (Some(ExistingPerson(parent1)), Some(ExistingPerson(parent2))) => ops.findFamily(ts, parent1, parent2)
+      case (Some(ExistingPerson(parent1)), None)                          => ops.findFamily(ts, parent1)
+      case (None, Some(ExistingPerson(parent2)))                          => ops.findFamily(ts, parent2)
+      case _                                                              => None
+    }).getOrElse(ops.newFamily(ts, stemmaId))
 
     ops.makeFamilyOwner(ts, ownerId, familyId) *> setFamilyRelations(ts, stemmaId, ownerId, familyId, (p1 ++ p2).toSeq, children)
   }

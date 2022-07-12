@@ -120,16 +120,6 @@ export class StemmaIndex {
         return []
     }
 
-    families(memberId: string) {
-        let cs = this.childToParents.get(memberId)
-        let ps = this.parentToChildren.get(memberId)
-
-        let csf = cs ? cs.map(f => f.familyId) : []
-        let psf = ps ? ps.map(f => f.familyId) : []
-
-        return [...csf, ...psf]
-    }
-
     name(personId: string) {
         return this._names.get(personId)
     }

@@ -15,6 +15,7 @@
     let addStemmaModal;
     let addFamilyModal;
     let personSelectionModal;
+    let stemmaChart;
 
     let model: Model;
     let user: User = {
@@ -50,6 +51,7 @@
     }
 
     function handleNewFamilyCreation(event: CustomEvent<CreateFamily>) {
+        console.log(event.detail)
         model.createFamily(selectedStemmaDescription.id, event.detail.parents, event.detail.children).then((s) => (selectedStemma = s));
     }
 
@@ -74,6 +76,7 @@
     }
 
     $: stemmaIndex = new StemmaIndex(selectedStemma);
+
 </script>
 
 <main>
@@ -105,7 +108,7 @@
 
     <PersonSelectionModal bind:this={personSelectionModal} on:personRemoved={(e) => handlePersonRemoved(e)} on:personUpdated={(e) => hadlePersonUpdated(e)} />
 
-    <FullStemma stemma={selectedStemma} {stemmaIndex} bind:selectionController on:personSelected={(e) => handlePersonSelection(e)} />
+    <FullStemma bind:this={stemmaChart} stemma={selectedStemma} {stemmaIndex} bind:selectionController on:personSelected={(e) => handlePersonSelection(e)} />
 
     <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </main>

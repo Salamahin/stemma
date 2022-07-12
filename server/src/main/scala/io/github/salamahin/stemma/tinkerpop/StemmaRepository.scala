@@ -33,7 +33,7 @@ class StemmaRepository extends LazyLogging {
         val name      = vertex.property(personKeys.name).value()
         val birthDate = vertex.property(personKeys.birthDate).toOption.map(LocalDate.parse)
         val deathDate = vertex.property(personKeys.deathDate).toOption.map(LocalDate.parse)
-        val bio = vertex.property(personKeys.bio).toOption
+        val bio       = vertex.property(personKeys.bio).toOption
 
         PersonDescription(vertex.id().toString, name, birthDate, deathDate, bio)
       }
@@ -68,6 +68,22 @@ class StemmaRepository extends LazyLogging {
     val family = ts.addV(types.family).head()
     family.setProperty(keys.stemmaId, stemmaId)
     family.id().toString
+  }
+
+  def findFamily(ts: TraversalSource, parent1: String, parent2: String) = {
+    ts.V(parent1)
+      .out(relations.spouseOf)
+      .where(_.in(relations.spouseOf).map(_.id().toString).is(parent2))
+      .headOption()
+      .map(_.id().toString)
+  }
+
+  def findFamily(ts: TraversalSource, parent1: String) = {
+    ts.V(parent1)
+      .out(relations.spouseOf)
+      .where(_.in(relations.spouseOf).count().is(P.eq(1)))
+      .headOption()
+      .map(_.id().toString)
   }
 
   def getOrCreateUser(ts: TraversalSource, email: Email): User = {
@@ -175,7 +191,7 @@ class StemmaRepository extends LazyLogging {
       fromV <- ts.V(from).headOption().toRight(sourceNotFound)
       toV   <- ts.V(to).headOption().toRight(targetNotFound)
       _     <- checks.toList.map(_.between(fromV, toV)).sequence
-      _     = ts.addE(relation).from(fromV).to(toV).iterate()
+      _     = if (fromV.out(relation).is(toV).notExists()) ts.addE(relation).from(fromV).to(toV).iterate()
     } yield ()
   }
 
