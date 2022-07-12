@@ -26,10 +26,6 @@
     export let stemmaIndex: StemmaIndex;
     export let selectionController: StackedSelectionController;
 
-    function personSelected(p: StoredPerson) {
-        dispatch("personSelected", p);
-    }
-
     let nodes = [];
     let relations = [];
 
@@ -84,19 +80,12 @@
 
         let simulation = d3
             .forceSimulation(nodes)
-            .force(
-                "link",
-                d3.forceLink(relations).id((node) => node.id)
-            )
-
-            .force("x", d3.forceX(window.innerWidth / 2).strength(0.5))
-            .force("y", d3.forceY(window.innerHeight / 2).strength(0.5))
+            .force("link", d3.forceLink(relations).id((node) => node.id))
+            .force("x", d3.forceX(window.innerWidth / 2).strength(0.2))
+            .force("y", d3.forceY(window.innerHeight / 2).strength(0.2))
             .force("center", d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2))
-            .force(
-                "collide",
-                d3.forceCollide().radius((d) => d.r * 20)
-            )
-            .force("repelForce", d3.forceManyBody().strength(-2500).distanceMin(85))
+            .force("collide", d3.forceCollide().radius((d) => d.r * 20))
+            .force("repelForce", d3.forceManyBody().strength(-1500).distanceMin(85))
             .on("tick", () => {
                 svg.selectAll("line")
                     .attr("x1", (d) => d.source.x)
@@ -151,14 +140,14 @@
 
             function markerEnd(line) {
                 if (!lineHighlighted(line)) return null;
-                else if(line.type == "familyToChild") return "url(#arrow-to-person)"
-                else return  "url(#arrow-to-family)"
+                else if (line.type == "familyToChild") return "url(#arrow-to-person)";
+                else return "url(#arrow-to-family)";
             }
 
             svg.selectAll("line")
                 .attr("stroke", (line) => lineFill(line))
                 .attr("stroke-width", (line) => lineWidth(line))
-                .attr("marker-end", (line) => markerEnd(line))
+                .attr("marker-end", (line) => markerEnd(line));
 
             let circles = svg.selectAll("circle");
 
@@ -183,7 +172,7 @@
                 (enter) => enter.append("line").lower(),
                 (update) => update,
                 (exit) => exit.remove()
-            )
+            );
 
         svg.select("g.main")
             .selectAll("g")
@@ -231,12 +220,13 @@
                 }
             })
             .on("click", (event, node) => {
-                let selectedPerson = stemma.people.find((p) => p.id == node.id);
-                personSelected(selectedPerson);
+                if (selectionController.personIsSelected(node.id)) {
+                    let selectedPerson = stemmaIndex.get(node.id);
+                    dispatch("personSelected", selectedPerson);
+                }
             });
 
-
-        highlight()    
+        highlight();
         svg.select("g.main").selectAll("g").call(drag());
     }
 

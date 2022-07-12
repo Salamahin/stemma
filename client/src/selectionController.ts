@@ -76,19 +76,27 @@ export class LineageSelectionController implements SelectionController {
 
 export class StackedSelectionController implements SelectionController {
     private underlying: SelectionController[]
+    private locked: boolean
 
     constructor(initial: SelectionController) {
         this.underlying = [initial]
+        this.locked = false
+    }
+
+    lock() {
+        this.locked = true
+    }
+
+    unlock() {
+        this.locked = false
     }
 
     push(contoller: SelectionController) {
-        this.underlying = [contoller, ...this.underlying]
-        console.log(this.underlying)
+        if (!this.locked) this.underlying = [contoller, ...this.underlying]
     }
 
     pop() {
-        this.underlying = this.underlying.slice(1, this.underlying.length)
-        console.log(this.underlying)
+        if (!this.locked) this.underlying = this.underlying.slice(1, this.underlying.length)
     }
 
     personIsSelected(personId: string): boolean {

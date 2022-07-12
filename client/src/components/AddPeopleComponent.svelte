@@ -70,6 +70,8 @@
             filteredNamesakes.push([]);
         }
 
+        
+
         selectedNames = [...filteredNames];
         selectedBirthDays = [...filteredBirthDays];
         selectedDeathDays = [...filteredDeathDays];
