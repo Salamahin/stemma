@@ -6,9 +6,10 @@
 </script>
 
 <script lang="ts">
-    import { createEventDispatcher } from "svelte";
+    import { createEventDispatcher, onDestroy } from "svelte";
     import { StemmaIndex } from "../stemmaIndex";
     import ClearIcon from "./ClearIconTranslated.svelte";
+    import { prop_dev } from "svelte/internal";
 
     const dispatch = createEventDispatcher();
 
@@ -16,67 +17,78 @@
     export let stemma: Stemma;
     export let stemmaIndex: StemmaIndex;
 
-    let selectedNames: string[] = [""];
-    let namesakes: string[][] = [[]];
-    let selectedIds: string[] = [""];
-    let selectedBirthDays: string[] = [""];
-    let selectedDeathDays: string[] = [""];
+    class PersonDetails {
+        name: string = "";
+        namesakes: string[] = [];
+        birthDate: string = "";
+        deathDate: string = "";
+        id: string = "";
 
-    let peopleNames: string[] = [];
-    let clearIcon = ClearIcon;
+        isNew() {
+            return this.id == "";
+        }
 
-    function updateName(personIndex: number, name: string) {
-        selectedNames[personIndex] = name;
-        namesakes[personIndex] = stemmaIndex.namesakes(name);
-        idChanged(personIndex, namesakes[personIndex][0]);
+        isEmpty() {
+            return this.name == "";
+        }
+
+        toStruct() {
+            let obj = {};
+
+            if (this.isNew()) {
+                obj.name = this.name;
+                obj.deathDate = this.deathDate;
+                obj.birthDate = this.birthDate;
+            } else {
+                obj.id = this.id;
+            }
+
+            return obj;
+        }
     }
 
-    function idChanged(personIndex: number, value: string) {
-        selectedIds[personIndex] = value;
+    let personDetails: PersonDetails[] = [new PersonDetails()];
+    let peopleNames: string[] = [""];
+    let clearIcon = ClearIcon;
 
-        if (!value || value.length == 0) {
-            selectedBirthDays[personIndex] = "";
-            selectedDeathDays[personIndex] = "";
+    export function reset() {
+        personDetails = [new PersonDetails()];
+    }
+
+    function nameChanged(personIndex: number, name: string) {
+        let pd = personDetails[personIndex];
+        pd.name = name;
+        pd.namesakes = stemmaIndex.namesakes(name);
+        idChanged(pd, personIndex, pd.namesakes[0]);
+    }
+
+    function idChanged(pd: PersonDetails, personIndex: number, value: string) {
+        if (!value || !value.length) {
+            pd.id = "";
+            pd.birthDate = "";
+            pd.deathDate = "";
         } else {
             let sp = stemmaIndex.get(value);
-            selectedBirthDays[personIndex] = sp.birthDate;
-            selectedDeathDays[personIndex] = sp.deathDate;
+            pd.id = value;
+            pd.birthDate = sp.birthDate;
+            pd.deathDate = sp.deathDate;
         }
+
+        personDetails[personIndex] = pd;
     }
 
     $: peopleNames = [...new Set(stemma.people.map((p) => p.name))];
     $: {
-        let filteredNames: string[] = [];
-        let filteredBirthDays: string[] = [];
-        let filteredDeathDays: string[] = [];
-        let filteredIds: string[] = [];
-        let filteredNamesakes: string[][] = [];
+        let clearedPersonDetails = personDetails.filter((pd) => !pd.isEmpty());
+        if (clearedPersonDetails.length < maxPeopleCount) clearedPersonDetails = [...clearedPersonDetails, new PersonDetails()];
 
-        for (let i = 0; i < selectedNames.length; i++) {
-            if (selectedNames[i].length != 0) {
-                filteredNames.push(selectedNames[i]);
-                filteredBirthDays.push(selectedBirthDays[i]);
-                filteredDeathDays.push(selectedDeathDays[i]);
-                filteredIds.push(selectedIds[i]);
-                filteredNamesakes.push(namesakes[i]);
-            }
-        }
+        personDetails = [...clearedPersonDetails];
+        console.log(personDetails);
 
-        if (filteredNames.length < maxPeopleCount) {
-            filteredNames.push("");
-            filteredBirthDays.push("");
-            filteredDeathDays.push("");
-            filteredIds.push("");
-            filteredNamesakes.push([]);
-        }
-
-        
-
-        selectedNames = [...filteredNames];
-        selectedBirthDays = [...filteredBirthDays];
-        selectedDeathDays = [...filteredDeathDays];
-        selectedIds = [...filteredIds];
-        namesakes = [...filteredNamesakes];
+        dispatch(
+            "selected",
+            clearedPersonDetails.map((pd) => pd.toStruct())
+        );
     }
 </script>
 
@@ -91,17 +103,17 @@
             </tr>
         </thead>
         <tbody>
-            {#each selectedNames as name, i}
+            {#each personDetails as pd, i}
                 <tr>
                     <td style="min-width:300px">
                         <Select
-                            value={name}
+                            value={pd.name}
                             items={peopleNames}
                             isCreatable={true}
                             isClearable={true}
                             placeholder="Имя..."
-                            on:select={(e) => updateName(i, e.detail.value)}
-                            on:clear={() => updateName(i, "")}
+                            on:select={(e) => nameChanged(i, e.detail.value)}
+                            on:clear={() => nameChanged(i, "")}
                             listAutoWidth={false}
                             containerStyles="height:38px"
                             ClearIcon={clearIcon}
@@ -116,24 +128,26 @@
                             id={`id_selector_${i}`}
                             class="form-select"
                             aria-label="namesake select"
-                            on:change={() => idChanged(i, document.getElementById(`id_selector_${i}`).value)}
-                            disabled={selectedNames[i] === ""}
-                            value={selectedIds[i]}
+                            on:change={() => idChanged(pd, i, document.getElementById(`id_selector_${i}`).value)}
+                            value={pd.id}
+                            disabled={pd.isEmpty()}
                         >
                             <option value={""}>Новый</option>
-                            <optgroup label="Существующий">
-                                {#each namesakes[i] as ns, nsIdx}
-                                    <option value={ns} selected={nsIdx == 0 ? true : false}>{ns}</option>
-                                {/each}
-                                <option>Выбрать...</option>
-                            </optgroup>
+                            {#if pd.namesakes.length}
+                                <optgroup label="Существующий">
+                                    {#each pd.namesakes as ns, nsIdx}
+                                        <option value={ns} selected={nsIdx == 0 ? true : false}>{ns}</option>
+                                    {/each}
+                                    <option>Выбрать...</option>
+                                </optgroup>
+                            {/if}
                         </select>
                     </td>
                     <td>
-                        <input class="form-control" type="date" value={selectedBirthDays[i]} disabled={selectedIds[i] === ""} />
+                        <input class="form-control" type="date" value={pd.birthDate} disabled={!pd.isNew() || pd.isEmpty()} />
                     </td>
                     <td>
-                        <input class="form-control" type="date" value={selectedDeathDays[i]} disabled={selectedIds[i] === ""} />
+                        <input class="form-control" type="date" value={pd.deathDate} disabled={!pd.isNew() || pd.isEmpty()} />
                     </td>
                 </tr>
             {/each}

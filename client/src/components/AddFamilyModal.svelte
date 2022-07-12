@@ -20,12 +20,15 @@
     let parentsEl;
     let childrenEl;
 
+    let parents;
+    let children;
+
     export let stemma: Stemma;
     export let stemmaIndex: StemmaIndex;
 
     export function promptNewFamily() {
-        // parentsEl.reset();
-        // childrenEl.reset();
+        parentsEl.reset();
+        childrenEl.reset();
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
@@ -35,6 +38,11 @@
     }
 
     let selectedParentsCount, selectedChildrenCount;
+
+    $: {
+        selectedParentsCount = parents ? parents.length : 0;
+        selectedChildrenCount = children ? children.length : 0;
+    }
 </script>
 
 <div
@@ -55,9 +63,9 @@
             </div>
             <div class="modal-body">
                 <p class="fs-5 text-center">Родители</p>
-                <AddPeopleComponent maxPeopleCount={2} bind:stemma bind:stemmaIndex={stemmaIndex} bind:this={parentsEl} />
+                <AddPeopleComponent maxPeopleCount={2} bind:stemma bind:stemmaIndex bind:this={parentsEl} on:selected={(e) => (parents = e.detail)} />
                 <p class="fs-5 text-center mt-5">Дети</p>
-                <AddPeopleComponent maxPeopleCount={20} bind:stemma bind:stemmaIndex={stemmaIndex} bind:this={childrenEl} />
+                <AddPeopleComponent maxPeopleCount={20} bind:stemma bind:stemmaIndex bind:this={childrenEl} on:selected={(e) => (children = e.detail)} />
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
