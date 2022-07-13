@@ -19,7 +19,7 @@
     let shadedRelationColor = "#a9a9a9";
 
     let childRelationWidth = "0.5px";
-    let familyRelationWidth = "1.5px";
+    let familyRelationWidth = "2.5px";
     let shadedRelationWidth = "0.1px";
 
     export let stemma: Stemma;
@@ -212,7 +212,7 @@
             .on("mouseenter", (event, node) => {
                 if (node.type == "person" && selectionController.personIsHighlighted(node.id)) {
                     selectionController.add(node.id, new GenerationSelection(stemmaIndex, node.id));
-                    highlight()
+                    highlight();
 
                     svg.selectAll("circle")
                         .filter((n) => n.id == node.id)
@@ -222,11 +222,11 @@
             .on("mouseleave", (_event, node) => {
                 if (node.type == "person") {
                     selectionController.remove(node.id);
-                    highlight()
+                    highlight();
                 }
             })
             .on("click", (event, node) => {
-                if (selectionController.personIsHighlighted(node.id)) {
+                if (node.type == "person" && selectionController.personIsHighlighted(node.id)) {
                     let selectedPerson = stemmaIndex.get(node.id);
                     dispatch("personSelected", selectedPerson);
                 }
