@@ -1,15 +1,14 @@
 <script context="module" lang="ts">
-    import { NewPerson, Stemma, StoredPerson } from "../model";
+    import { Stemma, StoredPerson } from "../model";
     import Select from "svelte-select";
 
     export type PersonChoice = { index: number; personIds: string[] };
 </script>
 
 <script lang="ts">
-    import { createEventDispatcher, onDestroy } from "svelte";
+    import { createEventDispatcher } from "svelte";
     import { StemmaIndex } from "../stemmaIndex";
     import ClearIcon from "./ClearIconTranslated.svelte";
-    import { prop_dev } from "svelte/internal";
 
     const dispatch = createEventDispatcher();
 

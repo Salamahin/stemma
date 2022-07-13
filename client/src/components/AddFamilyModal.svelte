@@ -101,7 +101,7 @@
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addFamlilyLabel">Добавить семью</h5>
+                <h5 class="modal-title" id="addFamlilyLabel">Добавить семью или членов семьи</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" on:click={(e) => reset()} />
             </div>
             <div class="modal-body">
