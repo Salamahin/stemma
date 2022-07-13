@@ -9,6 +9,9 @@ import sveltePreprocess from 'svelte-preprocess';
 import typescript from '@rollup/plugin-typescript';
 import css from 'rollup-plugin-css-only';
 import copy from 'rollup-plugin-copy';
+import {
+    less
+} from 'svelte-preprocess-less';
 
 const production = !process.env.ROLLUP_WATCH;
 
@@ -44,7 +47,8 @@ export default {
     plugins: [
         svelte({
             preprocess: sveltePreprocess({
-                sourceMap: !production
+                sourceMap: !production,
+                style: less(),
             }),
             Options: {
                 // enable run-time checks when not in production

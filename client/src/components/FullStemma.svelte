@@ -276,4 +276,10 @@
     });
 </script>
 
-<svg id="chart" class="w-100 p-3" style="height: 1200px;" />
+<svg id="chart" class="w-100 p-3 fullHeight" />
+
+<style lang="less">
+    .fullHeight {
+        min-height: calc(~"100vh - 56px");
+    }
+</style>
