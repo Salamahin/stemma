@@ -51,7 +51,6 @@
     }
 
     function handleNewFamilyCreation(event: CustomEvent<CreateFamily>) {
-        console.log(event.detail)
         model.createFamily(selectedStemmaDescription.id, event.detail.parents, event.detail.children).then((s) => (selectedStemma = s));
     }
 
@@ -76,7 +75,6 @@
     }
 
     $: stemmaIndex = new StemmaIndex(selectedStemma);
-
 </script>
 
 <main>
@@ -93,6 +91,7 @@
             bind:selectedStemmaDescription
             on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
             on:createNewFamily={() => addFamilyModal.promptNewFamily()}
+            stemma={selectedStemma}
         />
     </div>
 
@@ -119,7 +118,7 @@
     }
 
     .authenticate-bg {
-        background-image: url("/assets/bg.webp");
+        background-image: url("/assets/bg.jpg");
         height: 100%;
         background-position: center;
         background-repeat: no-repeat;

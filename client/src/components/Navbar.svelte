@@ -1,6 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    import { StemmaDescription, User } from "../model";
+    import { Stemma, StemmaDescription, User } from "../model";
     import Select from "svelte-select";
 
     export let user: User;
@@ -9,7 +9,15 @@
 
     const dispatch = createEventDispatcher();
 
+    export let stemma: Stemma;
+    type FilterItem = {
+        value: string;
+        label: string;
+    };
+    let filterItems: FilterItem[] = [];
+
     $: if (!selectedStemmaDescription && ownedStemmasDescriptions.length) selectedStemmaDescription = ownedStemmasDescriptions[0];
+    $: if (stemma) filterItems = stemma.people.map((p) => ({ value: `[${p.id}] ${p.name}`, label: p.name }));
 </script>
 
 <header>
@@ -33,14 +41,7 @@
                         <a class="nav-link" href="#">О проекте</a>
                     </li>
                     <li class="nav-item dropdown">
-                        <a
-                            class="nav-link dropdown-toggle"
-                            href="#"
-                            id="navbarDropdownMenuLink"
-                            role="button"
-                            data-bs-toggle="dropdown"
-                            aria-expanded="false"
-                        >
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             {selectedStemmaDescription ? selectedStemmaDescription.name : "Родословные"}
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
@@ -52,7 +53,7 @@
                             <li>
                                 <hr class="dropdown-divider" />
                             </li>
-    
+
                             <li>
                                 <a class="dropdown-item" href="#" on:click={() => dispatch("createNewStemma")}>Новая родословная...</a>
                             </li>
@@ -63,13 +64,12 @@
                     </li>
                 </ul>
                 <div class="d-flex ms-auto">
-                    <Select containerStyles="width: 476px" />
+                    <Select containerStyles="width: 476px" placeholder="Поиск" isMulti={true} isSearchable={true} items={filterItems} listAutoWidth={false} />
                 </div>
             </div>
         </div>
     </nav>
 </header>
-
 
 <style>
     .avatar {
