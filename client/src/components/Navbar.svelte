@@ -3,7 +3,6 @@
     import { Stemma, StemmaDescription, User } from "../model";
     import Select from "svelte-select";
 
-    export let user: User;
     export let ownedStemmasDescriptions: StemmaDescription[];
     export let selectedStemmaDescription: StemmaDescription;
 
@@ -70,11 +69,3 @@
         </div>
     </nav>
 </header>
-
-<style>
-    .avatar {
-        max-width: 40px;
-        max-height: 40px;
-        border-radius: 50%;
-    }
-</style>

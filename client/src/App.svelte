@@ -15,15 +15,8 @@
     let addStemmaModal;
     let addFamilyModal;
     let personSelectionModal;
-    let stemmaChart;
 
     let model: Model;
-    let user: User = {
-        name: "john doe",
-        id_token: "",
-        image_url: "",
-    };
-
     let signedIn = false;
 
     let ownedStemmasDescriptions: StemmaDescription[] = [];
@@ -33,7 +26,7 @@
     let selectionController: SelectionController = new ComposableSelectionController();
 
     function handleSignIn(event: CustomEvent) {
-        user = event.detail as User;
+        let user = event.detail as User;
         signedIn = true;
         model = new Model(stemma_backend_url, user);
         model.listStemmas().then((stemmas) => {
@@ -77,23 +70,14 @@
     $: stemmaIndex = new StemmaIndex(selectedStemma);
 </script>
 
-<main>
-    <div class="authenticate-bg {!signedIn ? 'd-block' : 'd-none'}">
-        <div class="authenticate-holder">
-            <Authenticate {google_client_id} on:signIn={handleSignIn} />
-        </div>
-    </div>
-
-    <div class={signedIn ? "d-block" : "d-none"}>
-        <Navbar
-            {user}
-            bind:ownedStemmasDescriptions
-            bind:selectedStemmaDescription
-            on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
-            on:createNewFamily={() => addFamilyModal.promptNewFamily()}
-            stemma={selectedStemma}
-        />
-    </div>
+{#if signedIn}
+    <Navbar
+        bind:ownedStemmasDescriptions
+        bind:selectedStemmaDescription
+        on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
+        on:createNewFamily={() => addFamilyModal.promptNewFamily()}
+        stemma={selectedStemma}
+    />
 
     <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={handleNewStemma} />
 
@@ -107,19 +91,18 @@
 
     <PersonSelectionModal bind:this={personSelectionModal} on:personRemoved={(e) => handlePersonRemoved(e)} on:personUpdated={(e) => hadlePersonUpdated(e)} />
 
-    <FullStemma bind:this={stemmaChart} stemma={selectedStemma} {stemmaIndex} bind:selectionController on:personSelected={(e) => handlePersonSelection(e)} />
-
-    <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-</main>
+    <FullStemma stemma={selectedStemma} {stemmaIndex} bind:selectionController on:personSelected={(e) => handlePersonSelection(e)} />
+{:else}
+    <div class="authenticate-bg vh-100">
+        <div class="authenticate-holder">
+            <Authenticate {google_client_id} on:signIn={handleSignIn} />
+        </div>
+    </div>
+{/if}
 
 <style>
-    main {
-        height: 100%;
-    }
-
     .authenticate-bg {
         background-image: url("/assets/bg.jpg");
-        height: 100%;
         background-position: center;
         background-repeat: no-repeat;
         background-size: cover;
