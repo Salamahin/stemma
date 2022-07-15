@@ -3,7 +3,7 @@
     import Navbar from "./components/Navbar.svelte";
     import AddStemmaModal from "./components/AddStemmaModal.svelte";
     import AddFamilyModal, { CreateFamily } from "./components/AddFamilyModal.svelte";
-    import PersonSelectionModal, { UpdatePerson } from "./components/PersonSelectionModal.svelte";
+    import PersonSelectionModal, { UpdatePerson } from "./components/PersonDetailsModal.svelte";
     import FullStemma from "./components/FullStemma.svelte";
     import { Model, StemmaDescription, User, Stemma, StoredPerson } from "./model";
     import { StemmaIndex } from "./stemmaIndex";
@@ -102,7 +102,7 @@
 
 <style>
     .authenticate-bg {
-        background-image: url("/assets/bg.jpg");
+        background-image: url("/assets/bg.webp");
         background-position: center;
         background-repeat: no-repeat;
         background-size: cover;

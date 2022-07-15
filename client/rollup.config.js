@@ -67,8 +67,12 @@ export default {
                     dest: "public/vendor/bootstrap/css",
                 },
                 {
-                    src: "node_modules/bootstrap/dist/js/bootstrap.bundle.min.js",
-                    dest: "public/vendor/bootstrap/js",
+                    src: "node_modules/bootstrap-icons/font/bootstrap-icons.css",
+                    dest: "public/vendor/bootstrap-icons/font",
+                },
+                {
+                    src: "node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff2",
+                    dest: "public/vendor/bootstrap-icons/font/fonts",
                 }
             ]
         }),

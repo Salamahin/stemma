@@ -10,7 +10,7 @@
 
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    import AddPeopleComponent, { PersonChoice } from "./AddPeopleComponent.svelte";
+    import AddPeopleComponent, { PersonChoice } from "./FamilyComposition.svelte";
     import { Stemma } from "../model";
     import { StemmaIndex } from "../stemmaIndex";
     import { RestrictiveSelectionController, SelectionController } from "../selectionController";
@@ -98,7 +98,7 @@
     aria-hidden="true"
     bind:this={modalEl}
 >
-    <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-lg-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="addFamlilyLabel">Добавить семью или членов семьи</h5>
@@ -127,7 +127,7 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" on:click={(e) => reset()}>Отмена</button>
                 <button type="button" class="btn btn-primary" on:click={() => familyCreated()} disabled={selectedParentsCount + selectedChildrenCount < 2}
-                    >Добавить</button
+                    >Сохранить семью</button
                 >
             </div>
         </div>

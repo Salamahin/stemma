@@ -38,7 +38,7 @@
 </script>
 
 <div class="modal fade" id="personDetailsModal" tabindex="-1" aria-hidden="true" bind:this={modalEl}>
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-lg-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="addFamlilyLabel">Изменить [{selectedPerson.id}]</h5>
@@ -60,10 +60,6 @@
                 <div class="mb-3">
                     <label for="personDeathDate" class="form-label">Био</label>
                     <textarea class="form-control" rows="6" id="personBioInput">{selectedPerson.bio ? selectedPerson.bio : ""}</textarea>
-                </div>
-                <div class="mb-3 form-switch">
-                    <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault" />
-                    <label class="form-check-label" for="flexSwitchCheckDefault">Закрепить ветку прямых родственников</label>
                 </div>
             </div>
             <div class="modal-footer">

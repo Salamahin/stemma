@@ -9,6 +9,9 @@
     import { createEventDispatcher } from "svelte";
     import { StemmaIndex } from "../stemmaIndex";
     import ClearIcon from "./ClearIconTranslated.svelte";
+    import CreateSelectPerson from "./CreateSelectPerson.svelte";
+
+    import SelectPerson from "./SelectPerson.svelte";
 
     const dispatch = createEventDispatcher();
 
@@ -87,7 +90,7 @@
         let pd = personDetails[personIndex];
 
         let namesakes = stemmaIndex.namesakes(name);
-        let selectAppendinx = namesakes.length > 1 ? [SelectId] : []
+        let selectAppendinx = namesakes.length > 1 ? [SelectId] : [];
 
         pd.name = name;
         pd.namesakes = [NewId, ...stemmaIndex.namesakes(name).map((id) => createId(id)), ...selectAppendinx];
@@ -113,7 +116,7 @@
     $: peopleNames = [...new Set(stemma.people.map((p) => p.name))];
     $: {
         let clearedPersonDetails = personDetails.filter((pd) => !pd.isEmpty());
-        let appendix = clearedPersonDetails.length < maxPeopleCount ? [new PersonDetails()] : [] 
+        let appendix = clearedPersonDetails.length < maxPeopleCount ? [new PersonDetails()] : [];
 
         personDetails = [...clearedPersonDetails, ...appendix];
 
@@ -124,7 +127,10 @@
     }
 </script>
 
-<div>
+<CreateSelectPerson />
+<!-- <SelectPerson></SelectPerson> -->
+
+<!-- <div>
     <table class="table">
         <thead>
             <tr>
@@ -171,4 +177,4 @@
             {/each}
         </tbody>
     </table>
-</div>
+</div> -->
