@@ -92,7 +92,6 @@ export function configureSimulation(svg, nodes, relations, width, height) {
         )
         .force("x", d3.forceX(width / 2).strength(0.2))
         .force("y", d3.forceY(height / 2).strength(0.2))
-        .force("center", d3.forceCenter(width / 2, height / 2))
         .force(
             "collide",
             d3.forceCollide().radius((d) => d.r * 20)
@@ -191,7 +190,6 @@ export function renderChart(svg, highlight, stemmaIndex) {
     }
 
     function markerEnd(line) {
-        console.log(line.type)
         if (!lineHighlighted(line)) return null;
         else if (line.type == "familyToChild") return "url(#arrow-to-person)";
         else return "url(#arrow-to-family)";

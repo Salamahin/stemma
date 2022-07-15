@@ -66,7 +66,6 @@
 
         svg.call(
             d3.zoom().on("zoom", (e) => {
-                console.log("zoom!!")
                 svg.select("g.main").attr("transform", e.transform);
             })
         );

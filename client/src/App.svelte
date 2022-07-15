@@ -1,9 +1,9 @@
 <script lang="ts">
     import Authenticate from "./components/Authenticate.svelte";
     import Navbar from "./components/Navbar.svelte";
-    import AddStemmaModal from "./components/AddStemmaModal.svelte";
-    import AddFamilyModal, { CreateFamily } from "./components/AddFamilyModal.svelte";
-    import PersonSelectionModal, { UpdatePerson } from "./components/PersonDetailsModal.svelte";
+    import AddStemmaModal from "./components/add_stemma_modal/AddStemmaModal.svelte";
+    import AddFamilyModal, { CreateFamily } from "./components/family_modal/AddFamilyModal.svelte";
+    import PersonSelectionModal, { UpdatePerson } from "./components/person_details_modal/PersonDetailsModal.svelte";
     import FullStemma from "./components/FullStemma.svelte";
     import { Model, StemmaDescription, User, Stemma, StoredPerson } from "./model";
     import { StemmaIndex } from "./stemmaIndex";

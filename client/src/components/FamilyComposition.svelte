@@ -8,10 +8,10 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
     import { StemmaIndex } from "../stemmaIndex";
-    import ClearIcon from "./ClearIconTranslated.svelte";
-    import CreateSelectPerson from "./CreateSelectPerson.svelte";
+    import ClearIcon from "./misc/ClearIconTranslated.svelte";
+    import CreateSelectPerson from "./family_modal/CreateSelectPerson.svelte";
 
-    import SelectPerson from "./FamilyGeneration.svelte";
+    import SelectPerson from "./family_modal/FamilyGeneration.svelte";
 
     const dispatch = createEventDispatcher();
 
