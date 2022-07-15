@@ -1,22 +1,14 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    import { Stemma, StemmaDescription, User } from "../model";
-    import Select from "svelte-select";
+    import { Stemma, StemmaDescription } from "../model";
 
+    export let stemma: Stemma;
     export let ownedStemmasDescriptions: StemmaDescription[];
     export let selectedStemmaDescription: StemmaDescription;
 
     const dispatch = createEventDispatcher();
 
-    export let stemma: Stemma;
-    type FilterItem = {
-        value: string;
-        label: string;
-    };
-    let filterItems: FilterItem[] = [];
-
     $: if (!selectedStemmaDescription && ownedStemmasDescriptions.length) selectedStemmaDescription = ownedStemmasDescriptions[0];
-    $: if (stemma) filterItems = stemma.people.map((p) => ({ value: `[${p.id}] ${p.name}`, label: p.name }));
 </script>
 
 <header>
@@ -36,17 +28,18 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarTogglerDemo02">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link" href="#">О проекте</a>
-                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            {selectedStemmaDescription ? selectedStemmaDescription.name : "Родословные"}
+                            Родословные
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
                             {#each ownedStemmasDescriptions as s}
                                 <li>
-                                    <a class="dropdown-item" href="#" on:click={() => (selectedStemmaDescription = s)}>{s.name}</a>
+                                    <a
+                                        class="dropdown-item {s == selectedStemmaDescription ? 'active' : ''}"
+                                        href="#"
+                                        on:click={() => (selectedStemmaDescription = s)}>{s.name}</a
+                                    >
                                 </li>
                             {/each}
                             <li>
@@ -54,16 +47,27 @@
                             </li>
 
                             <li>
-                                <a class="dropdown-item" href="#" on:click={() => dispatch("createNewStemma")}>Новая родословная...</a>
+                                <a class="dropdown-item" href="#" on:click={() => dispatch("createNewStemma")}>Создать новую</a>
                             </li>
                         </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link active" href="#" on:click={() => dispatch("createNewFamily")}>Создать</a>
+                        <a class="nav-link">Создание семей</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Настройка отображений</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Поделиться</a>
                     </li>
                 </ul>
                 <div class="d-flex ms-auto">
-                    <Select containerStyles="width: 476px" placeholder="Поиск" isMulti={true} isSearchable={true} items={filterItems} listAutoWidth={false} />
+                    <hr class="border border-light" />
+                    <ul class="navbar-nav">
+                        <li class="nav-item">
+                            <a class="nav-item nav-link" href="#">О проекте</a>
+                        </li>
+                    </ul>
                 </div>
             </div>
         </div>

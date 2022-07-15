@@ -105,7 +105,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" on:click={(e) => reset()} />
             </div>
             <div class="modal-body">
-                <p class="fs-5 text-center">Родители</p>
+                <p class="fs-5">Родители</p>
                 <AddPeopleComponent
                     maxPeopleCount={2}
                     bind:stemma
@@ -114,7 +114,7 @@
                     on:selected={(e) => (parents = e.detail)}
                     on:choose={(e) => promptParentSelection(e.detail)}
                 />
-                <p class="fs-5 text-center mt-5">Дети</p>
+                <p class="fs-5 mt-5">Дети</p>
                 <AddPeopleComponent
                     maxPeopleCount={20}
                     bind:stemma
