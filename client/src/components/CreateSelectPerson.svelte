@@ -1,47 +1,54 @@
 <script lang="ts">
+  import { NewPerson, Stemma, StoredPerson } from "../model";
+  import { StemmaIndex } from "../stemmaIndex";
+  import Select from "svelte-select";
+  import VisualPersonDescription from "./VisualPersonDescription.svelte";
+  export let stemmaIndex: StemmaIndex;
+
+  export let stemma: Stemma;
+
+  let namesakes: (NewPerson | StoredPerson)[] = [];
+  let peopleNames: string[];
+
+  function nameChanged(newName: string) {
+    namesakes = [{ name: newName }, ...stemmaIndex.namesakes(newName)];
+  }
+
+  $: if (stemma) peopleNames = [...new Set(stemma.people.map((p) => p.name))];
 </script>
 
 <form>
-    <div class="mb-3">
-        <label for="personName" class="form-label">Полное имя</label>
-        <input class="form-control" id="personName" />
-    </div>
-    <div id="carouselExampleDark" class="carousel carousel-dark slide" data-bs-ride="carousel">
+  <div class="mb-3">
+    <label for="personName" class="form-label">Полное имя</label>
+    <Select id="personName" items={peopleNames} isSearchable={true} isCreatable={true} on:select={(e) => nameChanged(e.detail.value)} />
+  </div>
+  {#if namesakes.length}
+    <div id="namesakeCarousel" class="carousel carousel-dark slide" data-bs-ride="carousel">
       <div class="carousel-indicators">
-        <button type="button" data-bs-target="#carouselExampleDark" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
-        <button type="button" data-bs-target="#carouselExampleDark" data-bs-slide-to="1" aria-label="Slide 2"></button>
-        <button type="button" data-bs-target="#carouselExampleDark" data-bs-slide-to="2" aria-label="Slide 3"></button>
+        {#each namesakes as ns, i}
+          <button type="button" data-bs-target="#namesakeCarousel" data-bs-slide-to={i} class={i == 0 ? "active" : null} aria-current={i == 0} />
+        {/each}
       </div>
       <div class="carousel-inner">
-        <div class="carousel-item active" data-interval="false">
-          <img src="..." class="d-block w-100" alt="...">
-          <div class="carousel-caption d-none d-md-block">
-            <h5>First slide label</h5>
-            <p>Some representative placeholder content for the first slide.</p>
+        {#each namesakes as ns, i}
+          <div class="carousel-item {i == 0 ? 'active' : ''}" data-bs-interval="false">
+            <VisualPersonDescription selectedPerson={ns} {stemmaIndex} chartId={`ns_chart_${i}`} />
+            <div class="carousel-caption d-none d-md-block">
+              {#if i == 0}
+                <p>Создать нового</p>
+              {/if}
+            </div>
           </div>
-        </div>
-        <div class="carousel-item" data-interval="false">
-          <img src="..." class="d-block w-100" alt="...">
-          <div class="carousel-caption d-none d-md-block">
-            <h5>Second slide label</h5>
-            <p>Some representative placeholder content for the second slide.</p>
-          </div>
-        </div>
-        <div class="carousel-item" data-interval="false">
-          <img src="..." class="d-block w-100" alt="...">
-          <div class="carousel-caption d-none d-md-block">
-            <h5>Third slide label</h5>
-            <p>Some representative placeholder content for the third slide.</p>
-          </div>
-        </div>
+        {/each}
       </div>
-      <button class="carousel-control-prev" type="button" data-bs-target="#carouselExampleDark" data-bs-slide="prev">
-        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+      <button class="carousel-control-prev" type="button" data-bs-target="#namesakeCarousel" data-bs-slide="prev">
+        <span class="carousel-control-prev-icon" aria-hidden="true" />
         <span class="visually-hidden">Previous</span>
       </button>
-      <button class="carousel-control-next" type="button" data-bs-target="#carouselExampleDark" data-bs-slide="next">
-        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+      <button class="carousel-control-next" type="button" data-bs-target="#namesakeCarousel" data-bs-slide="next">
+        <span class="carousel-control-next-icon" aria-hidden="true" />
         <span class="visually-hidden">Next</span>
       </button>
     </div>
+  {/if}
 </form>

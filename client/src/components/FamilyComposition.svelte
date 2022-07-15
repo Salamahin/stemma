@@ -11,7 +11,7 @@
     import ClearIcon from "./ClearIconTranslated.svelte";
     import CreateSelectPerson from "./CreateSelectPerson.svelte";
 
-    import SelectPerson from "./SelectPerson.svelte";
+    import SelectPerson from "./FamilyGeneration.svelte";
 
     const dispatch = createEventDispatcher();
 

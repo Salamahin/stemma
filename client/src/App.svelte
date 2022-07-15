@@ -85,7 +85,6 @@
         bind:this={addFamilyModal}
         stemma={selectedStemma}
         {stemmaIndex}
-        bind:selectionController
         on:familyAdded={(e) => handleNewFamilyCreation(e)}
     />
 

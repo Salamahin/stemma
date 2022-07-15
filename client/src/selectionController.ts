@@ -2,18 +2,29 @@ import { throws } from "assert";
 import { StoredPerson } from "./model";
 import { Generation, StemmaIndex } from "./stemmaIndex";
 
-export interface Selection {
+export interface Highlight {
     personIsHighlighted(personId: string): boolean
     familyIsHighlighted(familyId: string): boolean
 }
 
-export interface SelectionController extends Selection {
-    add(key: string, otherController: Selection)
+export interface SelectionController extends Highlight {
+    add(key: string, otherController: Highlight)
     remove(key: string)
 }
 
+export class HighlightAll implements Highlight {
+    personIsHighlighted(personId: string): boolean {
+        return true
+    }
+
+    familyIsHighlighted(familyId: string): boolean {
+        return true
+    }
+
+}
+
 export class ComposableSelectionController implements SelectionController {
-    private controllers: Map<string, Selection>
+    private controllers: Map<string, Highlight>
 
     constructor() {
         this.controllers = new Map()
@@ -60,7 +71,7 @@ export class RestrictiveSelectionController implements SelectionController {
     }
 }
 
-export class GenerationSelection implements Selection {
+export class GenerationSelection implements Highlight {
     private generation: Generation
 
     constructor(index: StemmaIndex, personId: string) {
@@ -73,9 +84,5 @@ export class GenerationSelection implements Selection {
 
     familyIsHighlighted(familyId: string): boolean {
         return this.generation.families.has(familyId)
-    }
-
-    personIsInteractive(personId: string): boolean {
-        return this.generation.relativies.has(personId)
     }
 }

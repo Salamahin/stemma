@@ -9,77 +9,40 @@
 </script>
 
 <script lang="ts">
-    import { createEventDispatcher } from "svelte";
-    import AddPeopleComponent, { PersonChoice } from "./FamilyComposition.svelte";
     import { Stemma } from "../model";
     import { StemmaIndex } from "../stemmaIndex";
-    import { RestrictiveSelectionController, SelectionController } from "../selectionController";
+    import CreateSelectPerson from "./CreateSelectPerson.svelte";
+    import FamilyComposition from "./FamilyComposition.svelte";
+    import FamilyGeneration from "./FamilyGeneration.svelte";
 
-    const dispatch = createEventDispatcher();
+    let familyCompositionModal;
+    let createOrSelectPersonModal;
 
-    let modalEl;
     let parentsEl;
     let childrenEl;
 
-    let parents;
-    let children;
+    let parents: (NewPerson | StoredPerson)[] = [];
+    let children: (NewPerson | StoredPerson)[] = [];
 
     let selectedParentsCount, selectedChildrenCount;
 
-    let promptingParentId = -1;
-    let promptingChildId = -1;
-
     export let stemma: Stemma;
     export let stemmaIndex: StemmaIndex;
-    export let selectionController: SelectionController;
-    let oldSelectionController: SelectionController;
 
     export function promptNewFamily() {
-        reset();
-        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        parents = [];
+        children = [];
+        bootstrap.Modal.getOrCreateInstance(familyCompositionModal).show();
     }
 
-    export function awaitsPersonSelection() {
-        return promptingParentId >= 0 || promptingChildId >= 0;
+    function showFamilyComposition() {
+        bootstrap.Modal.getOrCreateInstance(createOrSelectPersonModal).hide();
+        bootstrap.Modal.getOrCreateInstance(familyCompositionModal).show();
     }
 
-    function reset() {
-        parentsEl.reset();
-        childrenEl.reset();
-
-        promptingParentId = -1;
-        promptingChildId = -1;
-    }
-
-    function familyCreated() {
-        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-        dispatch("familyAdded", { parents: parents, children: children } as CreateFamily);
-    }
-
-    function promptParentSelection(event: PersonChoice) {
-        promptingParentId = event.index;
-        promtPersonSelection(event);
-    }
-
-    function promptChildSelection(event: PersonChoice) {
-        promptingChildId = event.index;
-        promtPersonSelection(event);
-    }
-
-    function promtPersonSelection(event: PersonChoice) {
-        oldSelectionController = selectionController;
-        selectionController = new RestrictiveSelectionController(event.personIds);
-
-        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-    }
-
-    export function personSelected(person: StoredPerson) {
-        selectionController = oldSelectionController;
-
-        if (promptingParentId >= 0) parentsEl.set(promptingParentId, person);
-        else if (promptingChildId >= 0) childrenEl.set(promptingChildId, person);
-
-        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    function showPersonSelection() {
+        bootstrap.Modal.getOrCreateInstance(familyCompositionModal).hide();
+        bootstrap.Modal.getOrCreateInstance(createOrSelectPersonModal).show();
     }
 
     $: {
@@ -90,54 +53,55 @@
 
 <div
     class="modal fade"
-    id="addFamilyModal"
     data-bs-backdrop="static"
     data-bs-keyboard="false"
     tabindex="-1"
     aria-labelledby="addFamlilyLabel"
     aria-hidden="true"
-    bind:this={modalEl}
+    bind:this={familyCompositionModal}
 >
     <div class="modal-dialog modal-dialog-centered modal-fullscreen-lg-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="addFamlilyLabel">Добавить семью или членов семьи</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" on:click={(e) => reset()} />
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
             </div>
             <div class="modal-body">
                 <p class="fs-5">Родители</p>
-                <AddPeopleComponent
-                    maxPeopleCount={2}
-                    bind:stemma
-                    bind:stemmaIndex
-                    bind:this={parentsEl}
-                    on:selected={(e) => (parents = e.detail)}
-                    on:choose={(e) => promptParentSelection(e.detail)}
-                />
+                <FamilyGeneration {stemma} {stemmaIndex} bind:selectedPeople={parents} maxPeople={2} on:create={(e) => showPersonSelection()} />
                 <p class="fs-5 mt-5">Дети</p>
-                <AddPeopleComponent
-                    maxPeopleCount={20}
-                    bind:stemma
-                    bind:stemmaIndex
-                    bind:this={childrenEl}
-                    on:selected={(e) => (children = e.detail)}
-                    on:choose={(e) => promptChildSelection(e.detail)}
-                />
+                <FamilyGeneration {stemma} {stemmaIndex} bind:selectedPeople={children} maxPeople={20} on:create={(e) => showPersonSelection()} />
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" on:click={(e) => reset()}>Отмена</button>
-                <button type="button" class="btn btn-primary" on:click={() => familyCreated()} disabled={selectedParentsCount + selectedChildrenCount < 2}
-                    >Сохранить семью</button
-                >
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" disabled={selectedParentsCount + selectedChildrenCount < 2}>Сохранить семью</button>
             </div>
         </div>
     </div>
 </div>
 
-<style>
-    body .modal-dialog {
-        max-width: 100%;
-        width: auto !important;
-        display: inline-block;
-    }
-</style>
+<div
+    class="modal fade"
+    data-bs-backdrop="static"
+    data-bs-keyboard="false"
+    tabindex="-1"
+    aria-labelledby="addFamlilyLabel"
+    aria-hidden="true"
+    bind:this={createOrSelectPersonModal}
+>
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-fullscreen-lg-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addFamlilyLabel">Создать или выбрать человека</h5>
+                <button type="button" class="btn-close" aria-label="Close" on:click={(e) => showFamilyComposition()} />
+            </div>
+            <div class="modal-body">
+                <CreateSelectPerson {stemma} {stemmaIndex} />
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" on:click={(e) => showFamilyComposition()}>Отменить</button>
+                <button type="button" class="btn btn-primary">Подтвердить</button>
+            </div>
+        </div>
+    </div>
+</div>
