@@ -56,8 +56,7 @@
     }
 
     function handlePersonSelection(event: CustomEvent<StoredPerson>) {
-        if (addFamilyModal.awaitsPersonSelection()) addFamilyModal.personSelected(event.detail);
-        else personSelectionModal.showPersonDetails(event.detail);
+        personSelectionModal.showPersonDetails(event.detail);
     }
 
     $: {
