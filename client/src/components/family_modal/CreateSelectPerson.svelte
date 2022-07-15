@@ -23,7 +23,7 @@
     namesakes = [...stemmaIndex.namesakes(newName), { name: newName }];
     if (carousel) carousel.goTo(0, { animated: false });
     dispatch("selected", namesakes[0]);
-    selectedName = null
+    selectedName = newName;
   }
 
   export function reset() {
@@ -36,24 +36,24 @@
 
 <form>
   {#key namesakes}
-  <div class="mb-3">
-    <label for="personName" class="form-label">Полное имя</label>
-    <Select
-      id="personName"
-      placeholder="Иванов Иван Иванович"
-      items={peopleNames}
-      isSearchable={true}
-      isCreatable={true}
-      on:select={(e) => nameChanged(e.detail.value)}
-      on:clear={() => reset()}
-      ClearIcon={clearIcon}
-      getOptionLabel={(option, filterText) => {
-        return option.isCreator ? `Создать "${filterText}"` : option["label"];
-      }}
-      hideEmptyState={true}
-      value={selectedName}
-    />
-  </div>
+    <div class="mb-3">
+      <label for="personName" class="form-label">Полное имя</label>
+      <Select
+        id="personName"
+        placeholder="Иванов Иван Иванович"
+        items={peopleNames}
+        isSearchable={true}
+        isCreatable={true}
+        on:select={(e) => nameChanged(e.detail.value)}
+        on:clear={() => reset()}
+        ClearIcon={clearIcon}
+        getOptionLabel={(option, filterText) => {
+          return option.isCreator ? `Создать "${filterText}"` : option["label"];
+        }}
+        hideEmptyState={true}
+        value={selectedName}
+      />
+    </div>
     {#if namesakes.length}
       <Carousel on:pageChange={(e) => dispatch("selected", namesakes[e.detail])} bind:this={carousel}>
         {#each namesakes as ns, i}

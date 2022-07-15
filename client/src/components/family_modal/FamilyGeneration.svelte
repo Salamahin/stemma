@@ -19,7 +19,7 @@
           <td class="align-middle">{p.name}</td>
           <td class="align-middle">
             <div class="float-end">
-              <button type="button" class="btn btn-sm btn-danger" on:click={(e) => remove(i)}><i class="bi bi-trash3-fill" /></button>
+              <button type="button" class="btn btn-sm btn-danger" on:click={(e) => remove(i)}><i class="bi bi-trash" /></button>
             </div>
           </td>
         </tr>
