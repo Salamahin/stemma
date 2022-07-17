@@ -16,8 +16,8 @@
 
     import { createEventDispatcher } from "svelte";
 
-    let familyCompositionModal;
-    let createOrSelectPersonModal;
+    let modalEl;
+    let mode = "familyComposition";
 
     let createSelectEl;
 
@@ -37,37 +37,32 @@
     export function promptNewFamily() {
         parents = [];
         children = [];
-        bootstrap.Modal.getOrCreateInstance(familyCompositionModal).show();
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
     function showFamilyComposition() {
-        bootstrap.Modal.getOrCreateInstance(createOrSelectPersonModal).hide();
-        bootstrap.Modal.getOrCreateInstance(familyCompositionModal).show();
+        mode = "familyComposition";
     }
 
     function showPersonSelection(isParent) {
         selectParent = isParent;
 
-        createSelectEl.reset();
+        if (createSelectEl) createSelectEl.reset();
         selected = null;
 
-        bootstrap.Modal.getOrCreateInstance(familyCompositionModal).hide();
-        bootstrap.Modal.getOrCreateInstance(createOrSelectPersonModal).show();
+        mode = "personSelection";
     }
 
     function confirmPersonSelection() {
         if (selectParent) parents = [...parents, { ...selected }];
         else children = [...children, { ...selected }];
 
-        createSelectEl.reset();
-        selected = null;
-
         showFamilyComposition();
     }
 
     function createFamily() {
         dispatch("familyAdded", { parents: parents, children: children });
-        bootstrap.Modal.getOrCreateInstance(familyCompositionModal).hide();
+        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     }
 
     $: {
@@ -83,62 +78,45 @@
     tabindex="-1"
     aria-labelledby="addFamlilyLabel"
     aria-hidden="true"
-    bind:this={familyCompositionModal}
+    bind:this={modalEl}
 >
     <div class="modal-dialog modal-lg modal-dialog-centered modal-fullscreen-lg-down">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addFamlilyLabel">Добавить семью или членов семьи</h5>
+                <h5 class="modal-title" id="addFamlilyLabel">{mode == "familyComposition" ? "Состав семьи" : "Выбрать члена семьи"}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
             </div>
             <div class="modal-body">
-                <p class="fs-5">Родители</p>
-                <FamilyGeneration bind:selectedPeople={parents} />
-                {#if selectedParentsCount < 2}
-                    <button type="button" class="btn btn-primary btn-sm" on:click={(e) => showPersonSelection(true)}
+                {#if mode == "familyComposition"}
+                    <p class="fs-5">Родители</p>
+                    <FamilyGeneration bind:selectedPeople={parents} />
+                    {#if selectedParentsCount < 2}
+                        <button type="button" class="btn btn-primary btn-sm" on:click={(e) => showPersonSelection(true)}
+                            ><i class="bi bi-person-plus-fill" /> добавить</button
+                        >
+                    {/if}
+
+                    <hr class="my-5" />
+
+                    <p class="fs-5">Дети</p>
+                    <FamilyGeneration bind:selectedPeople={children} />
+                    <button type="button" class="btn btn-primary btn-sm" on:click={(e) => showPersonSelection(false)}
                         ><i class="bi bi-person-plus-fill" /> добавить</button
                     >
+                {:else}
+                    <CreateSelectPerson {stemma} {stemmaIndex} bind:this={createSelectEl} on:selected={(e) => (selected = e.detail)} />
                 {/if}
-
-                <hr class="my-5" />
-
-                <p class="fs-5">Дети</p>
-                <FamilyGeneration bind:selectedPeople={children} />
-                <button type="button" class="btn btn-primary btn-sm" on:click={(e) => showPersonSelection(false)}
-                    ><i class="bi bi-person-plus-fill" /> добавить</button
-                >
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary" disabled={selectedParentsCount + selectedChildrenCount < 2} on:click={(e) => createFamily()}
-                    >Сохранить</button
-                >
-            </div>
-        </div>
-    </div>
-</div>
-
-<div
-    class="modal fade"
-    data-bs-backdrop="static"
-    data-bs-keyboard="false"
-    tabindex="-1"
-    aria-labelledby="addFamlilyLabel"
-    aria-hidden="true"
-    bind:this={createOrSelectPersonModal}
->
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-fullscreen-lg-down">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addFamlilyLabel">Создать или выбрать человека</h5>
-                <button type="button" class="btn-close" aria-label="Close" on:click={(e) => showFamilyComposition()} />
-            </div>
-            <div class="modal-body">
-                <CreateSelectPerson {stemma} {stemmaIndex} bind:this={createSelectEl} on:selected={(e) => (selected = e.detail)} />
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" on:click={(e) => showFamilyComposition()}>Отменить</button>
-                <button type="button" class="btn btn-primary" disabled={selected == null} on:click={(e) => confirmPersonSelection()}>Подтвердить</button>
+                {#if mode == "familyComposition"}
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" disabled={selectedParentsCount + selectedChildrenCount < 2} on:click={(e) => createFamily()}
+                        >Сохранить</button
+                    >
+                {:else}
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" on:click={(e) => showFamilyComposition()}>Назад</button>
+                    <button type="button" class="btn btn-primary" disabled={selected == null} on:click={(e) => confirmPersonSelection()}>Выбрать</button>
+                {/if}
             </div>
         </div>
     </div>
