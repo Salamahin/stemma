@@ -52,20 +52,21 @@
                         </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" on:click={() => dispatch("createNewFamily")}>Создание семей</a>
+                        <a class="nav-link" href="#" on:click={() => dispatch("createNewFamily")}><i class="bi bi-people-fill"></i> Добавить семью</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#">Настройка отображений</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" >Поделиться</a>
+                        <a class="nav-link" href="#">Поиск</a>
                     </li>
                 </ul>
+                <hr class="border border-white">
                 <div class="d-flex ms-auto">
                     <hr class="border border-light">
                     <ul class="navbar-nav">
                         <li class="nav-item">
-                            <a class="nav-item nav-link" href="#">О проекте</a>
+                            <a class="nav-link" href="#" ><i class="bi bi-share-fill"></i> Поделиться</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-item nav-link active" href="#">О проекте</a>
                         </li>
                     </ul>
                 </div>

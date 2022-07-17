@@ -85,7 +85,7 @@
     aria-hidden="true"
     bind:this={familyCompositionModal}
 >
-    <div class="modal-dialog modal-dialog-centered modal-fullscreen-lg-down">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-fullscreen-lg-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="addFamlilyLabel">Добавить семью или членов семьи</h5>
@@ -111,7 +111,7 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
                 <button type="button" class="btn btn-primary" disabled={selectedParentsCount + selectedChildrenCount < 2} on:click={(e) => createFamily()}
-                    >Сохранить семью</button
+                    >Сохранить</button
                 >
             </div>
         </div>

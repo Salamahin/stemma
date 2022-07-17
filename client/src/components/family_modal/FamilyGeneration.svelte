@@ -9,7 +9,7 @@
 </script>
 
 {#if !selectedPeople.length}
-  <p class="text-center text-secondary fs-6 fw-bolder">Нет информации</p>
+  <p class="text-center text-secondary fs-6">Нет информации</p>
 {:else}
   <table class="table">
     <tbody>
