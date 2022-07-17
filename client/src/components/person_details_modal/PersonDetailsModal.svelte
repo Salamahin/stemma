@@ -14,6 +14,8 @@
     let modalEl;
     const dispatch = createEventDispatcher();
 
+    let pinned;
+
     let selectedPerson: StoredPerson = {
         id: "",
         name: "",
@@ -22,7 +24,7 @@
     };
 
     function personUpdated(descr: NewPerson) {
-        dispatch("personUpdated", ({ id: selectedPerson.id, description: descr }));
+        dispatch("personUpdated", { id: selectedPerson.id, description: descr });
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     }
 
@@ -41,7 +43,7 @@
     <div class="modal-dialog modal-dialog-centered modal-fullscreen-lg-down">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addFamlilyLabel">Изменить [{selectedPerson.id}]</h5>
+                <h5 class="modal-title ms-2" id="addFamlilyLabel">Персональная информация</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
             </div>
             <div class="modal-body">
@@ -61,6 +63,10 @@
                     <label for="personDeathDate" class="form-label">Био</label>
                     <textarea class="form-control" rows="6" id="personBioInput">{selectedPerson.bio ? selectedPerson.bio : ""}</textarea>
                 </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault" bind:checked={pinned}>
+                    <label class="form-check-label" for="flexSwitchCheckDefault">Закрепить</label>
+                  </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-danger me-auto" on:click={() => personRemoved()}>Удалить</button>
