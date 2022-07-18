@@ -60,8 +60,10 @@
             originalPerson.deathDate != request.description.deathDate ||
             originalPerson.name != request.description.name ||
             originalPerson.bio != request.description.bio
-        )
+        ) {
+            console.log("update person");
             model.updatePerson(selectedStemmaDescription.id, request.id, request.description).then((s) => (selectedStemma = s));
+        }
     }
 
     function handlePersonRemoved(personId: string) {
@@ -72,21 +74,33 @@
         personSelectionModal.showPersonDetails({ description: personDetails, pin: pinnedPeople.isPinned(personDetails.id) });
     }
 
-    $: if (selectedStemmaDescription) {
-        pinnedPeople = new PinnedPeopleStorage(selectedStemmaDescription.id);
-        pinnedPeople.load();
+    function updateEverythingOnStemmaChange(stemmaId: string, stemma: Stemma) {
+        let si = new StemmaIndex(stemma);
 
-        model.getStemma(selectedStemmaDescription.id).then((s) => (selectedStemma = s));
+        let pp = new PinnedPeopleStorage(stemmaId);
+        pp.load();
+
+        let hg = new HiglightLineages(si, pp.allPinned());
+
+        return { si, pp, hg };
     }
 
-    $: if (selectedStemma) stemmaIndex = new StemmaIndex(selectedStemma);
-    $: if (pinnedPeople && stemmaIndex) highlight = new HiglightLineages(stemmaIndex, pinnedPeople.allPinned());
-    $: {
-        if (lookupPersonName && selectedStemma) {
-            const results = fuzzysort.go(lookupPersonName, selectedStemma.people, { key: "name" });
-            console.log(results)
-        }
+    function updateHighlightOnPinnedPeopleChange(pp: PinnedPeopleStorage) {
+        let hg = new HiglightLineages(stemmaIndex, pp.allPinned());
+        return hg;
     }
+
+    $: if (selectedStemmaDescription)
+        model.getStemma(selectedStemmaDescription.id).then((s) => {
+            let { si, pp, hg } = updateEverythingOnStemmaChange(selectedStemmaDescription.id, s);
+
+            selectedStemma = s;
+            stemmaIndex = si;
+            pinnedPeople = pp;
+            highlight = hg;
+        });
+
+    $: if (pinnedPeople) highlight = updateHighlightOnPinnedPeopleChange(pinnedPeople);
 </script>
 
 {#if signedIn}
@@ -108,7 +122,7 @@
         on:personUpdated={(e) => hadlePersonUpdated(e.detail)}
     />
 
-    <FullStemma stemma={selectedStemma} {stemmaIndex} bind:highlight bind:pinnedPeople on:personSelected={(e) => handlePersonSelection(e.detail)} />
+    <FullStemma stemma={selectedStemma} {stemmaIndex} {highlight} {pinnedPeople} on:personSelected={(e) => handlePersonSelection(e.detail)} />
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
