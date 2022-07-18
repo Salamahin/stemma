@@ -22,14 +22,12 @@ export class PinnedPeopleStorage {
     }
 
     add(personId: string) {
-        console.log("add!", personId)
         this.pinnedPeople.add(personId)
         this.save()
         return this;
     }
 
     remove(personId: string) {
-        console.log("remove!", personId)
         this.pinnedPeople.delete(personId)
         this.save()
         return this;

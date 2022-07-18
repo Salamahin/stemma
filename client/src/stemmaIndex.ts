@@ -76,7 +76,7 @@ export class StemmaIndex {
 
                 maxDepth = Math.max(maxDepth, nextDepth)
                 nextGen = descr.flatMap(x => x.members).map(personId => ({ personId: personId, depth: nextDepth }))
-                foundFamilies = [...descr.map(x => x.familyId), ...foundFamilies]
+                if (nextGen.length) foundFamilies = [...descr.map(x => x.familyId), ...foundFamilies]
             }
 
             toLookUp = [...nextGen, ...tail]

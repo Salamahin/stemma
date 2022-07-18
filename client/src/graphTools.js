@@ -207,7 +207,7 @@ export function renderChart(svg, highlight, stemmaIndex) {
         .attr("stroke-width", (line) => lineWidth(line))
         .attr("marker-end", (line) => markerEnd(line));
 
-    let circles = svg.selectAll("circle").attr("cursor", "pointer");
+    let circles = svg.selectAll("circle")
 
     circles
         .filter((t) => t.type == "person")
@@ -222,10 +222,12 @@ export function renderChart(svg, highlight, stemmaIndex) {
     svg.select("g.main")
         .selectAll("g")
         .select("text")
-        .style("fill", (node) => (highlight.personIsHighlighted(node.id) ? null : shadedNodeColor));
+        .style("fill", (node) => (highlight.personIsHighlighted(node.id) ? null : shadedNodeColor))
+        .attr("cursor", "default")
 
     svg.select("g.main")
         .selectAll("g")
+        .attr("cursor", "pointer")
         .filter(p => highlight.personIsHighlighted(p.id))
         .raise()
 

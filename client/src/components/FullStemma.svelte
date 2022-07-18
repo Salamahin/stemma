@@ -49,12 +49,13 @@
 
         mergeData(svg, nodes, relations);
 
-        svg.selectAll("circle")
+        svg.select("g.main")
+            .selectAll("g")
             .on("mouseenter", function (event, node) {
                 if (node.type == "person") {
                     highlight.push(node.id);
-                    renderFullStemma()
-                    d3.select(this).attr("r", hoveredPersonR);
+                    renderFullStemma();
+                    d3.select(this).select("circle").attr("r", hoveredPersonR);
                 }
             })
             .on("mouseleave", (_event, node) => {

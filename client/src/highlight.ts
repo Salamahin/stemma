@@ -16,7 +16,7 @@ export class HighlightAll implements Highlight {
 }
 
 type LineageData = {
-    borderFamilies: Set<string>
+    marriages: string[]
     relatedPeople: Set<string>
     relatedFamilies: Set<string>
 }
@@ -27,7 +27,7 @@ export class HiglightLineages implements Highlight {
 
     private allPeople: Set<string>
     private allFamilies: Set<string>
-    private borderFamilies: Set<string>
+    private allMariages: Set<string>
 
     constructor(index: StemmaIndex, people: string[]) {
         this.index = index
@@ -40,17 +40,28 @@ export class HiglightLineages implements Highlight {
         this.allPeople = new Set(this.lineagesData.map(d => d.relatedPeople).reduce((acc, next) => [...acc, ...next], []))
         this.allFamilies = new Set(this.lineagesData.map(d => d.relatedFamilies).reduce((acc, next) => [...acc, ...next], []))
 
-        let [bfHead, ...bfTail] = this.lineagesData.map(d => d.borderFamilies)
-        this.borderFamilies = bfTail.reduce((acc, next) => new Set([...acc].filter(element => next.has(element))), bfHead)
+        let allMarriagesCounted = this.count(this.lineagesData.flatMap(d => d.marriages))
+        this.allMariages = new Set(Array.from(allMarriagesCounted.entries()).filter(x => x[1] > 1).map(x => x[0]))
     }
 
     private toLineageData(personId) {
-        let relativies = this.index.relativies(personId).map(p => p.id)
+        let lineage = this.index.lineage(personId)
         return {
-            borderFamilies: new Set(relativies.flatMap(pId => this.index.marriages(pId))),
-            relatedPeople: new Set(relativies),
-            relatedFamilies: new Set(this.index.relatedFamilies(personId).map(f => f.id)),
+            marriages: [...lineage.relativies].flatMap(pId => this.index.marriages(pId)),
+            relatedPeople: lineage.relativies,
+            relatedFamilies: lineage.families,
         }
+    }
+
+    private count<T>(array: Array<T>) {
+        return array.reduce((acc, next) => {
+            if (acc.has(next)) {
+                acc.set(next, acc.get(next) + 1)
+            } else {
+                acc.set(next, 1)
+            }
+            return acc
+        }, new Map<T, number>())
     }
 
     personIsHighlighted(personId: string): boolean {
@@ -58,7 +69,7 @@ export class HiglightLineages implements Highlight {
     }
 
     familyIsHighlighted(familyId: string): boolean {
-        return !this.lineagesData.length || this.allFamilies.has(familyId) || (this.lineagesData.length > 1 && this.borderFamilies.has(familyId))
+        return !this.lineagesData.length || this.allFamilies.has(familyId) || this.allMariages.has(familyId)
     }
 
     push(personId: string) {
