@@ -4,6 +4,7 @@
 
     export let ownedStemmasDescriptions: StemmaDescription[];
     export let selectedStemmaDescription: StemmaDescription;
+    export let lookupPersonName;
 
     const dispatch = createEventDispatcher();
 
@@ -61,7 +62,7 @@
                     <hr class="border border-light" />
                     <ul class="navbar-nav w-100">
                         <li class="nav-item">
-                            <input type="search" class="form-control mw-100" style="min-width: 350px" placeholder="Быстрый поиск" />
+                            <input type="search" class="form-control mw-100" style="min-width: 350px" placeholder="Быстрый поиск" bind:value={lookupPersonName} />
                         </li>
                         <li class="nav-item">
                             <a class="nav-item nav-link active" href="#">О проекте</a>

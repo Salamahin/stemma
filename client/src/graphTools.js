@@ -223,7 +223,7 @@ export function renderChart(svg, highlight, stemmaIndex) {
         .selectAll("g")
         .select("text")
         .style("fill", (node) => (highlight.personIsHighlighted(node.id) ? null : shadedNodeColor))
-        .attr("cursor", "default")
+        .attr("cursor", "pointer")
 
     svg.select("g.main")
         .selectAll("g")

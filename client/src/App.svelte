@@ -9,6 +9,8 @@
     import { StemmaIndex } from "./stemmaIndex";
     import { HiglightLineages, HighlightAll } from "./highlight";
     import { PinnedPeopleStorage } from "./pinnedPeopleStorage";
+    import fuzzysort from "fuzzysort";
+
     export let google_client_id;
     export let stemma_backend_url;
 
@@ -23,6 +25,7 @@
     let selectedStemmaDescription: StemmaDescription;
     let selectedStemma: Stemma;
     let stemmaIndex: StemmaIndex;
+    let lookupPersonName;
 
     let highlight: HiglightLineages;
     let pinnedPeople: PinnedPeopleStorage;
@@ -78,12 +81,19 @@
 
     $: if (selectedStemma) stemmaIndex = new StemmaIndex(selectedStemma);
     $: if (pinnedPeople && stemmaIndex) highlight = new HiglightLineages(stemmaIndex, pinnedPeople.allPinned());
+    $: {
+        if (lookupPersonName && selectedStemma) {
+            const results = fuzzysort.go(lookupPersonName, selectedStemma.people, { key: "name" });
+            console.log(results)
+        }
+    }
 </script>
 
 {#if signedIn}
     <Navbar
         bind:ownedStemmasDescriptions
         bind:selectedStemmaDescription
+        bind:lookupPersonName
         on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
         on:createNewFamily={() => addFamilyModal.promptNewFamily()}
     />
