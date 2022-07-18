@@ -16,6 +16,7 @@ export class HighlightAll implements Highlight {
 }
 
 type LineageData = {
+    root: string
     marriages: string[]
     relatedPeople: Set<string>
     relatedFamilies: Set<string>
@@ -40,13 +41,15 @@ export class HiglightLineages implements Highlight {
         this.allPeople = new Set(this.lineagesData.map(d => d.relatedPeople).reduce((acc, next) => [...acc, ...next], []))
         this.allFamilies = new Set(this.lineagesData.map(d => d.relatedFamilies).reduce((acc, next) => [...acc, ...next], []))
 
-        let allMarriagesCounted = this.count(this.lineagesData.flatMap(d => d.marriages))
+        let distinctMariages = new Map(this.lineagesData.map(d => [d.root, d.marriages]))
+        let allMarriagesCounted = this.count([...distinctMariages.values()].flat())
         this.allMariages = new Set(Array.from(allMarriagesCounted.entries()).filter(x => x[1] > 1).map(x => x[0]))
     }
 
     private toLineageData(personId) {
         let lineage = this.index.lineage(personId)
         return {
+            root: personId,
             marriages: [...lineage.relativies].flatMap(pId => this.index.marriages(pId)),
             relatedPeople: lineage.relativies,
             relatedFamilies: lineage.families,
