@@ -56,6 +56,7 @@
                     highlight.push(node.id);
                     renderFullStemma();
                     d3.select(this).select("circle").attr("r", hoveredPersonR);
+                    d3.select(this).select("text").attr("font-weight", "bold");
                 }
             })
             .on("mouseleave", (_event, node) => {

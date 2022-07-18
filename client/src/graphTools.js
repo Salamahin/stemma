@@ -224,6 +224,7 @@ export function renderChart(svg, highlight, stemmaIndex) {
         .select("text")
         .style("fill", (node) => (highlight.personIsHighlighted(node.id) ? null : shadedNodeColor))
         .attr("cursor", "pointer")
+        .attr("font-weight", null);
 
     svg.select("g.main")
         .selectAll("g")
@@ -235,6 +236,6 @@ export function renderChart(svg, highlight, stemmaIndex) {
         .raise()
         .text((node) => node.name)
         .style("font-size", "15px")
-        .attr("dy", personR * 2)
+        .attr("dy", 40)
         .attr("dx", -personR);
 }
