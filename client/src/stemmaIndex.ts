@@ -20,11 +20,12 @@ type GenerationDescription = {
 export class StemmaIndex {
     private _parentToChildren: Map<string, FamilyDescription[]>
     private _childToParents: Map<string, FamilyDescription[]>
+    private _marriages: Map<string, string[]>
+
     private _people: Map<string, StoredPerson>
     private _namesakes: Map<string, string[]>
     private _lineage: Map<string, Generation>
     private _maxGeneration: number
-    private _families: Map<string, Family[]>
 
     private groupByKey<K, V>(array: Array<readonly [K, V]>) {
         return array.reduce((store, item) => {
@@ -40,14 +41,16 @@ export class StemmaIndex {
 
     constructor(stemma: Stemma) {
         this._parentToChildren = new Map(this.groupByKey(stemma.families.flatMap((f) => {
-            if (f.children.length) return f.parents.map((p) => [p, ({ familyId: f.id, members: f.children })])
+            if (f.children) return f.parents.map((p) => [p, ({ familyId: f.id, members: f.children })])
             else return []
         })))
 
         this._childToParents = new Map(this.groupByKey(stemma.families.flatMap((f) => {
-            if (f.parents.length) return f.children.map((p) => [p, ({ familyId: f.id, members: f.parents })])
+            if (f.parents) return f.children.map((p) => [p, ({ familyId: f.id, members: f.parents })])
             else return []
         })))
+
+        this._marriages = new Map([... this._parentToChildren.entries()].map(e => [e[0], e[1].map(f => f.familyId)]))
 
         this._namesakes = new Map(this.groupByKey(stemma.people.map(p => [p.name, p.id])))
         this._people = new Map(stemma.people.map(p => [p.id, p]))
@@ -119,6 +122,11 @@ export class StemmaIndex {
             ...directChildren.map(f => ({ id: f.familyId, parents: [personId], children: f.members })),
             ...directParents.map(f => ({ id: f.familyId, parents: f.members, children: [personId] }))
         ]
+    }
+
+    marriages(personId: string) {
+        if (this._marriages.has(personId)) return this._marriages.get(personId)
+        else return []
     }
 
     namesakes(personName: string) {

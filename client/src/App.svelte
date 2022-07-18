@@ -7,9 +7,8 @@
     import FullStemma from "./components/FullStemma.svelte";
     import { Model, StemmaDescription, User, Stemma, StoredPerson } from "./model";
     import { StemmaIndex } from "./stemmaIndex";
-    import { CompositeHighlight, HighlightLineage } from "./highlight";
+    import { HiglightLineages, HighlightAll } from "./highlight";
     import { PinnedPeopleStorage } from "./pinnedPeopleStorage";
-    import * as isEqual from "lodash.isequal";
     export let google_client_id;
     export let stemma_backend_url;
 
@@ -25,7 +24,7 @@
     let selectedStemma: Stemma;
     let stemmaIndex: StemmaIndex;
 
-    let highlight: CompositeHighlight;
+    let highlight: HiglightLineages;
     let pinnedPeople: PinnedPeopleStorage;
 
     function handleSignIn(user: User) {
@@ -50,7 +49,7 @@
 
     function hadlePersonUpdated(request: UpdatePerson) {
         pinnedPeople = request.pin ? pinnedPeople.add(request.id) : pinnedPeople.remove(request.id);
-        
+
         let originalPerson = stemmaIndex.get(request.id);
 
         if (
@@ -78,9 +77,7 @@
     }
 
     $: if (selectedStemma) stemmaIndex = new StemmaIndex(selectedStemma);
-
-    $: if (pinnedPeople && stemmaIndex)
-        highlight = new CompositeHighlight(pinnedPeople.allPinned().map((personId) => new HighlightLineage(stemmaIndex, personId)));
+    $: if (pinnedPeople && stemmaIndex) highlight = new HiglightLineages(stemmaIndex, pinnedPeople.allPinned());
 </script>
 
 {#if signedIn}

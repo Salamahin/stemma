@@ -12,8 +12,6 @@ export class PinnedPeopleStorage {
         let value = localStorage.getItem(this.stemmaId)
         if (value) this.pinnedPeople = new Set(JSON.parse(value).items)
         else this.pinnedPeople = new Set()
-
-        console.log(this.pinnedPeople)
     }
 
     private save() {

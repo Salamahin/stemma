@@ -55,16 +55,13 @@
                     <li class="nav-item">
                         <a class="nav-link" href="#" on:click={() => dispatch("createNewFamily")}><i class="bi bi-people-fill" /> Добавить семью</a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#">Поиск</a>
-                    </li>
                 </ul>
                 <hr class="border border-white" />
                 <div class="d-flex ms-auto">
                     <hr class="border border-light" />
-                    <ul class="navbar-nav">
+                    <ul class="navbar-nav w-100">
                         <li class="nav-item">
-                            <a class="nav-link" href="#"><i class="bi bi-share-fill" /> Поделиться</a>
+                            <input type="search" class="form-control mw-100" style="min-width: 350px" placeholder="Быстрый поиск" />
                         </li>
                         <li class="nav-item">
                             <a class="nav-item nav-link active" href="#">О проекте</a>

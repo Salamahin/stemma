@@ -4,7 +4,7 @@
     import { StemmaIndex } from "../stemmaIndex";
     import { onMount } from "svelte";
     import { createEventDispatcher } from "svelte";
-    import { CompositeHighlight, HighlightLineage } from "../highlight";
+    import { HiglightLineages } from "../highlight";
     import { configureSimulation, initChart, makeDrag, makeNodesAndRelations, mergeData, normalizeId, renderChart } from "../graphTools";
     import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
 
@@ -16,7 +16,7 @@
 
     export let stemma: Stemma;
     export let stemmaIndex: StemmaIndex;
-    export let highlight: CompositeHighlight;
+    export let highlight: HiglightLineages;
     export let pinnedPeople: PinnedPeopleStorage;
 
     let svg;
@@ -52,8 +52,8 @@
         svg.selectAll("circle")
             .on("mouseenter", function (event, node) {
                 if (node.type == "person") {
-                    highlight.push(new HighlightLineage(stemmaIndex, node.id));
-                    renderFullStemma();
+                    highlight.push(node.id);
+                    renderFullStemma()
                     d3.select(this).attr("r", hoveredPersonR);
                 }
             })

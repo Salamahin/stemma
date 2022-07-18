@@ -217,12 +217,17 @@ export function renderChart(svg, highlight, stemmaIndex) {
     circles
         .filter((t) => t.type == "family")
         .attr("fill", (node) => (highlight.familyIsHighlighted(node.id) ? defaultFamilyColor : shadedNodeColor))
-        .attr("r", familyR);
+        .attr("r", familyR)
 
     svg.select("g.main")
         .selectAll("g")
         .select("text")
         .style("fill", (node) => (highlight.personIsHighlighted(node.id) ? null : shadedNodeColor));
+
+    svg.select("g.main")
+        .selectAll("g")
+        .filter(p => highlight.personIsHighlighted(p.id))
+        .raise()
 
     svg.selectAll("text")
         .raise()
