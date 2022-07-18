@@ -7,8 +7,9 @@
     import FullStemma from "./components/FullStemma.svelte";
     import { Model, StemmaDescription, User, Stemma, StoredPerson } from "./model";
     import { StemmaIndex } from "./stemmaIndex";
-    import { ComposableSelectionController, SelectionController } from "./selectionController";
-
+    import { CompositeHighlight, HighlightLineage } from "./highlight";
+    import { PinnedPeopleStorage } from "./pinnedPeopleStorage";
+    import * as isEqual from "lodash.isequal";
     export let google_client_id;
     export let stemma_backend_url;
 
@@ -19,14 +20,15 @@
     let model: Model;
     let signedIn = false;
 
-    let ownedStemmasDescriptions: StemmaDescription[] = [];
+    let ownedStemmasDescriptions: StemmaDescription[];
     let selectedStemmaDescription: StemmaDescription;
-    let selectedStemma: Stemma = { people: [], families: [] };
+    let selectedStemma: Stemma;
     let stemmaIndex: StemmaIndex;
-    let selectionController: SelectionController = new ComposableSelectionController();
 
-    function handleSignIn(event: CustomEvent) {
-        let user = event.detail as User;
+    let highlight: CompositeHighlight;
+    let pinnedPeople: PinnedPeopleStorage;
+
+    function handleSignIn(user: User) {
         signedIn = true;
         model = new Model(stemma_backend_url, user);
         model.listStemmas().then((stemmas) => {
@@ -35,38 +37,50 @@
         });
     }
 
-    function handleNewStemma(event: CustomEvent<string>) {
-        let name = event.detail;
+    function handleNewStemma(name: string) {
         model.addStemma(name).then((newStemmaDescription) => {
             ownedStemmasDescriptions = [...ownedStemmasDescriptions, newStemmaDescription];
             selectedStemmaDescription = newStemmaDescription;
         });
     }
 
-    function handleNewFamilyCreation(event: CustomEvent<CreateFamily>) {
-        model.createFamily(selectedStemmaDescription.id, event.detail.parents, event.detail.children).then((s) => (selectedStemma = s));
+    function handleNewFamilyCreation(request: CreateFamily) {
+        model.createFamily(selectedStemmaDescription.id, request.parents, request.children).then((s) => (selectedStemma = s));
     }
 
-    function hadlePersonUpdated(event: CustomEvent<UpdatePerson>) {
-        model.updatePerson(selectedStemmaDescription.id, event.detail.id, event.detail.description).then((s) => (selectedStemma = s));
+    function hadlePersonUpdated(request: UpdatePerson) {
+        pinnedPeople = request.pin ? pinnedPeople.add(request.id) : pinnedPeople.remove(request.id);
+        
+        let originalPerson = stemmaIndex.get(request.id);
+
+        if (
+            originalPerson.birthDate != request.description.birthDate ||
+            originalPerson.deathDate != request.description.deathDate ||
+            originalPerson.name != request.description.name ||
+            originalPerson.bio != request.description.bio
+        )
+            model.updatePerson(selectedStemmaDescription.id, request.id, request.description).then((s) => (selectedStemma = s));
     }
 
-    function handlePersonRemoved(event: CustomEvent<string>) {
-        model.removePerson(selectedStemmaDescription.id, event.detail).then((s) => (selectedStemma = s));
+    function handlePersonRemoved(personId: string) {
+        model.removePerson(selectedStemmaDescription.id, personId).then((s) => (selectedStemma = s));
     }
 
-    function handlePersonSelection(event: CustomEvent<StoredPerson>) {
-        personSelectionModal.showPersonDetails(event.detail);
+    function handlePersonSelection(personDetails: StoredPerson) {
+        personSelectionModal.showPersonDetails({ description: personDetails, pin: pinnedPeople.isPinned(personDetails.id) });
     }
 
-    $: {
-        if (selectedStemmaDescription)
-            model.getStemma(selectedStemmaDescription.id).then((s) => {
-                selectedStemma = s;
-            });
+    $: if (selectedStemmaDescription) {
+        pinnedPeople = new PinnedPeopleStorage(selectedStemmaDescription.id);
+        pinnedPeople.load();
+
+        model.getStemma(selectedStemmaDescription.id).then((s) => (selectedStemma = s));
     }
 
-    $: stemmaIndex = new StemmaIndex(selectedStemma);
+    $: if (selectedStemma) stemmaIndex = new StemmaIndex(selectedStemma);
+
+    $: if (pinnedPeople && stemmaIndex)
+        highlight = new CompositeHighlight(pinnedPeople.allPinned().map((personId) => new HighlightLineage(stemmaIndex, personId)));
 </script>
 
 {#if signedIn}
@@ -75,25 +89,23 @@
         bind:selectedStemmaDescription
         on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
         on:createNewFamily={() => addFamilyModal.promptNewFamily()}
-        stemma={selectedStemma}
     />
 
-    <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={handleNewStemma} />
+    <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={(e) => handleNewStemma(e.detail)} />
 
-    <AddFamilyModal
-        bind:this={addFamilyModal}
-        stemma={selectedStemma}
-        {stemmaIndex}
-        on:familyAdded={(e) => handleNewFamilyCreation(e)}
+    <AddFamilyModal bind:this={addFamilyModal} stemma={selectedStemma} {stemmaIndex} on:familyAdded={(e) => handleNewFamilyCreation(e.detail)} />
+
+    <PersonSelectionModal
+        bind:this={personSelectionModal}
+        on:personRemoved={(e) => handlePersonRemoved(e.detail)}
+        on:personUpdated={(e) => hadlePersonUpdated(e.detail)}
     />
 
-    <PersonSelectionModal bind:this={personSelectionModal} on:personRemoved={(e) => handlePersonRemoved(e)} on:personUpdated={(e) => hadlePersonUpdated(e)} />
-
-    <FullStemma stemma={selectedStemma} {stemmaIndex} bind:selectionController on:personSelected={(e) => handlePersonSelection(e)} />
+    <FullStemma stemma={selectedStemma} {stemmaIndex} bind:highlight bind:pinnedPeople on:personSelected={(e) => handlePersonSelection(e.detail)} />
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
-            <Authenticate {google_client_id} on:signIn={handleSignIn} />
+            <Authenticate {google_client_id} on:signIn={(e) => handleSignIn(e.detail)} />
         </div>
     </div>
 {/if}

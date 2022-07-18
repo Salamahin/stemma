@@ -3,7 +3,13 @@
 
     export type UpdatePerson = {
         id: string;
+        pin: boolean;
         description: NewPerson;
+    };
+
+    export type ShowPerson = {
+        pin: boolean;
+        description: StoredPerson;
     };
 </script>
 
@@ -14,27 +20,33 @@
     let modalEl;
     const dispatch = createEventDispatcher();
 
-    let pinned;
+    let pinned: boolean;
+    let name: string;
+    let birthDate: string;
+    let deathDate: string;
+    let bio: string;
+    let id: string;
 
-    let selectedPerson: StoredPerson = {
-        id: "",
-        name: "",
-        birthDate: "",
-        deathDate: "",
-    };
+    function personUpdated() {
+        dispatch("personUpdated", { id: id, description: { name: name, birthDate: birthDate, deathDate: deathDate, bio: bio }, pin: pinned });
 
-    function personUpdated(descr: NewPerson) {
-        dispatch("personUpdated", { id: selectedPerson.id, description: descr });
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     }
 
     function personRemoved() {
-        dispatch("personRemoved", selectedPerson.id);
+        dispatch("personRemoved", id);
+
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     }
 
-    export function showPersonDetails(p: StoredPerson) {
-        selectedPerson = p;
+    export function showPersonDetails(p: ShowPerson) {
+        id = p.description.id;
+        name = p.description.name;
+        birthDate = p.description.birthDate;
+        deathDate = p.description.deathDate;
+        bio = p.description.bio;
+        pinned = p.pin;
+
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 </script>
@@ -49,40 +61,29 @@
             <div class="modal-body">
                 <div class="mb-3">
                     <label for="personNameInput" class="form-label">Имя</label>
-                    <input class="form-control" id="personNameInput" aria-describedby="personNameHelp" value={selectedPerson.name} />
+                    <input class="form-control" id="personNameInput" aria-describedby="personNameHelp" bind:value={name} />
                 </div>
                 <div class="mb-3">
                     <label for="personBirthDate" class="form-label">Дата рождения</label>
-                    <input type="date" class="form-control" id="personBirthDateInput" value={selectedPerson.birthDate} />
+                    <input type="date" class="form-control" id="personBirthDateInput" bind:value={birthDate} />
                 </div>
                 <div class="mb-3">
                     <label for="personDeathDate" class="form-label">Дата смерти</label>
-                    <input type="date" class="form-control" id="personDeathDateInput" value={selectedPerson.deathDate} />
+                    <input type="date" class="form-control" id="personDeathDateInput" bind:value={deathDate} />
                 </div>
                 <div class="mb-3">
                     <label for="personDeathDate" class="form-label">Био</label>
-                    <textarea class="form-control" rows="6" id="personBioInput">{selectedPerson.bio ? selectedPerson.bio : ""}</textarea>
+                    <textarea class="form-control" rows="6" id="personBioInput" bind:value={bio} />
                 </div>
                 <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault" bind:checked={pinned}>
+                    <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault" bind:checked={pinned} />
                     <label class="form-check-label" for="flexSwitchCheckDefault">Закрепить</label>
-                  </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-danger me-auto" on:click={() => personRemoved()}>Удалить</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button
-                    type="button"
-                    class="btn btn-primary"
-                    on:click={() => {
-                        personUpdated({
-                            name: document.getElementById("personNameInput").value,
-                            birthDate: document.getElementById("personBirthDateInput").value,
-                            deathDate: document.getElementById("personDeathDateInput").value,
-                            bio: document.getElementById("personBioInput").value,
-                        });
-                    }}>Сохранить</button
-                >
+                <button type="button" class="btn btn-primary" on:click={() => personUpdated()}>Сохранить</button>
             </div>
         </div>
     </div>

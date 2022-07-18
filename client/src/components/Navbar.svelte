@@ -1,14 +1,13 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    import { Stemma, StemmaDescription } from "../model";
+    import { StemmaDescription } from "../model";
 
-    export let stemma: Stemma;
     export let ownedStemmasDescriptions: StemmaDescription[];
     export let selectedStemmaDescription: StemmaDescription;
 
     const dispatch = createEventDispatcher();
 
-    $: if (!selectedStemmaDescription && ownedStemmasDescriptions.length) selectedStemmaDescription = ownedStemmasDescriptions[0];
+    $: if (!selectedStemmaDescription && ownedStemmasDescriptions && ownedStemmasDescriptions.length) selectedStemmaDescription = ownedStemmasDescriptions[0];
 </script>
 
 <header>
@@ -32,38 +31,40 @@
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             Родословные
                         </a>
-                        <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
-                            {#each ownedStemmasDescriptions as s}
+                        {#if ownedStemmasDescriptions}
+                            <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
+                                {#each ownedStemmasDescriptions as s}
+                                    <li>
+                                        <a
+                                            class="dropdown-item {s == selectedStemmaDescription ? 'active' : ''}"
+                                            href="#"
+                                            on:click={() => (selectedStemmaDescription = s)}>{s.name}</a
+                                        >
+                                    </li>
+                                {/each}
                                 <li>
-                                    <a
-                                        class="dropdown-item {s == selectedStemmaDescription ? 'active' : ''}"
-                                        href="#"
-                                        on:click={() => (selectedStemmaDescription = s)}>{s.name}</a
-                                    >
+                                    <hr class="dropdown-divider" />
                                 </li>
-                            {/each}
-                            <li>
-                                <hr class="dropdown-divider" />
-                            </li>
 
-                            <li>
-                                <a class="dropdown-item" href="#" on:click={() => dispatch("createNewStemma")}>Создать новую</a>
-                            </li>
-                        </ul>
+                                <li>
+                                    <a class="dropdown-item" href="#" on:click={() => dispatch("createNewStemma")}>Создать новую</a>
+                                </li>
+                            </ul>
+                        {/if}
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" on:click={() => dispatch("createNewFamily")}><i class="bi bi-people-fill"></i> Добавить семью</a>
+                        <a class="nav-link" href="#" on:click={() => dispatch("createNewFamily")}><i class="bi bi-people-fill" /> Добавить семью</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#">Поиск</a>
                     </li>
                 </ul>
-                <hr class="border border-white">
+                <hr class="border border-white" />
                 <div class="d-flex ms-auto">
-                    <hr class="border border-light">
+                    <hr class="border border-light" />
                     <ul class="navbar-nav">
                         <li class="nav-item">
-                            <a class="nav-link" href="#" ><i class="bi bi-share-fill"></i> Поделиться</a>
+                            <a class="nav-link" href="#"><i class="bi bi-share-fill" /> Поделиться</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-item nav-link active" href="#">О проекте</a>

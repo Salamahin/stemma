@@ -4,8 +4,9 @@
     import { StemmaIndex } from "../stemmaIndex";
     import { onMount } from "svelte";
     import { createEventDispatcher } from "svelte";
-    import { GenerationSelection, SelectionController } from "../selectionController";
-    import { configureSimulation, initChart, makeDrag, makeNodesAndRelations, mergeData, renderChart } from "../graphTools";
+    import { CompositeHighlight, HighlightLineage } from "../highlight";
+    import { configureSimulation, initChart, makeDrag, makeNodesAndRelations, mergeData, normalizeId, renderChart } from "../graphTools";
+    import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
 
     const dispatch = createEventDispatcher();
 
@@ -15,19 +16,32 @@
 
     export let stemma: Stemma;
     export let stemmaIndex: StemmaIndex;
-    export let selectionController: SelectionController;
+    export let highlight: CompositeHighlight;
+    export let pinnedPeople: PinnedPeopleStorage;
 
     let svg;
 
-    $: {
-        if (svg && stemma) {
-            let [nodes, relations] = makeNodesAndRelations(stemma.people, stemma.families);
-            reconfigureGraph(nodes, relations);
-        }
+    $: if (svg && stemma) {
+        let [nodes, relations] = makeNodesAndRelations(stemma.people, stemma.families);
+        reconfigureGraph(nodes, relations);
     }
 
-    $: {
-        if (svg && selectionController) renderChart(svg, selectionController, stemmaIndex);
+    $: if (svg && highlight && pinnedPeople) {
+        renderFullStemma();
+    }
+
+    function renderFullStemma() {
+        renderChart(svg, highlight, stemmaIndex);
+
+        d3.selectAll("path.pin").remove();
+        pinnedPeople.allPinned().forEach((personId) => {
+            d3.select("#" + normalizeId(personId))
+                .append("path")
+                .attr("d", pin)
+                .attr("class", "pin")
+                .attr("transform", "translate(-7.5, -6)")
+                .attr("fill", "white");
+        });
     }
 
     function reconfigureGraph(nodes, relations) {
@@ -37,33 +51,26 @@
 
         svg.selectAll("circle")
             .on("mouseenter", function (event, node) {
-                if (node.type == "person" && selectionController.personIsHighlighted(node.id)) {
-                    selectionController.add(node.id, new GenerationSelection(stemmaIndex, node.id));
-                    renderChart(svg, selectionController, stemmaIndex);
-
+                if (node.type == "person") {
+                    highlight.push(new HighlightLineage(stemmaIndex, node.id));
+                    renderFullStemma();
                     d3.select(this).attr("r", hoveredPersonR);
-
-                    d3.select(this.parentNode)
-                        .append("path")
-                        .attr("d", pin)
-                        .attr("transform", "translate(-7.5, -6)")
-                        .attr("fill", "white");
                 }
             })
             .on("mouseleave", (_event, node) => {
                 if (node.type == "person") {
-                    selectionController.remove(node.id);
-                    renderChart(svg, selectionController, stemmaIndex);
+                    highlight.pop();
+                    renderFullStemma();
                 }
             })
             .on("click", (event, node) => {
-                if (node.type == "person" && selectionController.personIsHighlighted(node.id)) {
+                if (node.type == "person" && highlight.personIsHighlighted(node.id)) {
                     let selectedPerson = stemmaIndex.get(node.id);
                     dispatch("personSelected", selectedPerson);
                 }
             });
 
-        renderChart(svg, selectionController, stemmaIndex);
+        renderChart(svg, highlight, stemmaIndex);
         makeDrag(svg, simulation);
     }
 

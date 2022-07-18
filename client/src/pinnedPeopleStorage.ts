@@ -10,10 +10,13 @@ export class PinnedPeopleStorage {
 
     load() {
         let value = localStorage.getItem(this.stemmaId)
-        this.pinnedPeople = new Set(...JSON.parse(value).items)
+        if (value) this.pinnedPeople = new Set(JSON.parse(value).items)
+        else this.pinnedPeople = new Set()
+
+        console.log(this.pinnedPeople)
     }
 
-    save() {
+    private save() {
         let value = JSON.stringify({
             items: [...this.pinnedPeople]
         })
@@ -21,13 +24,17 @@ export class PinnedPeopleStorage {
     }
 
     add(personId: string) {
+        console.log("add!", personId)
         this.pinnedPeople.add(personId)
         this.save()
+        return this;
     }
 
     remove(personId: string) {
+        console.log("remove!", personId)
         this.pinnedPeople.delete(personId)
         this.save()
+        return this;
     }
 
     allPinned() {
@@ -37,5 +44,4 @@ export class PinnedPeopleStorage {
     isPinned(personId: string) {
         return this.pinnedPeople.has(personId)
     }
-
 }

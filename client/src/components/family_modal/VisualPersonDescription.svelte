@@ -3,7 +3,7 @@
     import { StemmaIndex } from "../../stemmaIndex";
     import { onMount } from "svelte";
     import { configureSimulation, initChart, makeDrag, makeNodesAndRelations, mergeData, renderChart } from "../../graphTools";
-    import { HighlightAll } from "../../selectionController";
+    import { HighlightAll } from "../../highlight";
 
     export let chartId;
     export let selectedPerson: StoredPerson | NewPerson;
