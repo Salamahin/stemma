@@ -16,11 +16,16 @@ type GenerationDescription = {
     depth: number
 }
 
+type Eldens = {
+    familyId: string
+    members: string[]
+}
+
 
 export class StemmaIndex {
     private _parentToChildren: Map<string, FamilyDescription[]>
     private _childToParents: Map<string, FamilyDescription[]>
-    private _marriages: Map<string, string[]>
+    private _marriages: Eldens[]
 
     private _people: Map<string, StoredPerson>
     private _namesakes: Map<string, string[]>
@@ -50,13 +55,11 @@ export class StemmaIndex {
             else return []
         })))
 
-        this._marriages = new Map([... this._parentToChildren.entries()].map(e => [e[0], e[1].map(f => f.familyId)]))
+        this._marriages = stemma.families.map(f => ({ familyId: f.id, members: f.parents }))
 
         this._namesakes = new Map(this.groupByKey(stemma.people.map(p => [p.name, p.id])))
         this._people = new Map(stemma.people.map(p => [p.id, p]))
-        this._lineage = new Map<string, Generation>(
-            stemma.people.map(p => [p.id, this.buildLineage(p)])
-        )
+        this._lineage = new Map<string, Generation>(stemma.people.map(p => [p.id, this.buildLineage(p)]))
         this._maxGeneration = Math.max(...[...this._lineage.values()].map(p => p.generation));
     }
 
@@ -124,9 +127,12 @@ export class StemmaIndex {
         ]
     }
 
-    marriages(personId: string) {
-        if (this._marriages.has(personId)) return this._marriages.get(personId)
-        else return []
+    private hasAllMembers(members: string[], pool: Set<string>) {
+        return members.filter(m => pool.has(m)).length == members.length
+    }
+
+    marriages(peopleIds: Set<string>) {
+        return this._marriages.filter(fd => this.hasAllMembers(fd.members, peopleIds)).map(fd => fd.familyId)
     }
 
     namesakes(personName: string) {

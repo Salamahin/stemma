@@ -16,8 +16,6 @@ export class HighlightAll implements Highlight {
 }
 
 type LineageData = {
-    root: string
-    marriages: string[]
     relatedPeople: Set<string>
     relatedFamilies: Set<string>
 }
@@ -40,31 +38,15 @@ export class HiglightLineages implements Highlight {
     private remakeCashes() {
         this.allPeople = new Set(this.lineagesData.map(d => d.relatedPeople).reduce((acc, next) => [...acc, ...next], []))
         this.allFamilies = new Set(this.lineagesData.map(d => d.relatedFamilies).reduce((acc, next) => [...acc, ...next], []))
-
-        let distinctMariages = new Map(this.lineagesData.map(d => [d.root, d.marriages]))
-        let allMarriagesCounted = this.count([...distinctMariages.values()].flat())
-        this.allMariages = new Set(Array.from(allMarriagesCounted.entries()).filter(x => x[1] > 1).map(x => x[0]))
+        this.allMariages = new Set(this.index.marriages(this.allPeople))
     }
 
     private toLineageData(personId) {
         let lineage = this.index.lineage(personId)
         return {
-            root: personId,
-            marriages: [...lineage.relativies].flatMap(pId => this.index.marriages(pId)),
             relatedPeople: lineage.relativies,
             relatedFamilies: lineage.families,
         }
-    }
-
-    private count<T>(array: Array<T>) {
-        return array.reduce((acc, next) => {
-            if (acc.has(next)) {
-                acc.set(next, acc.get(next) + 1)
-            } else {
-                acc.set(next, 1)
-            }
-            return acc
-        }, new Map<T, number>())
     }
 
     personIsHighlighted(personId: string): boolean {
