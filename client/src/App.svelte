@@ -104,7 +104,7 @@
 
     function updateIndexAndHighlightOnStemmaChange(stemma: Stemma) {
         let si = new StemmaIndex(stemma);
-        let hg = new HiglightLineages(stemmaIndex, pinnedPeople.allPinned());
+        let hg = new HiglightLineages(si, pinnedPeople.allPinned());
 
         return { si, hg };
     }
@@ -121,7 +121,6 @@
 
     $: if (selectedStemma) {
         let { si, hg } = updateIndexAndHighlightOnStemmaChange(selectedStemma);
-        console.log("index!")
         stemmaIndex = si;
         highlight = hg;
     }
