@@ -128,9 +128,11 @@ export class StemmaIndex {
         let directChildren = this._parentToChildren.has(personId) ? this._parentToChildren.get(personId) : []
         let directParents = this._childToParents.has(personId) ? this._childToParents.get(personId) : []
 
+        console.log(directChildren, directParents)
+
         return [
-            ...directChildren.map(f => ({ id: f.familyId, parents: [personId], children: f.members })),
-            ...directParents.map(f => ({ id: f.familyId, parents: f.members, children: [personId] }))
+            ...directChildren.filter(f => f.members.length).map(f => ({ id: f.familyId, parents: [personId], children: f.members })),
+            ...directParents.filter(f => f.members.length).map(f => ({ id: f.familyId, parents: f.members, children: [personId] }))
         ]
     }
 
