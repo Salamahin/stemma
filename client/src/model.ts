@@ -83,6 +83,22 @@ export class Model {
         return await this.parseResponse<Stemma>(response);
     }
 
+    async updateFamily(stemmaId: string, familyId: string, parents: (NewPerson | StoredPerson)[], children: (NewPerson | StoredPerson)[]) {
+        let request = {
+            "parent1": parents.length > 0 ? this.sanitize(parents[0]) : null,
+            "parent2": parents.length > 1 ? this.sanitize(parents[1]) : null,
+            "children": children.map(c => this.sanitize(c))
+        }
+
+        const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/family/${encodeURIComponent(familyId)}`, {
+            method: 'PUT',
+            headers: this.commonHeader,
+            body: JSON.stringify(request)
+        })
+
+        return await this.parseResponse<Stemma>(response);
+    }
+
     async addStemma(name: string) {
         const response = await fetch(`${this.endpoint}/stemma`, {
             method: 'POST',
@@ -97,6 +113,15 @@ export class Model {
 
     async removePerson(stemmaId: string, personId: string) {
         const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/person/${encodeURIComponent(personId)}`, {
+            method: 'DELETE',
+            headers: this.commonHeader
+        })
+
+        return await this.parseResponse<Stemma>(response);
+    }
+
+    async removeFamily(stemmaId: string, familyId: string) {
+        const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/family/${encodeURIComponent(familyId)}`, {
             method: 'DELETE',
             headers: this.commonHeader
         })

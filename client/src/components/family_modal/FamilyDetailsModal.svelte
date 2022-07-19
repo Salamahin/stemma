@@ -1,8 +1,9 @@
 <script context="module" lang="ts">
-    import { NewPerson, StoredPerson } from "../../model";
+    import { Family, NewPerson, StoredPerson } from "../../model";
     import * as bootstrap from "bootstrap";
 
-    export type CreateFamily = {
+    export type GetOrCreateFamily = {
+        familyId?: string;
         parents: (NewPerson | StoredPerson)[];
         children: (NewPerson | StoredPerson)[];
     };
@@ -23,6 +24,7 @@
 
     let selectParent: boolean;
     let selected = null;
+    let familyId = null;
 
     let parents: (NewPerson | StoredPerson)[] = [];
     let children: (NewPerson | StoredPerson)[] = [];
@@ -34,7 +36,15 @@
     export let stemma: Stemma;
     export let stemmaIndex: StemmaIndex;
 
+    export function showExistingFamily(details: Family) {
+        familyId = details.id;
+        parents = details.parents.map((pid) => stemmaIndex.person(pid));
+        children = details.children.map((cid) => stemmaIndex.person(cid));
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
     export function promptNewFamily() {
+        familyId = null;
         parents = [];
         children = [];
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -60,8 +70,14 @@
         showFamilyComposition();
     }
 
-    function createFamily() {
-        dispatch("familyAdded", { parents: parents, children: children });
+    function saveFamily() {
+        if (familyId == null) dispatch("familyAdded", { parents: parents, children: children });
+        else dispatch("familyUpdated", { familyId: familyId, parents: parents, children: children });
+        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+    }
+
+    function removeFamily() {
+        dispatch("familyRemoved", familyId);
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     }
 
@@ -109,8 +125,11 @@
             </div>
             <div class="modal-footer">
                 {#if mode == "familyComposition"}
+                    {#if familyId != null}
+                        <button type="button" class="btn btn-danger me-auto" on:click={() => removeFamily()}>Удалить</button>
+                    {/if}
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <button type="button" class="btn btn-primary" disabled={selectedParentsCount + selectedChildrenCount < 2} on:click={(e) => createFamily()}
+                    <button type="button" class="btn btn-primary" disabled={selectedParentsCount + selectedChildrenCount < 2} on:click={(e) => saveFamily()}
                         >Сохранить</button
                     >
                 {:else}

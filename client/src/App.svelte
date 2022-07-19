@@ -2,12 +2,12 @@
     import Authenticate from "./components/Authenticate.svelte";
     import Navbar from "./components/Navbar.svelte";
     import AddStemmaModal from "./components/add_stemma_modal/AddStemmaModal.svelte";
-    import AddFamilyModal, { CreateFamily } from "./components/family_modal/AddFamilyModal.svelte";
+    import FamilySelectionModal, { GetOrCreateFamily } from "./components/family_modal/FamilyDetailsModal.svelte";
     import PersonSelectionModal, { UpdatePerson } from "./components/person_details_modal/PersonDetailsModal.svelte";
     import FullStemma from "./components/FullStemma.svelte";
-    import { Model, StemmaDescription, User, Stemma, StoredPerson } from "./model";
+    import { Model, StemmaDescription, User, Stemma, StoredPerson, Family } from "./model";
     import { StemmaIndex } from "./stemmaIndex";
-    import { HiglightLineages, HighlightAll } from "./highlight";
+    import { HiglightLineages } from "./highlight";
     import { PinnedPeopleStorage } from "./pinnedPeopleStorage";
     import fuzzysort from "fuzzysort";
 
@@ -15,7 +15,7 @@
     export let stemma_backend_url;
 
     let addStemmaModal;
-    let addFamilyModal;
+    let familySelectionModal;
     let personSelectionModal;
     let stemmaChart;
 
@@ -47,14 +47,14 @@
         });
     }
 
-    function handleNewFamilyCreation(request: CreateFamily) {
+    function handleNewFamilyCreation(request: GetOrCreateFamily) {
         model.createFamily(selectedStemmaDescription.id, request.parents, request.children).then((s) => (selectedStemma = s));
     }
 
     function hadlePersonUpdated(request: UpdatePerson) {
         pinnedPeople = request.pin ? pinnedPeople.add(request.id) : pinnedPeople.remove(request.id);
 
-        let originalPerson = stemmaIndex.get(request.id);
+        let originalPerson = stemmaIndex.person(request.id);
 
         if (
             originalPerson.birthDate != request.description.birthDate ||
@@ -65,12 +65,25 @@
             model.updatePerson(selectedStemmaDescription.id, request.id, request.description).then((s) => (selectedStemma = s));
     }
 
+    function handleFamilyUpdated(request: GetOrCreateFamily) {
+        model.updateFamily(selectedStemmaDescription.id, request.familyId, request.parents, request.children).then((s) => (selectedStemma = s));
+    }
+
+    function handleFamilyRemoved(familyId: string) {
+        model.removeFamily(selectedStemmaDescription.id, familyId).then((s) => (selectedStemma = s));
+    }
+
     function handlePersonRemoved(personId: string) {
         model.removePerson(selectedStemmaDescription.id, personId).then((s) => (selectedStemma = s));
+        pinnedPeople = pinnedPeople.remove(personId)
     }
 
     function handlePersonSelection(personDetails: StoredPerson) {
         personSelectionModal.showPersonDetails({ description: personDetails, pin: pinnedPeople.isPinned(personDetails.id) });
+    }
+
+    function handleFamilySelection(familyDetails: Family) {
+        familySelectionModal.showExistingFamily(familyDetails);
     }
 
     function updateEverythingOnStemmaChange(stemmaId: string, stemma: Stemma) {
@@ -113,12 +126,19 @@
         bind:selectedStemmaDescription
         bind:lookupPersonName
         on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
-        on:createNewFamily={() => addFamilyModal.promptNewFamily()}
+        on:createNewFamily={() => familySelectionModal.promptNewFamily()}
     />
 
     <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={(e) => handleNewStemma(e.detail)} />
 
-    <AddFamilyModal bind:this={addFamilyModal} stemma={selectedStemma} {stemmaIndex} on:familyAdded={(e) => handleNewFamilyCreation(e.detail)} />
+    <FamilySelectionModal
+        bind:this={familySelectionModal}
+        stemma={selectedStemma}
+        {stemmaIndex}
+        on:familyAdded={(e) => handleNewFamilyCreation(e.detail)}
+        on:familyUpdated={(e) => handleFamilyUpdated(e.detail)}
+        on:familyRemoved={(e) => handleFamilyRemoved(e.detail)}
+    />
 
     <PersonSelectionModal
         bind:this={personSelectionModal}
@@ -133,6 +153,7 @@
         {highlight}
         {pinnedPeople}
         on:personSelected={(e) => handlePersonSelection(e.detail)}
+        on:familySelected={(e) => handleFamilySelection(e.detail)}
     />
 {:else}
     <div class="authenticate-bg vh-100">

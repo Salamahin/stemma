@@ -82,5 +82,25 @@ object StemmaApi extends LazyLogging {
 
           stemma <- s.stemma(user.userId, stemmaId)
         } yield stemma).toResponse()
+
+      case Method.DELETE -> !! / "stemma" / queryParam(stemmaId) / "family" / queryParam(familyId) =>
+        logger.info(s"User ${user.userId} requested to remove a family with id = $familyId")
+        (for {
+          s      <- ZIO.service[StemmaService]
+          _      <- s.removeFamily(user.userId, familyId)
+          stemma <- s.stemma(user.userId, stemmaId)
+        } yield stemma).toResponse()
+
+      case req @ Method.PUT -> !! / "stemma" / queryParam(stemmaId) / "family" / queryParam(familyId) =>
+        logger.info(s"User ${user.userId} requested to update a family composition with id = $familyId")
+        (for {
+          body   <- req.bodyAsString.mapError(err => UnknownError(err))
+          family <- ZIO.fromEither(decode[CreateFamily](body)).mapError(err => UnknownError(err))
+
+          s <- ZIO.service[StemmaService]
+          _ <- s.updateFamily(user.userId, familyId, family)
+
+          stemma <- s.stemma(user.userId, stemmaId)
+        } yield stemma).toResponse()
     }
 }
