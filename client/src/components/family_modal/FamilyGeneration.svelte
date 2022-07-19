@@ -15,7 +15,7 @@
     <tbody>
       {#each selectedPeople as p, i}
         <tr>
-          <th class="align-middle text-end" scope="row">{i + 1}</th>
+          <th class="align-middle" scope="row">{i + 1}</th>
           <td class="align-middle">{p.name}</td>
           <td class="align-middle">
             <div class="float-end">
