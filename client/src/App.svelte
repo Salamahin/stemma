@@ -75,7 +75,7 @@
 
     function handlePersonRemoved(personId: string) {
         model.removePerson(selectedStemmaDescription.id, personId).then((s) => (selectedStemma = s));
-        pinnedPeople = pinnedPeople.remove(personId)
+        pinnedPeople = pinnedPeople.remove(personId);
     }
 
     function handlePersonSelection(personDetails: StoredPerson) {
@@ -102,6 +102,13 @@
         return hg;
     }
 
+    function updateIndexAndHighlightOnStemmaChange(stemma: Stemma) {
+        let si = new StemmaIndex(stemma);
+        let hg = new HiglightLineages(stemmaIndex, pinnedPeople.allPinned());
+
+        return { si, hg };
+    }
+
     $: if (selectedStemmaDescription)
         model.getStemma(selectedStemmaDescription.id).then((s) => {
             let { si, pp, hg } = updateEverythingOnStemmaChange(selectedStemmaDescription.id, s);
@@ -111,6 +118,13 @@
             pinnedPeople = pp;
             highlight = hg;
         });
+
+    $: if (selectedStemma) {
+        let { si, hg } = updateIndexAndHighlightOnStemmaChange(selectedStemma);
+        console.log("index!")
+        stemmaIndex = si;
+        highlight = hg;
+    }
 
     $: if (pinnedPeople) highlight = updateHighlightOnPinnedPeopleChange(pinnedPeople);
 
