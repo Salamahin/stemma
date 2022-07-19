@@ -74,8 +74,6 @@ export class Model {
             "children": children.map(c => this.sanitize(c))
         }
 
-        console.log(JSON.stringify(request))
-
         const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/family`, {
             method: 'POST',
             headers: this.commonHeader,

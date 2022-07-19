@@ -16,6 +16,7 @@ export class HighlightAll implements Highlight {
 }
 
 type LineageData = {
+    from: string
     relatedPeople: Set<string>
     relatedFamilies: Set<string>
 }
@@ -30,7 +31,7 @@ export class HiglightLineages implements Highlight {
 
     constructor(index: StemmaIndex, people: string[]) {
         this.index = index
-        this.lineagesData = people.map(personId => this.toLineageData(personId))
+        this.lineagesData = people.map(personId => this.personToLineageData(personId))
 
         this.remakeCashes()
     }
@@ -41,11 +42,21 @@ export class HiglightLineages implements Highlight {
         this.allMariages = new Set(this.index.marriages(this.allPeople))
     }
 
-    private toLineageData(personId) {
+    private personToLineageData(personId) {
         let lineage = this.index.lineage(personId)
         return {
+            from: personId,
             relatedPeople: lineage.relativies,
             relatedFamilies: lineage.families,
+        }
+    }
+
+    private familyToLineageData(familyId) {
+        let family = this.index.family(familyId)
+        return {
+            from: familyId,
+            relatedPeople: new Set([...family.children, ...family.parents]),
+            relatedFamilies: new Set<string>(familyId)
         }
     }
 
@@ -57,8 +68,13 @@ export class HiglightLineages implements Highlight {
         return !this.lineagesData.length || this.allFamilies.has(familyId) || this.allMariages.has(familyId)
     }
 
-    push(personId: string) {
-        this.lineagesData.push(this.toLineageData(personId))
+    pushPerson(personId: string) {
+        this.lineagesData.push(this.personToLineageData(personId))
+        this.remakeCashes()
+    }
+
+    pushFamily(familyId: string) {
+        this.lineagesData.push(this.familyToLineageData(familyId))
         this.remakeCashes()
     }
 

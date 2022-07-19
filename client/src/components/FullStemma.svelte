@@ -71,17 +71,19 @@
             .selectAll("g")
             .on("mouseenter", function (event, node) {
                 if (node.type == "person") {
-                    highlight.push(node.id);
+                    highlight.pushPerson(node.id);
                     renderFullStemma();
                     d3.select(this).select("circle").attr("r", hoveredPersonR);
                     d3.select(this).select("text").attr("font-weight", "bold");
                 }
-            })
-            .on("mouseleave", (_event, node) => {
-                if (node.type == "person") {
-                    highlight.pop();
+                if (node.type == "family") {
+                    highlight.pushFamily(node.id);
                     renderFullStemma();
                 }
+            })
+            .on("mouseleave", (_event, node) => {
+                highlight.pop();
+                renderFullStemma();
             })
             .on("click", (event, node) => {
                 if (node.type == "person" && highlight.personIsHighlighted(node.id)) {

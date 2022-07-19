@@ -26,6 +26,7 @@ export class StemmaIndex {
     private _parentToChildren: Map<string, FamilyDescription[]>
     private _childToParents: Map<string, FamilyDescription[]>
     private _marriages: Eldens[]
+    private _families: Map<string, Family>
 
     private _people: Map<string, StoredPerson>
     private _namesakes: Map<string, string[]>
@@ -55,6 +56,8 @@ export class StemmaIndex {
             else return []
         })))
 
+        this._families = new Map(stemma.families.map(f => [f.id, f]))
+
         this._marriages = stemma.families.map(f => ({ familyId: f.id, members: f.parents }))
 
         this._namesakes = new Map(this.groupByKey(stemma.people.map(p => [p.name, p.id])))
@@ -79,7 +82,7 @@ export class StemmaIndex {
 
                 maxDepth = Math.max(maxDepth, nextDepth)
                 nextGen = descr.flatMap(x => x.members).map(personId => ({ personId: personId, depth: nextDepth }))
-                if (nextGen.length) foundFamilies = [...descr.map(x => x.familyId), ...foundFamilies]
+                foundFamilies = [...descr.filter(f => f.members.length).map(x => x.familyId), ...foundFamilies]
             }
 
             toLookUp = [...nextGen, ...tail]
@@ -108,6 +111,10 @@ export class StemmaIndex {
 
     lineage(personId: string): Generation {
         return this._lineage.has(personId) ? this._lineage.get(personId) : { generation: 0, relativies: new Set(), families: new Set() }
+    }
+
+    family(familyId: string) {
+        return this._families.get(familyId)
     }
 
     relativies(personId: string) {

@@ -61,10 +61,8 @@
             originalPerson.deathDate != request.description.deathDate ||
             originalPerson.name != request.description.name ||
             originalPerson.bio != request.description.bio
-        ) {
-            console.log("update person");
+        )
             model.updatePerson(selectedStemmaDescription.id, request.id, request.description).then((s) => (selectedStemma = s));
-        }
     }
 
     function handlePersonRemoved(personId: string) {
