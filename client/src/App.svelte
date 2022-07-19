@@ -17,6 +17,7 @@
     let addStemmaModal;
     let addFamilyModal;
     let personSelectionModal;
+    let stemmaChart;
 
     let model: Model;
     let signedIn = false;
@@ -101,6 +102,11 @@
         });
 
     $: if (pinnedPeople) highlight = updateHighlightOnPinnedPeopleChange(pinnedPeople);
+
+    $: if (lookupPersonName) {
+        let results = fuzzysort.go(lookupPersonName, selectedStemma.people, { key: "name" });
+        if (results.length) stemmaChart.zoomToNode(results[0].obj.id);
+    }
 </script>
 
 {#if signedIn}
@@ -122,7 +128,14 @@
         on:personUpdated={(e) => hadlePersonUpdated(e.detail)}
     />
 
-    <FullStemma stemma={selectedStemma} {stemmaIndex} {highlight} {pinnedPeople} on:personSelected={(e) => handlePersonSelection(e.detail)} />
+    <FullStemma
+        bind:this={stemmaChart}
+        stemma={selectedStemma}
+        {stemmaIndex}
+        {highlight}
+        {pinnedPeople}
+        on:personSelected={(e) => handlePersonSelection(e.detail)}
+    />
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">

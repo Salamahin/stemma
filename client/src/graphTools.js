@@ -85,7 +85,6 @@ export function initChart(svgSelector) {
 }
 
 export function configureSimulation(svg, nodes, relations, width, height) {
-    console.log("simulation!")
     return d3
         .forceSimulation(nodes)
         .force(

@@ -44,6 +44,24 @@
         });
     }
 
+    const zoomHandler = d3.zoom().on("zoom", (e) => {
+        svg.select("g.main").attr("transform", e.transform);
+    });
+
+    export function zoomToNode(id: string) {
+        var scaleZoom = 2;
+        var nodeDatum = d3.select("#" + normalizeId(id)).datum();
+
+        svg.transition()
+            .duration(750)
+            .call(
+                zoomHandler.transform,
+                d3.zoomIdentity
+                    .translate(window.innerWidth * 0.5 - scaleZoom * nodeDatum.x, window.innerHeight * 0.5 - scaleZoom * nodeDatum.y)
+                    .scale(scaleZoom)
+            );
+    }
+
     function reconfigureGraph(nodes, relations) {
         let simulation = configureSimulation(svg, nodes, relations, window.innerWidth, window.innerHeight);
 
@@ -78,12 +96,7 @@
 
     onMount(() => {
         svg = initChart("#chart");
-
-        svg.call(
-            d3.zoom().on("zoom", (e) => {
-                svg.select("g.main").attr("transform", e.transform);
-            })
-        );
+        svg.call(zoomHandler);
     });
 </script>
 
