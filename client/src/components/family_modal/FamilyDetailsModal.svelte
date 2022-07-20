@@ -30,6 +30,7 @@
     let children: (NewPerson | StoredPerson)[] = [];
 
     let selectedParentsCount, selectedChildrenCount;
+    let readOnly: boolean;
 
     let dispatch = createEventDispatcher();
 
@@ -40,6 +41,7 @@
         familyId = details.id;
         parents = details.parents.map((pid) => stemmaIndex.person(pid));
         children = details.children.map((cid) => stemmaIndex.person(cid));
+        readOnly = details.readOnly;
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
@@ -47,6 +49,7 @@
         familyId = null;
         parents = [];
         children = [];
+        readOnly = false;
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
@@ -105,8 +108,8 @@
             <div class="modal-body">
                 {#if mode == "familyComposition"}
                     <p class="fs-5">Родители</p>
-                    <FamilyGeneration bind:selectedPeople={parents} />
-                    {#if selectedParentsCount < 2}
+                    <FamilyGeneration bind:selectedPeople={parents} {readOnly} />
+                    {#if selectedParentsCount < 2 && !readOnly}
                         <button type="button" class="btn btn-primary btn-sm" on:click={(e) => showPersonSelection(true)}
                             ><i class="bi bi-person-plus-fill" /> добавить</button
                         >
@@ -115,28 +118,32 @@
                     <hr class="my-5" />
 
                     <p class="fs-5">Дети</p>
-                    <FamilyGeneration bind:selectedPeople={children} />
-                    <button type="button" class="btn btn-primary btn-sm" on:click={(e) => showPersonSelection(false)}
-                        ><i class="bi bi-person-plus-fill" /> добавить</button
-                    >
+                    <FamilyGeneration bind:selectedPeople={children} {readOnly} />
+                    {#if !readOnly}
+                        <button type="button" class="btn btn-primary btn-sm" on:click={(e) => showPersonSelection(false)}
+                            ><i class="bi bi-person-plus-fill" /> добавить</button
+                        >
+                    {/if}
                 {:else}
                     <CreateSelectPerson {stemma} {stemmaIndex} bind:this={createSelectEl} on:selected={(e) => (selected = e.detail)} />
                 {/if}
             </div>
-            <div class="modal-footer">
-                {#if mode == "familyComposition"}
-                    {#if familyId != null}
-                        <button type="button" class="btn btn-danger me-auto" on:click={() => removeFamily()}>Удалить</button>
+            {#if !readOnly}
+                <div class="modal-footer">
+                    {#if mode == "familyComposition"}
+                        {#if familyId != null}
+                            <button type="button" class="btn btn-danger me-auto" on:click={() => removeFamily()}>Удалить</button>
+                        {/if}
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="button" class="btn btn-primary" disabled={selectedParentsCount + selectedChildrenCount < 2} on:click={(e) => saveFamily()}
+                            >Сохранить</button
+                        >
+                    {:else}
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" on:click={(e) => showFamilyComposition()}>Назад</button>
+                        <button type="button" class="btn btn-primary" disabled={selected == null} on:click={(e) => confirmPersonSelection()}>Выбрать</button>
                     {/if}
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <button type="button" class="btn btn-primary" disabled={selectedParentsCount + selectedChildrenCount < 2} on:click={(e) => saveFamily()}
-                        >Сохранить</button
-                    >
-                {:else}
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" on:click={(e) => showFamilyComposition()}>Назад</button>
-                    <button type="button" class="btn btn-primary" disabled={selected == null} on:click={(e) => confirmPersonSelection()}>Выбрать</button>
-                {/if}
-            </div>
+                </div>
+            {/if}
         </div>
     </div>
 </div>

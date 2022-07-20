@@ -11,12 +11,14 @@ export type StoredPerson = {
     birthDate?: string;
     deathDate?: string;
     bio?: string;
+    readOnly: boolean
 }
 
 export type Family = {
     id: string;
     parents: string[];
     children: string[];
+    readOnly: boolean
 }
 
 export type Stemma = {

@@ -20,7 +20,7 @@
   let selectedName;
 
   function nameChanged(newName: string) {
-    namesakes = [...stemmaIndex.namesakes(newName), { name: newName }];
+    namesakes = [...stemmaIndex.namesakes(newName).filter(p => !p.readOnly), { name: newName }];
     if (carousel) carousel.goTo(0, { animated: false });
     dispatch("selected", namesakes[0]);
     selectedName = newName;
