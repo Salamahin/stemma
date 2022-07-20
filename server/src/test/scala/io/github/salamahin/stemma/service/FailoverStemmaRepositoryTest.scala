@@ -24,9 +24,9 @@ object FailoverStemmaRepositoryTest extends ZIOSpecDefault with Requests with Re
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, jamesId :: _ :: Nil, Nil) <- s.createFamily(userId, stemmaId, family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())
-      _                                              <- s.removePerson(userId, jamesId).catchAll(_ => ZIO.succeed())
-      render(stemma)                                 <- s.stemma(userId, stemmaId)
+      FamilyDescription(_, jamesId :: _ :: Nil, Nil, _) <- s.createFamily(userId, stemmaId, family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())
+      _                                                 <- s.removePerson(userId, jamesId).catchAll(_ => ZIO.succeed())
+      render(stemma)                                    <- s.stemma(userId, stemmaId)
     } yield assert(stemma)(hasSameElements("(James, July) parentsOf ()" :: Nil))
   }
 

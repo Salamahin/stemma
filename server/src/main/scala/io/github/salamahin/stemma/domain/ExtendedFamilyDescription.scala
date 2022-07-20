@@ -1,3 +1,3 @@
 package io.github.salamahin.stemma.domain
 
-case class ExtendedFamilyDescription(family: FamilyDescription, stemmaId: String)
+final case class ExtendedFamilyDescription(id: String, parents: List[String], children: List[String], stemmaId: String)

@@ -2,7 +2,7 @@ package io.github.salamahin.stemma.service
 
 import io.github.salamahin.stemma.domain._
 import zio.ZIO
-import zio.test.Assertion.hasSameElements
+import zio.test.Assertion.{hasNoneOf, hasSameElements}
 import zio.test._
 
 object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with RenderStemma {
@@ -61,9 +61,9 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, jamesId :: _, _)       <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
-      FamilyDescription(_, _ :: jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(existing(jamesId), createJill)(createJohn))
-      _                                           <- s.createFamily(userId, stemmaId, family(existing(jamesId), existing(jillId))(createJosh))
+      FamilyDescription(_, jamesId :: _, _, _)       <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
+      FamilyDescription(_, _ :: jillId :: Nil, _, _) <- s.createFamily(userId, stemmaId, family(existing(jamesId), createJill)(createJohn))
+      _                                              <- s.createFamily(userId, stemmaId, family(existing(jamesId), existing(jillId))(createJosh))
 
       render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families)(hasSameElements("(James, Jill) parentsOf (John, Josh)" :: "(James) parentsOf (Jane)" :: Nil))
@@ -75,8 +75,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, jamesId :: _, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
-      _                                     <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJohn))
+      FamilyDescription(_, jamesId :: _, _, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
+      _                                        <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJohn))
 
       render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families)(hasSameElements("(James) parentsOf (Jane, John)" :: Nil))
@@ -89,8 +89,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(familyId, jamesId :: Nil, jillId :: Nil) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
-      err                                                        <- s.updateFamily(userId, familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
+      FamilyDescription(familyId, jamesId :: Nil, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
+      err                                                           <- s.updateFamily(userId, familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
     } yield assertTrue(err == DuplicatedIds(jamesId :: Nil))
   }
 
@@ -101,8 +101,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(firstFamilyId, _, jillId :: Nil) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
-      err                                                <- s.createFamily(userId, stemmaId, family(createJane)(existing(jillId))).flip
+      FamilyDescription(firstFamilyId, _, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
+      err                                                   <- s.createFamily(userId, stemmaId, family(createJane)(existing(jillId))).flip
     } yield assertTrue(err == ChildAlreadyBelongsToFamily(firstFamilyId, jillId))
   }
 
@@ -113,9 +113,9 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, _, jillId :: _ :: Nil) <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill, createJames))
-      _                                           <- s.createFamily(userId, stemmaId, family(existing(jillId), createJosh)(createJake))
-      _                                           <- s.removePerson(userId, jillId)
+      FamilyDescription(_, _, jillId :: _ :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill, createJames))
+      _                                              <- s.createFamily(userId, stemmaId, family(existing(jillId), createJosh)(createJake))
+      _                                              <- s.removePerson(userId, jillId)
 
       render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families)(hasSameElements("(Jane, John) parentsOf (James)" :: "(Josh) parentsOf (Jake)" :: Nil))
@@ -128,11 +128,11 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, jamesId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
-      _                                       <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJuly))
+      FamilyDescription(_, jamesId :: _, _, _) <- s.createFamily(userId, stemmaId, family(createJames, createJane)(createJill))
+      _                                        <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJuly))
 
       render(families) <- s.stemma(userId, stemmaId)
-    } yield assert(families)(hasSameElements("(James) parentsOf (Jill)" :: "(James) parentsOf (July)" :: Nil))
+    } yield assert(families)(hasSameElements("(James, Jane) parentsOf (Jill)" :: "(James) parentsOf (July)" :: Nil))
   }
 
   private val leavingSingleMemberOfFamilyDropsEmptyFamilies = test("when the only member of family left the family is removed") {
@@ -142,14 +142,13 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, _, jillId :: Nil) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
-      _                                      <- s.createFamily(userId, stemmaId, family(existing(jillId))(createJuly))
-      _                                      <- s.createFamily(userId, stemmaId, family(existing(jillId))(createJames))
+      FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
+      _                                         <- s.createFamily(userId, stemmaId, family(existing(jillId))(createJuly))
 
       _ <- s.removePerson(userId, jillId)
 
       Stemma(people, families) <- s.stemma(userId, stemmaId)
-    } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "July" :: "James" :: Nil))
+    } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "July" :: Nil))
   }
 
   private val canUpdateExistingPerson = test("can update existing person") {
@@ -159,7 +158,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, janeId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
+      FamilyDescription(_, janeId :: Nil, _, _) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
 
       _ <- s.updatePerson(userId, janeId, createJohn)
 
@@ -182,8 +181,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(familyId, _ :: johnId :: Nil, jillId :: Nil) <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill))
-      _                                                              <- s.updateFamily(userId, familyId, family(createJuly, existing(johnId))(existing(jillId), createJames))
+      FamilyDescription(familyId, _ :: johnId :: Nil, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill))
+      _                                                                 <- s.updateFamily(userId, familyId, family(createJuly, existing(johnId))(existing(jillId), createJames))
 
       st @ Stemma(people, _) <- s.stemma(userId, stemmaId)
       render(families)       = st
@@ -217,8 +216,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(creatorId, _)  <- a.getOrCreateUser(Email("user1@test.com"))
       User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
-      stemmaId                             <- s.createStemma(creatorId, "my first stemma")
-      FamilyDescription(_, janeId :: _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
+      stemmaId                                <- s.createStemma(creatorId, "my first stemma")
+      FamilyDescription(_, janeId :: _, _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
 
       personRemoveErr <- s.removePerson(accessorId, janeId).flip
       personUpdateErr <- s.updatePerson(accessorId, janeId, createJuly).flip
@@ -232,8 +231,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(creatorId, _)  <- a.getOrCreateUser(Email("user1@test.com"))
       User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
-      stemmaId                          <- s.createStemma(creatorId, "my first stemma")
-      FamilyDescription(familyId, _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
+      stemmaId                             <- s.createStemma(creatorId, "my first stemma")
+      FamilyDescription(familyId, _, _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
 
       familyRemoveErr <- s.removeFamily(accessorId, familyId).flip
       familyUpdateErr <- s.updateFamily(accessorId, familyId, family(createJames)(createJuly)).flip
@@ -249,8 +248,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       stemma1Id <- s.createStemma(userId, "my first stemma")
       stemma2Id <- s.createStemma(userId, "my second stemma")
 
-      FamilyDescription(_, janeId :: johnId :: Nil, joshId :: jillId :: Nil) <- s.createFamily(userId, stemma1Id, family(createJane, createJohn)(createJosh, createJill))
-      familyCreationErr                                                      <- s.createFamily(userId, stemma2Id, family(existing(janeId), existing(johnId))(existing(joshId), existing(jillId))).flip
+      FamilyDescription(_, janeId :: johnId :: Nil, joshId :: jillId :: Nil, _) <- s.createFamily(userId, stemma1Id, family(createJane, createJohn)(createJosh, createJill))
+      familyCreationErr                                                         <- s.createFamily(userId, stemma2Id, family(existing(janeId), existing(johnId))(existing(joshId), existing(jillId))).flip
     } yield assertTrue(familyCreationErr == NoSuchPersonId(janeId))
   }
 
@@ -267,6 +266,9 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
     } yield assertTrue(stemmaRequestErr == AccessToStemmaDenied(stemmaId))
   }
 
+  private def readOnlyP(people: Seq[PersonDescription])   = people.map(p => (p.id, p.readOnly)).toMap
+  private def readOnlyF(families: Seq[FamilyDescription]) = families.map(p => (p.id, p.readOnly)).toMap
+
   private val canChangeOwnershipInRecursiveManner = test("ownership change affects spouses, their ancestors and children") {
     for {
       (s, a)              <- services
@@ -274,27 +276,46 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
       /*
-         july             jane + john
+         july7             jane1 + john2
              \           /           \
-              jake + jill             josh
+              jake5 + jill4             josh3
                          \
-                          james
+                          james6
                                \
-                                jeff
+                                jeff8
 
        if jill ownership is granted, one can edit july, jake, jill, james & jeff. In other words the target person,
        her spouses and children, and ancestors of her spouses
        */
 
-      stemmaId                                                                <- s.createStemma(creatorId, "my first stemma")
-      FamilyDescription(_, _, _ :: jillId :: Nil)                             <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
-      FamilyDescription(jakeJillFamilyId, _ :: jakeId :: Nil, jamesId :: Nil) <- s.createFamily(creatorId, stemmaId, family(existing(jillId), createJake)(createJames))
-      FamilyDescription(julyJakeFamilyId, julyId :: Nil, _)                   <- s.createFamily(creatorId, stemmaId, family(createJuly)(existing(jakeId)))
-      FamilyDescription(jamesJeffFamilyId, _, jeffId :: Nil)                  <- s.createFamily(creatorId, stemmaId, family(existing(jamesId))(createJeff))
+      stemmaId <- s.createStemma(creatorId, "my first stemma")
 
-      chownEffect <- s.describeChown(creatorId, accessorId, jillId)
+      FamilyDescription(janeJohnFamilyId, janeId :: johnId :: Nil, joshId :: jillId :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
+      FamilyDescription(jakeJillFamilyId, _ :: jakeId :: Nil, jamesId :: Nil, _)               <- s.createFamily(creatorId, stemmaId, family(existing(jillId), createJake)(createJames))
+      FamilyDescription(julyJakeFamilyId, julyId :: Nil, _, _)                                 <- s.createFamily(creatorId, stemmaId, family(createJuly)(existing(jakeId)))
+      FamilyDescription(jamesJeffFamilyId, _, jeffId :: Nil, _)                                <- s.createFamily(creatorId, stemmaId, family(existing(jamesId))(createJeff))
+
+      chownEffect <- s.chown(accessorId, jillId)
+
+      creatorStemma  <- s.stemma(creatorId, stemmaId)
+      accessorStemma <- s.stemma(accessorId, stemmaId)
+
+      creatorReadOnlyP  = readOnlyP(creatorStemma.people)
+      accessorReadOnlyP = readOnlyP(accessorStemma.people)
+
+      creatorReadOnlyF  = readOnlyF(creatorStemma.families)
+      accessorReadOnlyF = readOnlyF(accessorStemma.families)
+
     } yield assert(chownEffect.affectedPeople)(hasSameElements(jillId :: julyId :: jakeId :: jamesId :: jeffId :: Nil)) &&
-      assert(chownEffect.affectedFamilies)(hasSameElements(jakeJillFamilyId :: julyJakeFamilyId :: jamesJeffFamilyId :: Nil))
+      assert(chownEffect.affectedPeople)(hasNoneOf(janeId :: johnId :: joshId :: Nil)) &&
+      assert(chownEffect.affectedFamilies)(hasSameElements(jakeJillFamilyId :: julyJakeFamilyId :: jamesJeffFamilyId :: Nil)) &&
+      assert(chownEffect.affectedFamilies)(hasNoneOf(janeJohnFamilyId :: Nil)) &&
+      //
+      assertTrue(accessorReadOnlyF == Map(janeJohnFamilyId -> true, jakeJillFamilyId  -> false, julyJakeFamilyId -> false, jamesJeffFamilyId -> false)) &&
+      assertTrue(creatorReadOnlyF == Map(janeJohnFamilyId  -> false, jakeJillFamilyId -> true, julyJakeFamilyId  -> true, jamesJeffFamilyId  -> true)) &&
+      //
+      assertTrue(accessorReadOnlyP == Map(janeId -> true, johnId  -> true, joshId  -> true, jakeId  -> false, jillId -> false, jamesId -> false, julyId -> false, jeffId -> false)) &&
+      assertTrue(creatorReadOnlyP == Map(janeId  -> false, johnId -> false, joshId -> false, jakeId -> true, jillId  -> true, jamesId  -> true, julyId  -> true, jeffId  -> true))
   }
 
   override def spec =

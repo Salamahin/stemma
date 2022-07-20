@@ -24,7 +24,7 @@ class StemmaRepository extends LazyLogging {
     xx
   }
 
-  def stemma(ts: TraversalSource, stemmaId: String): Stemma = {
+  def stemma(ts: TraversalSource, stemmaId: String, userId: String): Stemma = {
     val people = ts
       .V()
       .hasLabel(types.person)
@@ -34,8 +34,9 @@ class StemmaRepository extends LazyLogging {
         val birthDate = vertex.property(personKeys.birthDate).toOption.map(LocalDate.parse)
         val deathDate = vertex.property(personKeys.deathDate).toOption.map(LocalDate.parse)
         val bio       = vertex.property(personKeys.bio).toOption
+        val ownerId   = vertex.inE(relations.ownerOf).otherV().map(_.id().toString).headOption()
 
-        PersonDescription(vertex.id().toString, name, birthDate, deathDate, bio)
+        PersonDescription(vertex.id().toString, name, birthDate, deathDate, bio, !ownerId.contains(userId))
       }
       .toList()
 
@@ -46,8 +47,9 @@ class StemmaRepository extends LazyLogging {
       .map { family =>
         val parents  = family.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
         val children = family.inE(relations.childOf).otherV().id().map(_.toString).toList()
+        val ownerId  = family.inE(relations.ownerOf).otherV().map(_.id().toString).headOption()
 
-        FamilyDescription(family.id().toString, parents, children)
+        FamilyDescription(family.id().toString, parents, children, !ownerId.contains(userId))
       }
       .toList()
 
@@ -105,35 +107,34 @@ class StemmaRepository extends LazyLogging {
     User(userId, email)
   }
 
-  def listChownEffect(ts: TraversalSource, startPersonId: String, newOwnerId: String): Either[UnknownUser, ChownEffect] = {
-    val newOwner = ts.V(newOwnerId).headOption().toRight(UnknownUser(newOwnerId))
+  def chown(ts: TraversalSource, startPersonId: String, newOwnerId: String) = {
+    val owner = ts.V(newOwnerId).head()
 
-    newOwner
-      .map { _ =>
-        val familyIds = mutable.Set.empty[String]
-        val personIds = mutable.Set.empty[String]
+    val familyIds = mutable.ListBuffer.empty[String]
+    val personIds = mutable.ListBuffer.empty[String]
 
-        ts.V(startPersonId)
-          .outE(relations.spouseOf)
-          .otherV()
-          .sideEffect(family => familyIds += family.id().toString)
-          .repeat { family =>
-            val membersOfFamily = family
-              .inE(relations.spouseOf, relations.childOf)
-              .outV()
-              .sideEffect(person => personIds += person.id().toString)
-              .dedup()
+    def transferOwnership(traverse: GremlinScala[Vertex]) = {
+      traverse
+        .sideEffect(f => f.inE(relations.ownerOf).drop().iterate())
+        .sideEffect(f => owner.addEdge(relations.ownerOf, f))
+    }
 
-            membersOfFamily
-              .outE(relations.spouseOf, relations.childOf)
-              .inV()
-              .simplePath()
-              .sideEffect(family => familyIds += family.id().toString)
-          }
-          .iterate()
+    ts.V(startPersonId)
+      .out(relations.spouseOf)
+      .repeat { family =>
+        val people = transferOwnership(family.sideEffect(f => familyIds += f.id().toString))
+          .in(relations.spouseOf, relations.childOf)
+          .dedup()
 
-        ChownEffect(familyIds.toList, personIds.toList)
+        val families = transferOwnership(people.sideEffect(v => personIds += v.id().toString))
+          .out(relations.spouseOf, relations.childOf)
+          .simplePath()
+
+        families
       }
+      .iterate()
+
+    ChownEffect(familyIds.toList, personIds.toList)
   }
 
   def newStemma(ts: TraversalSource, name: String): String = {
@@ -175,32 +176,21 @@ class StemmaRepository extends LazyLogging {
     personVertex.id().toString
   }
 
-  def makeSpouseRelation(ts: TraversalSource, familyId: String, personId: String): Either[StemmaError, Unit] =
-    setRelation(ts, personId, familyId, relations.spouseOf)(
-      NoSuchPersonId(personId),
-      NoSuchFamilyId(familyId)
-    )
-
-  private def setRelation(ts: TraversalSource, from: String, to: String, relation: String)(
-    sourceNotFound: => StemmaError,
-    targetNotFound: => StemmaError,
-    checks: RelationRules*
-  ) = {
+  private def setRelation(ts: TraversalSource, from: String, to: String, relation: String)(checks: RelationRules*): Either[StemmaError, Unit] = {
     import cats.syntax.traverse._
-    for {
-      fromV <- ts.V(from).headOption().toRight(sourceNotFound)
-      toV   <- ts.V(to).headOption().toRight(targetNotFound)
-      _     <- checks.toList.map(_.between(fromV, toV)).sequence
-      _     = if (fromV.out(relation).is(toV).notExists()) ts.addE(relation).from(fromV).to(toV).iterate()
-    } yield ()
+
+    val fromV = ts.V(from).head()
+    val toV   = ts.V(to).head()
+
+    if (fromV.out(relation).is(toV).exists()) Right()
+    else checks.toList.map(_.between(fromV, toV)).sequence.map(_ => fromV.addEdge(relation, toV))
   }
 
   def makeChildRelation(ts: TraversalSource, familyId: String, personId: String): Either[StemmaError, Unit] =
-    setRelation(ts, personId, familyId, relations.childOf)(
-      NoSuchPersonId(personId),
-      NoSuchFamilyId(familyId),
-      childShouldBelongToSingleFamily
-    )
+    setRelation(ts, personId, familyId, relations.childOf)(childShouldBelongToSingleFamily)
+
+  def makeSpouseRelation(ts: TraversalSource, familyId: String, personId: String): Either[StemmaError, Unit] =
+    setRelation(ts, personId, familyId, relations.spouseOf)()
 
   def removeFamily(ts: TraversalSource, id: String): Either[NoSuchFamilyId, Unit] = ts.V(id).headOption().map(_.remove()).toRight(NoSuchFamilyId(id))
 
@@ -235,7 +225,7 @@ class StemmaRepository extends LazyLogging {
         val parents  = f.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
         val children = f.inE(relations.childOf).otherV().id().map(_.toString).toList()
 
-        ExtendedFamilyDescription(FamilyDescription(f.id().toString, parents, children), stemmaId)
+        ExtendedFamilyDescription(f.id().toString, parents, children, stemmaId)
       }
       .toRight(NoSuchFamilyId(id))
 
@@ -256,38 +246,13 @@ class StemmaRepository extends LazyLogging {
     isOwnerOf(ts, userId, stemmaId)(NoSuchFamilyId)
 
   def makeFamilyOwner(ts: TraversalSource, userId: String, familyId: String): Either[StemmaError, Unit] =
-    setRelation(ts, userId, familyId, relations.ownerOf)(
-      UnknownUser(userId),
-      NoSuchFamilyId(familyId),
-      thereAreNoOtherOwners(AccessToFamilyDenied(familyId))
-    )
+    setRelation(ts, userId, familyId, relations.ownerOf)(thereAreNoOtherOwners(AccessToFamilyDenied(familyId)))
 
   def makePersonOwner(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Unit] =
-    setRelation(ts, userId, personId, relations.ownerOf)(
-      UnknownUser(userId),
-      NoSuchPersonId(personId),
-      thereAreNoOtherOwners(AccessToPersonDenied(personId))
-    )
+    setRelation(ts, userId, personId, relations.ownerOf)(thereAreNoOtherOwners(AccessToPersonDenied(personId)))
 
   def makeGraphOwner(ts: TraversalSource, userId: String, stemmaId: String): Either[StemmaError, Unit] =
-    setRelation(ts, userId, stemmaId, relations.ownerOf)(
-      UnknownUser(userId),
-      NoSuchStemmaId(stemmaId)
-    )
-
-  private def removeOwnership(ts: TraversalSource, userId: String, targetId: String)(err: => StemmaError) =
-    for {
-      person <- ts.V(targetId).headOption().toRight(err)
-      user   <- ts.V(userId).headOption().toRight(UnknownUser(userId))
-      _      = person.inE(relations.ownerOf).drop().iterate()
-      _      = ts.addE(relations.ownerOf).from(user).to(person).head()
-    } yield ()
-
-  def resetPersonOwner(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Unit] =
-    removeOwnership(ts, userId, personId)(NoSuchPersonId(personId))
-
-  def resetFamilyOwner(ts: TraversalSource, userId: String, familyId: String): Either[StemmaError, Unit] =
-    removeOwnership(ts, userId, familyId)(NoSuchFamilyId(familyId))
+    setRelation(ts, userId, stemmaId, relations.ownerOf)()
 }
 
 private object StemmaRepository {

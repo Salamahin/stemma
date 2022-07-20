@@ -46,9 +46,9 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
   private def resetFamilyRelations(ts: TraversalSource, ownerId: String, familyId: String, family: CreateFamily) = {
     val CreateFamily(p1, p2, children) = family
     for {
-      ExtendedFamilyDescription(FamilyDescription(_, oldParents, oldChildren), stemmaId) <- ops.describeFamily(ts, familyId)
-      _                                                                                  <- oldParents.map(id => ops.removeSpouseRelation(ts, familyId, id)).sequence
-      _                                                                                  <- oldChildren.map(id => ops.removeChildRelation(ts, familyId, id)).sequence
+      ExtendedFamilyDescription(_, oldParents, oldChildren, stemmaId) <- ops.describeFamily(ts, familyId)
+      _                                                               <- oldParents.map(id => ops.removeSpouseRelation(ts, familyId, id)).sequence
+      _                                                               <- oldChildren.map(id => ops.removeChildRelation(ts, familyId, id)).sequence
 
       updatedFamily <- setFamilyRelations(ts, stemmaId, ownerId, familyId, (p1 ++ p2).toSeq, children)
     } yield updatedFamily
@@ -76,7 +76,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
       childrenIds <- children.map(getOrCreatePerson).sequence
       _           <- parentIds.map(id => ops.makeSpouseRelation(ts, familyId, id)).sequence
       _           <- childrenIds.map(id => ops.makeChildRelation(ts, familyId, id)).sequence
-    } yield FamilyDescription(familyId, parentIds.toList, childrenIds.toList)
+    } yield FamilyDescription(familyId, parentIds.toList, childrenIds.toList, false)
   }
 
   private def validateFamily(f: CreateFamily): Either[StemmaError, CreateFamily] = {
@@ -112,7 +112,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
   )
 
   private def removePersonAndDropEmptyFamilies(ts: TraversalSource, id: String) = {
-    def removeFamilyIfNotConnecting2Persons(family: FamilyDescription) =
+    def removeFamilyIfNotConnecting2Persons(family: ExtendedFamilyDescription) =
       if ((family.parents ++ family.children).size < 2) ops.removeFamily(ts, family.id) else Right((): Unit)
 
     for {
@@ -122,7 +122,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
       parentOfWhichFamily <- descr.spouseOf.map(ops.describeFamily(ts, _)).sequence
       childOfWhichFamily  <- descr.childOf.map(ops.describeFamily(ts, _)).toList.sequence
 
-      _ <- (parentOfWhichFamily ++ childOfWhichFamily).map(_.family).map(removeFamilyIfNotConnecting2Persons).sequence
+      _ <- (parentOfWhichFamily ++ childOfWhichFamily).map(removeFamilyIfNotConnecting2Persons).sequence
     } yield ()
   }
 
@@ -146,28 +146,19 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
     ZIO.fromEither(transaction(graph) { tx =>
       for {
         isOwner <- ops.isStemmaOwner(tx, userId, stemmaId)
-        stemma  <- if (isOwner) Right(ops.stemma(tx, stemmaId)) else Left(AccessToStemmaDenied(stemmaId))
+        stemma  <- if (isOwner) Right(ops.stemma(tx, stemmaId, userId)) else Left(AccessToStemmaDenied(stemmaId))
       } yield stemma
     })
 
-  def describeChown(userId: String, toUserId: String, targetPersonId: String) =
-    ZIO.fromEither(transaction(graph)(ts => makeChown(ts, userId, toUserId, targetPersonId)))
-
-  def chown(userId: String, toUserId: String, targetPersonId: String) = ZIO.fromEither(
-    transaction(graph)(ts =>
+  def chown(toUserId: String, targetPersonId: String) = ZIO.fromEither(
+    transaction(graph)(ts => {
       for {
-        chown <- makeChown(ts, userId, toUserId, targetPersonId)
-        _     <- chown.affectedFamilies.map(fid => ops.resetFamilyOwner(ts, toUserId, fid)).sequence
-        _     <- chown.affectedPeople.map(pid => ops.resetPersonOwner(ts, toUserId, pid)).sequence
-      } yield ()
-    )
+        person <- ops.describePerson(ts, targetPersonId)
+        effect = ops.chown(ts, targetPersonId, toUserId)
+        _      <- ops.makeGraphOwner(ts, toUserId, person.stemmaId)
+      } yield effect
+    })
   )
-
-  private def makeChown(ts: TraversalSource, userId: String, toUserId: String, targetPersonId: String) =
-    for {
-      isOwner <- ops.isPersonOwner(ts, userId, targetPersonId)
-      chown   <- if (isOwner) ops.listChownEffect(ts, targetPersonId, toUserId) else Left(AccessToPersonDenied(targetPersonId))
-    } yield chown
 }
 
 object StemmaService {
