@@ -36,6 +36,13 @@ object StemmaApi extends LazyLogging {
           .flatMap(_.listOwnedStemmas(user.userId))
           .toResponse()
 
+      case Method.DELETE -> !! / "stemma" / queryParam(stemmaId) =>
+        logger.info(s"User ${user.userId} asked to remove stemma with id = $stemmaId")
+        ZIO
+          .service[StemmaService]
+          .flatMap(_.removeStemma(user.userId, stemmaId))
+          .toResponse()
+
       case req @ Method.POST -> !! / "stemma" =>
         logger.info(s"User ${user.userId} requested a new stemma creation")
         (for {
@@ -44,7 +51,7 @@ object StemmaApi extends LazyLogging {
           s          <- ZIO.service[StemmaService]
           stemmaId   <- s.createStemma(user.userId, stemmaName.name)
           _          = logger.debug(s"User ${user.userId} created a new stemma with id = $stemmaId, name = $stemmaName")
-        } yield StemmaDescription(stemmaId, stemmaName.name)).toResponse()
+        } yield StemmaDescription(stemmaId, stemmaName.name, removable = true)).toResponse()
 
       case Method.GET -> !! / "stemma" / queryParam(stemmaId) =>
         logger.info(s"User ${user.userId} requested stemma data with stemmaId = $stemmaId")

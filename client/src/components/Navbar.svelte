@@ -36,11 +36,16 @@
                             <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
                                 {#each ownedStemmasDescriptions as s}
                                     <li>
-                                        <a
-                                            class="dropdown-item {s == selectedStemmaDescription ? 'active' : ''}"
-                                            href="#"
-                                            on:click={() => (selectedStemmaDescription = s)}>{s.name}</a
-                                        >
+                                        <div class="d-flex flex-row mt-1 me-1">
+                                            <a
+                                                class="dropdown-item {s == selectedStemmaDescription ? 'active' : ''}"
+                                                href="#"
+                                                on:click={() => (selectedStemmaDescription = s)}>{s.name}</a
+                                            >
+                                            {#if s != selectedStemmaDescription}
+                                                <button type="button" class="btn btn-danger btn-sm"><i class="bi bi-trash" /></button>
+                                            {/if}
+                                        </div>
                                     </li>
                                 {/each}
                                 <li>
@@ -62,7 +67,13 @@
                     <hr class="border border-light" />
                     <ul class="navbar-nav w-100">
                         <li class="nav-item">
-                            <input type="search" class="form-control mw-100" style="min-width: 350px" placeholder="Быстрый поиск" bind:value={lookupPersonName} />
+                            <input
+                                type="search"
+                                class="form-control mw-100"
+                                style="min-width: 350px"
+                                placeholder="Быстрый поиск"
+                                bind:value={lookupPersonName}
+                            />
                         </li>
                         <li class="nav-item">
                             <a class="nav-item nav-link active" href="#">О проекте</a>

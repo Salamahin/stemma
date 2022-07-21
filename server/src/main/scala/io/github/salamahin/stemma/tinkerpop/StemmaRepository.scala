@@ -3,6 +3,7 @@ package io.github.salamahin.stemma.tinkerpop
 import com.typesafe.scalalogging.LazyLogging
 import gremlin.scala._
 import io.github.salamahin.stemma.domain._
+import io.github.salamahin.stemma.tinkerpop.StemmaRepository.RelationRestriction._
 import io.github.salamahin.stemma.tinkerpop.StemmaRepository._
 
 import java.time.LocalDate
@@ -10,18 +11,26 @@ import java.time.format.DateTimeFormatter
 import scala.collection.mutable
 
 class StemmaRepository extends LazyLogging {
-  def listStemmas(ts: TraversalSource, ownerId: String): Either[UnknownUser, List[StemmaDescription]] = {
-    val xx = for {
-      owner <- ts.V(ownerId).headOption().toRight(UnknownUser(ownerId))
-      stemmas = owner
-        .outE(relations.ownerOf)
-        .otherV()
-        .where(_.hasLabel(types.stemma))
-        .map { v => StemmaDescription(v.id().toString, v.property(stemmaKeys.name).value()) }
-        .toList()
-    } yield stemmas
+  def listStemmas(ts: TraversalSource, ownerId: String): Either[NoSuchUserId, List[StemmaDescription]] =
+    ts.V(ownerId)
+      .headOption()
+      .toRight(NoSuchUserId(ownerId))
+      .map { owner =>
+        owner
+          .out(relations.ownerOf)
+          .where(_.hasLabel(types.stemma))
+          .map { v => StemmaDescription(v.id().toString, v.property(stemmaKeys.name).value(), thereAreNoOtherOwners(owner, v)) }
+          .toList()
+      }
 
-    xx
+  def removeStemma(ts: TraversalSource, stemmaId: String, userId: String): Either[StemmaError, Unit] = {
+    for {
+      isOwner          <- isStemmaOwner(ts, userId, stemmaId)
+      stemmaV          = ts.V(stemmaId).head()
+      hasNoOtherOwners = thereAreNoOtherOwners(ts.V(userId).head(), stemmaV)
+
+      _ <- if (isOwner && hasNoOtherOwners) Right(stemmaV.remove()) else Left(IsNotTheOnlyStemmaOwner(stemmaId))
+    } yield ()
   }
 
   def stemma(ts: TraversalSource, stemmaId: String, userId: String): Stemma = {
@@ -176,7 +185,7 @@ class StemmaRepository extends LazyLogging {
     personVertex.id().toString
   }
 
-  private def setRelation(ts: TraversalSource, from: String, to: String, relation: String)(checks: RelationRules*): Either[StemmaError, Unit] = {
+  private def setRelation(ts: TraversalSource, from: String, to: String, relation: String)(checks: RelationRestriction*): Either[StemmaError, Unit] = {
     import cats.syntax.traverse._
 
     val fromV = ts.V(from).head()
@@ -231,7 +240,7 @@ class StemmaRepository extends LazyLogging {
 
   private def isOwnerOf(ts: TraversalSource, userId: String, resourceId: String)(resourceNotFound: String => StemmaError) =
     for {
-      user     <- ts.V(userId).headOption().toRight(UnknownUser(userId))
+      user     <- ts.V(userId).headOption().toRight(NoSuchUserId(userId))
       resource <- ts.V(resourceId).headOption().toRight(resourceNotFound(resourceId))
       isOwner  = user.outE(relations.ownerOf).where(_.otherV().is(resource)).headOption().isDefined
     } yield isOwner
@@ -240,42 +249,46 @@ class StemmaRepository extends LazyLogging {
     isOwnerOf(ts, userId, familyId)(NoSuchFamilyId)
 
   def isPersonOwner(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Boolean] =
-    isOwnerOf(ts, userId, personId)(NoSuchFamilyId)
+    isOwnerOf(ts, userId, personId)(NoSuchPersonId)
 
   def isStemmaOwner(ts: TraversalSource, userId: String, stemmaId: String): Either[StemmaError, Boolean] =
-    isOwnerOf(ts, userId, stemmaId)(NoSuchFamilyId)
+    isOwnerOf(ts, userId, stemmaId)(NoSuchStemmaId)
 
   def makeFamilyOwner(ts: TraversalSource, userId: String, familyId: String): Either[StemmaError, Unit] =
-    setRelation(ts, userId, familyId, relations.ownerOf)(thereAreNoOtherOwners(AccessToFamilyDenied(familyId)))
+    setRelation(ts, userId, familyId, relations.ownerOf)(predicate(thereAreNoOtherOwners)(AccessToFamilyDenied(familyId)))
 
   def makePersonOwner(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Unit] =
-    setRelation(ts, userId, personId, relations.ownerOf)(thereAreNoOtherOwners(AccessToPersonDenied(personId)))
+    setRelation(ts, userId, personId, relations.ownerOf)(predicate(thereAreNoOtherOwners)(AccessToPersonDenied(personId)))
 
   def makeGraphOwner(ts: TraversalSource, userId: String, stemmaId: String): Either[StemmaError, Unit] =
     setRelation(ts, userId, stemmaId, relations.ownerOf)()
+
+  private def thereAreNoOtherOwners(currentOwner: Vertex, target: Vertex) =
+    target
+      .inE(relations.ownerOf)
+      .where(_.otherV().is(P.neq(currentOwner)))
+      .headOption()
+      .isEmpty
 }
 
 private object StemmaRepository {
-  trait RelationRules {
+  trait RelationRestriction {
     def between(from: Vertex, to: Vertex): Either[StemmaError, Unit]
   }
 
-  val childShouldBelongToSingleFamily: RelationRules = (child: Vertex, family: Vertex) => {
+  object RelationRestriction {
+    def predicate(p: (Vertex, Vertex) => Boolean)(onErr: => StemmaError) = new RelationRestriction {
+      override def between(from: Vertex, to: Vertex): Either[StemmaError, Unit] = if (p(from, to)) Right() else Left(onErr)
+    }
+  }
+
+  val childShouldBelongToSingleFamily: RelationRestriction = (child: Vertex, family: Vertex) => {
     child
       .outE(relations.childOf)
       .where(_.otherV().is(P.neq(family)))
       .otherV()
       .map(otherFamily => Left(ChildAlreadyBelongsToFamily(otherFamily.id().toString, child.id().toString)))
       .headOption()
-      .getOrElse(Right((): Unit))
-  }
-
-  def thereAreNoOtherOwners(err: => StemmaError): RelationRules = (source: Vertex, target: Vertex) => {
-    target
-      .inE(relations.ownerOf)
-      .where(_.otherV().is(P.neq(source)))
-      .headOption()
-      .map(_ => Left(err))
       .getOrElse(Right((): Unit))
   }
 

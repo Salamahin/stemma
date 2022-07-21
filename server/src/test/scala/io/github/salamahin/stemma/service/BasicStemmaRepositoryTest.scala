@@ -205,7 +205,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
       render(stemma1) <- s.stemma(userId, userStemmaId1)
       render(stemma2) <- s.stemma(userId, userStemmaId2)
-    } yield assert(stemmas)(hasSameElements(StemmaDescription(userStemmaId1, "first stemma") :: StemmaDescription(userStemmaId2, "second stemma") :: Nil)) &&
+    } yield assert(stemmas)(hasSameElements(StemmaDescription(userStemmaId1, "first stemma", true) :: StemmaDescription(userStemmaId2, "second stemma", true) :: Nil)) &&
       assert(stemma1)(hasSameElements("(Jane, John) parentsOf (Jill, Josh)" :: Nil)) &&
       assert(stemma2)(hasSameElements("(Jake) parentsOf (James, July)" :: Nil))
   }
@@ -276,13 +276,13 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
       /*
-         july7             jane1 + john2
+         july             jane + john
              \           /           \
-              jake5 + jill4             josh3
+              jake + jill             josh
                          \
-                          james6
+                          james
                                \
-                                jeff8
+                                jeff
 
        if jill ownership is granted, one can edit july, jake, jill, james & jeff. In other words the target person,
        her spouses and children, and ancestors of her spouses
@@ -318,6 +318,37 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       assertTrue(creatorReadOnlyP == Map(janeId  -> false, johnId -> false, joshId -> false, jakeId -> true, jillId  -> true, jamesId  -> true, julyId  -> true, jeffId  -> true))
   }
 
+  val whenThereAreSeveralOwnersThenStemmaIsNotRemovable = test("when there are several owners then chart is not removable") {
+    for {
+      (s, a)              <- services
+      User(creatorId, _)  <- a.getOrCreateUser(Email("user1@test.com"))
+      User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
+
+      stemmaId                                  <- s.createStemma(creatorId, "my first stemma")
+      FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJane)(createJill))
+
+      _ <- s.chown(accessorId, jillId)
+
+      creatorStemmas  <- s.listOwnedStemmas(creatorId)
+      accessorStemmas <- s.listOwnedStemmas(accessorId)
+    } yield assertTrue(
+      creatorStemmas.stemmas.forall(s => !s.removable),
+      accessorStemmas.stemmas.forall(s => !s.removable)
+    )
+  }
+
+  val canRemoveStemmaIfOnlyOwner = test("if only owner then can remove owned stemma") {
+    for {
+      (s, a)             <- services
+      User(creatorId, _) <- a.getOrCreateUser(Email("user1@test.com"))
+
+      stemmaId <- s.createStemma(creatorId, "my first stemma")
+      _        <- s.removeStemma(creatorId, stemmaId)
+
+      stemmas <- s.listOwnedStemmas(creatorId)
+    } yield assertTrue(stemmas.stemmas.isEmpty)
+  }
+
   override def spec =
     suite("StemmaService: basic ops & rules")(
       canCreateFamily,
@@ -337,6 +368,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       whenUpdatingFamilyAllMembersShouldBelongToGraph,
       canChangeOwnershipInRecursiveManner,
       appendChildrenToFullExistingFamily,
-      appendChildrenToIncompleteExistingFamily
+      appendChildrenToIncompleteExistingFamily,
+      whenThereAreSeveralOwnersThenStemmaIsNotRemovable,
+      canRemoveStemmaIfOnlyOwner
     )
 }

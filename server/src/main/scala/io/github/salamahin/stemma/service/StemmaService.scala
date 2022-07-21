@@ -18,6 +18,8 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
 
   def listOwnedStemmas(userId: String) = ZIO.fromEither(ops.listStemmas(graph.traversal, userId)).map(OwnedStemmasDescription.apply)
 
+  def removeStemma(userId: String, stemmaId: String) = ZIO.fromEither(transaction(graph)(ts => ops.removeStemma(ts, stemmaId, userId)))
+
   def createFamily(userId: String, stemmaId: String, family: CreateFamily): IO[StemmaError, FamilyDescription] =
     ZIO.fromEither(validateFamily(family) *> transaction(graph) { ts => createFamilyAndSetRelations(ts, stemmaId, userId, family) })
 
