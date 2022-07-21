@@ -38,11 +38,11 @@
                                     <li>
                                         <div class="d-flex flex-row mt-1 me-1">
                                             <a
-                                                class="dropdown-item {s == selectedStemmaDescription ? 'active' : ''}"
+                                                class="dropdown-item {s.id == selectedStemmaDescription.id ? 'active' : ''}"
                                                 href="#"
                                                 on:click={() => (selectedStemmaDescription = s)}>{s.name}</a
                                             >
-                                            {#if s != selectedStemmaDescription}
+                                            {#if s.id != selectedStemmaDescription.id}
                                                 <button type="button" class="btn btn-danger btn-sm" on:click={(e) => dispatch("removeStemma", s)}
                                                     ><i class="bi bi-trash" /></button
                                                 >

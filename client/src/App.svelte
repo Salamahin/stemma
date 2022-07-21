@@ -86,10 +86,7 @@
     }
 
     function handleStemmaRemoval(stemmaId) {
-        model.removeStemma(stemmaId).then(st => {
-            ownedStemmasDescriptions = st.stemmas
-            selectedStemmaDescription = ownedStemmasDescriptions.find(s => s.id = selectedStemmaDescription.id)
-        });
+        model.removeStemma(stemmaId).then((st) => ownedStemmasDescriptions = st.stemmas);
     }
 
     function updateEverythingOnStemmaChange(stemmaId: string, stemma: Stemma) {
