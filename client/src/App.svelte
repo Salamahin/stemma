@@ -10,6 +10,7 @@
     import { HiglightLineages } from "./highlight";
     import { PinnedPeopleStorage } from "./pinnedPeopleStorage";
     import fuzzysort from "fuzzysort";
+    import RemoveStemmaModal from "./components/delete_stemma_modal/RemoveStemmaModal.svelte";
 
     export let google_client_id;
     export let stemma_backend_url;
@@ -18,6 +19,7 @@
     let familySelectionModal;
     let personSelectionModal;
     let stemmaChart;
+    let removeStemmaModal;
 
     let model: Model;
     let signedIn = false;
@@ -34,10 +36,7 @@
     function handleSignIn(user: User) {
         signedIn = true;
         model = new Model(stemma_backend_url, user);
-        model.listStemmas().then((stemmas) => {
-            ownedStemmasDescriptions = stemmas.stemmas;
-            if (ownedStemmasDescriptions.length == 0) addStemmaModal.promptNewStemma(true);
-        });
+        model.listStemmas().then((stemmas) => (ownedStemmasDescriptions = stemmas.stemmas));
     }
 
     function handleNewStemma(name: string) {
@@ -86,6 +85,13 @@
         familySelectionModal.showExistingFamily(familyDetails);
     }
 
+    function handleStemmaRemoval(stemmaId) {
+        model.removeStemma(stemmaId).then(st => {
+            ownedStemmasDescriptions = st.stemmas
+            selectedStemmaDescription = ownedStemmasDescriptions.find(s => s.id = selectedStemmaDescription.id)
+        });
+    }
+
     function updateEverythingOnStemmaChange(stemmaId: string, stemma: Stemma) {
         let si = new StemmaIndex(stemma);
 
@@ -119,6 +125,8 @@
             highlight = hg;
         });
 
+    $: if (ownedStemmasDescriptions && ownedStemmasDescriptions.length == 0) addStemmaModal.promptNewStemma(true);
+
     $: if (selectedStemma) {
         let { si, hg } = updateIndexAndHighlightOnStemmaChange(selectedStemma);
         stemmaIndex = si;
@@ -140,9 +148,12 @@
         bind:lookupPersonName
         on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
         on:createNewFamily={() => familySelectionModal.promptNewFamily()}
+        on:removeStemma={(e) => removeStemmaModal.askForConfirmation(e.detail)}
     />
 
     <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={(e) => handleNewStemma(e.detail)} />
+
+    <RemoveStemmaModal bind:this={removeStemmaModal} on:stemmaRemoved={(e) => handleStemmaRemoval(e.detail)} />
 
     <FamilySelectionModal
         bind:this={familySelectionModal}

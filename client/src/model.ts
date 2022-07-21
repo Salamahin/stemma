@@ -61,6 +61,14 @@ export class Model {
         return await this.parseResponse<OwnedStemmas>(response);
     }
 
+    async removeStemma(stemmaId) {
+        const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}`, {
+            method: 'DELETE',
+            headers: this.commonHeader
+        })
+        return await this.parseResponse<OwnedStemmas>(response);
+    }
+
     async getStemma(stemmaId: string) {
         const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}`, {
             method: 'GET',

@@ -43,7 +43,9 @@
                                                 on:click={() => (selectedStemmaDescription = s)}>{s.name}</a
                                             >
                                             {#if s != selectedStemmaDescription}
-                                                <button type="button" class="btn btn-danger btn-sm"><i class="bi bi-trash" /></button>
+                                                <button type="button" class="btn btn-danger btn-sm" on:click={(e) => dispatch("removeStemma", s)}
+                                                    ><i class="bi bi-trash" /></button
+                                                >
                                             {/if}
                                         </div>
                                     </li>

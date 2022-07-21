@@ -38,10 +38,12 @@ object StemmaApi extends LazyLogging {
 
       case Method.DELETE -> !! / "stemma" / queryParam(stemmaId) =>
         logger.info(s"User ${user.userId} asked to remove stemma with id = $stemmaId")
-        ZIO
-          .service[StemmaService]
-          .flatMap(_.removeStemma(user.userId, stemmaId))
-          .toResponse()
+        (for {
+          s       <- ZIO.service[StemmaService]
+          _       <- s.removeStemma(user.userId, stemmaId)
+          stemmas <- s.listOwnedStemmas(user.userId)
+          _       = logger.debug(stemmas.toString)
+        } yield stemmas).toResponse()
 
       case req @ Method.POST -> !! / "stemma" =>
         logger.info(s"User ${user.userId} requested a new stemma creation")
