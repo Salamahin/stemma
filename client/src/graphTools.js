@@ -89,7 +89,7 @@ export function configureSimulation(svg, nodes, relations, width, height) {
         .forceSimulation(nodes)
         .force(
             "link",
-            d3.forceLink(relations).id((node) => node.id)
+            d3.forceLink(relations).id((node) => node.id).distance(85)
         )
         .force("x", d3.forceX(width / 2).strength(0.2))
         .force("y", d3.forceY(height / 2).strength(0.2))
