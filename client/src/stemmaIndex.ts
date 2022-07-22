@@ -145,7 +145,7 @@ export class StemmaIndex {
     }
 
     marriages(peopleIds: Set<string>) {
-        return this._marriages.filter(fd => this.hasAllMembers(fd.members, peopleIds)).map(fd => fd.familyId)
+        return this._marriages.filter(fd => fd.members.length > 1 && this.hasAllMembers(fd.members, peopleIds)).map(fd => fd.familyId)
     }
 
     uncleFamilies(peopleIds: Set<string>) {
