@@ -85,9 +85,7 @@ export function initChart(svgSelector) {
 }
 
 
-let coordinatesCacheNodes = new Map()
-let coordinatesCacheRelations = new Map()
-
+let coordinatesCache = new Map()
 export function configureSimulation(svg, nodes, relations, width, height) {
     return d3
         .forceSimulation(nodes)
@@ -106,7 +104,7 @@ export function configureSimulation(svg, nodes, relations, width, height) {
             svg.select("g.main")
             .selectAll("g")
             .attr("transform", (d) => {
-                coordinatesCacheNodes.set(d.id, [d.x, d.y])
+                coordinatesCache.set(d.id, [d.x, d.y])
                 return "translate(" + d.x + "," + d.y + ")"
             });
 
@@ -121,7 +119,7 @@ export function configureSimulation(svg, nodes, relations, width, height) {
 export function updateSimulation(simulation, nodes, relations) {
     simulation.nodes(nodes)
     simulation.force("link").links(relations)
-    simulation.alphaTarget(0.1).restart()
+    simulation.alphaTarget(0.3).restart()
 }
 
 export function makeDrag(svg, simulation) {
@@ -167,8 +165,8 @@ export function mergeData(svg, nodes, relations, widht, height) {
 
     nodes.forEach(n => {
         let x, y;
-        if (coordinatesCacheNodes.has(n.id)) {
-            [x, y] = coordinatesCacheNodes.get(n.id)
+        if (coordinatesCache.has(n.id)) {
+            [x, y] = coordinatesCache.get(n.id)
         } else {
             x = widht / 2;
             y = height / 2

@@ -18,23 +18,23 @@ import { Stemma } from './model';
 
 let jjFamily: Stemma = {
     people: [
-        { id: "Jane", name: "Jane" },
-        { id: "John", name: "John" },
-        { id: "Josh", name: "Josh" },
-        { id: "Jill", name: "Jill" },
-        { id: "Jake", name: "Jake" },
-        { id: "James", name: "James" },
-        { id: "July", name: "July" },
-        { id: "Jeff", name: "Jeff" },
-        { id: "Joseph", name: "Joseph" },
+        { id: "Jane", name: "Jane", readOnly: false },
+        { id: "John", name: "John", readOnly: false },
+        { id: "Josh", name: "Josh", readOnly: false },
+        { id: "Jill", name: "Jill", readOnly: false },
+        { id: "Jake", name: "Jake", readOnly: false },
+        { id: "James", name: "James", readOnly: false },
+        { id: "July", name: "July", readOnly: false },
+        { id: "Jeff", name: "Jeff", readOnly: false },
+        { id: "Joseph", name: "Joseph", readOnly: false },
 
     ],
     families: [
-        { id: "f1", parents: ["Jane", "John"], "children": ["Josh", "Jill"] },
-        { id: "f2", parents: ["Jill", "Jake"], "children": ["James"] },
-        { id: "f3", parents: ["July"], "children": ["Jake"] },
-        { id: "f4", parents: ["James"], "children": ["Jeff"] },
-        { id: "f5", parents: ["Joseph"], "children": ["July"] },
+        { id: "f1", parents: ["Jane", "John"], "children": ["Josh", "Jill"], readOnly: false },
+        { id: "f2", parents: ["Jill", "Jake"], "children": ["James"], readOnly: false },
+        { id: "f3", parents: ["July"], "children": ["Jake"], readOnly: false },
+        { id: "f4", parents: ["James"], "children": ["Jeff"], readOnly: false },
+        { id: "f5", parents: ["Joseph"], "children": ["July"], readOnly: false },
     ]
 }
 
@@ -68,27 +68,27 @@ test("Generation is selected as max known generations count", () => {
 test("lineage takes into account all children from all families", () => {
     let mashaFamily = {
         families: [
-            { id: "f1", parents: ["masha", "katya"], children: ["petya"] },
-            { id: "f2", parents: ["masha", "dasha"], children: ["lena"] },
+            { id: "f1", parents: ["masha", "katya"], children: ["petya"], readOnly: false },
+            { id: "f2", parents: ["masha", "dasha"], children: ["lena"], readOnly: false },
         ],
         people: [
-            { id: "masha", name: "masha" },
-            { id: "katya", name: "katya" },
-            { id: "petya", name: "petya" },
-            { id: "dasha", name: "dasha" },
-            { id: "lena", name: "lena" },
+            { id: "masha", name: "masha", readOnly: false },
+            { id: "katya", name: "katya", readOnly: false },
+            { id: "petya", name: "petya", readOnly: false },
+            { id: "dasha", name: "dasha", readOnly: false },
+            { id: "lena", name: "lena", readOnly: false },
         ],
     }
 
     let lineage = new StemmaIndex(mashaFamily).lineage("masha")
     expect(lineage).toEqual({
-        generation: 0, 
+        generation: 0,
         relativies: new Set(["masha", "petya", "lena"]),
         families: new Set(["f1", "f2"])
     })
 })
 
-test("calculates max generation", () =>{
+test("calculates max generation", () => {
     let maxGeneration = new StemmaIndex(jjFamily).maxGeneration()
     expect(maxGeneration).toEqual(4)
 })
@@ -96,11 +96,11 @@ test("calculates max generation", () =>{
 test("lineage skips empty families", () => {
     let mashaFamily = {
         families: [
-            { id: "f1", parents: ["masha", "katya"], children: [] },
+            { id: "f1", parents: ["masha", "katya"], children: [] , readOnly:false},
         ],
         people: [
-            { id: "masha", name: "masha" },
-            { id: "katya", name: "katya" }
+            { id: "masha", name: "masha" , readOnly:false},
+            { id: "katya", name: "katya" , readOnly:false}
         ],
     }
 

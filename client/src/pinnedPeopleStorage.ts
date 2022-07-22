@@ -4,8 +4,7 @@ export class PinnedPeopleStorage {
     private pinnedPeople: Set<string>
 
     constructor(stemmaId: string) {
-        this.stemmaId = stemmaId
-        this.pinnedPeople = new Set()
+        this.stemmaId = `pinned.${stemmaId}`
     }
 
     load() {

@@ -65,8 +65,8 @@
 
     let simulation;
     function reconfigureGraph(nodes, relations) {
-        if(!simulation) simulation = configureSimulation(svg, nodes, relations, window.innerWidth, window.innerHeight);
-        else updateSimulation(simulation, nodes, relations)
+        if (!simulation) simulation = configureSimulation(svg, nodes, relations, window.innerWidth, window.innerHeight);
+        else updateSimulation(simulation, nodes, relations);
 
         mergeData(svg, nodes, relations, window.innerWidth, window.innerHeight);
 
