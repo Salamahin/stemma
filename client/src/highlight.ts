@@ -28,6 +28,7 @@ export class HiglightLineages implements Highlight {
     private allPeople: Set<string>
     private allFamilies: Set<string>
     private allMariages: Set<string>
+    private allUncleFamilies: Set<string>
 
     constructor(index: StemmaIndex, people: string[]) {
         this.index = index
@@ -40,6 +41,8 @@ export class HiglightLineages implements Highlight {
         this.allPeople = new Set(this.lineagesData.map(d => d.relatedPeople).reduce((acc, next) => [...acc, ...next], []))
         this.allFamilies = new Set(this.lineagesData.map(d => d.relatedFamilies).reduce((acc, next) => [...acc, ...next], []))
         this.allMariages = new Set(this.index.marriages(this.allPeople))
+        this.allUncleFamilies = new Set(this.index.uncleFamilies(this.allPeople))
+        console.log(this.allUncleFamilies)
     }
 
     private personToLineageData(personId) {
@@ -56,7 +59,7 @@ export class HiglightLineages implements Highlight {
         return {
             from: familyId,
             relatedPeople: new Set([...family.children, ...family.parents]),
-            relatedFamilies: new Set<string>(familyId)
+            relatedFamilies: new Set<string>([familyId])
         }
     }
 
@@ -65,7 +68,7 @@ export class HiglightLineages implements Highlight {
     }
 
     familyIsHighlighted(familyId: string): boolean {
-        return !this.lineagesData.length || this.allFamilies.has(familyId) || this.allMariages.has(familyId)
+        return !this.lineagesData.length || this.allFamilies.has(familyId) || this.allMariages.has(familyId) || this.allUncleFamilies.has(familyId)
     }
 
     pushPerson(personId: string) {

@@ -11,12 +11,12 @@ type FamilyDescription = {
     members: string[]
 }
 
-type GenerationDescription = {
+type PersonalGeneration = {
     personId: string,
     depth: number
 }
 
-type Eldens = {
+type FamilyMembers = {
     familyId: string
     members: string[]
 }
@@ -25,7 +25,8 @@ type Eldens = {
 export class StemmaIndex {
     private _parentToChildren: Map<string, FamilyDescription[]>
     private _childToParents: Map<string, FamilyDescription[]>
-    private _marriages: Eldens[]
+    private _marriages: FamilyMembers[]
+    private _uncles: FamilyMembers[]
     private _families: Map<string, Family>
 
     private _people: Map<string, StoredPerson>
@@ -59,6 +60,7 @@ export class StemmaIndex {
         this._families = new Map(stemma.families.map(f => [f.id, f]))
 
         this._marriages = stemma.families.map(f => ({ familyId: f.id, members: f.parents }))
+        this._uncles = stemma.families.map(f => ({ familyId: f.id, members: f.children }))
 
         this._namesakes = new Map(this.groupByKey(stemma.people.map(p => [p.name, p.id])))
         this._people = new Map(stemma.people.map(p => [p.id, p]))
@@ -74,7 +76,7 @@ export class StemmaIndex {
 
         while (toLookUp.length) {
             let [head, ...tail] = toLookUp
-            var nextGen: GenerationDescription[] = []
+            var nextGen: PersonalGeneration[] = []
 
             if (relation.has(head.personId)) {
                 let nextDepth = head.depth + 1
@@ -135,11 +137,20 @@ export class StemmaIndex {
     }
 
     private hasAllMembers(members: string[], pool: Set<string>) {
-        return members.filter(m => pool.has(m)).length == members.length
+        return members.length != 0 && members.filter(m => pool.has(m)).length == members.length
+    }
+
+    private has2Members(members: string[], pool: Set<string>) {
+        return members.length != 0 && members.filter(m => pool.has(m)).length > 1
     }
 
     marriages(peopleIds: Set<string>) {
         return this._marriages.filter(fd => this.hasAllMembers(fd.members, peopleIds)).map(fd => fd.familyId)
+    }
+
+    uncleFamilies(peopleIds: Set<string>) {
+        console.log(this._uncles)
+        return this._uncles.filter(fd => this.has2Members(fd.members, peopleIds)).map(fd => fd.familyId)
     }
 
     namesakes(personName: string) {
