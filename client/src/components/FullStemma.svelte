@@ -40,7 +40,7 @@
                 .append("path")
                 .attr("d", pin)
                 .attr("class", "pin")
-                .attr("transform", "translate(-7.5, -6)")
+                .attr("transform", "translate(-8.25, -6)")
                 .attr("fill", "white");
         });
     }
