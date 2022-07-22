@@ -42,7 +42,6 @@ export class HiglightLineages implements Highlight {
         this.allFamilies = new Set(this.lineagesData.map(d => d.relatedFamilies).reduce((acc, next) => [...acc, ...next], []))
         this.allMariages = new Set(this.index.marriages(this.allPeople))
         this.allUncleFamilies = new Set(this.index.uncleFamilies(this.allPeople))
-        console.log(this.allUncleFamilies)
     }
 
     private personToLineageData(personId) {

@@ -149,7 +149,6 @@ export class StemmaIndex {
     }
 
     uncleFamilies(peopleIds: Set<string>) {
-        console.log(this._uncles)
         return this._uncles.filter(fd => this.has2Members(fd.members, peopleIds)).map(fd => fd.familyId)
     }
 
