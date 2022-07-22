@@ -84,6 +84,10 @@ export function initChart(svgSelector) {
     return svg
 }
 
+
+let coordinatesCacheNodes = new Map()
+let coordinatesCacheRelations = new Map()
+
 export function configureSimulation(svg, nodes, relations, width, height) {
     return d3
         .forceSimulation(nodes)
@@ -91,24 +95,33 @@ export function configureSimulation(svg, nodes, relations, width, height) {
             "link",
             d3.forceLink(relations).id((node) => node.id).distance(85)
         )
-        .force("x", d3.forceX(width / 2).strength(0.2))
-        .force("y", d3.forceY(height / 2).strength(0.2))
+        .force("x", d3.forceX().x(width * 0.5).strength(0.2))
+        .force("y", d3.forceY().y(height * 0.5).strength(0.2))
         .force(
             "collide",
             d3.forceCollide().radius((d) => d.r * 20)
         )
         .force("repelForce", d3.forceManyBody().strength(-1500).distanceMin(85))
         .on("tick", () => {
+            svg.select("g.main")
+            .selectAll("g")
+            .attr("transform", (d) => {
+                coordinatesCacheNodes.set(d.id, [d.x, d.y])
+                return "translate(" + d.x + "," + d.y + ")"
+            });
+
             svg.selectAll("line")
                 .attr("x1", (d) => d.source.x)
                 .attr("y1", (d) => d.source.y)
                 .attr("x2", (d) => d.target.x)
                 .attr("y2", (d) => d.target.y);
-
-            svg.select("g.main")
-                .selectAll("g")
-                .attr("transform", (d) => "translate(" + d.x + "," + d.y + ")");
         });
+}
+
+export function updateSimulation(simulation, nodes, relations) {
+    simulation.nodes(nodes)
+    simulation.force("link").links(relations)
+    simulation.alphaTarget(0.1).restart()
 }
 
 export function makeDrag(svg, simulation) {
@@ -142,7 +155,7 @@ export function normalizeId(id) {
         .replace(/\:/g, "_")
 }
 
-export function mergeData(svg, nodes, relations) {
+export function mergeData(svg, nodes, relations, widht, height) {
     svg.select("g.main")
         .selectAll("line")
         .data(relations, (r) => r.id)
@@ -151,6 +164,19 @@ export function mergeData(svg, nodes, relations) {
             (update) => update,
             (exit) => exit.remove()
         );
+
+    nodes.forEach(n => {
+        let x, y;
+        if (coordinatesCacheNodes.has(n.id)) {
+            [x, y] = coordinatesCacheNodes.get(n.id)
+        } else {
+            x = widht / 2;
+            y = height / 2
+        }
+
+        n.x = x
+        n.y = y
+    })
 
     svg.select("g.main")
         .selectAll("g")

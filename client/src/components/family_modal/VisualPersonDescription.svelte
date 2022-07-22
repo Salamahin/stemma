@@ -37,7 +37,7 @@
     $: {
         if(width && height && svg && nodes && relations) {
             sim = configureSimulation(svg, nodes, relations, width, height);
-            mergeData(svg, nodes, relations);
+            mergeData(svg, nodes, relations, width, height);
             makeDrag(svg, sim);
             renderChart(svg, new HighlightAll(), stemmaIndex);
         }

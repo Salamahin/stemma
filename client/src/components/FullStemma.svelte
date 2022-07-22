@@ -5,7 +5,7 @@
     import { onMount } from "svelte";
     import { createEventDispatcher } from "svelte";
     import { HiglightLineages } from "../highlight";
-    import { configureSimulation, initChart, makeDrag, makeNodesAndRelations, mergeData, normalizeId, renderChart } from "../graphTools";
+    import { configureSimulation, initChart, makeDrag, makeNodesAndRelations, mergeData, normalizeId, renderChart, updateSimulation } from "../graphTools";
     import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
 
     const dispatch = createEventDispatcher();
@@ -63,10 +63,12 @@
             );
     }
 
+    let simulation;
     function reconfigureGraph(nodes, relations) {
-        let simulation = configureSimulation(svg, nodes, relations, window.innerWidth, window.innerHeight);
+        if(!simulation) simulation = configureSimulation(svg, nodes, relations, window.innerWidth, window.innerHeight);
+        else updateSimulation(simulation, nodes, relations)
 
-        mergeData(svg, nodes, relations);
+        mergeData(svg, nodes, relations, window.innerWidth, window.innerHeight);
 
         svg.select("g.main")
             .selectAll("g")
