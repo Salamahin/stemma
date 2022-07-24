@@ -158,6 +158,8 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
         person <- ops.describePerson(ts, targetPersonId)
         effect = ops.chown(ts, targetPersonId, toUserId)
         _      <- ops.makeGraphOwner(ts, toUserId, person.stemmaId)
+        _      <- effect.affectedPeople.traverse(p => ops.makePersonOwner(ts, toUserId, p))
+        _      <- effect.affectedFamilies.traverse(f => ops.makeFamilyOwner(ts, toUserId, f))
       } yield effect
     })
   )

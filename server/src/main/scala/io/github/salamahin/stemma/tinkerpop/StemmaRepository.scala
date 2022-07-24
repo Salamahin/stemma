@@ -37,14 +37,14 @@ class StemmaRepository extends LazyLogging {
       .V()
       .hasLabel(types.person)
       .has(keys.stemmaId, stemmaId)
-      .map { vertex =>
-        val name      = vertex.property(personKeys.name).value()
-        val birthDate = vertex.property(personKeys.birthDate).toOption.map(LocalDate.parse)
-        val deathDate = vertex.property(personKeys.deathDate).toOption.map(LocalDate.parse)
-        val bio       = vertex.property(personKeys.bio).toOption
-        val ownerId   = vertex.inE(relations.ownerOf).otherV().map(_.id().toString).headOption()
+      .map { person =>
+        val name      = person.property(personKeys.name).value()
+        val birthDate = person.property(personKeys.birthDate).toOption.map(LocalDate.parse)
+        val deathDate = person.property(personKeys.deathDate).toOption.map(LocalDate.parse)
+        val bio       = person.property(personKeys.bio).toOption
+        val isOwner   = isOwnerOf(ts, userId, person)
 
-        PersonDescription(vertex.id().toString, name, birthDate, deathDate, bio, !ownerId.contains(userId))
+        PersonDescription(person.id().toString, name, birthDate, deathDate, bio, !isOwner)
       }
       .toList()
 
@@ -55,9 +55,9 @@ class StemmaRepository extends LazyLogging {
       .map { family =>
         val parents  = family.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
         val children = family.inE(relations.childOf).otherV().id().map(_.toString).toList()
-        val ownerId  = family.inE(relations.ownerOf).otherV().map(_.id().toString).headOption()
+        val isOwner  = isOwnerOf(ts, userId, family)
 
-        FamilyDescription(family.id().toString, parents, children, !ownerId.contains(userId))
+        FamilyDescription(family.id().toString, parents, children, !isOwner)
       }
       .toList()
 
@@ -134,11 +134,9 @@ class StemmaRepository extends LazyLogging {
       )
       .dedup()
       .sideEffect(family => familyIds += family.id().toString)
-      .sideEffect(family => makeFamilyOwner(ts, newOwnerId, family.id().toString))
       .in(relations.childOf, relations.spouseOf)
-      .sideEffect(person => personIds += person.id().toString)
-      .sideEffect(person => makePersonOwner(ts, newOwnerId, person.id().toString))
       .dedup()
+      .sideEffect(person => personIds += person.id().toString)
       .iterate()
 
     ChownEffect(familyIds.toList, personIds.toList)
@@ -242,6 +240,11 @@ class StemmaRepository extends LazyLogging {
       resource <- ts.V(resourceId).headOption().toRight(resourceNotFound(resourceId))
       isOwner  = user.outE(relations.ownerOf).where(_.otherV().is(resource)).headOption().isDefined
     } yield isOwner
+
+  private def isOwnerOf(ts: TraversalSource, userId: String, resource: Vertex) = {
+    val user = ts.V(userId).head()
+    user.outE(relations.ownerOf).where(_.otherV().is(resource)).headOption().isDefined
+  }
 
   def isFamilyOwner(ts: TraversalSource, userId: String, familyId: String): Either[StemmaError, Boolean] =
     isOwnerOf(ts, userId, familyId)(NoSuchFamilyId)
