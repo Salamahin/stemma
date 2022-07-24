@@ -10,7 +10,7 @@ trait RenderStemma {
 
       val descr = families
         .map {
-          case FamilyDescription(_, parents, children) =>
+          case FamilyDescription(_, parents, children, _) =>
             val parentNames   = parents.map(personById).map(_.name).sorted.mkString("(", ", ", ")")
             val childrenNames = children.map(personById).map(_.name).sorted.mkString("(", ", ", ")")
 

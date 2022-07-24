@@ -3,7 +3,6 @@ package io.github.salamahin.stemma.tinkerpop
 import com.typesafe.scalalogging.LazyLogging
 import gremlin.scala._
 import io.github.salamahin.stemma.domain._
-import io.github.salamahin.stemma.tinkerpop.StemmaRepository.RelationRestriction._
 import io.github.salamahin.stemma.tinkerpop.StemmaRepository._
 
 import java.time.LocalDate
@@ -116,31 +115,30 @@ class StemmaRepository extends LazyLogging {
     User(userId, email)
   }
 
-  def chown(ts: TraversalSource, startPersonId: String, newOwnerId: String) = {
-    val owner = ts.V(newOwnerId).head()
-
+  def chown(ts: TraversalSource, startPersonId: String, newOwnerId: String): ChownEffect = {
     val familyIds = mutable.ListBuffer.empty[String]
     val personIds = mutable.ListBuffer.empty[String]
 
-    def transferOwnership(traverse: GremlinScala[Vertex]) = {
-      traverse
-        .sideEffect(f => f.inE(relations.ownerOf).drop().iterate())
-        .sideEffect(f => owner.addEdge(relations.ownerOf, f))
-    }
+    def ancestorFamilies(family: GremlinScala[Vertex]) =
+      family.repeat(f => f.in(relations.spouseOf).out(relations.childOf)).emit()
 
-    ts.V(startPersonId)
-      .out(relations.spouseOf)
-      .repeat { family =>
-        val people = transferOwnership(family.sideEffect(f => familyIds += f.id().toString))
-          .in(relations.spouseOf, relations.childOf)
-          .dedup()
+    def dependentFamilies(family: GremlinScala[Vertex]) =
+      family.repeat(f => f.in(relations.childOf).out(relations.spouseOf)).emit()
 
-        val families = transferOwnership(people.sideEffect(v => personIds += v.id().toString))
-          .out(relations.spouseOf, relations.childOf)
-          .simplePath()
-
-        families
-      }
+    val initFamily = ts.V(startPersonId).out(relations.childOf, relations.spouseOf)
+    initFamily
+      .unionFlat(
+        p => ancestorFamilies(p),
+        p => dependentFamilies(p),
+        p => p
+      )
+      .dedup()
+      .sideEffect(family => familyIds += family.id().toString)
+      .sideEffect(family => makeFamilyOwner(ts, newOwnerId, family.id().toString))
+      .in(relations.childOf, relations.spouseOf)
+      .sideEffect(person => personIds += person.id().toString)
+      .sideEffect(person => makePersonOwner(ts, newOwnerId, person.id().toString))
+      .dedup()
       .iterate()
 
     ChownEffect(familyIds.toList, personIds.toList)
@@ -255,10 +253,10 @@ class StemmaRepository extends LazyLogging {
     isOwnerOf(ts, userId, stemmaId)(NoSuchStemmaId)
 
   def makeFamilyOwner(ts: TraversalSource, userId: String, familyId: String): Either[StemmaError, Unit] =
-    setRelation(ts, userId, familyId, relations.ownerOf)(predicate(thereAreNoOtherOwners)(AccessToFamilyDenied(familyId)))
+    setRelation(ts, userId, familyId, relations.ownerOf)()
 
   def makePersonOwner(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Unit] =
-    setRelation(ts, userId, personId, relations.ownerOf)(predicate(thereAreNoOtherOwners)(AccessToPersonDenied(personId)))
+    setRelation(ts, userId, personId, relations.ownerOf)()
 
   def makeGraphOwner(ts: TraversalSource, userId: String, stemmaId: String): Either[StemmaError, Unit] =
     setRelation(ts, userId, stemmaId, relations.ownerOf)()
@@ -274,12 +272,6 @@ class StemmaRepository extends LazyLogging {
 private object StemmaRepository {
   trait RelationRestriction {
     def between(from: Vertex, to: Vertex): Either[StemmaError, Unit]
-  }
-
-  object RelationRestriction {
-    def predicate(p: (Vertex, Vertex) => Boolean)(onErr: => StemmaError) = new RelationRestriction {
-      override def between(from: Vertex, to: Vertex): Either[StemmaError, Unit] = if (p(from, to)) Right() else Left(onErr)
-    }
   }
 
   val childShouldBelongToSingleFamily: RelationRestriction = (child: Vertex, family: Vertex) => {

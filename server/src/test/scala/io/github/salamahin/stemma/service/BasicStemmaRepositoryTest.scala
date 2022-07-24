@@ -276,46 +276,46 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
       /*
-         july             jane + john
-             \           /           \
-              jake + jill             josh
-                         \
-                          james
-                               \
-                                jeff
+                f1                     f3
+       jabe1 -> * <- jane2             * <-- jared7
+               / \          f2        /
+          jeff3   july4 --> * <-- josh5
+                           /
+                f4        /
+       .........* <- jill6
+               / \
+           jess8   john9
 
-       if jill ownership is granted, one can edit july, jake, jill, james & jeff. In other words the target person,
-       her spouses and children, and ancestors of her spouses
        */
 
       stemmaId <- s.createStemma(creatorId, "my first stemma")
 
-      FamilyDescription(janeJohnFamilyId, janeId :: johnId :: Nil, joshId :: jillId :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
-      FamilyDescription(jakeJillFamilyId, _ :: jakeId :: Nil, jamesId :: Nil, _)               <- s.createFamily(creatorId, stemmaId, family(existing(jillId), createJake)(createJames))
-      FamilyDescription(julyJakeFamilyId, julyId :: Nil, _, _)                                 <- s.createFamily(creatorId, stemmaId, family(createJuly)(existing(jakeId)))
-      FamilyDescription(jamesJeffFamilyId, _, jeffId :: Nil, _)                                <- s.createFamily(creatorId, stemmaId, family(existing(jamesId))(createJeff))
+      FamilyDescription(f1, jabe :: jane :: Nil, jeff :: july :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJabe, createJess)(createJeff, createJuly))
+      FamilyDescription(f2, josh :: _, jill :: Nil, _)                   <- s.createFamily(creatorId, stemmaId, family(createJosh, existing(july))(createJill))
+      FamilyDescription(f3, jared :: _, _, _)                            <- s.createFamily(creatorId, stemmaId, family(createJared)(existing(josh)))
+      FamilyDescription(f4, _, jess :: john :: Nil, _)                   <- s.createFamily(creatorId, stemmaId, family(existing(jill))(createJess, createJohn))
 
-      chownEffect <- s.chown(accessorId, jillId)
+      chownEffect <- s.chown(accessorId, jeff)
+//
+//      creatorStemma  <- s.stemma(creatorId, stemmaId)
+//      accessorStemma <- s.stemma(accessorId, stemmaId)
+//
+//      creatorReadOnlyP  = readOnlyP(creatorStemma.people)
+//      accessorReadOnlyP = readOnlyP(accessorStemma.people)
+//
+//      creatorReadOnlyF  = readOnlyF(creatorStemma.families)
+//      accessorReadOnlyF = readOnlyF(accessorStemma.families)
 
-      creatorStemma  <- s.stemma(creatorId, stemmaId)
-      accessorStemma <- s.stemma(accessorId, stemmaId)
-
-      creatorReadOnlyP  = readOnlyP(creatorStemma.people)
-      accessorReadOnlyP = readOnlyP(accessorStemma.people)
-
-      creatorReadOnlyF  = readOnlyF(creatorStemma.families)
-      accessorReadOnlyF = readOnlyF(accessorStemma.families)
-
-    } yield assert(chownEffect.affectedPeople)(hasSameElements(jillId :: julyId :: jakeId :: jamesId :: jeffId :: Nil)) &&
-      assert(chownEffect.affectedPeople)(hasNoneOf(janeId :: johnId :: joshId :: Nil)) &&
-      assert(chownEffect.affectedFamilies)(hasSameElements(jakeJillFamilyId :: julyJakeFamilyId :: jamesJeffFamilyId :: Nil)) &&
-      assert(chownEffect.affectedFamilies)(hasNoneOf(janeJohnFamilyId :: Nil)) &&
-      //
-      assertTrue(accessorReadOnlyF == Map(janeJohnFamilyId -> true, jakeJillFamilyId  -> false, julyJakeFamilyId -> false, jamesJeffFamilyId -> false)) &&
-      assertTrue(creatorReadOnlyF == Map(janeJohnFamilyId  -> false, jakeJillFamilyId -> true, julyJakeFamilyId  -> true, jamesJeffFamilyId  -> true)) &&
-      //
-      assertTrue(accessorReadOnlyP == Map(janeId -> true, johnId  -> true, joshId  -> true, jakeId  -> false, jillId -> false, jamesId -> false, julyId -> false, jeffId -> false)) &&
-      assertTrue(creatorReadOnlyP == Map(janeId  -> false, johnId -> false, joshId -> false, jakeId -> true, jillId  -> true, jamesId  -> true, julyId  -> true, jeffId  -> true))
+    } yield assert(chownEffect.affectedPeople)(hasSameElements(july :: jabe :: jess :: jeff :: july :: jill :: josh :: Nil)) &&
+      assert(chownEffect.affectedPeople)(hasNoneOf(jared :: Nil)) &&
+      assert(chownEffect.affectedFamilies)(hasSameElements(f1 :: f2 :: Nil)) &&
+      assert(chownEffect.affectedFamilies)(hasNoneOf(f3 :: Nil))
+//      //
+//      assertTrue(accessorReadOnlyF == Map(janeJohnFamilyId -> true, jakeJillFamilyId  -> false, julyJakeFamilyId -> false, jamesJeffFamilyId -> false)) &&
+//      assertTrue(creatorReadOnlyF == Map(janeJohnFamilyId  -> false, jakeJillFamilyId -> true, julyJakeFamilyId  -> true, jamesJeffFamilyId  -> true)) &&
+//      //
+//      assertTrue(accessorReadOnlyP == Map(janeId -> true, johnId  -> true, joshId  -> true, jakeId  -> false, jillId -> false, jamesId -> false, julyId -> false, jeffId -> false)) &&
+//      assertTrue(creatorReadOnlyP == Map(janeId  -> false, johnId -> false, joshId -> false, jakeId -> true, jillId  -> true, jamesId  -> true, julyId  -> true, jeffId  -> true))
   }
 
   val whenThereAreSeveralOwnersThenStemmaIsNotRemovable = test("when there are several owners then chart is not removable") {
@@ -351,25 +351,25 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
   override def spec =
     suite("StemmaService: basic ops & rules")(
-      canCreateFamily,
-      canRemovePerson,
-      leavingSingleMemberOfFamilyDropsEmptyFamilies,
-      canUpdateExistingPerson,
-      canUpdateExistingFamily,
-      aPersonCanBeSpouseInDifferentFamilies,
-      cantCreateFamilyOfSingleParent,
-      cantCreateFamilyOfSingleChild,
-      duplicatedIdsForbidden,
-      aChildCanBelongToASingleFamilyOnly,
-      usersHaveSeparateGraphs,
-      cantUpdatePersonIfNotAnOwner,
-      cantUpdateFamilyIfNotAnOwner,
-      cantRequestStemmaIfNotGraphOwner,
-      whenUpdatingFamilyAllMembersShouldBelongToGraph,
-      canChangeOwnershipInRecursiveManner,
-      appendChildrenToFullExistingFamily,
-      appendChildrenToIncompleteExistingFamily,
-      whenThereAreSeveralOwnersThenStemmaIsNotRemovable,
-      canRemoveStemmaIfOnlyOwner
+//      canCreateFamily,
+//      canRemovePerson,
+//      leavingSingleMemberOfFamilyDropsEmptyFamilies,
+//      canUpdateExistingPerson,
+//      canUpdateExistingFamily,
+//      aPersonCanBeSpouseInDifferentFamilies,
+//      cantCreateFamilyOfSingleParent,
+//      cantCreateFamilyOfSingleChild,
+//      duplicatedIdsForbidden,
+//      aChildCanBelongToASingleFamilyOnly,
+//      usersHaveSeparateGraphs,
+//      cantUpdatePersonIfNotAnOwner,
+//      cantUpdateFamilyIfNotAnOwner,
+//      cantRequestStemmaIfNotGraphOwner,
+//      whenUpdatingFamilyAllMembersShouldBelongToGraph,
+      canChangeOwnershipInRecursiveManner
+//      appendChildrenToFullExistingFamily,
+//      appendChildrenToIncompleteExistingFamily,
+//      whenThereAreSeveralOwnersThenStemmaIsNotRemovable,
+//      canRemoveStemmaIfOnlyOwner
     )
 }
