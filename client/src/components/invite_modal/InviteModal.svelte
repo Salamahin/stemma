@@ -37,6 +37,7 @@
         namesakes = [...stemmaIndex.namesakes(newName).filter((p) => !p.readOnly)];
         if (carousel) carousel.goTo(0, { animated: false });
         selectedName = newName;
+        selectedPersonId = namesakes[0].id;
     }
 
     function reset() {
@@ -123,8 +124,11 @@
                         readonly
                         value={inviteLink}
                     />
-                    <button class="btn btn-outline-secondary" type="button" disabled={inviteLink == undefined || !inviteLink.length}
-                        ><i class="bi bi-clipboard" /></button
+                    <button
+                        class="btn btn-outline-secondary"
+                        type="button"
+                        disabled={inviteLink == undefined || !inviteLink.length}
+                        on:click={() => navigator.clipboard.writeText(inviteLink)}><i class="bi bi-clipboard" /></button
                     >
                 </div>
             </div>

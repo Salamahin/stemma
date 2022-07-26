@@ -139,7 +139,17 @@ export class Model {
             headers: this.commonHeader
         })
 
-        return await this.parseResponse<string>(response).then(token => `${location.origin}/${encodeURIComponent(token)}`);
+        return await this.parseResponse<string>(response).then(token => `${location.origin}/?inviteToken=${encodeURIComponent(token)}`);
+    }
+
+    async proposeInvitationToken(token: string) {
+        const response = await fetch(`${this.endpoint}/invitation`, {
+            method: 'PUT',
+            body: decodeURIComponent(token),
+            headers: this.commonHeader
+        })
+
+        await this.discardResponse(response);
     }
 
     async removeFamily(stemmaId: string, familyId: string) {
@@ -171,6 +181,12 @@ export class Model {
         if (!response.ok)
             throw new Error(`Unexpected response: ${json}`)
         return json as T;
+    }
+
+    private async discardResponse(response: Response) {
+        const json = await response.json();
+        if (!response.ok)
+            throw new Error(`Unexpected response: ${json}`)
     }
 
     private sanitize(obj) {

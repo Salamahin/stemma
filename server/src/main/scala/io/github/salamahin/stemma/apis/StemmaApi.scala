@@ -22,7 +22,7 @@ object StemmaApi extends LazyLogging {
       effect
         .mapError(err => { logger.error(s"Service error: $err"); err })
         .mapBoth(
-          error => HttpError.BadRequest((error: StemmaError).asJson.noSpaces),
+          error => HttpError.InternalServerError((error: StemmaError).asJson.noSpaces),
           result => Response.json(result.asJson.noSpaces)
         )
   }
@@ -36,10 +36,11 @@ object StemmaApi extends LazyLogging {
           .flatMap(_.listOwnedStemmas(user.userId))
           .toResponse()
 
-      case Method.PUT -> !! / queryParam(token) =>
-        logger.info(s"User ${user.userId} bears the invitation token = $token")
+      case req @ Method.PUT -> !! / "invitation" =>
+        logger.info(s"User ${user.userId} bears the invitation")
         (for {
           s     <- ZIO.service[StemmaService]
+          token <- req.bodyAsString.mapError(err => UnknownError(err))
           us    <- ZIO.service[UserService]
           token <- us.decodeInviteToken(token)
 
