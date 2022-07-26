@@ -139,7 +139,7 @@
                             >Сохранить</button
                         >
                     {:else}
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" on:click={(e) => showFamilyComposition()}>Назад</button>
+                        <button type="button" class="btn btn-secondary" on:click={(e) => showFamilyComposition()}>Назад</button>
                         <button type="button" class="btn btn-primary" disabled={selected == null} on:click={(e) => confirmPersonSelection()}>Выбрать</button>
                     {/if}
                 </div>
