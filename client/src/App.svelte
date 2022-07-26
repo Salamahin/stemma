@@ -12,7 +12,6 @@
     import fuzzysort from "fuzzysort";
     import RemoveStemmaModal from "./components/delete_stemma_modal/RemoveStemmaModal.svelte";
     import InviteModal, { CreateInviteLink } from "./components/invite_modal/InviteModal.svelte";
-    import { onMount } from "svelte";
 
     export let google_client_id;
     export let stemma_backend_url;
@@ -43,11 +42,14 @@
         const urlParams = new URLSearchParams(window.location.search);
 
         if (urlParams.has("inviteToken")) {
-            console.log("invite");
             model
                 .proposeInvitationToken(urlParams.get("inviteToken"))
                 .catch((e) => {})
-                .then(() => model.listStemmas().then((stemmas) => (ownedStemmasDescriptions = stemmas.stemmas)));
+                .then(() => {
+                    urlParams.delete("inviteToken");
+                    window.history.pushState({}, document.title, window.location.pathname);
+                    model.listStemmas().then((stemmas) => (ownedStemmasDescriptions = stemmas.stemmas));
+                });
         } else {
             model.listStemmas().then((stemmas) => (ownedStemmasDescriptions = stemmas.stemmas));
         }
