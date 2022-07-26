@@ -2,12 +2,12 @@
   import { NewPerson, Stemma, StoredPerson } from "../../model";
   import { StemmaIndex } from "../../stemmaIndex";
   import Select from "svelte-select";
-  export let stemmaIndex: StemmaIndex;
   import Carousel from "svelte-carousel";
-  import VisualPersonDescription from "./VisualPersonDescription.svelte";
+  import VisualPersonDescription from "../misc/VisualPersonDescription.svelte";
   import ClearIcon from "../misc/ClearIconTranslated.svelte";
   import { createEventDispatcher } from "svelte";
 
+  export let stemmaIndex: StemmaIndex;
   export let stemma: Stemma;
 
   let namesakes: (NewPerson | StoredPerson)[] = [];
@@ -20,7 +20,7 @@
   let selectedName;
 
   function nameChanged(newName: string) {
-    namesakes = [...stemmaIndex.namesakes(newName).filter(p => !p.readOnly), { name: newName }];
+    namesakes = [...stemmaIndex.namesakes(newName).filter((p) => !p.readOnly), { name: newName }];
     if (carousel) carousel.goTo(0, { animated: false });
     dispatch("selected", namesakes[0]);
     selectedName = newName;

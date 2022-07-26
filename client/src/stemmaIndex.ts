@@ -8,7 +8,8 @@ export type Generation = {
 
 type FamilyDescription = {
     familyId: string,
-    members: string[]
+    members: string[],
+    otherMembers: string[]
 }
 
 type PersonalGeneration = {
@@ -26,6 +27,7 @@ export class StemmaIndex {
     private _parentToChildren: Map<string, FamilyDescription[]>
     private _childToParents: Map<string, FamilyDescription[]>
     private _marriages: FamilyMembers[]
+    private _indexedMarriages: Map<string, FamilyMembers[]>
     private _uncles: FamilyMembers[]
     private _families: Map<string, Family>
 
@@ -48,18 +50,20 @@ export class StemmaIndex {
 
     constructor(stemma: Stemma) {
         this._parentToChildren = new Map(this.groupByKey(stemma.families.flatMap((f) => {
-            if (f.children) return f.parents.map((p) => [p, ({ familyId: f.id, members: f.children })])
+            if (f.children) return f.parents.map((p) => [p, ({ familyId: f.id, members: f.children, otherMembers: f.parents })])
             else return []
         })))
 
         this._childToParents = new Map(this.groupByKey(stemma.families.flatMap((f) => {
-            if (f.parents) return f.children.map((p) => [p, ({ familyId: f.id, members: f.parents })])
+            if (f.parents) return f.children.map((p) => [p, ({ familyId: f.id, members: f.parents, otherMembers: f.children })])
             else return []
         })))
 
         this._families = new Map(stemma.families.map(f => [f.id, f]))
 
         this._marriages = stemma.families.map(f => ({ familyId: f.id, members: f.parents }))
+        this._indexedMarriages = this.groupByKey(this._marriages.flatMap(f => f.members.map(m => [m, f])))
+
         this._uncles = stemma.families.map(f => ({ familyId: f.id, members: f.children }))
 
         this._namesakes = new Map(this.groupByKey(stemma.people.map(p => [p.name, p.id])))
@@ -120,19 +124,24 @@ export class StemmaIndex {
     }
 
     relativies(personId: string) {
-        let ps = this._parentToChildren.has(personId) ? this._parentToChildren.get(personId).flatMap(x => x.members).map(p => this._people.get(p)) : []
-        let cs = this._childToParents.has(personId) ? this._childToParents.get(personId).flatMap(x => x.members).map(p => this._people.get(p)) : []
+        let ps = this._parentToChildren.has(personId)
+            ? this._parentToChildren.get(personId).flatMap(x => [...x.members, ...x.otherMembers]).map(p => this._people.get(p))
+            : []
 
-        return [...ps, ...cs, this._people.get(personId)]
+        let cs = this._childToParents.has(personId)
+            ? this._childToParents.get(personId).flatMap(x => [...x.members, ...x.otherMembers]).map(p => this._people.get(p))
+            : []
+
+        return [...new Set([...ps, ...cs, this._people.get(personId)])]
     }
 
     relatedFamilies(personId: string) {
-        let directChildren = this._parentToChildren.has(personId) ? this._parentToChildren.get(personId) : []
-        let directParents = this._childToParents.has(personId) ? this._childToParents.get(personId) : []
+        let dc = this._parentToChildren.has(personId) ? this._parentToChildren.get(personId) : []
+        let dp = this._childToParents.has(personId) ? this._childToParents.get(personId) : []
 
         return [
-            ...directChildren.filter(f => f.members.length).map(f => ({ id: f.familyId, parents: [personId], children: f.members })),
-            ...directParents.filter(f => f.members.length).map(f => ({ id: f.familyId, parents: f.members, children: [personId] }))
+            ...dc.filter(f => f.members.length + f.otherMembers.length).map(f => ({ id: f.familyId, parents: f.otherMembers, children: f.members })),
+            ...dp.filter(f => f.members.length + f.otherMembers.length).map(f => ({ id: f.familyId, parents: f.members, children: f.otherMembers }))
         ]
     }
 

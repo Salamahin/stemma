@@ -63,6 +63,9 @@
                     <li class="nav-item">
                         <a class="nav-link" href="#" on:click={() => dispatch("createNewFamily")}><i class="bi bi-people-fill" /> Добавить семью</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" on:click={() => dispatch("invite")}><i class="bi bi-share-fill" /> Пригласить участника</a>
+                    </li>
                 </ul>
                 <hr class="border border-white" />
                 <div class="d-flex ms-auto">
