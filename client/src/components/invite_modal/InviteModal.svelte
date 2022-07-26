@@ -14,8 +14,10 @@
     import { StemmaIndex } from "../../stemmaIndex";
     import Carousel from "svelte-carousel";
     import VisualPersonDescription from "../misc/VisualPersonDescription.svelte";
+    import { onMount } from "svelte";
 
     let modalEl;
+    let copyBtn;
 
     export let stemmaIndex: StemmaIndex;
     export let stemma: Stemma;
