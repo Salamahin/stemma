@@ -1,16 +1,16 @@
 package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.domain.{Family, Person, Stemma}
+import io.github.salamahin.stemma.domain.{FamilyDescription, PersonDescription, Stemma}
 
 trait RenderStemma {
   object render {
     def unapply(stemma: Stemma) = {
-      val Stemma(people: List[Person], families: List[Family]) = stemma
+      val Stemma(people: List[PersonDescription], families: List[FamilyDescription]) = stemma
       val personById                                           = people.map(p => (p.id, p)).toMap
 
       val descr = families
         .map {
-          case Family(_, parents, children) =>
+          case FamilyDescription(_, parents, children, _) =>
             val parentNames   = parents.map(personById).map(_.name).sorted.mkString("(", ", ", ")")
             val childrenNames = children.map(personById).map(_.name).sorted.mkString("(", ", ", ")")
 

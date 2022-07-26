@@ -1,4 +1,12 @@
-state.json
-target
 .idea
 .bsp
+.DS_store
+
+client/node_modules/
+client/public/build/
+client/public/vendor
+client/.vscode
+client/package-lock.json
+
+target
+

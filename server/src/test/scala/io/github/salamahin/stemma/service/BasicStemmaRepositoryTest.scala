@@ -1,34 +1,27 @@
 package io.github.salamahin.stemma.service
 
 import io.github.salamahin.stemma.domain._
-import io.github.salamahin.stemma.service.GraphService.GRAPH
-import io.github.salamahin.stemma.service.OpsService.OPS
-import io.github.salamahin.stemma.service.SecretService.SECRET
-import io.github.salamahin.stemma.service.StemmaService.STEMMA
-import io.github.salamahin.stemma.service.UserService.USER
-import zio.test.Assertion.hasSameElements
-import zio.test.{DefaultRunnableSpec, _}
-import zio.{ULayer, ZIO}
+import zio.ZIO
+import zio.test.Assertion.{hasNoneOf, hasSameElements}
+import zio.test._
 
-object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with RenderStemma {
+object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with RenderStemma {
+  private val services = (ZIO.service[StemmaService] zip ZIO.service[UserService])
+    .provide(tempGraph, hardcodedSecret, StemmaService.live, UserService.live)
 
-  private val layer: ULayer[GRAPH with OPS with SECRET] = tempGraph ++ OpsService.live ++ hardcodedSecret
-  private val services = (ZIO.environment[STEMMA].map(_.get) zip ZIO.environment[USER].map(_.get))
-    .provideCustomLayer(layer >>> (StemmaService.live ++ UserService.live))
-
-  private val canCreateFamily = testM("can create different family with both parents and several children") {
+  private val canCreateFamily = test("can create different family with both parents and several children") {
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
-      graphId         <- s.createGraph(userId, "test graph")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      _ <- s.createFamily(userId, graphId, family(createJane, createJohn)(createJill, createJosh))
-      _ <- s.createFamily(userId, graphId, family(createJohn)(createJosh))
-      _ <- s.createFamily(userId, graphId, family(createJane, createJohn)())
-      _ <- s.createFamily(userId, graphId, family()(createJane, createJohn))
+      _ <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill, createJosh))
+      _ <- s.createFamily(userId, stemmaId, family(createJohn)(createJosh))
+      _ <- s.createFamily(userId, stemmaId, family(createJane, createJohn)())
+      _ <- s.createFamily(userId, stemmaId, family()(createJane, createJohn))
 
-      render(families) <- s.stemma(userId, graphId)
+      render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families) {
       hasSameElements(
         "(Jane, John) parentsOf (Jill, Josh)" ::
@@ -40,110 +33,136 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     }
   }
 
-  private val cantCreateFamilyOfSingleParent = testM("there cant be a family with a single parent and no children") {
+  private val cantCreateFamilyOfSingleParent = test("there cant be a family with a single parent and no children") {
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
-      graphId         <- s.createGraph(userId, "test graph")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      err <- s.createFamily(userId, graphId, family(createJohn)()).flip
+      err <- s.createFamily(userId, stemmaId, family(createJohn)()).flip
     } yield assertTrue(err == IncompleteFamily())
   }
 
-  private val cantCreateFamilyOfSingleChild = testM("there cant be a family with no parents and a single child") {
+  private val cantCreateFamilyOfSingleChild = test("there cant be a family with no parents and a single child") {
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
-      graphId         <- s.createGraph(userId, "test graph")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      err <- s.createFamily(userId, graphId, family()(createJill)).flip
+      err <- s.createFamily(userId, stemmaId, family()(createJill)).flip
     } yield assertTrue(err == IncompleteFamily())
   }
 
-  private val duplicatedIdsForbidden = testM("cant update a family when there are duplicated ids in members") {
+  private val appendChildrenToFullExistingFamily = test("when family description contains existing parents that already have a full family then children appended to that family") {
+    for {
+      (s, a)          <- services
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      stemmaId        <- s.createStemma(userId, "test stemma")
+
+      FamilyDescription(_, jamesId :: _, _, _)       <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
+      FamilyDescription(_, _ :: jillId :: Nil, _, _) <- s.createFamily(userId, stemmaId, family(existing(jamesId), createJill)(createJohn))
+      _                                              <- s.createFamily(userId, stemmaId, family(existing(jamesId), existing(jillId))(createJosh))
+
+      render(families) <- s.stemma(userId, stemmaId)
+    } yield assert(families)(hasSameElements("(James, Jill) parentsOf (John, Josh)" :: "(James) parentsOf (Jane)" :: Nil))
+  }
+
+  private val appendChildrenToIncompleteExistingFamily = test("when family description contains a single parent then newely added with same single parent appended to that family") {
+    for {
+      (s, a)          <- services
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      stemmaId        <- s.createStemma(userId, "test stemma")
+
+      FamilyDescription(_, jamesId :: _, _, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
+      _                                        <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJohn))
+
+      render(families) <- s.stemma(userId, stemmaId)
+    } yield assert(families)(hasSameElements("(James) parentsOf (Jane, John)" :: Nil))
+  }
+
+  private val duplicatedIdsForbidden = test("cant update a family when there are duplicated ids in members") {
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
-      graphId         <- s.createGraph(userId, "test graph")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      Family(familyId, jamesId :: Nil, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJames)(createJill))
-      err                                             <- s.updateFamily(userId, familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
+      FamilyDescription(familyId, jamesId :: Nil, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
+      err                                                           <- s.updateFamily(userId, familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
     } yield assertTrue(err == DuplicatedIds(jamesId :: Nil))
   }
 
-  private val aChildCanBelongToASingleFamilyOnly = testM("a child must belong to a single family") {
+  private val aChildCanBelongToASingleFamilyOnly = test("a child must belong to a single family") {
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
-      graphId         <- s.createGraph(userId, "test graph")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      Family(firstFamilyId, _, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJames)(createJill))
-      err                                     <- s.createFamily(userId, graphId, family(createJane)(existing(jillId))).flip
+      FamilyDescription(firstFamilyId, _, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
+      err                                                   <- s.createFamily(userId, stemmaId, family(createJane)(existing(jillId))).flip
     } yield assertTrue(err == ChildAlreadyBelongsToFamily(firstFamilyId, jillId))
   }
 
-  private val canRemovePerson = testM("when removing a person hist child & spouse relations are removed as well") {
+  private val canRemovePerson = test("when removing a person hist child & spouse relations are removed as well") {
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
-      graphId         <- s.createGraph(userId, "test graph")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      Family(_, _, jillId :: _ :: Nil) <- s.createFamily(userId, graphId, family(createJane, createJohn)(createJill, createJames))
-      _                                <- s.createFamily(userId, graphId, family(existing(jillId), createJosh)(createJake))
-      _                                <- s.removePerson(userId, jillId)
+      FamilyDescription(_, _, jillId :: _ :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill, createJames))
+      _                                              <- s.createFamily(userId, stemmaId, family(existing(jillId), createJosh)(createJake))
+      _                                              <- s.removePerson(userId, jillId)
 
-      render(families) <- s.stemma(userId, graphId)
+      render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families)(hasSameElements("(Jane, John) parentsOf (James)" :: "(Josh) parentsOf (Jake)" :: Nil))
   }
 
-  private val aPersonCanBeSpouseInDifferentFamilies = testM("one can have several families as a spouse") {
+  private val aPersonCanBeSpouseInDifferentFamilies = test("one can have several families as a spouse") {
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
-      graphId         <- s.createGraph(userId, "test graph")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      Family(_, jamesId :: Nil, _) <- s.createFamily(userId, graphId, family(createJames)(createJill))
-      _                            <- s.createFamily(userId, graphId, family(existing(jamesId))(createJuly))
+      FamilyDescription(_, jamesId :: _, _, _) <- s.createFamily(userId, stemmaId, family(createJames, createJane)(createJill))
+      _                                        <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJuly))
 
-      render(families) <- s.stemma(userId, graphId)
-    } yield assert(families)(hasSameElements("(James) parentsOf (Jill)" :: "(James) parentsOf (July)" :: Nil))
+      render(families) <- s.stemma(userId, stemmaId)
+    } yield assert(families)(hasSameElements("(James, Jane) parentsOf (Jill)" :: "(James) parentsOf (July)" :: Nil))
   }
 
-  private val leavingSingleMemberOfFamilyDropsEmptyFamilies = testM("when the only member of family left the family is removed") {
+  private val leavingSingleMemberOfFamilyDropsEmptyFamilies = test("when the only member of family left the family is removed") {
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
-      graphId         <- s.createGraph(userId, "test graph")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      Family(_, _, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJane)(createJill))
-      _                           <- s.createFamily(userId, graphId, family(existing(jillId))(createJuly))
-      _                           <- s.createFamily(userId, graphId, family(existing(jillId))(createJames))
+      FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
+      _                                         <- s.createFamily(userId, stemmaId, family(existing(jillId))(createJuly))
 
       _ <- s.removePerson(userId, jillId)
 
-      Stemma(people, families) <- s.stemma(userId, graphId)
-    } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "July" :: "James" :: Nil))
+      Stemma(people, families) <- s.stemma(userId, stemmaId)
+    } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "July" :: Nil))
   }
 
-  private val canUpdateExistingPerson = testM("can update existing person") {
+  private val canUpdateExistingPerson = test("can update existing person") {
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
-      graphId         <- s.createGraph(userId, "test graph")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      Family(_, janeId :: Nil, _) <- s.createFamily(userId, graphId, family(createJane)(createJill))
+      FamilyDescription(_, janeId :: Nil, _, _) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
 
       _ <- s.updatePerson(userId, janeId, createJohn)
 
-      st @ Stemma(people, _) <- s.stemma(userId, graphId)
+      st @ Stemma(people, _) <- s.stemma(userId, stemmaId)
       render(families)       = st
     } yield assertTrue(families == List("(John) parentsOf (Jill)")) && assertTrue(
       people.exists(p =>
@@ -155,50 +174,50 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
     )
   }
 
-  private val canUpdateExistingFamily = testM("when updating a family members are not removed") {
+  private val canUpdateExistingFamily = test("when updating a family members are not removed") {
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
-      graphId         <- s.createGraph(userId, "test graph")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      Family(familyId, _ :: johnId :: Nil, jillId :: Nil) <- s.createFamily(userId, graphId, family(createJane, createJohn)(createJill))
-      _                                                   <- s.updateFamily(userId, familyId, family(createJuly, existing(johnId))(existing(jillId), createJames))
+      FamilyDescription(familyId, _ :: johnId :: Nil, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill))
+      _                                                                 <- s.updateFamily(userId, familyId, family(createJuly, existing(johnId))(existing(jillId), createJames))
 
-      st @ Stemma(people, _) <- s.stemma(userId, graphId)
+      st @ Stemma(people, _) <- s.stemma(userId, stemmaId)
       render(families)       = st
     } yield assertTrue(families == List("(John, July) parentsOf (James, Jill)")) &&
       assert(people.map(_.name))(hasSameElements("Jane" :: "John" :: "Jill" :: "July" :: "James" :: Nil))
   }
 
-  private val usersHaveSeparateGraphs = testM("users might have separated graphs") {
+  private val usersHaveSeparateGraphs = test("users might have separated stemmas") {
     for {
       (s, a)          <- services
-      User(userId, _) <- a.getOrCreateUser("user1@test.com")
+      User(userId, _) <- a.getOrCreateUser(Email("user1@test.com"))
 
-      userGraphId1 <- s.createGraph(userId, "first graph")
-      _            <- s.createFamily(userId, userGraphId1, family(createJane, createJohn)(createJosh, createJill))
+      userStemmaId1 <- s.createStemma(userId, "first stemma")
+      _             <- s.createFamily(userId, userStemmaId1, family(createJane, createJohn)(createJosh, createJill))
 
-      userGraphId2 <- s.createGraph(userId, "second graph")
-      _            <- s.createFamily(userId, userGraphId2, family(createJake)(createJuly, createJames))
+      userStemmaId2 <- s.createStemma(userId, "second stemma")
+      _             <- s.createFamily(userId, userStemmaId2, family(createJake)(createJuly, createJames))
 
-      graphs <- s.listOwnedGraphs(userId)
+      OwnedStemmasDescription(stemmas) <- s.listOwnedStemmas(userId)
 
-      render(stemma1) <- s.stemma(userId, userGraphId1)
-      render(stemma2) <- s.stemma(userId, userGraphId2)
-    } yield assert(graphs)(hasSameElements(GraphDescription(userGraphId1, "first graph") :: GraphDescription(userGraphId2, "second graph") :: Nil)) &&
+      render(stemma1) <- s.stemma(userId, userStemmaId1)
+      render(stemma2) <- s.stemma(userId, userStemmaId2)
+    } yield assert(stemmas)(hasSameElements(StemmaDescription(userStemmaId1, "first stemma", true) :: StemmaDescription(userStemmaId2, "second stemma", true) :: Nil)) &&
       assert(stemma1)(hasSameElements("(Jane, John) parentsOf (Jill, Josh)" :: Nil)) &&
       assert(stemma2)(hasSameElements("(Jake) parentsOf (James, July)" :: Nil))
   }
 
-  private val cantUpdatePersonIfNotAnOwner = testM("cant update or remove a person that dont own") {
+  private val cantUpdatePersonIfNotAnOwner = test("cant update or remove a person that dont own") {
     for {
       (s, a)              <- services
-      User(creatorId, _)  <- a.getOrCreateUser("user1@test.com")
-      User(accessorId, _) <- a.getOrCreateUser("user2@test.com")
+      User(creatorId, _)  <- a.getOrCreateUser(Email("user1@test.com"))
+      User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
-      graphId                   <- s.createGraph(creatorId, "my first graph")
-      Family(_, janeId :: _, _) <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
+      stemmaId                                <- s.createStemma(creatorId, "my first stemma")
+      FamilyDescription(_, janeId :: _, _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
 
       personRemoveErr <- s.removePerson(accessorId, janeId).flip
       personUpdateErr <- s.updatePerson(accessorId, janeId, createJuly).flip
@@ -206,14 +225,14 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       assertTrue(personUpdateErr == AccessToPersonDenied(janeId))
   }
 
-  private val cantUpdateFamilyIfNotAnOwner = testM("cant update or remove a family that dont own") {
+  private val cantUpdateFamilyIfNotAnOwner = test("cant update or remove a family that dont own") {
     for {
       (s, a)              <- services
-      User(creatorId, _)  <- a.getOrCreateUser("user1@test.com")
-      User(accessorId, _) <- a.getOrCreateUser("user2@test.com")
+      User(creatorId, _)  <- a.getOrCreateUser(Email("user1@test.com"))
+      User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
-      graphId                <- s.createGraph(creatorId, "my first graph")
-      Family(familyId, _, _) <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
+      stemmaId                             <- s.createStemma(creatorId, "my first stemma")
+      FamilyDescription(familyId, _, _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
 
       familyRemoveErr <- s.removeFamily(accessorId, familyId).flip
       familyUpdateErr <- s.updateFamily(accessorId, familyId, family(createJames)(createJuly)).flip
@@ -221,60 +240,113 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       assertTrue(familyUpdateErr == AccessToFamilyDenied(familyId))
   }
 
-  private val whenUpdatingFamilyAllMembersShouldBelongToGraph = testM("when updating a family with existing person there should be no members of different graphs") {
+  private val whenUpdatingFamilyAllMembersShouldBelongToGraph = test("when updating a family with existing person there should be no members of different stemmas") {
     for {
       (s, a)          <- services
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
 
-      graph1Id <- s.createGraph(userId, "my first graph")
-      graph2Id <- s.createGraph(userId, "my second graph")
+      stemma1Id <- s.createStemma(userId, "my first stemma")
+      stemma2Id <- s.createStemma(userId, "my second stemma")
 
-      Family(_, janeId :: johnId :: Nil, joshId :: jillId :: Nil) <- s.createFamily(userId, graph1Id, family(createJane, createJohn)(createJosh, createJill))
-      familyCreationErr                                           <- s.createFamily(userId, graph2Id, family(existing(janeId), existing(johnId))(existing(joshId), existing(jillId))).flip
+      FamilyDescription(_, janeId :: johnId :: Nil, joshId :: jillId :: Nil, _) <- s.createFamily(userId, stemma1Id, family(createJane, createJohn)(createJosh, createJill))
+      familyCreationErr                                                         <- s.createFamily(userId, stemma2Id, family(existing(janeId), existing(johnId))(existing(joshId), existing(jillId))).flip
     } yield assertTrue(familyCreationErr == NoSuchPersonId(janeId))
   }
 
-  private val cantRequestStemmaIfNotGraphOwner = testM("cant request stemma if not a graph owner") {
+  private val cantRequestStemmaIfNotGraphOwner = test("cant request stemma if not a stemma owner") {
     for {
       (s, a)              <- services
-      User(creatorId, _)  <- a.getOrCreateUser("user1@test.com")
-      User(accessorId, _) <- a.getOrCreateUser("user2@test.com")
+      User(creatorId, _)  <- a.getOrCreateUser(Email("user1@test.com"))
+      User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
-      graphId <- s.createGraph(creatorId, "my first graph")
-      _       <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
+      stemmaId <- s.createStemma(creatorId, "my first stemma")
+      _        <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
 
-      stemmaRequestErr <- s.stemma(accessorId, graphId).flip
-    } yield assertTrue(stemmaRequestErr == AccessToGraphDenied(graphId))
+      stemmaRequestErr <- s.stemma(accessorId, stemmaId).flip
+    } yield assertTrue(stemmaRequestErr == AccessToStemmaDenied(stemmaId))
   }
 
-  private val canChangeOwnershipInRecursiveManner = testM("ownership change affects spouses, their ancestors and children") {
+  private def readOnlyP(people: Seq[PersonDescription])   = people.map(p => (p.id, p.readOnly)).toMap
+  private def readOnlyF(families: Seq[FamilyDescription]) = families.map(p => (p.id, p.readOnly)).toMap
+
+  private val canChangeOwnershipInRecursiveManner = test("ownership change affects spouses, their ancestors and children") {
     for {
       (s, a)              <- services
-      User(creatorId, _)  <- a.getOrCreateUser("user1@test.com")
-      User(accessorId, _) <- a.getOrCreateUser("user2@test.com")
+      User(creatorId, _)  <- a.getOrCreateUser(Email("user1@test.com"))
+      User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
 
       /*
-         july             jane + john
-             \           /           \
-              jake + jill             josh
-                         \
-                          james
-                               \
-                                jeff
+                f1                     f3
+       jabe1 -> * <- jane2             * <-- jared7
+               / \          f2        /
+          jeff3   july4 --> * <-- josh5
+                           /
+                f4        /
+       .........* <- jill6
+               / \
+           jess8   john9
 
-       if jill ownership is granted, one can edit july, jake, jill, james & jeff. In other words the target person,
-       her spouses and children, and ancestors of her spouses
        */
 
-      graphId                                                      <- s.createGraph(creatorId, "my first graph")
-      Family(_, _, _ :: jillId :: Nil)                             <- s.createFamily(creatorId, graphId, family(createJane, createJohn)(createJosh, createJill))
-      Family(jakeJillFamilyId, _ :: jakeId :: Nil, jamesId :: Nil) <- s.createFamily(creatorId, graphId, family(existing(jillId), createJake)(createJames))
-      Family(julyJakeFamilyId, julyId :: Nil, _)                   <- s.createFamily(creatorId, graphId, family(createJuly)(existing(jakeId)))
-      Family(jamesJeffFamilyId, _, jeffId :: Nil)                  <- s.createFamily(creatorId, graphId, family(existing(jamesId))(createJeff))
+      stemmaId <- s.createStemma(creatorId, "my first stemma")
 
-      chownEffect <- s.describeChown(creatorId, accessorId, jillId)
-    } yield assert(chownEffect.affectedPeople)(hasSameElements(jillId :: julyId :: jakeId :: jamesId :: jeffId :: Nil)) &&
-      assert(chownEffect.affectedFamilies)(hasSameElements(jakeJillFamilyId :: julyJakeFamilyId :: jamesJeffFamilyId :: Nil))
+      FamilyDescription(f1, jabe :: jane :: Nil, jeff :: july :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJabe, createJess)(createJeff, createJuly))
+      FamilyDescription(f2, josh :: _, jill :: Nil, _)                   <- s.createFamily(creatorId, stemmaId, family(createJosh, existing(july))(createJill))
+      FamilyDescription(f3, jared :: _, _, _)                            <- s.createFamily(creatorId, stemmaId, family(createJared)(existing(josh)))
+      FamilyDescription(f4, _, jess :: john :: Nil, _)                   <- s.createFamily(creatorId, stemmaId, family(existing(jill))(createJess, createJohn))
+
+      chownEffect <- s.chown(accessorId, jeff)
+
+      creatorStemma  <- s.stemma(creatorId, stemmaId)
+      accessorStemma <- s.stemma(accessorId, stemmaId)
+
+      creatorReadOnlyP  = readOnlyP(creatorStemma.people)
+      accessorReadOnlyP = readOnlyP(accessorStemma.people)
+
+      creatorReadOnlyF  = readOnlyF(creatorStemma.families)
+      accessorReadOnlyF = readOnlyF(accessorStemma.families)
+
+    } yield assert(chownEffect.affectedPeople)(hasSameElements(jabe :: jane :: jeff :: july :: josh :: jill :: jess :: john :: Nil)) &&
+      assert(chownEffect.affectedPeople)(hasNoneOf(jared :: Nil)) &&
+      assert(chownEffect.affectedFamilies)(hasSameElements(f1 :: f2 :: f4 :: Nil)) &&
+      assert(chownEffect.affectedFamilies)(hasNoneOf(f3 :: Nil)) &&
+      //
+      assertTrue(creatorReadOnlyF.forall { case (_, v) => !v }) &&
+      assertTrue(creatorReadOnlyP.forall { case (_, v) => !v }) &&
+      //
+      assertTrue(accessorReadOnlyF == Map(f1  -> false, f2   -> false, f3   -> true, f4    -> false)) &&
+      assertTrue(accessorReadOnlyP == Map(jabe -> false, jane -> false, jeff -> false, july -> false, josh -> false, jared -> true, jill -> false, jess -> false, john -> false))
+  }
+
+  val whenThereAreSeveralOwnersThenStemmaIsNotRemovable = test("when there are several owners then chart is not removable") {
+    for {
+      (s, a)              <- services
+      User(creatorId, _)  <- a.getOrCreateUser(Email("user1@test.com"))
+      User(accessorId, _) <- a.getOrCreateUser(Email("user2@test.com"))
+
+      stemmaId                                  <- s.createStemma(creatorId, "my first stemma")
+      FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJane)(createJill))
+
+      _ <- s.chown(accessorId, jillId)
+
+      creatorStemmas  <- s.listOwnedStemmas(creatorId)
+      accessorStemmas <- s.listOwnedStemmas(accessorId)
+    } yield assertTrue(
+      creatorStemmas.stemmas.forall(s => !s.removable),
+      accessorStemmas.stemmas.forall(s => !s.removable)
+    )
+  }
+
+  val canRemoveStemmaIfOnlyOwner = test("if only owner then can remove owned stemma") {
+    for {
+      (s, a)             <- services
+      User(creatorId, _) <- a.getOrCreateUser(Email("user1@test.com"))
+
+      stemmaId <- s.createStemma(creatorId, "my first stemma")
+      _        <- s.removeStemma(creatorId, stemmaId)
+
+      stemmas <- s.listOwnedStemmas(creatorId)
+    } yield assertTrue(stemmas.stemmas.isEmpty)
   }
 
   override def spec =
@@ -294,6 +366,10 @@ object BasicStemmaRepositoryTest extends DefaultRunnableSpec with Requests with 
       cantUpdateFamilyIfNotAnOwner,
       cantRequestStemmaIfNotGraphOwner,
       whenUpdatingFamilyAllMembersShouldBelongToGraph,
-      canChangeOwnershipInRecursiveManner
+      canChangeOwnershipInRecursiveManner,
+      appendChildrenToFullExistingFamily,
+      appendChildrenToIncompleteExistingFamily,
+      whenThereAreSeveralOwnersThenStemmaIsNotRemovable,
+      canRemoveStemmaIfOnlyOwner
     )
 }

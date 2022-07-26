@@ -2,36 +2,31 @@ package io.github.salamahin.stemma.service
 
 import gremlin.scala.TraversalSource
 import io.github.salamahin.stemma.domain._
-import UserService.USER
-import io.github.salamahin.stemma.service.GraphService.GRAPH
-import io.github.salamahin.stemma.service.OpsService.OPS
-import io.github.salamahin.stemma.service.SecretService.SECRET
-import io.github.salamahin.stemma.service.StemmaService.STEMMA
-import io.github.salamahin.stemma.tinkerpop.StemmaOperations
+import io.github.salamahin.stemma.tinkerpop.StemmaRepository
 import zio.test.Assertion.hasSameElements
 import zio.test._
-import zio.{ULayer, ZIO, ZLayer}
+import zio.{ZIO, ZLayer}
 
-object FailoverStemmaRepositoryTest extends DefaultRunnableSpec with Requests with RenderStemma {
-  private val failedToRemoveOps = ZLayer.succeed(new StemmaOperations {
+object FailoverStemmaRepositoryTest extends ZIOSpecDefault with Requests with RenderStemma {
+  private val failedToRemoveRepo = new StemmaRepository {
     override def removeFamily(ts: TraversalSource, id: String): Either[NoSuchFamilyId, Unit] = Left(NoSuchFamilyId(id))
-  })
+  }
 
-  private val layer: ULayer[GRAPH with OPS with SECRET] = tempGraph ++ failedToRemoveOps ++ hardcodedSecret
-  private val services = (ZIO.environment[STEMMA].map(_.get) zip ZIO.environment[USER].map(_.get))
-    .provideCustomLayer(layer >>> (StemmaService.live ++ UserService.live))
+  private val stemmaService = ZLayer(ZIO.service[GraphService].map(g => new StemmaService(g.graph, failedToRemoveRepo)))
 
+  private val services = (ZIO.service[StemmaService] zip ZIO.service[UserService])
+    .provide(tempGraph, hardcodedSecret, stemmaService, UserService.live)
 
-  private val revertChangesOnFailure = testM("any change that modifies graph would be reverted on failure") {
+  private val revertChangesOnFailure = test("any change that modifies stemma would be reverted on failure") {
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
-      graphId         <- s.createGraph(userId, "test graph")
+      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      stemmaId        <- s.createStemma(userId, "test stemma")
 
-      Family(_, jamesId :: _ :: Nil, Nil) <- s.createFamily(userId, graphId, family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())
-      _                                   <- s.removePerson(userId, jamesId).catchAll(_ => ZIO.succeed())
-      render(stemma)                      <- s.stemma(userId, graphId)
+      FamilyDescription(_, jamesId :: _ :: Nil, Nil, _) <- s.createFamily(userId, stemmaId, family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())
+      _                                                 <- s.removePerson(userId, jamesId).catchAll(_ => ZIO.succeed())
+      render(stemma)                                    <- s.stemma(userId, stemmaId)
     } yield assert(stemma)(hasSameElements("(James, July) parentsOf ()" :: Nil))
   }
 
