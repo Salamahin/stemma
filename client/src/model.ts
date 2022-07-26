@@ -130,6 +130,18 @@ export class Model {
         return await this.parseResponse<Stemma>(response);
     }
 
+    async createInvintation(stemmaId: string, personId: string, email: string) {
+        const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/person/${encodeURIComponent(personId)}/invite`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                "email": email
+            }),
+            headers: this.commonHeader
+        })
+
+        return await this.parseResponse<string>(response).then(token => `${location.origin}/${encodeURIComponent(token)}`);
+    }
+
     async removeFamily(stemmaId: string, familyId: string) {
         const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/family/${encodeURIComponent(familyId)}`, {
             method: 'DELETE',

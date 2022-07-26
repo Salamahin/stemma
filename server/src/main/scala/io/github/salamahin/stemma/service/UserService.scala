@@ -6,7 +6,7 @@ import io.circe.parser
 import io.github.salamahin.stemma.domain.{Email, InvalidInviteToken, InviteToken, User}
 import io.github.salamahin.stemma.tinkerpop.StemmaRepository
 import io.github.salamahin.stemma.tinkerpop.Transaction.transactionSafe
-import zio.{IO, UIO, URLayer, ZIO, ZLayer}
+import zio.{IO, Random, UIO, URLayer, ZIO, ZLayer}
 
 import java.security.MessageDigest
 import java.util
@@ -22,18 +22,20 @@ trait UserService {
 
 object UserService extends LazyLogging {
 
-  val live: URLayer[Secrets with GraphService, UserService] = ZLayer(for {
+  val live: URLayer[Secrets with GraphService with Random, UserService] = ZLayer(for {
     graph  <- ZIO.service[GraphService]
     secret <- ZIO.service[Secrets]
-  } yield new UserServiceImpl(secret.invitationSecret, graph.graph, new StemmaRepository))
+    rnd    <- ZIO.service[Random]
+  } yield new UserServiceImpl(secret.invitationSecret, graph.graph, new StemmaRepository, rnd))
 
-  private class UserServiceImpl(secret: String, graph: ScalaGraph, ops: StemmaRepository) extends UserService {
-    override def createInviteToken(inviteeEmail: String, associatedPersonId: String): UIO[String] = ZIO.succeed {
-      import io.circe.syntax._
+  private class UserServiceImpl(secret: String, graph: ScalaGraph, ops: StemmaRepository, rnd: Random) extends UserService {
+    override def createInviteToken(inviteeEmail: String, associatedPersonId: String): UIO[String] =
+      rnd.nextString(20).map { entropy =>
+        import io.circe.syntax._
 
-      val token = InviteToken(inviteeEmail, associatedPersonId)
-      encrypt(secret, token.asJson.noSpaces)
-    }
+        val token = InviteToken(inviteeEmail, associatedPersonId, entropy)
+        encrypt(secret, token.asJson.noSpaces)
+      }
 
     private def encrypt(key: String, value: String): String = {
       val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")

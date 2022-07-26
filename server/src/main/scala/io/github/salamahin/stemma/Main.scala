@@ -6,7 +6,7 @@ import io.github.salamahin.stemma.service._
 import zhttp.http.Middleware.cors
 import zhttp.http.middleware.Cors.CorsConfig
 import zhttp.service.Server
-import zio.{ExitCode, Scope, ZIO, ZIOAppArgs, ZIOAppDefault}
+import zio.{ExitCode, Random, Scope, ZIO, ZIOAppArgs, ZIOAppDefault}
 
 object Main extends ZIOAppDefault with LazyLogging {
   private val corsConfig = CorsConfig(
@@ -19,6 +19,7 @@ object Main extends ZIOAppDefault with LazyLogging {
       .start(8090, OAuth.authenticate(StemmaApi.api) @@ cors(corsConfig))
       .exitCode
       .provide(
+        Random.live,
         Secrets.envSecrets,
         GraphService.postgres,
         StemmaService.live,

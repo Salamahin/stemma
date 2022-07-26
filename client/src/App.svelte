@@ -11,7 +11,7 @@
     import { PinnedPeopleStorage } from "./pinnedPeopleStorage";
     import fuzzysort from "fuzzysort";
     import RemoveStemmaModal from "./components/delete_stemma_modal/RemoveStemmaModal.svelte";
-    import InviteModal from "./components/invite_modal/InviteModal.svelte";
+    import InviteModal, { CreateInviteLink } from "./components/invite_modal/InviteModal.svelte";
 
     export let google_client_id;
     export let stemma_backend_url;
@@ -89,6 +89,12 @@
 
     function handleStemmaRemoval(stemmaId) {
         model.removeStemma(stemmaId).then((st) => (ownedStemmasDescriptions = st.stemmas));
+    }
+
+    function handleInvitationCreation(e: CreateInviteLink) {
+        model
+            .createInvintation(selectedStemmaDescription.id, e.personId, e.email)
+            .then((link) => inviteModal.setInviteLink(link));
     }
 
     function updateEverythingOnStemmaChange(stemmaId: string, stemma: Stemma) {
@@ -180,7 +186,7 @@
         on:familySelected={(e) => handleFamilySelection(e.detail)}
     />
 
-    <InviteModal bind:this={inviteModal} stemma={selectedStemma} {stemmaIndex} />
+    <InviteModal bind:this={inviteModal} stemma={selectedStemma} {stemmaIndex} on:invite={(e) => handleInvitationCreation(e.detail)} />
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">

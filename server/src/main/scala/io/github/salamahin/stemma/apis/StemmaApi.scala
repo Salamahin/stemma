@@ -2,8 +2,8 @@ package io.github.salamahin.stemma.apis
 
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.Encoder
-import io.github.salamahin.stemma.domain.{CreateFamily, CreateNewPerson, CreateStemma, StemmaDescription, StemmaError, UnknownError, User}
-import io.github.salamahin.stemma.service.StemmaService
+import io.github.salamahin.stemma.domain.{CreateFamily, CreateNewPerson, CreateStemma, Email, ForeignInviteToken, StemmaDescription, StemmaError, UnknownError, User}
+import io.github.salamahin.stemma.service.{StemmaService, UserService}
 import zhttp.http._
 import zio.ZIO
 
@@ -35,6 +35,18 @@ object StemmaApi extends LazyLogging {
           .service[StemmaService]
           .flatMap(_.listOwnedStemmas(user.userId))
           .toResponse()
+
+      case Method.PUT -> !! / queryParam(token) =>
+        logger.info(s"User ${user.userId} bears the invitation token = $token")
+        (for {
+          s     <- ZIO.service[StemmaService]
+          us    <- ZIO.service[UserService]
+          token <- us.decodeInviteToken(token)
+
+          _ <- ZIO.fromEither(if (token.inviteesEmail == user.email.email) Right() else Left(ForeignInviteToken()))
+
+          _ <- s.chown(user.userId, token.targetPersonId)
+        } yield ()).toResponse()
 
       case Method.DELETE -> !! / "stemma" / queryParam(stemmaId) =>
         logger.info(s"User ${user.userId} asked to remove stemma with id = $stemmaId")
@@ -79,6 +91,15 @@ object StemmaApi extends LazyLogging {
           _           <- s.updatePerson(user.userId, personId, personDescr)
           stemma      <- s.stemma(user.userId, stemmaId)
         } yield stemma).toResponse()
+
+      case req @ Method.PUT -> !! / "stemma" / queryParam(_) / "person" / queryParam(personId) / "invite" =>
+        logger.info(s"User ${user.userId} requested to invite for person with id = $personId")
+        (for {
+          us         <- ZIO.service[UserService]
+          body       <- req.bodyAsString.mapError(err => UnknownError(err))
+          email      <- ZIO.fromEither(decode[Email](body)).mapError(err => UnknownError(err))
+          inviteLink <- us.createInviteToken(email.email, personId)
+        } yield inviteLink).toResponse()
 
       case req @ Method.POST -> !! / "stemma" / queryParam(stemmaId) / "family" =>
         logger.info(s"User ${user.userId} requested a new family creation")

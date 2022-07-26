@@ -31,6 +31,7 @@ final case class UserIsAlreadyGraphOwner(stemmaId: String)  extends StemmaError
 final case class IsNotTheOnlyStemmaOwner(stemmaId: String) extends StemmaError
 
 final case class InvalidInviteToken() extends StemmaError
+final case class ForeignInviteToken() extends StemmaError
 
 trait Discriminated {
   implicit val circeConfig = Configuration.default.withDiscriminator("type")

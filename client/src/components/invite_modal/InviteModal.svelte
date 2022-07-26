@@ -1,3 +1,10 @@
+<script context="module" lang="ts">
+    export type CreateInviteLink = {
+        personId: string;
+        email: string;
+    };
+</script>
+
 <script lang="ts">
     import Select from "svelte-select";
     import * as bootstrap from "bootstrap";
@@ -20,25 +27,35 @@
     let carousel;
 
     let dispatch = createEventDispatcher();
+
     let selectedName;
+    let selectedPersonId;
+    let email;
+    let inviteLink = "";
 
     function nameChanged(newName: string) {
         namesakes = [...stemmaIndex.namesakes(newName).filter((p) => !p.readOnly)];
         if (carousel) carousel.goTo(0, { animated: false });
-        dispatch("selected", namesakes[0]);
         selectedName = newName;
     }
 
-    export function reset() {
+    function reset() {
         namesakes = [];
         selectedName = null;
+        email = null;
+        inviteLink = "";
+    }
+
+    export function showInvintation() {
+        reset();
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    export function setInviteLink(link: string) {
+        inviteLink = link;
     }
 
     $: if (stemma) peopleNames = [...new Set(stemma.people.map((p) => p.name))];
-
-    export function showInvintation() {
-        bootstrap.Modal.getOrCreateInstance(modalEl).show();
-    }
 </script>
 
 <div class="modal fade" id="personDetailsModal" tabindex="-1" aria-hidden="true" bind:this={modalEl}>
@@ -49,6 +66,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
             </div>
             <div class="modal-body">
+                <label for="personName" class="form-label">Пользователь</label>
                 <Select
                     id="personName"
                     placeholder="Иванов Иван Иванович"
@@ -66,24 +84,52 @@
                 />
                 {#key namesakes}
                     {#if namesakes.length}
-                        <Carousel on:pageChange={(e) => dispatch("selected", namesakes[e.detail])} bind:this={carousel}>
+                        <Carousel
+                            on:pageChange={(e) => (selectedPersonId = namesakes[e.detail].id)}
+                            bind:this={carousel}
+                            arrows={namesakes.length > 1}
+                            duration={0}
+                        >
                             {#each namesakes as ns, i}
                                 <div class="d-flex flex-column">
                                     <VisualPersonDescription selectedPerson={ns} {stemmaIndex} chartId={`ns_chart_${i}`} />
                                 </div>
                             {/each}
                         </Carousel>
+                    {:else}
+                        <div style="height:320px" />
                     {/if}
                 {/key}
 
-                <input type="email" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Введите почту" />
-                <div class="input-group mb-3">
-                    <input type="text" class="form-control" aria-label="inviteLink" aria-describedby="button-addon2" readonly />
-                    <button class="btn btn-outline-secondary" type="button" id="button-addon2">Скопировать</button>
+                <div class="mt-2">
+                    <label for="emainInput" class="form-label">Email-адрес</label>
+                    <input type="email" class="form-control" id="emainInput" placeholder="name@example.com" bind:value={email} />
+                </div>
+
+                <label for="outline" class="form-label mt-2">Ссылка для приглашения</label>
+                <div class="input-group">
+                    <button
+                        class="btn btn-outline-primary"
+                        type="button"
+                        disabled={!email || !selectedName}
+                        on:click={(e) => dispatch("invite", { personId: selectedPersonId, email: email })}>Создать</button
+                    >
+                    <input
+                        type="text"
+                        id="inviteLink"
+                        class="form-control"
+                        aria-label="inviteLink"
+                        aria-describedby="button-addon2"
+                        readonly
+                        value={inviteLink}
+                    />
+                    <button class="btn btn-outline-secondary" type="button" disabled={inviteLink == undefined || !inviteLink.length}
+                        ><i class="bi bi-clipboard" /></button
+                    >
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
             </div>
         </div>
     </div>

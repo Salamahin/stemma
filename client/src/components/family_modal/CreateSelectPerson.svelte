@@ -55,7 +55,7 @@
       />
     </div>
     {#if namesakes.length}
-      <Carousel on:pageChange={(e) => dispatch("selected", namesakes[e.detail])} bind:this={carousel}>
+      <Carousel on:pageChange={(e) => dispatch("selected", namesakes[e.detail])} bind:this={carousel} duration={0}>
         {#each namesakes as ns, i}
           <div class="d-flex flex-column">
             <VisualPersonDescription selectedPerson={ns} {stemmaIndex} chartId={`ns_chart_${i}`} />
@@ -65,6 +65,8 @@
           </div>
         {/each}
       </Carousel>
+    {:else}
+      <div style="height:360px" />
     {/if}
   {/key}
 </form>

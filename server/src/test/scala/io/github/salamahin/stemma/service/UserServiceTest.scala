@@ -1,13 +1,12 @@
 package io.github.salamahin.stemma.service
 
-import io.github.salamahin.stemma.domain.{Email, FamilyDescription, InviteToken}
-import io.github.salamahin.stemma.tinkerpop.StemmaRepository
+import io.github.salamahin.stemma.domain.{Email, FamilyDescription}
+import zio.ZIO
 import zio.test._
-import zio.{ULayer, ZIO}
 
 object UserServiceTest extends ZIOSpecDefault with Requests with RenderStemma {
   private val services = (ZIO.service[StemmaService] zip ZIO.service[UserService])
-    .provide(tempGraph, hardcodedSecret, StemmaService.live, UserService.live)
+    .provide(tempGraph, hardcodedSecret, StemmaService.live, UserService.live, TestRandom.deterministic)
 
   private val canCreateUser = test("can create or found a user") {
     for {
@@ -27,7 +26,7 @@ object UserServiceTest extends ZIOSpecDefault with Requests with RenderStemma {
 
       token        <- a.createInviteToken("invitee@test.com", joshId)
       decodedToken <- a.decodeInviteToken(token)
-    } yield assertTrue(decodedToken == InviteToken("invitee@test.com", joshId))
+    } yield assertTrue(decodedToken.inviteesEmail == "invitee@test.com") && assertTrue(decodedToken.targetPersonId == joshId)
   }
 
   override def spec = suite("UserServiceTest")(
