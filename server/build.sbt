@@ -11,6 +11,7 @@ libraryDependencies ++= Seq(
   "dev.zio"                    %% "zio"                    % versions.zioV,
   "dev.zio"                    %% "zio-test"               % versions.zioV % Test,
   "dev.zio"                    %% "zio-test-sbt"           % versions.zioV % Test,
+  "dev.zio"                    %% "zio-lambda"             % "1.0.0-RC5",
   "io.d11"                     %% "zhttp"                  % "2.0.0-RC9",
   "io.circe"                   %% "circe-parser"           % versions.circeV,
   "io.circe"                   %% "circe-generic-extras"   % versions.circeV,

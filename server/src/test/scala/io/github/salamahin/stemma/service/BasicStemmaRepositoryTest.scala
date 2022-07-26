@@ -7,7 +7,7 @@ import zio.test._
 
 object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with RenderStemma {
   private val services = (ZIO.service[StemmaService] zip ZIO.service[UserService])
-    .provide(tempGraph, hardcodedSecret, StemmaService.live, UserService.live)
+    .provide(tempGraph, hardcodedSecret, StemmaService.live, UserService.live, TestRandom.deterministic)
 
   private val canCreateFamily = test("can create different family with both parents and several children") {
     for {

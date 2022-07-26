@@ -1,10 +1,10 @@
-package io.github.salamahin.stemma.apis
+package io.github.salamahin.stemma.apis.rest
 
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.Encoder
 import io.github.salamahin.stemma.domain.{CreateFamily, CreateNewPerson, CreateStemma, Email, ForeignInviteToken, StemmaDescription, StemmaError, UnknownError, User}
 import io.github.salamahin.stemma.service.{StemmaService, UserService}
-import zhttp.http._
+import zhttp.http.{Http, HttpError, Method, Request, Response}
 import zio.ZIO
 
 import java.net.URLDecoder
@@ -12,6 +12,7 @@ import java.net.URLDecoder
 object StemmaApi extends LazyLogging {
   import io.circe.parser.decode
   import io.circe.syntax._
+  import zhttp.http._
 
   object queryParam {
     def unapply(param: String) = Some(URLDecoder.decode(param, "UTF-8"))

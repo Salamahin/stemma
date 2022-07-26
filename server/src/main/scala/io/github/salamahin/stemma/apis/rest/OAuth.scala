@@ -1,8 +1,8 @@
-package io.github.salamahin.stemma.apis
+package io.github.salamahin.stemma.apis.rest
 
 import io.github.salamahin.stemma.domain.User
 import io.github.salamahin.stemma.service.{OAuthService, UserService}
-import zhttp.http._
+import zhttp.http.{HeaderNames, Http, HttpApp, HttpError, Request, Response}
 import zio.ZIO
 
 object OAuth {

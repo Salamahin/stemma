@@ -1,14 +1,13 @@
-package io.github.salamahin.stemma
+package io.github.salamahin.stemma.apis.rest
 
 import com.typesafe.scalalogging.LazyLogging
-import io.github.salamahin.stemma.apis.{OAuth, StemmaApi}
 import io.github.salamahin.stemma.service._
 import zhttp.http.Middleware.cors
 import zhttp.http.middleware.Cors.CorsConfig
 import zhttp.service.Server
 import zio.{ExitCode, Random, Scope, ZIO, ZIOAppArgs, ZIOAppDefault}
 
-object Main extends ZIOAppDefault with LazyLogging {
+object RestRunner extends ZIOAppDefault with LazyLogging {
   private val corsConfig = CorsConfig(
     anyOrigin = false,
     allowedOrigins = _ contains "localhost" //fixme configure?
