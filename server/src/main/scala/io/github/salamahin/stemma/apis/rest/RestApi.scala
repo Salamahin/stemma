@@ -3,7 +3,6 @@ package io.github.salamahin.stemma.apis.rest
 import io.circe.Encoder
 import io.github.salamahin.stemma.apis._
 import io.github.salamahin.stemma.domain.{CreateFamily, CreateNewPerson, MissingBearerHeader, StemmaError, UnknownError}
-import io.github.salamahin.stemma.service.{OAuthService, StemmaService, UserService}
 import zio.ZIO
 
 import java.net.URLDecoder

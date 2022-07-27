@@ -1,9 +1,9 @@
 package io.github.salamahin.stemma.apis
 
+import com.typesafe.scalalogging.LazyLogging
 import io.github.salamahin.stemma.domain._
 import io.github.salamahin.stemma.service.{OAuthService, StemmaService, UserService}
 import zio.ZIO
-import zio.logging.LogAnnotation
 
 import java.util.UUID
 
@@ -19,9 +19,7 @@ case class CreateFamilyRequest(bearerToken: String, stemmaId: String, familyDesc
 case class DeleteFamilyRequest(bearerToken: String, stemmaId: String, familyId: String)
 case class UpdateFamilyRequest(bearerToken: String, stemmaId: String, familyId: String, familyDescr: CreateFamily)
 
-object Api {
-  private val userLogAnnotation = LogAnnotation[User]("user", (_, i) => i, _.userId)
-
+object Api extends LazyLogging {
   private def traced[R, T](f: UUID => ZIO[R, StemmaError, T]) =
     ZIO.succeed(UUID.randomUUID()).flatMap(traceId => f(traceId).mapError(err => TracedStemmaError(traceId, err)))
 
@@ -30,148 +28,148 @@ object Api {
       oauth <- ZIO.service[OAuthService]
       us    <- ZIO.service[UserService]
 
-      _     <- ZIO.logInfo(s"Decoding token ${bearerToken.take(5)}*****") @@ LogAnnotation.TraceId(traceId)
+      _     = logger.info(s"[$traceId] Decoding token ${bearerToken.take(5)}*****")
       email <- oauth.decodeEmail(bearerToken)
       u     <- us.getOrCreateUser(email)
-      _     <- ZIO.logInfo(s"User was associated with $u") @@ LogAnnotation.TraceId(traceId)
+      _     = logger.info(s"[$traceId] User was associated with $u")
     } yield u
 
-  def listStemmas(request: ListStemmasRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, OwnedStemmasDescription] = traced { traceId =>
+  def listStemmas(request: ListStemmasRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
 
-      _       <- ZIO.logInfo(s"Requested list of owned stemmas") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _       = logger.info(s"[$traceId] [$user] Requested list of owned stemmas")
       stemmas <- s.listOwnedStemmas(user.userId)
-      _       <- ZIO.logInfo(s"Onwed stemmas: ${stemmas.stemmas}") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _       = logger.info(s"[$traceId] [$user] Onwed stemmas: ${stemmas.stemmas}")
     } yield stemmas
   }
 
-  def bearInvitation(request: BearInvitationRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, Unit] = traced { traceId =>
+  def bearInvitation(request: BearInvitationRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       us   <- ZIO.service[UserService]
       user <- user(request.bearerToken)(traceId)
 
-      _     <- ZIO.logInfo(s"Bears invitation token ${request.encodedToken}") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _     = logger.info(s"[$traceId] [$user] Bears invitation token ${request.encodedToken}")
       token <- us.decodeInviteToken(request.encodedToken)
-      _     <- ZIO.logInfo(s"Token was successfully decoded, target person is ${token.targetPersonId}") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _     = logger.info(s"[$traceId] [$user] Token was successfully decoded, target person is ${token.targetPersonId}")
 
       _ <- if (token.inviteesEmail == user.email) ZIO.succeed((): Unit)
-          else ZIO.fail(ForeignInviteToken()) <* (ZIO.logError(s"User beared a foreign token") @@ userLogAnnotation(user)) @@ LogAnnotation.TraceId(traceId)
+          else ZIO.fail(ForeignInviteToken()) <* ZIO.succeed(logger.error("User beared a foreign token"))
 
       result <- s.chown(user.userId, token.targetPersonId)
 
-      _ <- ZIO.logInfo(s"Chown is complete, effected nodes $result") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _ = logger.info(s"[$traceId] [$user] Chown is complete, effected nodes $result")
     } yield ()
   }
 
-  def deleteStemma(request: DeleteStemmaRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, OwnedStemmasDescription] = traced { traceId =>
+  def deleteStemma(request: DeleteStemmaRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
 
-      _       <- ZIO.logInfo(s"Attempts to remove a stemma with id ${request.stemmaId}") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _       = logger.info(s"[$traceId] [$user] Attempts to remove a stemma with id ${request.stemmaId}")
       _       <- s.removeStemma(user.userId, request.stemmaId)
       stemmas <- s.listOwnedStemmas(user.userId)
-      _       <- ZIO.logInfo(s"Stemma removal succeed, onwed stemmas are $stemmas") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _       = logger.info(s"[$traceId] [$user] Stemma removal succeed, onwed stemmas are $stemmas")
     } yield stemmas
   }
 
-  def createNewStemma(request: CreateNewStemmaRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, StemmaDescription] = traced { traceId =>
+  def createNewStemma(request: CreateNewStemmaRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
 
-      _        <- ZIO.logInfo(s"Creates a new stemma with name ${request.stemmaName}") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _        = logger.info(s"[$traceId] [$user] Creates a new stemma with name ${request.stemmaName}")
       stemmaId <- s.createStemma(user.userId, request.stemmaName)
-      _        <- ZIO.logInfo(s"New stemma with id $stemmaId created") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _        = logger.info(s"[$traceId] [$user] New stemma with id $stemmaId created")
     } yield StemmaDescription(stemmaId, request.stemmaName, removable = true)
   }
 
-  def stemma(request: GetStemmaRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, Stemma] = traced { traceId =>
+  def stemma(request: GetStemmaRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
 
-      _      <- ZIO.logInfo(s"Asks for stemma data with stemma id ${request.stemmaId}") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _      = logger.info(s"[$traceId] [$user] Asks for stemma data with stemma id ${request.stemmaId}")
       stemma <- s.stemma(user.userId, request.stemmaId)
-      _      <- ZIO.logInfo(s"Stemma has ${stemma.people.size} people and ${stemma.families.size} families total") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _      = logger.info(s"[$traceId] [$user] Stemma has ${stemma.people.size} people and ${stemma.families.size} families total")
     } yield stemma
   }
 
-  def deletePerson(request: DeletePersonRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, Stemma] = traced { traceId =>
+  def deletePerson(request: DeletePersonRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
 
-      _      <- ZIO.logInfo(s"Deletes person with id ${request.personId} in stemma ${request.stemmaId}") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _      = logger.info(s"[$traceId] [$user] Deletes person with id ${request.personId} in stemma ${request.stemmaId}")
       _      <- s.removePerson(user.userId, request.personId)
       stemma <- s.stemma(user.userId, request.stemmaId)
-      _      <- ZIO.logInfo(s"Person removed, now stemma has ${stemma.people.size} people and ${stemma.families.size} families total") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _      = logger.info(s"[$traceId] [$user] Person removed, now stemma has ${stemma.people.size} people and ${stemma.families.size} families total")
     } yield stemma
   }
 
-  def updatePerson(request: UpdatePersonRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, Stemma] = traced { traceId =>
+  def updatePerson(request: UpdatePersonRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
 
-      _      <- ZIO.logInfo(s"Updates person with id ${request.personId} in stemma ${request.stemmaId} with ${request.personDescr}") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _      = logger.info(s"[$traceId] [$user] Updates person with id ${request.personId} in stemma ${request.stemmaId} with ${request.personDescr}")
       _      <- s.updatePerson(user.userId, request.personId, request.personDescr)
       stemma <- s.stemma(user.userId, request.stemmaId)
-      _      <- ZIO.logInfo(s"Person updated") @@ userLogAnnotation(user)
+      _      = logger.info(s"[$traceId] [$user] Person updated")
     } yield stemma
   }
 
-  def createInvitationToken(request: CreateInvitationTokenRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, String] = traced { traceId =>
+  def createInvitationToken(request: CreateInvitationTokenRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       us   <- ZIO.service[UserService]
       user <- user(request.bearerToken)(traceId)
 
-      _ <- ZIO.logInfo(s"Creates an invitation token for ${request.targetPersonId}") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _ = logger.info(s"[$traceId] [$user] Creates an invitation token for ${request.targetPersonId}")
       inviteLink <- ZIO.ifZIO(s.ownsPerson(user.userId, request.targetPersonId))(
                      us.createInviteToken(request.targetPersonEmail, request.targetPersonId),
-                     ZIO.fail(AccessToPersonDenied(request.targetPersonId)) <* ZIO.logError("User does not own the target person") @@ LogAnnotation.TraceId(traceId)
+                     ZIO.fail(AccessToPersonDenied(request.targetPersonId)) <* ZIO.succeed(logger.error(s"[$traceId] [$user] User does not own the target person"))
                    )
-      _ <- ZIO.logInfo(s"An invitation created, token $inviteLink") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _ = logger.info(s"[$traceId] [$user] An invitation created, token $inviteLink")
     } yield inviteLink
   }
 
-  def createFamily(request: CreateFamilyRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, Stemma] = traced { traceId =>
+  def createFamily(request: CreateFamilyRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
 
-      _        <- ZIO.logInfo(s"Creates a new family in stemma ${request.stemmaId}, desc ${request.familyDescr}") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _        = logger.info(s"[$traceId] [$user] Creates a new family in stemma ${request.stemmaId}, desc ${request.familyDescr}")
       familyId <- s.createFamily(user.userId, request.stemmaId, request.familyDescr)
       stemma   <- s.stemma(user.userId, request.stemmaId)
-      _        <- ZIO.logInfo(s"Family with id ${familyId} created, now stemma has ${stemma.people.size} people and ${stemma.families.size} families total") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _        = logger.info(s"[$traceId] [$user] Family with id $familyId created, now stemma has ${stemma.people.size} people and ${stemma.families.size} families total")
     } yield stemma
   }
 
-  def deleteFamily(request: DeleteFamilyRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, Stemma] = traced { traceId =>
+  def deleteFamily(request: DeleteFamilyRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
 
-      _      <- ZIO.logInfo(s"Removes family ${request.familyId} in stemma ${request.stemmaId}") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _      = logger.info(s"[$traceId] [$user] Removes family ${request.familyId} in stemma ${request.stemmaId}")
       _      <- s.removeFamily(user.userId, request.familyId)
       stemma <- s.stemma(user.userId, request.stemmaId)
-      _      <- ZIO.logInfo(s"Family removed, now stemma has ${stemma.people.size} people and ${stemma.families.size} families total") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _      = logger.info(s"[$traceId] [$user] Family removed, now stemma has ${stemma.people.size} people and ${stemma.families.size} families total")
     } yield stemma
   }
 
-  def updateFamily(request: UpdateFamilyRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, Stemma] = traced { traceId =>
+  def updateFamily(request: UpdateFamilyRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
 
-      _      <- ZIO.logInfo(s"Updates family ${request.familyId} in stemma ${request.stemmaId}, desc ${request.familyDescr}") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _      = logger.info(s"[$traceId] [$user] Updates family ${request.familyId} in stemma ${request.stemmaId}, desc ${request.familyDescr}")
       _      <- s.updateFamily(user.userId, request.familyId, request.familyDescr)
       stemma <- s.stemma(user.userId, request.stemmaId)
-      _      <- ZIO.logInfo(s"Family updated, now stemma has ${stemma.people.size} people and ${stemma.families.size} families total") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
+      _      = logger.info(s"[$traceId] [$user] Family updated, now stemma has ${stemma.people.size} people and ${stemma.families.size} families total")
     } yield stemma
   }
 }
