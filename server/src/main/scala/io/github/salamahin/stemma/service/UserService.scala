@@ -1,9 +1,8 @@
 package io.github.salamahin.stemma.service
 
-import com.typesafe.scalalogging.LazyLogging
 import gremlin.scala.ScalaGraph
 import io.circe.parser
-import io.github.salamahin.stemma.domain.{Email, InvalidInviteToken, InviteToken, User}
+import io.github.salamahin.stemma.domain.{InvalidInviteToken, InviteToken, User}
 import io.github.salamahin.stemma.tinkerpop.StemmaRepository
 import io.github.salamahin.stemma.tinkerpop.Transaction.transactionSafe
 import zio.{IO, Random, UIO, URLayer, ZIO, ZLayer}
@@ -17,10 +16,10 @@ import javax.crypto.spec.SecretKeySpec
 trait UserService {
   def createInviteToken(inviteeEmail: String, associatedPersonId: String): UIO[String]
   def decodeInviteToken(token: String): IO[InvalidInviteToken, InviteToken]
-  def getOrCreateUser(email: Email): UIO[User]
+  def getOrCreateUser(email: String): UIO[User]
 }
 
-object UserService extends LazyLogging {
+object UserService {
 
   val live: URLayer[Secrets with GraphService with Random, UserService] = ZLayer(for {
     graph  <- ZIO.service[GraphService]
@@ -68,8 +67,7 @@ object UserService extends LazyLogging {
       new String(cipher.doFinal(Base64.getDecoder.decode(encryptedValue)))
     }
 
-    override def getOrCreateUser(email: Email): UIO[User] = ZIO.succeed {
-      logger.debug(s"Get or create a new user with email $email")
+    override def getOrCreateUser(email: String): UIO[User] = ZIO.succeed {
       transactionSafe(graph) { tx => ops.getOrCreateUser(tx, email) }
     }
   }

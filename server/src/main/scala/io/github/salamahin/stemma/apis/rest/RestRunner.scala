@@ -1,13 +1,12 @@
 package io.github.salamahin.stemma.apis.rest
 
-import com.typesafe.scalalogging.LazyLogging
 import io.github.salamahin.stemma.service._
 import zhttp.http.Middleware.cors
 import zhttp.http.middleware.Cors.CorsConfig
 import zhttp.service.Server
 import zio.{ExitCode, Random, Scope, ZIO, ZIOAppArgs, ZIOAppDefault}
 
-object RestRunner extends ZIOAppDefault with LazyLogging {
+object RestRunner extends ZIOAppDefault  {
   private val corsConfig = CorsConfig(
     anyOrigin = false,
     allowedOrigins = _ contains "localhost" //fixme configure?
@@ -23,11 +22,12 @@ object RestRunner extends ZIOAppDefault with LazyLogging {
         GraphService.postgres,
         StemmaService.live,
         UserService.live,
-        OAuthService.googleSignIn
+        OAuthService.googleSignIn,
+        Scope.default
       )
-      .foldCause(
-        failure => { logger.error(s"Unexpected failure:\n${failure.prettyPrint}"); ExitCode.failure },
-        _ => { logger.info("bb gl hf"); ExitCode.success; }
-      )
+//      .foldCause(
+//        failure => { logger.error(s"Unexpected failure:\n${failure.prettyPrint}"); ExitCode.failure },
+//        _ => { logger.info("bb gl hf"); ExitCode.success; }
+//      )
   }
 }

@@ -3,13 +3,13 @@ package io.github.salamahin.stemma.service
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
-import io.github.salamahin.stemma.domain.{Email, UnknownError}
+import io.github.salamahin.stemma.domain.UnknownError
 import zio.{IO, URLayer, ZIO, ZLayer}
 
 import java.util.Collections
 
 trait OAuthService {
-  def decode(token: String): IO[UnknownError, Email]
+  def decodeEmail(token: String): IO[UnknownError, String]
 }
 
 object OAuthService {
@@ -23,10 +23,10 @@ object OAuthService {
             .setAudience(Collections.singletonList(s"$secret.apps.googleusercontent.com"))
             .build()
 
-          override def decode(token: String) = ZIO.fromEither {
+          override def decodeEmail(token: String) = ZIO.fromEither {
             try {
               val verified = verifier.verify(token)
-              Right(Email(verified.getPayload.getEmail))
+              Right(verified.getPayload.getEmail)
             } catch {
               case ex: Throwable => Left(UnknownError(ex))
             }

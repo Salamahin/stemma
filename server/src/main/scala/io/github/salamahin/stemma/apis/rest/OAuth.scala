@@ -23,7 +23,7 @@ object OAuth {
           authService <- ZIO.service[OAuthService]
 
           token <- parseToken
-          email <- authService.decode(token).mapError(err => HttpError.InternalServerError(cause = Some(err.cause)))
+          email <- authService.decodeEmail(token).mapError(err => HttpError.InternalServerError(cause = Some(err.cause)))
           user  <- userService.getOrCreateUser(email)
         } yield user
 

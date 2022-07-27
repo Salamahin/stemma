@@ -134,7 +134,7 @@ object OldStemmaParser extends ZIOAppDefault {
       stemma <- s.stemma("public.user:::1", stemmaId)
       _      = println(stemma)
     } yield ())
-      .provide(StemmaService.live, GraphService.postgres, Secrets.envSecrets)
+      .provide(StemmaService.live, GraphService.postgres, Secrets.envSecrets, Scope.default)
       .foldCause(
         failure => { println(s"Unexpected failure:\n${failure.prettyPrint}"); ExitCode.failure },
         _ => { println("bb gl hf"); ExitCode.success; }

@@ -21,7 +21,7 @@ object FailoverStemmaRepositoryTest extends ZIOSpecDefault with Requests with Re
     for {
       (s, a) <- services
 
-      User(userId, _) <- a.getOrCreateUser(Email("user@test.com"))
+      User(userId, _) <- a.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
       FamilyDescription(_, jamesId :: _ :: Nil, Nil, _) <- s.createFamily(userId, stemmaId, family(createJames, createJuly)()).catchAll(_ => ZIO.succeed())

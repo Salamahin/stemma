@@ -163,6 +163,8 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
       } yield effect
     })
   )
+
+  def ownsPerson(userId: String, personId: String): IO[StemmaError, Boolean] = ZIO.fromEither(ops.isPersonOwner(graph.traversal, userId, personId))
 }
 
 object StemmaService {

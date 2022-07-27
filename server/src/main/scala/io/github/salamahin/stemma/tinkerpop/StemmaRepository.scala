@@ -1,6 +1,5 @@
 package io.github.salamahin.stemma.tinkerpop
 
-import com.typesafe.scalalogging.LazyLogging
 import gremlin.scala._
 import io.github.salamahin.stemma.domain._
 import io.github.salamahin.stemma.tinkerpop.StemmaRepository._
@@ -9,7 +8,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import scala.collection.mutable
 
-class StemmaRepository extends LazyLogging {
+class StemmaRepository {
   def listStemmas(ts: TraversalSource, ownerId: String): Either[NoSuchUserId, List[StemmaDescription]] =
     ts.V(ownerId)
       .headOption()
@@ -96,22 +95,20 @@ class StemmaRepository extends LazyLogging {
       .map(_.id().toString)
   }
 
-  def getOrCreateUser(ts: TraversalSource, email: Email): User = {
+  def getOrCreateUser(ts: TraversalSource, email: String): User = {
     val userId = ts
       .V()
       .hasLabel(types.user)
-      .has(userKeys.email, email.email)
+      .has(userKeys.email, email)
       .headOption()
       .getOrElse {
-        logger.debug(s"User with email $email is not found, creating a new one")
         val newUser = ts.addV(types.user).head()
-        newUser.setProperty(userKeys.email, email.email)
+        newUser.setProperty(userKeys.email, email)
         newUser
       }
       .id()
       .toString
 
-    logger.debug(s"User email $email is associated with id $userId")
     User(userId, email)
   }
 

@@ -5,6 +5,8 @@ import io.circe.generic.extras.semiauto.deriveConfiguredEncoder
 import io.circe.{Encoder, Json}
 import org.apache.commons.lang3.exception.ExceptionUtils
 
+import java.util.UUID
+
 sealed trait StemmaError
 
 final case class UnknownError(cause: Throwable) extends StemmaError
@@ -32,6 +34,8 @@ final case class IsNotTheOnlyStemmaOwner(stemmaId: String) extends StemmaError
 
 final case class InvalidInviteToken() extends StemmaError
 final case class ForeignInviteToken() extends StemmaError
+
+final case class TracedStemmaError(traceId: UUID, cause: StemmaError) extends StemmaError
 
 trait Discriminated {
   implicit val circeConfig = Configuration.default.withDiscriminator("type")
