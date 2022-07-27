@@ -19,13 +19,13 @@ case class CreateFamilyRequest(bearerToken: String, stemmaId: String, familyDesc
 case class DeleteFamilyRequest(bearerToken: String, stemmaId: String, familyId: String)
 case class UpdateFamilyRequest(bearerToken: String, stemmaId: String, familyId: String, familyDescr: CreateFamily)
 
-trait Api {
+object Api {
   private val userLogAnnotation = LogAnnotation[User]("user", (_, i) => i, _.userId)
 
   private def traced[R, T](f: UUID => ZIO[R, StemmaError, T]) =
     ZIO.succeed(UUID.randomUUID()).flatMap(traceId => f(traceId).mapError(err => TracedStemmaError(traceId, err)))
 
-  private def user(bearerToken: String)(traceId: UUID) =
+  private def user(bearerToken: String)(traceId: UUID): ZIO[UserService with OAuthService, UnknownError, User] =
     for {
       oauth <- ZIO.service[OAuthService]
       us    <- ZIO.service[UserService]
@@ -36,7 +36,7 @@ trait Api {
       _     <- ZIO.logInfo(s"User was associated with $u") @@ LogAnnotation.TraceId(traceId)
     } yield u
 
-  def listStemmas(request: ListStemmasRequest) = traced { traceId =>
+  def listStemmas(request: ListStemmasRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, OwnedStemmasDescription] = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
@@ -47,7 +47,7 @@ trait Api {
     } yield stemmas
   }
 
-  def bearInvitation(request: BearInvitationRequest) = traced { traceId =>
+  def bearInvitation(request: BearInvitationRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, Unit] = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       us   <- ZIO.service[UserService]
@@ -57,7 +57,7 @@ trait Api {
       token <- us.decodeInviteToken(request.encodedToken)
       _     <- ZIO.logInfo(s"Token was successfully decoded, target person is ${token.targetPersonId}") @@ userLogAnnotation(user) @@ LogAnnotation.TraceId(traceId)
 
-      _ <- if (token.inviteesEmail == user.email) ZIO.succeed()
+      _ <- if (token.inviteesEmail == user.email) ZIO.succeed((): Unit)
           else ZIO.fail(ForeignInviteToken()) <* (ZIO.logError(s"User beared a foreign token") @@ userLogAnnotation(user)) @@ LogAnnotation.TraceId(traceId)
 
       result <- s.chown(user.userId, token.targetPersonId)
@@ -66,7 +66,7 @@ trait Api {
     } yield ()
   }
 
-  def deleteStemma(request: DeleteStemmaRequest) = traced { traceId =>
+  def deleteStemma(request: DeleteStemmaRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, OwnedStemmasDescription] = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
@@ -78,7 +78,7 @@ trait Api {
     } yield stemmas
   }
 
-  def createNewStemma(request: CreateNewStemmaRequest) = traced { traceId =>
+  def createNewStemma(request: CreateNewStemmaRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, StemmaDescription] = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
@@ -89,7 +89,7 @@ trait Api {
     } yield StemmaDescription(stemmaId, request.stemmaName, removable = true)
   }
 
-  def stemma(request: GetStemmaRequest) = traced { traceId =>
+  def stemma(request: GetStemmaRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, Stemma] = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
@@ -100,7 +100,7 @@ trait Api {
     } yield stemma
   }
 
-  def deletePerson(request: DeletePersonRequest) = traced { traceId =>
+  def deletePerson(request: DeletePersonRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, Stemma] = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
@@ -112,7 +112,7 @@ trait Api {
     } yield stemma
   }
 
-  def updatePerson(request: UpdatePersonRequest) = traced { traceId =>
+  def updatePerson(request: UpdatePersonRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, Stemma] = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
@@ -124,7 +124,7 @@ trait Api {
     } yield stemma
   }
 
-  def createInvitationToken(request: CreateInvitationTokenRequest) = traced { traceId =>
+  def createInvitationToken(request: CreateInvitationTokenRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, String] = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       us   <- ZIO.service[UserService]
@@ -139,7 +139,7 @@ trait Api {
     } yield inviteLink
   }
 
-  def createFamily(request: CreateFamilyRequest) = traced { traceId =>
+  def createFamily(request: CreateFamilyRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, Stemma] = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
@@ -151,7 +151,7 @@ trait Api {
     } yield stemma
   }
 
-  def deleteFamily(request: DeleteFamilyRequest) = traced { traceId =>
+  def deleteFamily(request: DeleteFamilyRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, Stemma] = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)
@@ -163,7 +163,7 @@ trait Api {
     } yield stemma
   }
 
-  def updateFamily(request: UpdateFamilyRequest) = traced { traceId =>
+  def updateFamily(request: UpdateFamilyRequest): ZIO[UserService with OAuthService with StemmaService, TracedStemmaError, Stemma] = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
       user <- user(request.bearerToken)(traceId)

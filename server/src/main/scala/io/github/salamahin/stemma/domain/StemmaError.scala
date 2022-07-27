@@ -22,6 +22,7 @@ final case class SpouseDoesNotBelongToFamily(familyId: String, personId: String)
 final case class IncompleteFamily()                                              extends StemmaError
 final case class DuplicatedIds(duplicatedIds: Seq[String])                       extends StemmaError
 
+final case class MissingBearerHeader()                  extends Throwable with StemmaError
 final case class AccessToFamilyDenied(familyId: String) extends StemmaError
 final case class AccessToPersonDenied(personId: String) extends StemmaError
 final case class AccessToStemmaDenied(stemmaId: String) extends StemmaError

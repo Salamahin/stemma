@@ -184,7 +184,7 @@ class StemmaRepository {
     val fromV = ts.V(from).head()
     val toV   = ts.V(to).head()
 
-    if (fromV.out(relation).is(toV).exists()) Right()
+    if (fromV.out(relation).is(toV).exists()) Right((): Unit)
     else checks.toList.map(_.between(fromV, toV)).sequence.map(_ => fromV.addEdge(relation, toV))
   }
 
