@@ -1,13 +1,18 @@
 package io.github.salamahin.stemma.apis.rest
 
+import com.typesafe.scalalogging.LazyLogging
 import io.circe.Encoder
 import io.github.salamahin.stemma.apis._
 import io.github.salamahin.stemma.domain.{CreateFamily, CreateNewPerson, MissingBearerHeader, StemmaError, UnknownError}
-import zio.ZIO
+import io.github.salamahin.stemma.service._
+import zhttp.http.Middleware.cors
+import zhttp.http.middleware.Cors.CorsConfig
+import zhttp.service.Server
+import zio.{DefaultServices, Scope, ZIO, ZIOAppArgs, ZIOAppDefault, ZLayer}
 
 import java.net.URLDecoder
 
-object RestApi {
+object RestApi extends ZIOAppDefault with LazyLogging {
   import io.circe.parser.decode
   import io.circe.syntax._
   import zhttp.http._
@@ -37,7 +42,7 @@ object RestApi {
         )
     }
 
-  private def main(bearerToken: String) = Http.collectZIO[Request] {
+  private def restWrapper(bearerToken: String) = Http.collectZIO[Request] {
     case Method.GET -> !! / "stemma" => Api.listStemmas(ListStemmasRequest(bearerToken)).toResponse()
 
     case Method.GET -> !! / "stemma" / queryParam(stemmaId) => Api.stemma(GetStemmaRequest(bearerToken, stemmaId)).toResponse()
@@ -96,5 +101,23 @@ object RestApi {
         .toResponse()
   }
 
-  val api = auth.flatMap(bearerToken => main(bearerToken))
+  private val corsConfig = CorsConfig(
+    anyOrigin = false,
+    allowedOrigins = _ contains "localhost" //fixme configure?
+  )
+
+  override def run: ZIO[Environment with ZIOAppArgs with Scope, Any, Any] = {
+    val program = auth.flatMap(bearerToken => restWrapper(bearerToken)) @@ cors(corsConfig)
+
+    (Server.start(8090, program) <&> ZIO.succeed(logger.info("Hello stemma")))
+      .exitCode
+      .provideSome(
+        Secrets.envSecrets,
+        GraphService.postgres,
+        StemmaService.live,
+        UserService.live,
+        OAuthService.googleSignIn,
+        ZLayer.succeedEnvironment(DefaultServices.live)
+      )
+  }
 }
