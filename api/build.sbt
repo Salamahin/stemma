@@ -1,6 +1,6 @@
 lazy val versions = new {
-  val zioV   = "2.0.0"
-  val sqlgV  = "2.1.6"
+  val zioV  = "2.0.0"
+  val sqlgV = "2.1.6"
 }
 
 testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
@@ -8,7 +8,6 @@ scalacOptions ++= Seq("-deprecation", "-feature", "-Ylog-classpath")
 
 libraryDependencies ++= Seq(
   "dev.zio"                    %% "zio"                  % versions.zioV,
-  "dev.zio"                    %% "zio-lambda"           % "1.0.0-RC6",
   "dev.zio"                    %% "zio-json"             % "0.3.0-RC10",
   "org.typelevel"              %% "cats-core"            % "2.8.0",
   "com.michaelpollmeier"       %% "gremlin-scala"        % "3.5.3.2",

@@ -2,6 +2,8 @@
 .bsp
 .DS_store
 
+*.iml
+
 client/node_modules/
 client/public/build/
 client/public/vendor

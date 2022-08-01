@@ -14,6 +14,8 @@ case class NoSuchFamilyId(id: String) extends Throwable with StemmaError
 case class NoSuchStemmaId(id: String) extends Throwable with StemmaError
 case class NoSuchUserId(id: String)   extends Throwable with StemmaError
 
+case class MissingAuthHeader() extends Throwable with StemmaError
+
 case class ChildAlreadyBelongsToFamily(familyId: String, personId: String) extends Throwable with StemmaError
 case class ChildDoesNotBelongToFamily(familyId: String, childId: String)   extends Throwable with StemmaError
 case class SpouseDoesNotBelongToFamily(familyId: String, personId: String) extends Throwable with StemmaError
@@ -32,5 +34,5 @@ case class TracedStemmaError(traceId: UUID, cause: StemmaError) extends Throwabl
 
 object StemmaError {
   implicit val throwableEnc: JsonEncoder[Throwable] = JsonEncoder.string.contramap(th => ExceptionUtils.getStackTrace(th))
-  implicit val encoder: JsonEncoder[StemmaError] = DeriveJsonEncoder.gen[StemmaError]
+  implicit val encoder: JsonEncoder[StemmaError]    = DeriveJsonEncoder.gen[StemmaError]
 }
