@@ -1,7 +1,6 @@
 package io.github.salamahin.stemma.service
 
 import gremlin.scala.ScalaGraph
-import io.circe.parser
 import io.github.salamahin.stemma.domain.{InvalidInviteToken, InviteToken, User}
 import io.github.salamahin.stemma.tinkerpop.StemmaRepository
 import io.github.salamahin.stemma.tinkerpop.Transaction.transactionSafe
@@ -28,13 +27,14 @@ object UserService {
   } yield new UserServiceImpl(secret.invitationSecret, graph.graph, new StemmaRepository, rnd))
 
   private class UserServiceImpl(secret: String, graph: ScalaGraph, ops: StemmaRepository, rnd: Random) extends UserService {
-    override def createInviteToken(inviteeEmail: String, associatedPersonId: String): UIO[String] =
-      rnd.nextString(20).map { entropy =>
-        import io.circe.syntax._
+    import zio.json._
 
+    override def createInviteToken(inviteeEmail: String, associatedPersonId: String): UIO[String] = {
+      rnd.nextString(20).map { entropy =>
         val token = InviteToken(inviteeEmail, associatedPersonId, entropy)
-        encrypt(secret, token.asJson.noSpaces)
+        encrypt(secret, token.toJson)
       }
+    }
 
     private def encrypt(key: String, value: String): String = {
       val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
@@ -52,13 +52,11 @@ object UserService {
       new SecretKeySpec(keySpec, "AES")
     }
 
-    override def decodeInviteToken(token: String) = ZIO.fromEither {
-      import cats.syntax.bifunctor._
-      parser
-        .parse(decrypt(secret, token))
-        .flatMap(_.as[InviteToken])
-        .leftMap(_ => InvalidInviteToken())
-    }
+    override def decodeInviteToken(token: String) =
+      for {
+        decrypted <- ZIO.attempt(decrypt(secret, token)).orElseFail(InvalidInviteToken())
+        parsed    <- ZIO.fromEither(decrypted.fromJson[InviteToken]).orElseFail(InvalidInviteToken())
+      } yield parsed
 
     private def decrypt(key: String, encryptedValue: String): String = {
       val cipher = Cipher.getInstance("AES/ECB/PKCS5PADDING")

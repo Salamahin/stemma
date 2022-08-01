@@ -2,6 +2,7 @@ package io.github.salamahin.stemma.tinkerpop
 
 import gremlin.scala._
 import io.github.salamahin.stemma.domain._
+import io.github.salamahin.stemma.tinkerpop
 import io.github.salamahin.stemma.tinkerpop.StemmaRepository._
 
 import java.time.LocalDate
@@ -214,7 +215,7 @@ class StemmaRepository {
           p.property(personKeys.bio).toOption
         )
 
-        ExtendedPersonDescription(personDescr, childOf, spouseOf, stemmaId, ownerId)
+        tinkerpop.ExtendedPersonDescription(personDescr, childOf, spouseOf, stemmaId, ownerId)
       }
       .toRight(NoSuchPersonId(id))
   }

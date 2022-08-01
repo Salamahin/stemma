@@ -1,10 +1,9 @@
 package io.github.salamahin.stemma.domain
 
-import io.circe.Encoder
+import zio.json.{DeriveJsonEncoder, JsonEncoder}
 
 case class StemmaDescription(id: String, name: String, removable: Boolean)
 
 object StemmaDescription {
-  import io.circe.generic.semiauto._
-  implicit val encoder: Encoder[StemmaDescription] = deriveEncoder[StemmaDescription]
+  implicit val encoder: JsonEncoder[StemmaDescription] = DeriveJsonEncoder.gen[StemmaDescription]
 }

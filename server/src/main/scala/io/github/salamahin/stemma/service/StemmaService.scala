@@ -2,7 +2,7 @@ package io.github.salamahin.stemma.service
 
 import gremlin.scala.{ScalaGraph, TraversalSource}
 import io.github.salamahin.stemma.domain._
-import io.github.salamahin.stemma.tinkerpop.StemmaRepository
+import io.github.salamahin.stemma.tinkerpop.{ExtendedFamilyDescription, StemmaRepository}
 import io.github.salamahin.stemma.tinkerpop.Transaction._
 import zio._
 

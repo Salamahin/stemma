@@ -1,10 +1,10 @@
 package io.github.salamahin.stemma.domain
 
-import io.circe.{Decoder, Encoder}
+import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
 
 case class InviteToken(inviteesEmail: String, targetPersonId: String, entropy: String)
+
 object InviteToken {
-  import io.circe.generic.semiauto._
-  implicit val encoder: Encoder[InviteToken] = deriveEncoder[InviteToken]
-  implicit val decoder: Decoder[InviteToken] = deriveDecoder[InviteToken]
+  implicit val decoder: JsonDecoder[InviteToken] = DeriveJsonDecoder.gen[InviteToken]
+  implicit val encoder: JsonEncoder[InviteToken] = DeriveJsonEncoder.gen[InviteToken]
 }

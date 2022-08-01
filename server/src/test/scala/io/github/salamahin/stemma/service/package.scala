@@ -10,7 +10,6 @@ import java.io.File
 package object service {
   val hardcodedSecret: ULayer[Secrets] = ZLayer.succeed(new Secrets {
     override val invitationSecret: String = "secret_string"
-    override val googleApiSecret: String  = "secret_string"
     override val postgresSecret: String   = "secret_string"
   })
 

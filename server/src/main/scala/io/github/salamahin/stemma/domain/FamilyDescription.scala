@@ -1,10 +1,10 @@
 package io.github.salamahin.stemma.domain
 
-import io.circe.Encoder
+import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
 
-final case class FamilyDescription(id: String, parents: List[String], children: List[String], readOnly: Boolean)
+case class FamilyDescription(id: String, parents: List[String], children: List[String], readOnly: Boolean)
 
 object FamilyDescription {
-  import io.circe.generic.semiauto._
-  implicit val encoder: Encoder[FamilyDescription] = deriveEncoder[FamilyDescription]
+  implicit val decoder: JsonDecoder[FamilyDescription] = DeriveJsonDecoder.gen[FamilyDescription]
+  implicit val encoder: JsonEncoder[FamilyDescription] = DeriveJsonEncoder.gen[FamilyDescription]
 }

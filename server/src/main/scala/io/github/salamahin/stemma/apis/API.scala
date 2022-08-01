@@ -2,42 +2,26 @@ package io.github.salamahin.stemma.apis
 
 import com.typesafe.scalalogging.LazyLogging
 import io.github.salamahin.stemma.domain._
-import io.github.salamahin.stemma.service.{OAuthService, StemmaService, UserService}
+import io.github.salamahin.stemma.service.{StemmaService, UserService}
 import zio.ZIO
 
 import java.util.UUID
 
-case class ListStemmasRequest(bearerToken: String)
-case class BearInvitationRequest(bearerToken: String, encodedToken: String)
-case class DeleteStemmaRequest(bearerToken: String, stemmaId: String)
-case class CreateNewStemmaRequest(bearerToken: String, stemmaName: String)
-case class GetStemmaRequest(bearerToken: String, stemmaId: String)
-case class DeletePersonRequest(bearerToken: String, stemmaId: String, personId: String)
-case class UpdatePersonRequest(bearerToken: String, stemmaId: String, personId: String, personDescr: CreateNewPerson)
-case class CreateInvitationTokenRequest(bearerToken: String, targetPersonId: String, targetPersonEmail: String)
-case class CreateFamilyRequest(bearerToken: String, stemmaId: String, familyDescr: CreateFamily)
-case class DeleteFamilyRequest(bearerToken: String, stemmaId: String, familyId: String)
-case class UpdateFamilyRequest(bearerToken: String, stemmaId: String, familyId: String, familyDescr: CreateFamily)
-
-object Api extends LazyLogging {
+object API extends LazyLogging {
   private def traced[R, T](f: UUID => ZIO[R, StemmaError, T]) =
     ZIO.succeed(UUID.randomUUID()).flatMap(traceId => f(traceId).mapError(err => TracedStemmaError(traceId, err)))
 
-  private def user(bearerToken: String)(traceId: UUID): ZIO[UserService with OAuthService, UnknownError, User] =
+  private def user(email: String)(traceId: UUID): ZIO[UserService, UnknownError, User] =
     for {
-      oauth <- ZIO.service[OAuthService]
-      us    <- ZIO.service[UserService]
-
-      _     = logger.info(s"[$traceId] Decoding token ${bearerToken.take(5)}*****")
-      email <- oauth.decodeEmail(bearerToken)
-      u     <- us.getOrCreateUser(email)
-      _     = logger.info(s"[$traceId] User was associated with $u")
+      us <- ZIO.service[UserService]
+      u  <- us.getOrCreateUser(email)
+      _  = logger.info(s"[$traceId] User was associated with $u")
     } yield u
 
   def listStemmas(request: ListStemmasRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
-      user <- user(request.bearerToken)(traceId)
+      user <- user(request.email)(traceId)
 
       _       = logger.info(s"[$traceId] [$user] Requested list of owned stemmas")
       stemmas <- s.listOwnedStemmas(user.userId)
@@ -49,7 +33,7 @@ object Api extends LazyLogging {
     for {
       s    <- ZIO.service[StemmaService]
       us   <- ZIO.service[UserService]
-      user <- user(request.bearerToken)(traceId)
+      user <- user(request.email)(traceId)
 
       _     = logger.info(s"[$traceId] [$user] Bears invitation token ${request.encodedToken}")
       token <- us.decodeInviteToken(request.encodedToken)
@@ -67,7 +51,7 @@ object Api extends LazyLogging {
   def deleteStemma(request: DeleteStemmaRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
-      user <- user(request.bearerToken)(traceId)
+      user <- user(request.email)(traceId)
 
       _       = logger.info(s"[$traceId] [$user] Attempts to remove a stemma with id ${request.stemmaId}")
       _       <- s.removeStemma(user.userId, request.stemmaId)
@@ -79,7 +63,7 @@ object Api extends LazyLogging {
   def createNewStemma(request: CreateNewStemmaRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
-      user <- user(request.bearerToken)(traceId)
+      user <- user(request.email)(traceId)
 
       _        = logger.info(s"[$traceId] [$user] Creates a new stemma with name ${request.stemmaName}")
       stemmaId <- s.createStemma(user.userId, request.stemmaName)
@@ -90,7 +74,7 @@ object Api extends LazyLogging {
   def stemma(request: GetStemmaRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
-      user <- user(request.bearerToken)(traceId)
+      user <- user(request.email)(traceId)
 
       _      = logger.info(s"[$traceId] [$user] Asks for stemma data with stemma id ${request.stemmaId}")
       stemma <- s.stemma(user.userId, request.stemmaId)
@@ -101,7 +85,7 @@ object Api extends LazyLogging {
   def deletePerson(request: DeletePersonRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
-      user <- user(request.bearerToken)(traceId)
+      user <- user(request.email)(traceId)
 
       _      = logger.info(s"[$traceId] [$user] Deletes person with id ${request.personId} in stemma ${request.stemmaId}")
       _      <- s.removePerson(user.userId, request.personId)
@@ -113,7 +97,7 @@ object Api extends LazyLogging {
   def updatePerson(request: UpdatePersonRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
-      user <- user(request.bearerToken)(traceId)
+      user <- user(request.email)(traceId)
 
       _      = logger.info(s"[$traceId] [$user] Updates person with id ${request.personId} in stemma ${request.stemmaId} with ${request.personDescr}")
       _      <- s.updatePerson(user.userId, request.personId, request.personDescr)
@@ -126,7 +110,7 @@ object Api extends LazyLogging {
     for {
       s    <- ZIO.service[StemmaService]
       us   <- ZIO.service[UserService]
-      user <- user(request.bearerToken)(traceId)
+      user <- user(request.email)(traceId)
 
       _ = logger.info(s"[$traceId] [$user] Creates an invitation token for ${request.targetPersonId}")
       inviteLink <- ZIO.ifZIO(s.ownsPerson(user.userId, request.targetPersonId))(
@@ -140,7 +124,7 @@ object Api extends LazyLogging {
   def createFamily(request: CreateFamilyRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
-      user <- user(request.bearerToken)(traceId)
+      user <- user(request.email)(traceId)
 
       _        = logger.info(s"[$traceId] [$user] Creates a new family in stemma ${request.stemmaId}, desc ${request.familyDescr}")
       familyId <- s.createFamily(user.userId, request.stemmaId, request.familyDescr)
@@ -152,7 +136,7 @@ object Api extends LazyLogging {
   def deleteFamily(request: DeleteFamilyRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
-      user <- user(request.bearerToken)(traceId)
+      user <- user(request.email)(traceId)
 
       _      = logger.info(s"[$traceId] [$user] Removes family ${request.familyId} in stemma ${request.stemmaId}")
       _      <- s.removeFamily(user.userId, request.familyId)
@@ -164,7 +148,7 @@ object Api extends LazyLogging {
   def updateFamily(request: UpdateFamilyRequest) = traced { traceId =>
     for {
       s    <- ZIO.service[StemmaService]
-      user <- user(request.bearerToken)(traceId)
+      user <- user(request.email)(traceId)
 
       _      = logger.info(s"[$traceId] [$user] Updates family ${request.familyId} in stemma ${request.stemmaId}, desc ${request.familyDescr}")
       _      <- s.updateFamily(user.userId, request.familyId, request.familyDescr)

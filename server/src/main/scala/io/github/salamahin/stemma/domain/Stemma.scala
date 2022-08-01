@@ -1,10 +1,9 @@
 package io.github.salamahin.stemma.domain
 
-import io.circe.{Decoder, Encoder}
+import zio.json.{DeriveJsonEncoder, JsonEncoder}
 
-final case class Stemma(people: List[PersonDescription], families: List[FamilyDescription])
+case class Stemma(people: List[PersonDescription], families: List[FamilyDescription])
 
 object Stemma {
-  import io.circe.generic.semiauto._
-  implicit val encoder: Encoder[Stemma] = deriveEncoder[Stemma]
+  implicit val encoder: JsonEncoder[Stemma] = DeriveJsonEncoder.gen[Stemma]
 }
