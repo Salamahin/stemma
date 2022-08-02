@@ -27,7 +27,6 @@ export class StemmaIndex {
     private _parentToChildren: Map<string, FamilyDescription[]>
     private _childToParents: Map<string, FamilyDescription[]>
     private _marriages: FamilyMembers[]
-    private _indexedMarriages: Map<string, FamilyMembers[]>
     private _uncles: FamilyMembers[]
     private _families: Map<string, Family>
 
@@ -62,8 +61,6 @@ export class StemmaIndex {
         this._families = new Map(stemma.families.map(f => [f.id, f]))
 
         this._marriages = stemma.families.map(f => ({ familyId: f.id, members: f.parents }))
-        this._indexedMarriages = this.groupByKey(this._marriages.flatMap(f => f.members.map(m => [m, f])))
-
         this._uncles = stemma.families.map(f => ({ familyId: f.id, members: f.children }))
 
         this._namesakes = new Map(this.groupByKey(stemma.people.map(p => [p.name, p.id])))
