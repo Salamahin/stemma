@@ -56,7 +56,6 @@ export class Model {
     async listStemmas() {
         const response = await fetch(`${this.endpoint}/stemma`, {
             method: 'GET',
-            mode: 'cors', //todo remove
             headers: this.commonHeader
         })
         return await this.parseResponse<OwnedStemmas>(response);
@@ -65,7 +64,6 @@ export class Model {
     async removeStemma(stemmaId) {
         const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}`, {
             method: 'DELETE',
-            mode: 'cors', //todo remove
             headers: this.commonHeader
         })
         return await this.parseResponse<OwnedStemmas>(response);
@@ -74,7 +72,6 @@ export class Model {
     async getStemma(stemmaId: string) {
         const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}`, {
             method: 'GET',
-            mode: 'cors', //todo remove
             headers: this.commonHeader
         })
         return await this.parseResponse<Stemma>(response);
@@ -89,7 +86,6 @@ export class Model {
 
         const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/family`, {
             method: 'POST',
-            mode: 'cors', //todo remove
             headers: this.commonHeader,
             body: JSON.stringify(request)
         })
@@ -106,7 +102,6 @@ export class Model {
 
         const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/family/${encodeURIComponent(familyId)}`, {
             method: 'PUT',
-            mode: 'cors', //todo remove
             headers: this.commonHeader,
             body: JSON.stringify(request)
         })
@@ -117,11 +112,8 @@ export class Model {
     async addStemma(name: string) {
         const response = await fetch(`${this.endpoint}/stemma`, {
             method: 'POST',
-            mode: 'cors', //todo remove
             headers: this.commonHeader,
-            body: JSON.stringify({
-                "name": name
-            })
+            body: name
         })
 
         return await this.parseResponse<StemmaDescription>(response);
@@ -130,7 +122,6 @@ export class Model {
     async removePerson(stemmaId: string, personId: string) {
         const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/person/${encodeURIComponent(personId)}`, {
             method: 'DELETE',
-            mode: 'cors', //todo remove
             headers: this.commonHeader
         })
 
@@ -140,10 +131,7 @@ export class Model {
     async createInvintation(stemmaId: string, personId: string, email: string) {
         const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/person/${encodeURIComponent(personId)}/invite`, {
             method: 'PUT',
-            mode: 'cors', //todo remove
-            body: JSON.stringify({
-                "email": email
-            }),
+            body: email,
             headers: this.commonHeader
         })
 
@@ -153,7 +141,6 @@ export class Model {
     async proposeInvitationToken(token: string) {
         const response = await fetch(`${this.endpoint}/invitation`, {
             method: 'PUT',
-            mode: 'cors', //todo remove
             body: decodeURIComponent(token),
             headers: this.commonHeader
         })
@@ -164,7 +151,6 @@ export class Model {
     async removeFamily(stemmaId: string, familyId: string) {
         const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/family/${encodeURIComponent(familyId)}`, {
             method: 'DELETE',
-            mode: 'cors', //todo remove
             headers: this.commonHeader
         })
 
@@ -174,7 +160,6 @@ export class Model {
     async updatePerson(stemmaId: string, personId: string, descr: NewPerson) {
         const response = await fetch(`${this.endpoint}/stemma/${encodeURIComponent(stemmaId)}/person/${encodeURIComponent(personId)}`, {
             method: 'PUT',
-            mode: 'cors', //todo remove
             headers: this.commonHeader,
             body: JSON.stringify(({
                 name: descr.name,
