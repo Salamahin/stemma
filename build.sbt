@@ -4,18 +4,18 @@ ThisBuild / organization := "io.github.salamahin"
 name := "stemma"
 version := "0.1.0-SNAPSHOT"
 
+val commonOptsions = Seq(
+  scalacOptions ++= Seq("-deprecation", "-feature", "-Ylog-classpath"),
+  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
+)
+
 lazy val api = project
-  .disablePlugins(AssemblyPlugin)
+  .settings(commonOptsions: _*)
 
 lazy val api_impl_aws_lambda = project
   .dependsOn(api)
-  .settings(
-    assembly / assemblyMergeStrategy := {
-      case PathList("META-INF", xs @ _*) => MergeStrategy.discard
-      case x                             => MergeStrategy.last
-    }
-  )
+  .settings(commonOptsions: _*)
 
 lazy val api_impl_rest = project
   .dependsOn(api)
-  .disablePlugins(AssemblyPlugin)
+  .settings(commonOptsions: _*)

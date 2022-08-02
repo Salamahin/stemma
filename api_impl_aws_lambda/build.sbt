@@ -2,4 +2,9 @@ libraryDependencies ++= Seq(
   "dev.zio" %% "zio-lambda" % "1.0.0-RC6"
 )
 
-addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
+assembly / assemblyMergeStrategy := {
+  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+  case x                             => MergeStrategy.last
+}
+
+
