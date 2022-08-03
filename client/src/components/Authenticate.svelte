@@ -34,7 +34,7 @@
     <div>
         <h1>project stemma</h1>
         <div class="d-flex justify-content-center">
-            <div class="g_id_signin" data-type="standard" />
+            <img src="assets/icon.webp" alt="" width="100" height="100">
         </div>
     </div>
 </div>

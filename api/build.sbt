@@ -12,7 +12,8 @@ libraryDependencies ++= Seq(
   "ch.qos.logback"             % "logback-classic"       % "1.3.0-alpha16",
   "dev.zio"                    %% "zio-test"             % Versions.zioV % Test,
   "dev.zio"                    %% "zio-test-sbt"         % Versions.zioV % Test,
-  "org.umlg"                   % "sqlg-h2-dialect"       % Versions.sqlgV % Test
+  "org.umlg"                   % "sqlg-h2-dialect"       % Versions.sqlgV % Test,
+  "org.scalatest"              %% "scalatest"            % "3.3.0-SNAP3" % Test
 )
 
 disablePlugins(AssemblyPlugin)

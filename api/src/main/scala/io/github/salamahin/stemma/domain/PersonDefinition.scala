@@ -17,5 +17,5 @@ object ExistingPerson {
 }
 
 object PersonDefinition {
-  implicit val adtDec: JsonDecoder[PersonDefinition] =  DeriveJsonDecoder.gen[PersonDefinition]
+  implicit val adtDec: JsonDecoder[PersonDefinition] = ExistingPerson.existingPersonDec.widen[PersonDefinition] orElse CreateNewPerson.createNewPersonDec.widen[PersonDefinition]
 }
