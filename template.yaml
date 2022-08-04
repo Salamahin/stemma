@@ -1,0 +1,133 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  sam-app
+  Sample SAM Template for sam-app
+
+Globals:
+  Function:
+    Runtime: java11
+    Timeout: 20
+    MemorySize: 512
+    Environment:
+      Variables:
+        JAVA_TOOL_OPTIONS: -XX:+TieredCompilation -XX:TieredStopAtLevel=1
+    Layers:
+      - !Ref MyLayer
+
+Resources:
+  HtmlAssetsBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: stemma-html-assets-public
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+    DeletionPolicy: Delete
+  HtmlAssetsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref HtmlAssetsBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:GetObject'
+            Effect: Allow
+            Resource: !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref HtmlAssetsBucket
+                - /*
+            Principal: '*'
+  FilesBucket:
+    Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Delete
+    Properties:
+      BucketName: stemma-files-public
+      AccessControl: PublicRead
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+  FilesBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FilesBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:GetObject'
+            Effect: Allow
+            Resource: !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref FilesBucket
+                - /*
+            Principal: '*'
+  #  autosetloggroupretention:
+  #    Type: AWS::Serverless::Application
+  #    Properties:
+  #      Location:
+  #        ApplicationId: arn:aws:serverlessrepo:us-east-1:374852340823:applications/auto-set-log-group-retention
+  #        SemanticVersion: 1.5.0
+  #      Parameters:
+  #       RetentionDays: 3
+  AccessLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 1
+  MyApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      AccessLogSettings:
+        DestinationArn: !GetAtt AccessLogs.Arn
+        Format: '{
+        $context.requestId ; $context.authorizer.error ; $context.error.message ; $context.integration.error ; $context.integrationErrorMessage ; $context.integration.integrationStatus
+        "requestId":"$context.requestId", 
+        "ip": "$context.identity.sourceIp",
+         "caller":"$context.identity.caller",
+          "user":"$context.identity.user",
+          "requestTime":"$context.requestTime",
+          "httpMethod":"$context.httpMethod",
+          "resourcePath":"$context.resourcePath",
+          "status":"$context.status",
+          "protocol":"$context.protocol",
+          "responseLength":"$context.responseLength" 
+          }'
+      StageName: dev
+  MyLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: .
+      CompatibleRuntimes:
+        - java11
+      RetentionPolicy: Delete
+    Metadata:
+      BuildMethod: makefile
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Handler: io.github.salamahin.stemma.apis.serverless.aws.HelloWorld$::apply
+      Events:
+        AdminExhibition:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyApi
+            Path: /hello-world
+            Method: get
+
+Outputs:
+  ApiEndpoint:
+    Description: "HTTP API endpoint URL"
+    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com"
+  S3BucketSecureURL:
+    Value: !GetAtt
+      - HtmlAssetsBucket
+      - WebsiteURL
+    Description: Name of S3 bucket to hold website content
