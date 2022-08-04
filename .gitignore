@@ -11,4 +11,4 @@ client/.vscode
 client/package-lock.json
 
 target
-
+.aws-sam
