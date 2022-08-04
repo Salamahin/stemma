@@ -8,9 +8,8 @@ import zio.{ULayer, ZIO, ZLayer}
 import java.io.File
 
 package object service {
-  val hardcodedSecret: ULayer[Secrets] = ZLayer.succeed(new Secrets {
-    override val invitationSecret: String = "secret_string"
-    override val postgresSecret: String   = "secret_string"
+  val hardcodedSecret: ULayer[UserSecrets] = ZLayer.succeed(new UserSecrets {
+    override val secretString: String = "secret_string"
   })
 
   case class TempGraphService(graph: ScalaGraph) extends GraphService
