@@ -13,6 +13,9 @@ enablePlugins(JavaAppPackaging)
 
 assembly / assemblyJarName := "stemma-restful-standalone.jar"
 
+dockerBaseImage := "openjdk:11.0.16-jre"
+Docker / packageName := "stemma-restful-standalone"
+Docker / version := version.value
 Linux / packageSummary := "Stemma RESTful backend API implemenation"
 Universal / mappings := {
   val universalMappings = (Universal / mappings).value
@@ -24,5 +27,3 @@ Universal / mappings := {
 }
 scriptClasspath := Seq((assembly / assemblyJarName).value)
 dockerExposedPorts := Seq(8090)
-Docker / packageName := "stemma-restful-standalone"
-Docker / version := version.value

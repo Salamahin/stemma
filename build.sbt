@@ -6,7 +6,8 @@ version := "0.1.0-SNAPSHOT"
 
 val commonOptsions = Seq(
   scalacOptions ++= Seq("-deprecation", "-feature", "-Ylog-classpath"),
-  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
+  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
+  javacOptions ++= Seq("-source", "11")
 )
 
 lazy val api = project
