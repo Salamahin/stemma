@@ -17,4 +17,4 @@ libraryDependencies ++= Seq(
   "org.scalatest"              %% "scalatest"            % "3.3.0-SNAP3" % Test
 )
 
-disablePlugins(AssemblyPlugin)
+exportJars := true
