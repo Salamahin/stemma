@@ -4,7 +4,6 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import io.github.salamahin.stemma.domain.UnknownError
-import io.github.salamahin.stemma.service.Secrets
 import zio.{IO, URLayer, ZIO, ZLayer}
 
 import java.util.Collections

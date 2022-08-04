@@ -7,7 +7,7 @@ trait Google {
 }
 
 object Google {
-  val envSecret: TaskLayer[Google] = {
+  val fromEnv: TaskLayer[Google] = {
     ZLayer(ZIO.attempt(new Google {
       override val clientId: String = sys.env.getOrElse("GOOGLEAPI_SECRET", throw new IllegalStateException("GOOGLEAPI_SECRET env var is missing"))
     }))
