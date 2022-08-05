@@ -113,7 +113,7 @@ Resources:
     Metadata:
       BuildMethod: makefile
     Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.HelloWorld$::apply
+      Handler: io.github.salamahin.stemma.apis.serverless.aws.HelloWorld::handleRequest
       Events:
         AdminExhibition:
           Type: HttpApi

@@ -3,7 +3,7 @@ build-any-lambda:
 
 
 build-MyLayer:
-	mkdir -p $(ARTIFACTS_DIR)/java
-	cp -r api_impl_aws_lambda/target/scala-2.13/*.jar $(ARTIFACTS_DIR)
+	mkdir -p $(ARTIFACTS_DIR)/java/lib
+	cp -r api_impl_aws_lambda/target/pack/lib/*.jar $(ARTIFACTS_DIR)/java/lib
 
 build-HelloWorldFunction: build-any-lambda

@@ -1,14 +1,19 @@
 package io.github.salamahin.stemma.apis.serverless.aws
 
+import com.amazonaws.services.lambda.runtime
+import com.amazonaws.services.lambda.runtime.RequestHandler
+import com.amazonaws.services.lambda.runtime.events.{APIGatewayProxyRequestEvent, APIGatewayV2HTTPEvent}
 import io.github.salamahin.stemma.apis.API
 import io.github.salamahin.stemma.domain._
 import zio.{Task, ZIO}
 import zio.lambda.{Context, ZLambda}
 
 
-object HelloWorld extends ZLambda[ListStemmasRequest, StemmaDescription] with Layers {
-  override def apply(event: ListStemmasRequest, context: Context): Task[StemmaDescription] =
-    ZIO.succeed(StemmaDescription(event.email, "my-id", removable = true))
+class HelloWorld extends RequestHandler[APIGatewayV2HTTPEvent, String] {
+
+  override def handleRequest(input: APIGatewayV2HTTPEvent, context: runtime.Context): String = {
+    "OK" + System.currentTimeMillis()
+  }
 }
 
 object ListStemma extends ZLambda[ListStemmasRequest, OwnedStemmasDescription] with Layers {
