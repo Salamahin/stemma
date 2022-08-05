@@ -38,6 +38,11 @@ Resources:
         #this hardcoded value is always the case https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-route53-aliastarget.html
         HostedZoneId: "Z2FDTNDATAQYW2"
         DNSName: !GetAtt WebAppCDN.DomainName
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub 'CloudFront OAI for ${cloudFrontAlias}'
   WebAppCDN:
     DependsOn: appbucket
     Type: AWS::CloudFront::Distribution
@@ -66,15 +71,11 @@ Resources:
   appbucket:
     Type: 'AWS::S3::Bucket'
     Properties:
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: false
-        BlockPublicPolicy: false
-        IgnorePublicAcls: false
-        RestrictPublicBuckets: false
-      AccessControl: PublicRead
-      WebsiteConfiguration:
-        IndexDocument: index.html
-        ErrorDocument: error.html
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          -
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
   BucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -84,7 +85,8 @@ Resources:
         Statement:
           - Sid: PublicReadForGetBucketObjects
             Effect: Allow
-            Principal: '*'
+            Principal:
+              CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
             Action: 's3:GetObject'
             Resource: !Join
               - ''
