@@ -14,25 +14,37 @@ Globals:
     Layers:
       - !Ref MyLayer
 
+
+Parameters:
+  hostedZoneId:
+    Description: ""
+    Type: String
+    Default: "Z0371539135CFRSV7N3PQ"
+  cloudFrontAlias:
+    Description: ""
+    Type: String
+    Default: "web.stemma.link"
+
+
 Resources:
-#  myDNSRecord:
-#    DependsOn:  WebAppCDN
-#    Type: AWS::Route53::RecordSet
-#    Properties:
-#      Type: Simple
-#      AliasTarget:
-#        DNSName: !GetAtt WebAppCDN.DomainName
-#        HostedZoneId: Z0371539135CFRSV7N3PQ
-#      Name: "huy"
-#      HostedZoneId: Z0371539135CFRSV7N3PQ
-#      HostedZoneName: web.stemma.link
+  myDNSRecord:
+    DependsOn:  WebAppCDN
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Sub "${cloudFrontAlias}"
+      Type: A
+      HostedZoneName: !Sub "${hostedZoneId}"
+      AliasTarget:
+        #this hardcoded value is always the case https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-route53-aliastarget.html
+        HostedZoneId: "Z2FDTNDATAQYW2"
+        DNSName: !GetAtt WebAppCDN.DomainName
   WebAppCDN:
-    DependsOn:  appbucket
+    DependsOn: appbucket
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
         Aliases:
-          - web.stemma.link
+          - !Sub "${cloudFrontAlias}"
         ViewerCertificate:
           AcmCertificateArn: "arn:aws:acm:us-east-1:537602986733:certificate/447c1e43-350a-40cf-b971-f6e8a8287982"
           SslSupportMethod: "sni-only"
@@ -135,9 +147,4 @@ Resources:
 Outputs:
   ApiEndpoint:
     Description: "HTTP API endpoint URL"
-    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com"
-  S3BucketSecureURL:
-    Value: !GetAtt
-      - appbucket
-      - WebsiteURL
-    Description: Name of S3 bucket to hold website content
+    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/dev"
