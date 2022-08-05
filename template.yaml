@@ -1,8 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: >
-  sam-app
-  Sample SAM Template for sam-app
+Description: SAM Template for stemma-app
+
 
 Globals:
   Function:
@@ -16,58 +15,69 @@ Globals:
       - !Ref MyLayer
 
 Resources:
-  HtmlAssetsBucket:
+#  myDNSRecord:
+#    DependsOn:  WebAppCDN
+#    Type: AWS::Route53::RecordSet
+#    Properties:
+#      Type: Simple
+#      AliasTarget:
+#        DNSName: !GetAtt WebAppCDN.DomainName
+#        HostedZoneId: Z0371539135CFRSV7N3PQ
+#      Name: "huy"
+#      HostedZoneId: Z0371539135CFRSV7N3PQ
+#      HostedZoneName: web.stemma.link
+  WebAppCDN:
+    DependsOn:  appbucket
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - web.stemma.link
+        ViewerCertificate:
+          AcmCertificateArn: "arn:aws:acm:us-east-1:537602986733:certificate/447c1e43-350a-40cf-b971-f6e8a8287982"
+          SslSupportMethod: "sni-only"
+        PriceClass: "PriceClass_100"
+        Enabled: 'true'
+        DefaultCacheBehavior:
+          ForwardedValues:
+            QueryString: 'true'
+          TargetOriginId: appbucket
+          ViewerProtocolPolicy: redirect-to-https
+        DefaultRootObject: index.html
+        Origins:
+          - DomainName: !GetAtt appbucket.DomainName
+            Id: "appbucket"
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+  appbucket:
     Type: 'AWS::S3::Bucket'
     Properties:
-      BucketName: stemma-html-assets-public
-      AccessControl: PublicRead
-      WebsiteConfiguration:
-        IndexDocument: index.html
-        ErrorDocument: error.html
-    DeletionPolicy: Delete
-  HtmlAssetsBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref HtmlAssetsBucket
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Action:
-              - 's3:GetObject'
-            Effect: Allow
-            Resource: !Join
-              - ''
-              - - 'arn:aws:s3:::'
-                - !Ref HtmlAssetsBucket
-                - /*
-            Principal: '*'
-  FilesBucket:
-    Type: 'AWS::S3::Bucket'
-    DeletionPolicy: Delete
-    Properties:
-      BucketName: stemma-files-public
-      AccessControl: PublicRead
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false
         IgnorePublicAcls: false
         RestrictPublicBuckets: false
-  FilesBucketPolicy:
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+  BucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref FilesBucket
       PolicyDocument:
+        Id: MyPolicy
         Version: 2012-10-17
         Statement:
-          - Action:
-              - 's3:GetObject'
+          - Sid: PublicReadForGetBucketObjects
             Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
             Resource: !Join
               - ''
               - - 'arn:aws:s3:::'
-                - !Ref FilesBucket
+                - !Ref appbucket
                 - /*
-            Principal: '*'
+      Bucket: !Ref appbucket
   #  autosetloggroupretention:
   #    Type: AWS::Serverless::Application
   #    Properties:
@@ -128,6 +138,6 @@ Outputs:
     Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com"
   S3BucketSecureURL:
     Value: !GetAtt
-      - HtmlAssetsBucket
+      - appbucket
       - WebsiteURL
     Description: Name of S3 bucket to hold website content

@@ -22,4 +22,6 @@ sbt 'clean;test;compile;pack' \
 ```
 
 # Cleanup
+```console
 aws cloudformation delete-stack --stack-name stemma-app
+```
