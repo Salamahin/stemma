@@ -24,10 +24,29 @@ Parameters:
     Description: ""
     Type: String
     Default: "web.stemma.link"
+  apiAlias:
+    Description: ""
+    Type: String
+    Default: "api.stemma.link"
+  certificateArn:
+    Description: ""
+    Type: String
+    Default: "arn:aws:acm:us-east-1:537602986733:certificate/447c1e43-350a-40cf-b971-f6e8a8287982"
+
 
 
 Resources:
-  myDNSRecord:
+  apiDnsRecord:
+    DependsOn:  ApiGWCustomDomain
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Sub "${apiAlias}"
+      Type: A
+      HostedZoneId: !Sub "${hostedZoneId}"
+      AliasTarget:
+        HostedZoneId: !GetAtt ApiGWCustomDomain.DistributionHostedZoneId
+        DNSName: !GetAtt ApiGWCustomDomain.DistributionDomainName
+  assetsDnsRecord:
     DependsOn:  WebAppCDN
     Type: AWS::Route53::RecordSet
     Properties:
@@ -50,7 +69,7 @@ Resources:
         Aliases:
           - !Sub "${cloudFrontAlias}"
         ViewerCertificate:
-          AcmCertificateArn: "arn:aws:acm:us-east-1:537602986733:certificate/447c1e43-350a-40cf-b971-f6e8a8287982"
+          AcmCertificateArn: !Sub "${certificateArn}"
           SslSupportMethod: "sni-only"
           MinimumProtocolVersion: "TLSv1.2_2021"
         PriceClass: "PriceClass_100"
@@ -66,7 +85,11 @@ Resources:
           - DomainName: !GetAtt appbucket.DomainName
             Id: "appbucket"
             S3OriginConfig:
-              OriginAccessIdentity: ""
+              OriginAccessIdentity: !Join
+                - /
+                - - origin-access-identity
+                  - cloudfront
+                  - !Ref CloudFrontOriginAccessIdentity
   appbucket:
     Type: 'AWS::S3::Bucket'
     Properties:
@@ -105,6 +128,12 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: 1
+  ApiGWCustomDomain:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName: !Sub "${apiAlias}"
+      CertificateArn: !Sub "${certificateArn}"
+      SecurityPolicy: TLS_1_2
   MyApi:
     Type: AWS::Serverless::HttpApi
     Properties:
