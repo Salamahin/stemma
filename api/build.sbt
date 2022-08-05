@@ -10,6 +10,8 @@ libraryDependencies ++= Seq(
   "org.umlg"                   % "sqlg-hikari"           % Versions.sqlgV,
   "org.postgresql"             % "postgresql"            % "42.4.1",
   "com.typesafe.scala-logging" %% "scala-logging"        % "3.9.4",
+  "com.amazonaws"              % "aws-lambda-java-core"  % "1.2.1",
+  "com.amazonaws"              % "aws-lambda-java-events"% "3.11.0",
   "ch.qos.logback"             % "logback-classic"       % "1.3.0-alpha16",
   "dev.zio"                    %% "zio-test"             % Versions.zioV % Test,
   "dev.zio"                    %% "zio-test-sbt"         % Versions.zioV % Test,
@@ -17,4 +19,5 @@ libraryDependencies ++= Seq(
   "org.scalatest"              %% "scalatest"            % "3.3.0-SNAP3" % Test
 )
 
-exportJars := true
+enablePlugins(PackPlugin)
+packMain := Map()

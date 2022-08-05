@@ -16,7 +16,7 @@ aws s3 ls
 ```
 # Deploy to aws
 ```console
-sbt pack \
+sbt 'clean;test;compile;pack' \
 && sam build --cached \
 && sam deploy
 ```

@@ -1,17 +1,16 @@
 package io.github.salamahin.stemma.apis.serverless.aws
 
 import com.amazonaws.services.lambda.runtime
-import com.amazonaws.services.lambda.runtime.RequestHandler
-import com.amazonaws.services.lambda.runtime.events.{APIGatewayProxyRequestEvent, APIGatewayV2HTTPEvent}
+import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
 import io.github.salamahin.stemma.apis.API
 import io.github.salamahin.stemma.domain._
-import zio.{Task, ZIO}
+import zio.Task
 import zio.lambda.{Context, ZLambda}
 
 
-class HelloWorld extends RequestHandler[APIGatewayV2HTTPEvent, String] {
+class HelloWorld {
 
-  override def handleRequest(input: APIGatewayV2HTTPEvent, context: runtime.Context): String = {
+  def helloWorldRequest(input: APIGatewayV2HTTPEvent, context: runtime.Context): String = {
     "OK" + System.currentTimeMillis()
   }
 }
