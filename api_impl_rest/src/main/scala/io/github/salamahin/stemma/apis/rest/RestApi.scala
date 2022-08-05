@@ -127,13 +127,15 @@ object RestApi extends ZIOAppDefault with LazyLogging {
     val program = (auth >>= restWrapper) @@ cors(corsConfig)
 
     (Server.start(8090, program) <&> ZIO.succeed(logger.info("Hello stemma")))
+      .tapError(err => ZIO.succeed(logger.error("Unexpected error", err)))
       .exitCode
       .provideSome(
-        Secrets.envSecrets,
+        UserSecrets.fromEnv,
+        JdbcConfiguration.fromEnv,
         GraphService.postgres,
         StemmaService.live,
         UserService.live,
-        Google.envSecret,
+        Google.fromEnv,
         OAuthService.googleSignIn,
         ZLayer.succeedEnvironment(DefaultServices.live)
       )

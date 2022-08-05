@@ -10,16 +10,15 @@ trait GraphService {
 }
 
 object GraphService {
-  val postgres: ZLayer[Secrets with Scope, Throwable, GraphService] = ZLayer(
+  val postgres: ZLayer[JdbcConfiguration with Scope, Throwable, GraphService] = ZLayer(
     ZIO
-      .service[Secrets]
-      .map(_.postgresSecret)
-      .flatMap(secret => {
+      .service[JdbcConfiguration]
+      .flatMap(conf => {
         import gremlin.scala._
         val config = new BaseConfiguration {
-          addPropertyDirect("jdbc.url", "jdbc:postgresql://localhost:5432/stemma")
-          addPropertyDirect("jdbc.username", "postgres")
-          addPropertyDirect("jdbc.password", secret)
+          addPropertyDirect("jdbc.url", conf.jdbcUrl)
+          addPropertyDirect("jdbc.username", conf.jdbcUser)
+          addPropertyDirect("jdbc.password", conf.jdbcPassword)
         }
 
         ZIO.acquireRelease(
