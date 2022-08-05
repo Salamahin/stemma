@@ -48,8 +48,10 @@ Resources:
         ViewerCertificate:
           AcmCertificateArn: "arn:aws:acm:us-east-1:537602986733:certificate/447c1e43-350a-40cf-b971-f6e8a8287982"
           SslSupportMethod: "sni-only"
+          MinimumProtocolVersion: "TLSv1.2_2021"
         PriceClass: "PriceClass_100"
         Enabled: 'true'
+        HttpVersion: "http2"
         DefaultCacheBehavior:
           ForwardedValues:
             QueryString: 'true'
