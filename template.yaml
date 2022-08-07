@@ -28,24 +28,17 @@ Parameters:
     Description: ""
     Type: String
     Default: "api.stemma.link"
-  certificateArn:
+  certificateArnUsEast1:
+    Description: ""
+    Type: String
+    Default: "arn:aws:acm:us-east-1:537602986733:certificate/447c1e43-350a-40cf-b971-f6e8a8287982"
+  certificateArnEurope:
     Description: ""
     Type: String
     Default: "arn:aws:acm:us-east-1:537602986733:certificate/447c1e43-350a-40cf-b971-f6e8a8287982"
 
 
-
 Resources:
-  apiDnsRecord:
-    DependsOn:  ApiGWCustomDomain
-    Type: AWS::Route53::RecordSet
-    Properties:
-      Name: !Sub "${apiAlias}"
-      Type: A
-      HostedZoneId: !Sub "${hostedZoneId}"
-      AliasTarget:
-        HostedZoneId: !GetAtt ApiGWCustomDomain.DistributionHostedZoneId
-        DNSName: !GetAtt ApiGWCustomDomain.DistributionDomainName
   assetsDnsRecord:
     DependsOn:  WebAppCDN
     Type: AWS::Route53::RecordSet
@@ -69,7 +62,7 @@ Resources:
         Aliases:
           - !Sub "${cloudFrontAlias}"
         ViewerCertificate:
-          AcmCertificateArn: !Sub "${certificateArn}"
+          AcmCertificateArn: !Sub "${certificateArnUsEast1}"
           SslSupportMethod: "sni-only"
           MinimumProtocolVersion: "TLSv1.2_2021"
         PriceClass: "PriceClass_100"
@@ -128,15 +121,15 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: 1
-  ApiGWCustomDomain:
-    Type: AWS::ApiGateway::DomainName
-    Properties:
-      DomainName: !Sub "${apiAlias}"
-      CertificateArn: !Sub "${certificateArn}"
-      SecurityPolicy: TLS_1_2
   MyApi:
     Type: AWS::Serverless::HttpApi
     Properties:
+      Domain:
+        DomainName: !Sub "${apiAlias}"
+        CertificateArn: !Sub "${certificateArnEurope}"
+        EndpointConfiguration: REGIONAL
+        Route53:
+          HostedZoneId: !Sub "${hostedZoneId}"
       AccessLogSettings:
         DestinationArn: !GetAtt AccessLogs.Arn
         Format: '{
