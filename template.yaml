@@ -126,6 +126,14 @@ Resources:
   MyApi:
     Type: AWS::Serverless::HttpApi
     Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowHeaders:
+          - 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
+        AllowMethods:
+          - GET
+        MaxAge: 600
       Domain:
         DomainName: !Sub "${apiAlias}"
         CertificateArn: !Sub "${certificateArnEurope}"
