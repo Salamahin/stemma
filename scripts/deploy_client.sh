@@ -9,8 +9,13 @@ aws s3 sync $SCRIPT_DIR/../client-demo/ s3://$html_assets_bucket/ \
  --delete \
  --size-only
 
-aws cloudfront create-invalidation \
+id=$(aws cloudfront create-invalidation \
     --distribution-id $cloudfront_distribution_id \
-    --paths "/*"
+    --paths "/*" | 	jq -r .Invalidation.Id)
 
-echo "ok"
+
+aws cloudfront wait invalidation-completed \
+--distribution-id $cloudfront_distribution_id \
+--id $id
+
+echo "ok" $id
