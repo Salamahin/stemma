@@ -1,4 +1,3 @@
-
 function onSignIn(googleToken) {
   // Google have OK'd the sign-in
   // pass the token into our web app
@@ -28,12 +27,12 @@ function credentialExchange(googleToken) {
       }
     });
 
-    // Now lets obtain the credentials we just swapped
+    // Now let's obtain the credentials we just swapped
     AWS.config.credentials.get(function(err) {
       if (!err) {
         console.log('Exchanged to Cognito Identity Id: ' + AWS.config.credentials.identityId);
         // if we are here, things are working as they should...
-        // ... now lets call a function to access images, generate signed URL's and display
+        // ... now lets call a function to access api
         accessApi();
       } else {
         // if we are here, bad things have happened, so we should error.
@@ -41,77 +40,24 @@ function credentialExchange(googleToken) {
         console.log('ERROR: ' + err);
       }
     });
-
   } else {
     console.log('User not logged in!');
   }
 }
 
 function accessApi() {
-  
-  // Using the temp AWS Credentials, lets connect to S3
-  const userAction = async () => {
-    const response = await fetch('https://api.stemma.link/hello-world', {
-      method: 'GET',
-      body: "", // string or object
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    const myJson = await response.json(); //extract JSON from the http response
-    // do something with myJson
-  }
-
-  console.log("Creating Session to S3...");
-  var s3 = new AWS.S3();
-  var params = {
-    Bucket: "REPLACE_ME_NAME_OF_PATCHES_PRIVATE_BUCKET" // MAKE SURE YOU REPLACE THIS
-  }; 
-
-  // If we are here, things are going well, lets list all of the objects in the bucket
-  s3.listObjects(params, function(err, data) {
-    console.log("Listing objects in patchesprivate bucket...");
-    if (err) {
-      document.getElementById('output').innerHTML = "<b>YOU ARE NOT AUTHORISED TO QUERY AWS!</b>";
-      console.log(err, err.stack);
-    } else {
-      console.log('AWS response:');
-      console.log(data);
-      var href = this.request.httpRequest.endpoint.href;
-      var bucketUrl = href + data.Name + '/';
-      
-      // for all of the images in the bucket, we need to generate a signedURL for the object
-      var photos = data.Contents.map(function(photo) {
-        var photoKey = photo.Key;
-        
-        console.log("Generating signedURL for : " + photoKey);
-        var url = s3.getSignedUrl ('getObject', {
-          Bucket: data.Name,
-          Key: photoKey
-        })
-
-        var photoUrl = bucketUrl + encodeURIComponent(photoKey);
-        return getHtml([
-          '<span>',
-            '<div>',
-              '<br/>',
-              '<a href="' + url + '" target="_blank"><img style="width:224px;height:224px;" src="' + url + '"/></a>',
-            '</div>',
-            '<div>',
-              '<span>',
-              '</span>',
-            '</div>',
-          '</span>',
-        ]);
-      });
-
-      // let's take those signedURL's, create a HTML page, and display it in the web browser
-      var htmlTemplate = [ '<div>',   getHtml(photos), '</div>']
-      console.log("Creating and returning html...")
-      document.getElementById('viewer').innerHTML = getHtml(htmlTemplate);
-    }    
-
-  });
+  console.log("Accessing API..");
+  fetch('https://api.stemma.link/hello-world')
+      .then(data => {
+        return data.json()
+      })
+      .then(res => {
+        console.log("Successfully received: " + JSON. stringify(res));
+        const htmlTemplate = ['<div>', res['time'], '</div>'];
+        document.getElementById('viewer').innerHTML = getHtml(htmlTemplate);
+        console.log("Everything is ok")
+      })
+      .catch(error => console.error(error))
 }
 
 // A utility function to create HTML.
@@ -125,4 +71,4 @@ function parseJwt(token) {
   var base64 = base64Url.replace('-', '+').replace('_', '/');
   var plain_token = JSON.parse(window.atob(base64));
   return plain_token;
-};
+}
