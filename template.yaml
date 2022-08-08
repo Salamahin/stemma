@@ -35,7 +35,7 @@ Parameters:
   certificateArnEurope:
     Description: ""
     Type: String
-    Default: "arn:aws:acm:us-east-1:537602986733:certificate/447c1e43-350a-40cf-b971-f6e8a8287982"
+    Default: "arn:aws:acm:eu-central-1:537602986733:certificate/6d7733eb-fff5-4c6e-b06d-01868a79e108"
 
 
 Resources:
