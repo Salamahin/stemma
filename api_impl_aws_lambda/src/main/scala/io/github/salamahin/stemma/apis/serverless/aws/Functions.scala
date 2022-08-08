@@ -11,7 +11,7 @@ import zio.lambda.{Context, ZLambda}
 class HelloWorld {
 
   def helloWorldRequest(input: APIGatewayV2HTTPEvent, context: runtime.Context): String = {
-    "OK" + System.currentTimeMillis()
+    s"{\"time\": ${System.currentTimeMillis()}}"
   }
 }
 
