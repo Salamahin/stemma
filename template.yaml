@@ -72,6 +72,8 @@ Resources:
           ForwardedValues:
             QueryString: 'true'
           TargetOriginId: appbucket
+          Compress: true
+          CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6" #managed Managed-CachingOptimized cache policy
           ViewerProtocolPolicy: redirect-to-https
         DefaultRootObject: index.html
         Origins:
