@@ -20,9 +20,9 @@ function credentialExchange(googleToken) {
     // We can't access anything in AWS with a google token...
     // ... so we need to exchange it using Cognito for AWS credentials
     console.log("Exchanging Google Token for AWS credentials...");
-    AWS.config.region = 'us-east-1'; 
+    AWS.config.region = 'eu-central-1';
     AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-      IdentityPoolId: 'REPLACE_ME_COGNITO_IDENTITY_POOL_ID', // MAKE SURE YOU REPLACE THIS
+      IdentityPoolId: 'eu-central-1:af1b28ad-b6e1-4369-98a4-fcd02004af5c', // MAKE SURE YOU REPLACE THIS
       Logins: {
         'accounts.google.com': googleToken.credential
       }
@@ -34,7 +34,7 @@ function credentialExchange(googleToken) {
         console.log('Exchanged to Cognito Identity Id: ' + AWS.config.credentials.identityId);
         // if we are here, things are working as they should...
         // ... now lets call a function to access images, generate signed URL's and display
-        accessImages();
+        accessApi();
       } else {
         // if we are here, bad things have happened, so we should error.
         document.getElementById('output').innerHTML = "<b>YOU ARE NOT AUTHORISED TO QUERY AWS!</b>";
@@ -47,9 +47,21 @@ function credentialExchange(googleToken) {
   }
 }
 
-function accessImages() {
+function accessApi() {
   
   // Using the temp AWS Credentials, lets connect to S3
+  const userAction = async () => {
+    const response = await fetch('https://api.stemma.link/hello-world', {
+      method: 'GET',
+      body: "", // string or object
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    const myJson = await response.json(); //extract JSON from the http response
+    // do something with myJson
+  }
+
   console.log("Creating Session to S3...");
   var s3 = new AWS.S3();
   var params = {
