@@ -16,7 +16,3 @@ lazy val api = project
 lazy val api_impl_aws_lambda = project
   .dependsOn(api)
   .settings(commonOptsions: _*)
-
-lazy val api_impl_rest = project
-  .dependsOn(api)
-  .settings(commonOptsions: _*)

@@ -2,11 +2,13 @@ package io.github.salamahin.stemma.apis.serverless.aws
 
 import com.amazonaws.services.lambda.runtime
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
+import com.amazonaws.services.lambda.runtime.Context
+import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
+import com.amazonaws.services.lambda.runtime
+import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
 import io.github.salamahin.stemma.apis.API
 import io.github.salamahin.stemma.domain._
-import zio.Task
-import zio.lambda.{Context, ZLambda}
-
+import zio.ZIO
 
 class HelloWorld {
 
@@ -21,57 +23,112 @@ class HelloWorld {
   }
 }
 
-object ListStemma extends ZLambda[ListStemmasRequest, OwnedStemmasDescription] with Layers {
-  override def apply(event: ListStemmasRequest, context: Context): Task[OwnedStemmasDescription] =
-    API.listStemmas(event).provideSomeLayer(layers)
+
+class ListStemmas extends Lambda with Layers {
+  def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
+    API
+      .listStemmas(context.getIdentity.getIdentityId)
+      .provideSomeLayer(layers)
+  }
 }
 
-object BearInvitationStemma extends ZLambda[BearInvitationRequest, String] with Layers {
-  override def apply(event: BearInvitationRequest, context: Context): Task[String] =
-    API.bearInvitation(event).as("success").provideSomeLayer(layers)
+class BearInvitationStemma extends Lambda with Layers {
+  def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
+    API
+      .bearInvitation(context.getIdentity.getIdentityId, input.getBody)
+      .as("success")
+      .provideSomeLayer(layers)
+  }
 }
 
-object DeleteStemma extends ZLambda[DeleteStemmaRequest, OwnedStemmasDescription] with Layers {
-  override def apply(event: DeleteStemmaRequest, context: Context): Task[OwnedStemmasDescription] =
-    API.deleteStemma(event).provideSomeLayer(layers)
+class DeleteStemma extends Lambda with Layers {
+  def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
+    API
+      .deleteStemma(context.getIdentity.getIdentityId, input.getBody)
+      .provideSomeLayer(layers)
+  }
 }
 
-object CreateNewStemma extends ZLambda[CreateNewStemmaRequest, StemmaDescription] with Layers {
-  override def apply(event: CreateNewStemmaRequest, context: Context): Task[StemmaDescription] =
-    API.createNewStemma(event).provideSomeLayer(layers)
+class CreateNewStemma extends Lambda with Layers {
+  def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
+    API.createNewStemma(context.getIdentity.getIdentityId, input.getBody).provideSomeLayer(layers)
+  }
 }
 
-object Stemma extends ZLambda[GetStemmaRequest, Stemma] with Layers {
-  override def apply(event: GetStemmaRequest, context: Context): Task[Stemma] =
-    API.stemma(event).provideSomeLayer(layers)
+class Stemma extends Lambda with Layers {
+  def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
+    API.stemma(context.getIdentity.getIdentityId, input.getBody).provideSomeLayer(layers)
+  }
 }
 
-object DeletePerson extends ZLambda[DeletePersonRequest, Stemma] with Layers {
-  override def apply(event: DeletePersonRequest, context: Context): Task[Stemma] =
-    API.deletePerson(event).provideSomeLayer(layers)
+class DeletePerson extends Lambda with Layers {
+  def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
+    import zio.json._
+
+    ZIO
+      .fromEither(input.getBody.fromJson[DeletePersonRequest])
+      .mapError(err => RequestDeserializationProblem(s"Failed to deser delete person request, details: ${err}"))
+      .flatMap(request => API.deletePerson(context.getIdentity.getIdentityId, request))
+      .provideSomeLayer(layers)
+  }
 }
 
-object UpdatePerson extends ZLambda[UpdatePersonRequest, Stemma] with Layers {
-  override def apply(event: UpdatePersonRequest, context: Context): Task[Stemma] =
-    API.updatePerson(event).provideSomeLayer(layers)
+class UpdatePerson extends Lambda with Layers {
+  def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
+    import zio.json._
+
+    ZIO
+      .fromEither(input.getBody.fromJson[UpdatePersonRequest])
+      .mapError(err => RequestDeserializationProblem(s"Failed to deser update person request, details: ${err}"))
+      .flatMap(request => API.updatePerson(context.getIdentity.getIdentityId, request))
+      .provideSomeLayer(layers)
+  }
 }
 
-object CreateInvitationToken extends ZLambda[CreateInvitationTokenRequest, String] with Layers {
-  override def apply(event: CreateInvitationTokenRequest, context: Context): Task[String] =
-    API.createInvitationToken(event).provideSomeLayer(layers)
+class CreateInvitationToken extends Lambda with Layers {
+  def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
+    import zio.json._
+
+    ZIO
+      .fromEither(input.getBody.fromJson[CreateInvitationTokenRequest])
+      .mapError(err => RequestDeserializationProblem(s"Failed to deser create invite token request, details: ${err}"))
+      .flatMap(request => API.createInvitationToken(context.getIdentity.getIdentityId, request))
+      .provideSomeLayer(layers)
+  }
 }
 
-object CreateFamily extends ZLambda[CreateFamilyRequest, Stemma] with Layers {
-  override def apply(event: CreateFamilyRequest, context: Context): Task[Stemma] =
-    API.createFamily(event).provideSomeLayer(layers)
+class CreateFamily extends Lambda with Layers {
+  def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
+    import zio.json._
+
+    ZIO
+      .fromEither(input.getBody.fromJson[CreateFamilyRequest])
+      .mapError(err => RequestDeserializationProblem(s"Failed to deser create family request, details: ${err}"))
+      .flatMap(request => API.createFamily(context.getIdentity.getIdentityId, request))
+      .provideSomeLayer(layers)
+  }
 }
 
-object UpdateFamily extends ZLambda[UpdateFamilyRequest, Stemma] with Layers {
-  override def apply(event: UpdateFamilyRequest, context: Context): Task[Stemma] =
-    API.updateFamily(event).provideSomeLayer(layers)
+class UpdateFamily extends Lambda with Layers {
+  def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
+    import zio.json._
+
+    ZIO
+      .fromEither(input.getBody.fromJson[UpdateFamilyRequest])
+      .mapError(err => RequestDeserializationProblem(s"Failed to deser create update family request, details: ${err}"))
+      .flatMap(request => API.updateFamily(context.getIdentity.getIdentityId, request))
+      .provideSomeLayer(layers)
+  }
 }
 
-object DeleteFamily extends ZLambda[DeleteFamilyRequest, Stemma] with Layers {
-  override def apply(event: DeleteFamilyRequest, context: Context): Task[Stemma] =
-    API.deleteFamily(event).provideSomeLayer(layers)
+class DeleteFamily extends Lambda with Layers {
+  def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
+    import zio.json._
+
+    ZIO
+      .fromEither(input.getBody.fromJson[DeleteFamilyRequest])
+      .mapError(err => RequestDeserializationProblem(s"Failed to deser delete family request, details: ${err}"))
+      .flatMap(request => API.deleteFamily(context.getIdentity.getIdentityId, request))
+      .provideSomeLayer(layers)
+  }
 }

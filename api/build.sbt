@@ -19,5 +19,9 @@ libraryDependencies ++= Seq(
   "org.scalatest"              %% "scalatest"            % "3.3.0-SNAP3" % Test
 )
 
-enablePlugins(PackPlugin)
-packMain := Map()
+assembly / assemblyMergeStrategy := {
+  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+  case x                             => MergeStrategy.last
+}
+assembly / assemblyJarName := "stemma-api.jar"
+
