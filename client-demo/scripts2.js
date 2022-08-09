@@ -17,7 +17,7 @@ function credentialExchange(googleToken) {
 }
 
 function accessApi(token) {
-  console.log("Accessing API..");
+  console.log("Accessing API.. with token: " + token);
   fetch('https://api.stemma.link/hello-world', {
     headers: {
       'Authorization': token
