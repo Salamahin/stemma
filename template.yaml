@@ -73,7 +73,6 @@ Resources:
                   - "cognito-sync:*"
                   - "cognito-identity:*"
                 Resource: "*"
-
   CognitoAuthRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -97,6 +96,10 @@ Resources:
                 Action:
                   - "cognito-sync:*"
                   - "cognito-identity:*"
+                Resource: "*"
+              - Effect: "Allow"
+                Action:
+                  - "execute-api:Invoke"
                 Resource: "*"
   IdentityPoolRoleAttachment:
     Type: "AWS::Cognito::IdentityPoolRoleAttachment"
@@ -193,6 +196,9 @@ Resources:
   MyApi:
     Type: AWS::Serverless::HttpApi
     Properties:
+      Auth:
+        EnableIamAuthorizer: true
+        DefaultAuthorizer: AWS_IAM
       CorsConfiguration:
         AllowOrigins:
           - '*'
