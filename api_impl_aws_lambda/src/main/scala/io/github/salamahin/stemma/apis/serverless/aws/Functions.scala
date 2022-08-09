@@ -1,22 +1,20 @@
 package io.github.salamahin.stemma.apis.serverless.aws
 
-import com.amazonaws.services.lambda.runtime
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
 import io.github.salamahin.stemma.apis.API
 import io.github.salamahin.stemma.domain._
 import zio.ZIO
+import zio.json.DeriveJsonEncoder
 
-class HelloWorld {
+case class TimeLogin(login: String, ts: Long)
 
-  def helloWorldRequest(input: APIGatewayV2HTTPEvent, context: runtime.Context): String = {
+class HelloWorld extends Lambda with Layers {
+  implicit val enc = DeriveJsonEncoder.gen[TimeLogin]
+
+  def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
     val email = input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email")
-    println(s"context.getRequestContext.getAuthorizer = $email")
-    val str = s"{" +
-      s"\"time\": ${System.currentTimeMillis()} ," +
-      s"\"user\": \"$email\"" +
-      s"}"
-    str
+    ZIO.succeed(TimeLogin(email, System.currentTimeMillis()))
   }
 }
 
