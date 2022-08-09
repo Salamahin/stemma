@@ -42,74 +42,6 @@ Parameters:
     Default: "584519661541-m7jkpf0o4cu08jpiq4eo4bmaoa6ah7j1.apps.googleusercontent.com"
 
 Resources:
-  CognitoId:
-    Type: "AWS::Cognito::IdentityPool"
-    Properties:
-      AllowUnauthenticatedIdentities: false
-      IdentityPoolName: "stemma-identity-pool"
-      SupportedLoginProviders: { "accounts.google.com": !Sub "${googleAuthClientId}" }
-  CognitoUnauthRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: stemma_unauth_role
-      Path: /
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: "Allow"
-            Action:
-              - "sts:AssumeRoleWithWebIdentity"
-            Condition: { "ForAnyValue:StringLike": { "cognito-identity.amazonaws.com:amr": "authenticated" },  "StringEquals": { "cognito-identity.amazonaws.com:aud": !Ref CognitoId } }
-            Principal:
-              Federated:
-                - "cognito-identity.amazonaws.com"
-      Policies:
-        - PolicyName: "CognitoUnauthorizedPolicy"
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: "Allow"
-                Action:
-                  - "cognito-sync:*"
-                  - "cognito-identity:*"
-                Resource: "*"
-  CognitoAuthRole:
-    Type: "AWS::IAM::Role"
-    Properties:
-      RoleName: stemma_auth_role
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: "Allow"
-            Action:
-              - "sts:AssumeRoleWithWebIdentity"
-            Condition: { "ForAnyValue:StringLike": { "cognito-identity.amazonaws.com:amr": "authenticated" },  "StringEquals": { "cognito-identity.amazonaws.com:aud": !Ref CognitoId } }
-            Principal:
-              Federated:
-                - "cognito-identity.amazonaws.com"
-      Policies:
-        - PolicyName: main
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: "Allow"
-                Action:
-                  - "cognito-sync:*"
-                  - "cognito-identity:*"
-                Resource: "*"
-              - Effect: "Allow"
-                Action:
-                  - "execute-api:Invoke"
-                Resource: "*"
-  IdentityPoolRoleAttachment:
-    Type: "AWS::Cognito::IdentityPoolRoleAttachment"
-    Properties:
-      IdentityPoolId: !Ref CognitoId
-      Roles:
-        authenticated:
-          Fn::GetAtt: [CognitoAuthRole, Arn]
-        unauthenticated:
-          Fn::GetAtt: [CognitoUnauthRole, Arn]
   assetsDnsRecord:
     DependsOn: WebAppCDN
     Type: AWS::Route53::RecordSet
@@ -197,15 +129,21 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       Auth:
-        EnableIamAuthorizer: true
-        DefaultAuthorizer: AWS_IAM
+        Authorizers:
+          OAuth2Authorizer:
+            JwtConfiguration:
+              issuer: "https://accounts.google.com"
+              audience:
+                - !Sub "${googleAuthClientId}"
+            IdentitySource: "$request.header.Authorization"
+        DefaultAuthorizer: OAuth2Authorizer
       CorsConfiguration:
         AllowOrigins:
           - '*'
         AllowHeaders:
-          - 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
+          - '*'
         AllowMethods:
-          - GET
+          - '*'
         MaxAge: 600
       Domain:
         DomainName: !Sub "${apiAlias}"
