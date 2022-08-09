@@ -11,7 +11,13 @@ import zio.lambda.{Context, ZLambda}
 class HelloWorld {
 
   def helloWorldRequest(input: APIGatewayV2HTTPEvent, context: runtime.Context): String = {
-    s"{\"time\": ${System.currentTimeMillis()}}"
+    val email = input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email")
+    println(s"context.getRequestContext.getAuthorizer = $email")
+    val str = s"{" +
+      s"\"time\": ${System.currentTimeMillis()} ," +
+      s"\"user\": \"$email\"" +
+      s"}"
+    str
   }
 }
 
