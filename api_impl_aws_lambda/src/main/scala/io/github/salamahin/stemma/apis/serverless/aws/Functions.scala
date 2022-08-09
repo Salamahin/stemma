@@ -1,10 +1,7 @@
 package io.github.salamahin.stemma.apis.serverless.aws
 
 import com.amazonaws.services.lambda.runtime
-import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
 import com.amazonaws.services.lambda.runtime.Context
-import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
-import com.amazonaws.services.lambda.runtime
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
 import io.github.salamahin.stemma.apis.API
 import io.github.salamahin.stemma.domain._
