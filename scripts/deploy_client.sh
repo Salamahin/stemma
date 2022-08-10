@@ -5,7 +5,7 @@ export html_assets_bucket="stemma-app-appbucket-ka4mb0u47xrb"
 export cloudfront_distribution_id="E5F8905QR70BK"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-aws s3 sync $SCRIPT_DIR/../client-demo/ s3://$html_assets_bucket/ \
+aws s3 sync $SCRIPT_DIR/../client/public s3://$html_assets_bucket/ \
  --delete
 
 id=$(aws cloudfront create-invalidation \

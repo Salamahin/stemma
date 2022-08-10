@@ -4,9 +4,9 @@ import io.github.salamahin.stemma.service._
 import zio.Random.RandomLive
 import zio.{Scope, TaskLayer, ZLayer}
 
-trait Layers {
+object Layers {
   val layers: TaskLayer[StemmaService with UserService] =
     (Scope.default ++ ZLayer.succeed(RandomLive)) >+>
-      (UserSecrets.fromEnv >+> JdbcConfiguration.fromEnv >+> GraphService.postgres) >>>
+      (InviteSecrets.fromEnv >+> JdbcConfiguration.fromEnv >+> GraphService.postgres) >>>
       (StemmaService.live ++ UserService.live)
 }
