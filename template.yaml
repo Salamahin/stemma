@@ -10,7 +10,7 @@ Globals:
     MemorySize: 512
     Environment:
       Variables:
-#        JAVA_TOOL_OPTIONS: -XX:+TieredCompilation -XX:TieredStopAtLevel=1
+        JAVA_TOOL_OPTIONS: -XX:+TieredCompilation -XX:TieredStopAtLevel=1
         JDBC_URL: "{{resolve:secretsmanager:prod/jdbc:SecretString:JDBC_URL}}"
         JDBC_USER: "{{resolve:secretsmanager:prod/jdbc:SecretString:JDBC_USER}}"
         JDBC_PASSWORD: "{{resolve:secretsmanager:prod/jdbc:SecretString:JDBC_PASSWORD}}"
