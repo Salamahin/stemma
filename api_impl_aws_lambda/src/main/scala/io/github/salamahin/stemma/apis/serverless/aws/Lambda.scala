@@ -12,7 +12,7 @@ trait Lambda extends LazyLogging {
     Unsafe.unsafe { implicit u => Runtime.default.unsafe.run(task) } match {
       case Exit.Success(value) => value.toJson
       case Exit.Failure(cause) =>
-        logger.error("Unexpected error", Throwables.getStackTraceAsString(cause.squash))
+        logger.error(s"Unexpected error: ${Throwables.getStackTraceAsString(cause.squash)}")
         throw new IllegalStateException(cause.squash)
     }
   }

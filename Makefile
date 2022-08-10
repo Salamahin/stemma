@@ -4,7 +4,7 @@ build-any-lambda:
 
 build-MyLayer:
 	mkdir -p $(ARTIFACTS_DIR)/java/lib
-	cp -r api/target/scala-2.13/*.jar $(ARTIFACTS_DIR)/java/lib
+	cp -r api/target/scala-2.13/stemma-api.jar $(ARTIFACTS_DIR)/java/lib
 
 build-ListStemmasFunction: build-any-lambda
 build-DeleteStemmaFunction: build-any-lambda
