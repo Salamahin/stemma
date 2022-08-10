@@ -26,6 +26,7 @@ object GraphService {
             new GraphService {
               override val graph: ScalaGraph = {
                 Class.forName("org.postgresql.Driver")
+                Class.forName("org.umlg.sqlg.PostgresPlugin")
 
                 val g: SqlgGraph = SqlgGraph.open(config)
                 g.asScala()
