@@ -13,16 +13,12 @@ libraryDependencies ++= Seq(
   "org.umlg"                   % "sqlg-hikari"            % Versions.sqlgV,
   "org.postgresql"             % "postgresql"             % "42.4.1",
   "com.typesafe.scala-logging" %% "scala-logging"         % "3.9.4",
-  "ch.qos.logback"             % "logback-classic"        % "1.3.0-alpha16",
+  "ch.qos.logback"             % "logback-classic"        % "1.2.11",
   "dev.zio"                    %% "zio-test"              % Versions.zioV % Test,
   "dev.zio"                    %% "zio-test-sbt"          % Versions.zioV % Test,
   "org.umlg"                   % "sqlg-h2-dialect"        % Versions.sqlgV % Test,
   "org.scalatest"              %% "scalatest"             % "3.3.0-SNAP3" % Test
 )
 
-assembly / assemblyMergeStrategy := {
-  case PathList("META-INF", xs@_*) => MergeStrategy.discard
-  case x => MergeStrategy.last
-}
-assembly / assemblyJarName := "stemma-api.jar"
-
+enablePlugins(PackPlugin)
+packMain := Map()

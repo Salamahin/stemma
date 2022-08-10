@@ -1,1 +1,0 @@
-disablePlugins(AssemblyPlugin)

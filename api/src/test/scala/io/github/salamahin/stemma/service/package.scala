@@ -8,7 +8,7 @@ import zio.{ULayer, ZIO, ZLayer}
 import java.io.File
 
 package object service {
-  val hardcodedSecret: ULayer[UserSecrets] = ZLayer.succeed(new UserSecrets {
+  val hardcodedSecret: ULayer[InviteSecrets] = ZLayer.succeed(new InviteSecrets {
     override val secretString: String = "secret_string"
   })
 

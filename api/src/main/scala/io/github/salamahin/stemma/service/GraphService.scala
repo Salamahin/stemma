@@ -1,15 +1,17 @@
 package io.github.salamahin.stemma.service
 
+import com.typesafe.scalalogging.LazyLogging
 import gremlin.scala.ScalaGraph
 import org.apache.commons.configuration2.BaseConfiguration
 import org.umlg.sqlg.structure.SqlgGraph
+import org.umlg.sqlg.structure.ds.SqlgHikariDataSource
 import zio.{Scope, ZIO, ZLayer}
 
 trait GraphService {
   val graph: ScalaGraph
 }
 
-object GraphService {
+object GraphService extends LazyLogging {
   val postgres: ZLayer[JdbcConfiguration with Scope, Throwable, GraphService] = ZLayer(
     ZIO
       .service[JdbcConfiguration]
@@ -19,6 +21,7 @@ object GraphService {
           addPropertyDirect("jdbc.url", conf.jdbcUrl)
           addPropertyDirect("jdbc.username", conf.jdbcUser)
           addPropertyDirect("jdbc.password", conf.jdbcPassword)
+          addPropertyDirect("sqlg.dataSource", classOf[SqlgHikariDataSource].getCanonicalName)
         }
 
         ZIO.acquireRelease(
@@ -26,7 +29,9 @@ object GraphService {
             new GraphService {
               override val graph: ScalaGraph = {
                 val g: SqlgGraph = SqlgGraph.open(config)
-                g.asScala()
+                val scalaG       = g.asScala()
+                logger.debug("Graph service initiated")
+                scalaG
               }
             }
           )

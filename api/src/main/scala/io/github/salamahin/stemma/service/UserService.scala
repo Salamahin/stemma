@@ -20,9 +20,9 @@ trait UserService {
 
 object UserService {
 
-  val live: URLayer[UserSecrets with GraphService with Random, UserService] = ZLayer(for {
+  val live: URLayer[InviteSecrets with GraphService with Random, UserService] = ZLayer(for {
     graph  <- ZIO.service[GraphService]
-    secret <- ZIO.service[UserSecrets]
+    secret <- ZIO.service[InviteSecrets]
     rnd    <- ZIO.service[Random]
   } yield new UserServiceImpl(secret.secretString, graph.graph, new StemmaRepository, rnd))
 

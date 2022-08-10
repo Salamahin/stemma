@@ -3,131 +3,115 @@ package io.github.salamahin.stemma.apis.serverless.aws
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
 import io.github.salamahin.stemma.apis.API
+import io.github.salamahin.stemma.apis.serverless.aws.Layers.layers
 import io.github.salamahin.stemma.domain._
 import zio.ZIO
-import zio.json.DeriveJsonEncoder
 
-case class TimeLogin(login: String, ts: Long, users: String)
-
-class HelloWorld extends Lambda with Layers {
-  implicit val enc = DeriveJsonEncoder.gen[TimeLogin]
-
-  def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
-    val email = input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email")
-    val jdbcUrl = System.getenv("JDBC_URL")
-    val jdbcUser = System.getenv("JDBC_USER")
-    val jdbcPassword = System.getenv("JDBC_PASSWORD")
-    val users = new SelectDemo(jdbcUrl, jdbcUser, jdbcPassword).selectUsers()
-    ZIO.succeed(TimeLogin(email, System.currentTimeMillis(), users.toList.map(d => d.email).mkString("\n")))
-  }
-}
-
-
-class ListStemmas extends Lambda with Layers {
+class ListStemmas extends Lambda {
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
     API
-      .listStemmas(context.getIdentity.getIdentityId)
+      .listStemmas(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"))
       .provideSomeLayer(layers)
   }
 }
 
-class BearInvitationStemma extends Lambda with Layers {
+class BearInvitationStemma extends Lambda {
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
     API
-      .bearInvitation(context.getIdentity.getIdentityId, input.getBody)
+      .bearInvitation(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"), input.getBody)
       .as("success")
       .provideSomeLayer(layers)
   }
 }
 
-class DeleteStemma extends Lambda with Layers {
+class DeleteStemma extends Lambda {
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
     API
-      .deleteStemma(context.getIdentity.getIdentityId, input.getBody)
+      .deleteStemma(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"), input.getBody)
       .provideSomeLayer(layers)
   }
 }
 
-class CreateNewStemma extends Lambda with Layers {
+class CreateNewStemma extends Lambda {
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
-    API.createNewStemma(context.getIdentity.getIdentityId, input.getBody).provideSomeLayer(layers)
+    API.createNewStemma(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"), input.getBody).provideSomeLayer(layers)
   }
 }
 
-class Stemma extends Lambda with Layers {
+class Stemma extends Lambda {
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
-    API.stemma(context.getIdentity.getIdentityId, input.getBody).provideSomeLayer(layers)
+    API.stemma(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"), input.getBody).provideSomeLayer(layers)
   }
 }
 
-class DeletePerson extends Lambda with Layers {
+class DeletePerson extends Lambda {
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
     import zio.json._
 
     ZIO
       .fromEither(input.getBody.fromJson[DeletePersonRequest])
       .mapError(err => RequestDeserializationProblem(s"Failed to deser delete person request, details: ${err}"))
-      .flatMap(request => API.deletePerson(context.getIdentity.getIdentityId, request))
+      .flatMap(request => API.deletePerson(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"), request))
       .provideSomeLayer(layers)
   }
 }
 
-class UpdatePerson extends Lambda with Layers {
+class UpdatePerson extends Lambda {
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
     import zio.json._
 
     ZIO
       .fromEither(input.getBody.fromJson[UpdatePersonRequest])
       .mapError(err => RequestDeserializationProblem(s"Failed to deser update person request, details: ${err}"))
-      .flatMap(request => API.updatePerson(context.getIdentity.getIdentityId, request))
+      .flatMap(request => API.updatePerson(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"), request))
       .provideSomeLayer(layers)
   }
 }
 
-class CreateInvitationToken extends Lambda with Layers {
+class CreateInvitationToken extends Lambda {
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
     import zio.json._
 
     ZIO
       .fromEither(input.getBody.fromJson[CreateInvitationTokenRequest])
       .mapError(err => RequestDeserializationProblem(s"Failed to deser create invite token request, details: ${err}"))
-      .flatMap(request => API.createInvitationToken(context.getIdentity.getIdentityId, request))
+      .flatMap(request => API.createInvitationToken(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"), request))
       .provideSomeLayer(layers)
   }
 }
 
-class CreateFamily extends Lambda with Layers {
+class CreateFamily extends Lambda {
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
     import zio.json._
 
     ZIO
       .fromEither(input.getBody.fromJson[CreateFamilyRequest])
       .mapError(err => RequestDeserializationProblem(s"Failed to deser create family request, details: ${err}"))
-      .flatMap(request => API.createFamily(context.getIdentity.getIdentityId, request))
+      .flatMap(request => API.createFamily(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"), request))
       .provideSomeLayer(layers)
   }
 }
 
-class UpdateFamily extends Lambda with Layers {
+class UpdateFamily extends Lambda {
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
     import zio.json._
 
     ZIO
       .fromEither(input.getBody.fromJson[UpdateFamilyRequest])
       .mapError(err => RequestDeserializationProblem(s"Failed to deser create update family request, details: ${err}"))
-      .flatMap(request => API.updateFamily(context.getIdentity.getIdentityId, request))
+      .flatMap(request => API.updateFamily(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"), request))
       .provideSomeLayer(layers)
   }
 }
 
-class DeleteFamily extends Lambda with Layers {
+class DeleteFamily extends Lambda {
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
     import zio.json._
 
     ZIO
       .fromEither(input.getBody.fromJson[DeleteFamilyRequest])
       .mapError(err => RequestDeserializationProblem(s"Failed to deser delete family request, details: ${err}"))
-      .flatMap(request => API.deleteFamily(context.getIdentity.getIdentityId, request))
+      .flatMap(request => API.deleteFamily(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"), request))
       .provideSomeLayer(layers)
   }
 }
