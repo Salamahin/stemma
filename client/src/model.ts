@@ -71,8 +71,8 @@ export class Model {
     }
 
     async getStemma(stemmaId: string) {
-        const response = await fetch(`${this.endpoint}/stemma`, {
-            method: 'GET',
+        const response = await fetch(`${this.endpoint}/stemma/get`, {
+            method: 'POST',
             headers: this.commonHeader,
             body: stemmaId
         })

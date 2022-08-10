@@ -230,8 +230,8 @@ Resources:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
-            Path: /stemma
-            Method: get
+            Path: /stemma/get
+            Method: post
   DeletePersonFunction:
     Type: AWS::Serverless::Function
     Metadata:
