@@ -3,8 +3,6 @@ testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
 libraryDependencies ++= Seq(
   "com.amazonaws"              % "aws-lambda-java-core"   % "1.2.1",
   "com.amazonaws"              % "aws-lambda-java-events" % "3.11.0",
-  "software.amazon.awssdk"     % "ssm"                    % Versions.awsV,
-  "software.amazon.awssdk"     % "url-connection-client"  % Versions.awsV,
   "org.postgresql"             % "postgresql"             % "42.4.1",
   "dev.zio"                    %% "zio"                   % Versions.zioV,
   "dev.zio"                    %% "zio-json"              % "0.3.0-RC10",

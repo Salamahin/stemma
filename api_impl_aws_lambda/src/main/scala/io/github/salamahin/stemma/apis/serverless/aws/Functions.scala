@@ -4,10 +4,6 @@ import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
 import io.github.salamahin.stemma.apis.API
 import io.github.salamahin.stemma.domain._
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
-import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient
-import software.amazon.awssdk.services.ssm.SsmClient
-import software.amazon.awssdk.services.ssm.model.GetParameterRequest
 import zio.ZIO
 import zio.json.DeriveJsonEncoder
 
@@ -16,26 +12,13 @@ case class TimeLogin(login: String, ts: Long, users: String)
 class HelloWorld extends Lambda with Layers {
   implicit val enc = DeriveJsonEncoder.gen[TimeLogin]
 
-  val client = SsmClient.builder()
-    .httpClient(UrlConnectionHttpClient.builder().build())
-    .credentialsProvider(DefaultCredentialsProvider.create())
-    .build()
-
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
     val email = input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email")
-    val jdbcUrl = getValue("jdbc_url")
-    val jdbcPassword = getValue("jdbc_password", isSecured = true)
-    val jdbcUser = getValue("jdbc_user")
+    val jdbcUrl = System.getenv("JDBC_URL")
+    val jdbcUser = System.getenv("JDBC_USER")
+    val jdbcPassword = System.getenv("JDBC_PASSWORD")
     val users = new SelectDemo(jdbcUrl, jdbcUser, jdbcPassword).selectUsers()
     ZIO.succeed(TimeLogin(email, System.currentTimeMillis(), users.toList.map(d => d.email).mkString("\n")))
-  }
-
-  private def getValue(key: String, isSecured: Boolean = false) = {
-    val request = GetParameterRequest.builder()
-      .withDecryption(isSecured)
-      .name(key)
-      .build()
-    client.getParameter(request).parameter().value()
   }
 }
 

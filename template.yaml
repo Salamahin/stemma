@@ -11,6 +11,9 @@ Globals:
     Environment:
       Variables:
         JAVA_TOOL_OPTIONS: -XX:+TieredCompilation -XX:TieredStopAtLevel=1
+        JDBC_URL: "{{resolve:secretsmanager:prod/jdbc:SecretString:JDBC_URL}}"
+        JDBC_USER: "{{resolve:secretsmanager:prod/jdbc:SecretString:JDBC_USER}}"
+        JDBC_PASSWORD: "{{resolve:secretsmanager:prod/jdbc:SecretString:JDBC_PASSWORD}}"
     Layers:
       - !Ref MyLayer
 
@@ -182,13 +185,6 @@ Resources:
       BuildMethod: makefile
     Properties:
       Handler: io.github.salamahin.stemma.apis.serverless.aws.HelloWorld::apply
-      Policies:
-        - SSMParameterReadPolicy:
-            ParameterName: "jdbc_url"
-        - SSMParameterReadPolicy:
-            ParameterName: "jdbc_password"
-        - SSMParameterReadPolicy:
-            ParameterName: "jdbc_user"
       Events:
         AdminExhibition:
           Type: HttpApi
