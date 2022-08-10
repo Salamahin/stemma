@@ -269,8 +269,8 @@ Resources:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
-            Path: /invite
-            Method: get
+            Path: /invite/create
+            Method: post
   BearInvitationTokenFunction:
     Type: AWS::Serverless::Function
     Metadata:

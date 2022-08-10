@@ -132,8 +132,8 @@ export class Model {
     }
 
     async createInvintation(stemmaId: string, personId: string, email: string) {
-        const response = await fetch(`${this.endpoint}/invite`, {
-            method: 'PUT',
+        const response = await fetch(`${this.endpoint}/invite/create`, {
+            method: 'POST',
             body: JSON.stringify({ targetPersonId: personId, targetPersonEmail: email }),
             headers: this.commonHeader
         })
