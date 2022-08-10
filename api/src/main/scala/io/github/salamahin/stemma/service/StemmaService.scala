@@ -156,7 +156,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
     transaction(graph)(ts => {
       for {
         person <- ops.describePerson(ts, targetPersonId)
-        effect = ops.chown(ts, targetPersonId, toUserId)
+        effect = ops.chown(ts, targetPersonId)
         _      <- ops.makeGraphOwner(ts, toUserId, person.stemmaId)
         _      <- effect.affectedPeople.traverse(p => ops.makePersonOwner(ts, toUserId, p))
         _      <- effect.affectedFamilies.traverse(f => ops.makeFamilyOwner(ts, toUserId, f))
