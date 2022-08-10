@@ -71,7 +71,7 @@ export class Model {
     }
 
     async getStemma(stemmaId: string) {
-        const response = await fetch(`${this.endpoint}/stemma/get`, {
+        const response = await fetch(`${this.endpoint}/get-stemma`, {
             method: 'POST',
             headers: this.commonHeader,
             body: stemmaId
@@ -132,7 +132,7 @@ export class Model {
     }
 
     async createInvintation(stemmaId: string, personId: string, email: string) {
-        const response = await fetch(`${this.endpoint}/invite/create`, {
+        const response = await fetch(`${this.endpoint}/create-invite`, {
             method: 'POST',
             body: JSON.stringify({ targetPersonId: personId, targetPersonEmail: email }),
             headers: this.commonHeader
