@@ -116,14 +116,14 @@ Resources:
                 - !Ref appbucket
                 - /*
       Bucket: !Ref appbucket
-  #  autosetloggroupretention:
-  #    Type: AWS::Serverless::Application
-  #    Properties:
-  #      Location:
-  #        ApplicationId: arn:aws:serverlessrepo:us-east-1:374852340823:applications/auto-set-log-group-retention
-  #        SemanticVersion: 1.5.0
-  #      Parameters:
-  #       RetentionDays: 3
+#  autosetloggroupretention:
+#    Type: AWS::Serverless::Application
+#    Properties:
+#      Location:
+#        ApplicationId: arn:aws:serverlessrepo:us-east-1:374852340823:applications/auto-set-log-group-retention
+#        SemanticVersion: 1.5.0
+#      Parameters:
+#       RetentionDays: 1
   AccessLogs:
     Type: AWS::Logs::LogGroup
     Properties:
