@@ -28,6 +28,7 @@ object GraphService extends LazyLogging {
           ZIO.attempt(
             new GraphService {
               override val graph: ScalaGraph = {
+                logger.debug("Graph service init start")
                 val g: SqlgGraph = SqlgGraph.open(config)
                 val scalaG       = g.asScala()
                 logger.debug("Graph service initiated")
