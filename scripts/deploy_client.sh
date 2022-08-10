@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 set -x
-export html_assets_bucket="stemma-app-appbucket-1tws50417h1zw"
-export cloudfront_distribution_id="E22WOJI3A2N1Q6"
+export html_assets_bucket="stemma-app-appbucket-ka4mb0u47xrb"
+export cloudfront_distribution_id="E5F8905QR70BK"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 aws s3 sync $SCRIPT_DIR/../client-demo/ s3://$html_assets_bucket/ \

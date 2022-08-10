@@ -182,6 +182,13 @@ Resources:
       BuildMethod: makefile
     Properties:
       Handler: io.github.salamahin.stemma.apis.serverless.aws.HelloWorld::apply
+      Policies:
+        - SSMParameterReadPolicy:
+            ParameterName: "jdbc_url"
+        - SSMParameterReadPolicy:
+            ParameterName: "jdbc_password"
+        - SSMParameterReadPolicy:
+            ParameterName: "jdbc_user"
       Events:
         AdminExhibition:
           Type: HttpApi
