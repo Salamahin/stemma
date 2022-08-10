@@ -9,7 +9,7 @@ libraryDependencies ++= Seq(
   "org.typelevel"              %% "cats-core"             % "2.8.0",
   "com.michaelpollmeier"       %% "gremlin-scala"         % "3.5.3.2",
   "org.umlg"                   % "sqlg-core"              % Versions.sqlgV,
-  "org.umlg"                   % "sqlg-postgres-dialect"  % Versions.sqlgV,
+  "org.umlg"                   % "sqlg-postgres"          % Versions.sqlgV,
   "org.umlg"                   % "sqlg-hikari"            % Versions.sqlgV,
   "org.postgresql"             % "postgresql"             % "42.4.1",
   "com.typesafe.scala-logging" %% "scala-logging"         % "3.9.4",
@@ -21,8 +21,7 @@ libraryDependencies ++= Seq(
 )
 
 assembly / assemblyMergeStrategy := {
-  case PathList("META-INF", xs@_*) => MergeStrategy.discard
-  case x => MergeStrategy.last
+  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+  case x                             => MergeStrategy.last
 }
 assembly / assemblyJarName := "stemma-api.jar"
-
