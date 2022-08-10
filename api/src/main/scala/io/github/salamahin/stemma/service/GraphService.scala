@@ -25,6 +25,8 @@ object GraphService {
           ZIO.attempt(
             new GraphService {
               override val graph: ScalaGraph = {
+                Class.forName("org.postgresql.Driver")
+
                 val g: SqlgGraph = SqlgGraph.open(config)
                 g.asScala()
               }
