@@ -193,136 +193,136 @@ Resources:
             ApiId: !Ref MyApi
             Path: /stemmas
             Method: get
-  DeleteStemmaFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.DeleteStemma::apply
-      Events:
-        AdminExhibition:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /stemma
-            Method: delete
-  CreateNewStemmaFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.CreateNewStemma::apply
-      Events:
-        AdminExhibition:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /stemma
-            Method: post
-  StemmaFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.Stemma::apply
-      Events:
-        AdminExhibition:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /stemma
-            Method: get
-  DeletePersonFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.DeletePerson::apply
-      Events:
-        AdminExhibition:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /person
-            Method: delete
-  UpdatePersonFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.UpdatePerson::apply
-      Events:
-        AdminExhibition:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /person
-            Method: put
-  CreateInvitationTokenFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.CreateInvitationToken::apply
-      Events:
-        AdminExhibition:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /invite
-            Method: get
-  BearInvitationTokenFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.BearInvitationStemma::apply
-      Events:
-        AdminExhibition:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /invite
-            Method: post
-  CreateFamilyFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.CreateFamily::apply
-      Events:
-        AdminExhibition:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /family
-            Method: post
-  UpdateFamilyFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.UpdateFamily::apply
-      Events:
-        AdminExhibition:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /family
-            Method: put
-  DeleteFamilyFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.DeleteFamily::apply
-      Events:
-        AdminExhibition:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /family
-            Method: delete
+#  DeleteStemmaFunction:
+#    Type: AWS::Serverless::Function
+#    Metadata:
+#      BuildMethod: makefile
+#    Properties:
+#      Handler: io.github.salamahin.stemma.apis.serverless.aws.DeleteStemma::apply
+#      Events:
+#        AdminExhibition:
+#          Type: HttpApi
+#          Properties:
+#            ApiId: !Ref MyApi
+#            Path: /stemma
+#            Method: delete
+#  CreateNewStemmaFunction:
+#    Type: AWS::Serverless::Function
+#    Metadata:
+#      BuildMethod: makefile
+#    Properties:
+#      Handler: io.github.salamahin.stemma.apis.serverless.aws.CreateNewStemma::apply
+#      Events:
+#        AdminExhibition:
+#          Type: HttpApi
+#          Properties:
+#            ApiId: !Ref MyApi
+#            Path: /stemma
+#            Method: post
+#  StemmaFunction:
+#    Type: AWS::Serverless::Function
+#    Metadata:
+#      BuildMethod: makefile
+#    Properties:
+#      Handler: io.github.salamahin.stemma.apis.serverless.aws.Stemma::apply
+#      Events:
+#        AdminExhibition:
+#          Type: HttpApi
+#          Properties:
+#            ApiId: !Ref MyApi
+#            Path: /stemma
+#            Method: get
+#  DeletePersonFunction:
+#    Type: AWS::Serverless::Function
+#    Metadata:
+#      BuildMethod: makefile
+#    Properties:
+#      Handler: io.github.salamahin.stemma.apis.serverless.aws.DeletePerson::apply
+#      Events:
+#        AdminExhibition:
+#          Type: HttpApi
+#          Properties:
+#            ApiId: !Ref MyApi
+#            Path: /person
+#            Method: delete
+#  UpdatePersonFunction:
+#    Type: AWS::Serverless::Function
+#    Metadata:
+#      BuildMethod: makefile
+#    Properties:
+#      Handler: io.github.salamahin.stemma.apis.serverless.aws.UpdatePerson::apply
+#      Events:
+#        AdminExhibition:
+#          Type: HttpApi
+#          Properties:
+#            ApiId: !Ref MyApi
+#            Path: /person
+#            Method: put
+#  CreateInvitationTokenFunction:
+#    Type: AWS::Serverless::Function
+#    Metadata:
+#      BuildMethod: makefile
+#    Properties:
+#      Handler: io.github.salamahin.stemma.apis.serverless.aws.CreateInvitationToken::apply
+#      Events:
+#        AdminExhibition:
+#          Type: HttpApi
+#          Properties:
+#            ApiId: !Ref MyApi
+#            Path: /invite
+#            Method: get
+#  BearInvitationTokenFunction:
+#    Type: AWS::Serverless::Function
+#    Metadata:
+#      BuildMethod: makefile
+#    Properties:
+#      Handler: io.github.salamahin.stemma.apis.serverless.aws.BearInvitationStemma::apply
+#      Events:
+#        AdminExhibition:
+#          Type: HttpApi
+#          Properties:
+#            ApiId: !Ref MyApi
+#            Path: /invite
+#            Method: post
+#  CreateFamilyFunction:
+#    Type: AWS::Serverless::Function
+#    Metadata:
+#      BuildMethod: makefile
+#    Properties:
+#      Handler: io.github.salamahin.stemma.apis.serverless.aws.CreateFamily::apply
+#      Events:
+#        AdminExhibition:
+#          Type: HttpApi
+#          Properties:
+#            ApiId: !Ref MyApi
+#            Path: /family
+#            Method: post
+#  UpdateFamilyFunction:
+#    Type: AWS::Serverless::Function
+#    Metadata:
+#      BuildMethod: makefile
+#    Properties:
+#      Handler: io.github.salamahin.stemma.apis.serverless.aws.UpdateFamily::apply
+#      Events:
+#        AdminExhibition:
+#          Type: HttpApi
+#          Properties:
+#            ApiId: !Ref MyApi
+#            Path: /family
+#            Method: put
+#  DeleteFamilyFunction:
+#    Type: AWS::Serverless::Function
+#    Metadata:
+#      BuildMethod: makefile
+#    Properties:
+#      Handler: io.github.salamahin.stemma.apis.serverless.aws.DeleteFamily::apply
+#      Events:
+#        AdminExhibition:
+#          Type: HttpApi
+#          Properties:
+#            ApiId: !Ref MyApi
+#            Path: /family
+#            Method: delete
 
 Outputs:
   ApiEndpoint:
