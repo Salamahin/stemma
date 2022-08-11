@@ -192,7 +192,7 @@ Resources:
           Properties:
             ApiId: !Ref MyApi
             Path: /stemmas
-            Method: get
+            Method: post
   DeleteStemmaFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -224,7 +224,7 @@ Resources:
     Metadata:
       BuildMethod: makefile
     Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.Stemma::apply
+      Handler: io.github.salamahin.stemma.apis.serverless.aws.GetStemma::apply
       Events:
         ApiEvent:
           Type: HttpApi
