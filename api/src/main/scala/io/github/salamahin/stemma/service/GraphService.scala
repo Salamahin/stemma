@@ -12,31 +12,31 @@ trait GraphService {
 }
 
 object GraphService extends LazyLogging {
-  val postgres: ZLayer[JdbcConfiguration with Scope, Throwable, GraphService] = ZLayer(
-    ZIO
-      .service[JdbcConfiguration]
-      .flatMap(conf => {
-        import gremlin.scala._
-        val config = new BaseConfiguration {
-          addPropertyDirect("jdbc.url", conf.jdbcUrl)
-          addPropertyDirect("jdbc.username", conf.jdbcUser)
-          addPropertyDirect("jdbc.password", conf.jdbcPassword)
-          addPropertyDirect("sqlg.dataSource", classOf[SqlgHikariDataSource].getCanonicalName)
-        }
+  def configure(jdbcConfiguration: JdbcConfiguration): ScalaGraph = {
+    logger.debug("Graph service init start")
 
-        ZIO.acquireRelease(
-          ZIO.attempt(
-            new GraphService {
-              override val graph: ScalaGraph = {
-                logger.debug("Graph service init start")
-                val g: SqlgGraph = SqlgGraph.open(config)
-                val scalaG       = g.asScala()
-                logger.debug("Graph service initiated")
-                scalaG
-              }
-            }
-          )
-        )(g => ZIO.succeed(g.graph.close()))
-      })
+    val config = new BaseConfiguration {
+      addPropertyDirect("jdbc.url", jdbcConfiguration.jdbcUrl)
+      addPropertyDirect("jdbc.username", jdbcConfiguration.jdbcUser)
+      addPropertyDirect("jdbc.password", jdbcConfiguration.jdbcPassword)
+      addPropertyDirect("sqlg.dataSource", classOf[SqlgHikariDataSource].getCanonicalName)
+    }
+
+    import gremlin.scala._
+    val g: SqlgGraph = SqlgGraph.open(config)
+    val scalaG       = g.asScala()
+
+    logger.debug("Graph service initiated")
+
+    scalaG
+  }
+
+  val scoped: ZLayer[JdbcConfiguration with Scope, Throwable, GraphService] = ZLayer.fromZIO(
+    for {
+      conf <- ZIO.service[JdbcConfiguration]
+      g    <- ZIO.acquireRelease(ZIO.attempt(configure(conf)))(g => ZIO.succeed(g.close()))
+    } yield new GraphService {
+      override val graph: ScalaGraph = g
+    }
   )
 }
