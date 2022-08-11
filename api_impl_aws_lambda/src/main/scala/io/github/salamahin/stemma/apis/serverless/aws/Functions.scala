@@ -6,7 +6,7 @@ import io.github.salamahin.stemma.domain._
 
 import java.util.Base64
 
-class ListStemmas extends Lambda[String, String] {
+class ListStemmas extends Lambda[String, OwnedStemmasDescription] {
   def run(email: String, request: String) = API.listStemmas(email).provideSomeLayer(layers)
 }
 
