@@ -12,6 +12,7 @@
     import fuzzysort from "fuzzysort";
     import RemoveStemmaModal from "./components/delete_stemma_modal/RemoveStemmaModal.svelte";
     import InviteModal, { CreateInviteLink } from "./components/invite_modal/InviteModal.svelte";
+    import { Circle2 } from "svelte-loading-spinners";
 
     export let google_client_id;
     export let stemma_backend_url;
@@ -161,46 +162,50 @@
 </script>
 
 {#if signedIn}
-    <Navbar
-        bind:ownedStemmasDescriptions
-        bind:selectedStemmaDescription
-        bind:lookupPersonName
-        on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
-        on:createNewFamily={() => familySelectionModal.promptNewFamily()}
-        on:removeStemma={(e) => removeStemmaModal.askForConfirmation(e.detail)}
-        on:invite={() => inviteModal.showInvintation()}
-    />
+    {#await expect}
+        <Circle2 />
+    {:then}
+        <Navbar
+            bind:ownedStemmasDescriptions
+            bind:selectedStemmaDescription
+            bind:lookupPersonName
+            on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
+            on:createNewFamily={() => familySelectionModal.promptNewFamily()}
+            on:removeStemma={(e) => removeStemmaModal.askForConfirmation(e.detail)}
+            on:invite={() => inviteModal.showInvintation()}
+        />
 
-    <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={(e) => handleNewStemma(e.detail)} />
+        <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={(e) => handleNewStemma(e.detail)} />
 
-    <RemoveStemmaModal bind:this={removeStemmaModal} on:stemmaRemoved={(e) => handleStemmaRemoval(e.detail)} />
+        <RemoveStemmaModal bind:this={removeStemmaModal} on:stemmaRemoved={(e) => handleStemmaRemoval(e.detail)} />
 
-    <FamilySelectionModal
-        bind:this={familySelectionModal}
-        stemma={selectedStemma}
-        {stemmaIndex}
-        on:familyAdded={(e) => handleNewFamilyCreation(e.detail)}
-        on:familyUpdated={(e) => handleFamilyUpdated(e.detail)}
-        on:familyRemoved={(e) => handleFamilyRemoved(e.detail)}
-    />
+        <FamilySelectionModal
+            bind:this={familySelectionModal}
+            stemma={selectedStemma}
+            {stemmaIndex}
+            on:familyAdded={(e) => handleNewFamilyCreation(e.detail)}
+            on:familyUpdated={(e) => handleFamilyUpdated(e.detail)}
+            on:familyRemoved={(e) => handleFamilyRemoved(e.detail)}
+        />
 
-    <PersonSelectionModal
-        bind:this={personSelectionModal}
-        on:personRemoved={(e) => handlePersonRemoved(e.detail)}
-        on:personUpdated={(e) => hadlePersonUpdated(e.detail)}
-    />
+        <PersonSelectionModal
+            bind:this={personSelectionModal}
+            on:personRemoved={(e) => handlePersonRemoved(e.detail)}
+            on:personUpdated={(e) => hadlePersonUpdated(e.detail)}
+        />
 
-    <FullStemma
-        bind:this={stemmaChart}
-        stemma={selectedStemma}
-        {stemmaIndex}
-        {highlight}
-        {pinnedPeople}
-        on:personSelected={(e) => handlePersonSelection(e.detail)}
-        on:familySelected={(e) => handleFamilySelection(e.detail)}
-    />
+        <FullStemma
+            bind:this={stemmaChart}
+            stemma={selectedStemma}
+            {stemmaIndex}
+            {highlight}
+            {pinnedPeople}
+            on:personSelected={(e) => handlePersonSelection(e.detail)}
+            on:familySelected={(e) => handleFamilySelection(e.detail)}
+        />
 
-    <InviteModal bind:this={inviteModal} stemma={selectedStemma} {stemmaIndex} on:invite={(e) => handleInvitationCreation(e.detail)} />
+        <InviteModal bind:this={inviteModal} stemma={selectedStemma} {stemmaIndex} on:invite={(e) => handleInvitationCreation(e.detail)} />
+    {/await}
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
