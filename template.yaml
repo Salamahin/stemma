@@ -27,7 +27,7 @@ Parameters:
   cloudFrontAlias:
     Description: ""
     Type: String
-    Default: "web.stemma.link"
+    Default: "stemma.link"
   apiAlias:
     Description: ""
     Type: String
