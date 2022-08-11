@@ -8,10 +8,10 @@ class PersonDefinitionTest extends AnyFunSuite with Matchers {
   import zio.json._
 
   test("parses existing person") {
-    """{"id": "personId"}""".fromJson[PersonDefinition] should be(Right(ExistingPerson("personId")))
+    """{"ExistingPerson": {"id": "personId"}}""".fromJson[PersonDefinition] should be(Right(ExistingPerson("personId")))
   }
 
   test("parses new person") {
-    """{"name": "personName"}""".fromJson[PersonDefinition] should be(Right(CreateNewPerson("personName", None, None, None)))
+    """{"CreateNewPerson": {"name": "personName"}}""".fromJson[PersonDefinition] should be(Right(CreateNewPerson("personName", None, None, None)))
   }
 }

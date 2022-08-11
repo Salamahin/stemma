@@ -1,6 +1,6 @@
 package io.github.salamahin.stemma.domain
 
-import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
+import zio.json.{DeriveJsonDecoder, JsonDecoder}
 
 import java.time.LocalDate
 
@@ -25,24 +25,20 @@ case class BearInvitationRequest(encodedToken: String)                          
 
 object PersonDefinition {
   implicit val decoder: JsonDecoder[PersonDefinition] = DeriveJsonDecoder.gen[PersonDefinition]
-  implicit val encoder: JsonEncoder[PersonDefinition] = DeriveJsonEncoder.gen[PersonDefinition]
 }
 
 object CreateNewPerson {
   implicit val decoder: JsonDecoder[CreateNewPerson] = DeriveJsonDecoder.gen[CreateNewPerson]
-  implicit val encoder: JsonEncoder[CreateNewPerson] = DeriveJsonEncoder.gen[CreateNewPerson]
 }
 
 object CreateFamily {
   implicit val decoder: JsonDecoder[CreateFamily] = DeriveJsonDecoder.gen[CreateFamily]
-  implicit val encoder: JsonEncoder[CreateFamily] = DeriveJsonEncoder.gen[CreateFamily]
 }
+
 object UpdatePersonRequest {
   implicit val decoder: JsonDecoder[UpdatePersonRequest] = DeriveJsonDecoder.gen[UpdatePersonRequest]
-  implicit val encoder: JsonEncoder[UpdatePersonRequest] = DeriveJsonEncoder.gen[UpdatePersonRequest]
 }
 
 object Request {
   implicit val requestDecoder: JsonDecoder[Request] = DeriveJsonDecoder.gen[Request]
-  implicit val requestEncoder: JsonEncoder[Request] = DeriveJsonEncoder.gen[Request]
 }
