@@ -2,10 +2,10 @@ package io.github.salamahin.stemma.apis.serverless.aws
 
 import io.github.salamahin.stemma.apis.API
 import io.github.salamahin.stemma.domain._
-import zio.Task
+import zio.{Task, ZIO}
 
 class StemmaLambda extends Lambda[Request, Response] {
-  override def run(email: String, request: Request): Task[Response] =
+  override def run(email: String, request: Request): ZIO[Any, StemmaError, Response] =
     (request match {
       case ListStemmasRequest()                     => API.listStemmas(email)
       case req @ CreateFamilyRequest(_, _)          => API.createFamily(email, req)

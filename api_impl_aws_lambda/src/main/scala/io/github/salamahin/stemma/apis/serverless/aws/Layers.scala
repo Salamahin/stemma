@@ -1,12 +1,13 @@
 package io.github.salamahin.stemma.apis.serverless.aws
 
 import gremlin.scala.ScalaGraph
+import io.github.salamahin.stemma.domain.{StemmaError, UnknownError}
 import io.github.salamahin.stemma.service._
 import org.apache.commons.configuration2.BaseConfiguration
 import org.umlg.sqlg.structure.SqlgGraph
 import org.umlg.sqlg.structure.ds.SqlgHikariDataSource
 import zio.Random.RandomLive
-import zio.{TaskLayer, ZIO, ZLayer}
+import zio.{ZIO, ZLayer}
 
 object Layers {
   @volatile private var gs: ScalaGraph = _
@@ -38,8 +39,8 @@ object Layers {
       })
   )
 
-  val layers: TaskLayer[StemmaService with UserService] =
-    ZLayer.succeed(RandomLive) >+>
+  val layers: ZLayer[Any, StemmaError, StemmaService with UserService] =
+    (ZLayer.succeed(RandomLive) >+>
       (InviteSecrets.fromEnv >+> JdbcConfiguration.fromEnv >+> hookedGraphService) >>>
-      (StemmaService.live ++ UserService.live)
+      (StemmaService.live ++ UserService.live)).mapError(exc => UnknownError(exc))
 }
