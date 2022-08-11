@@ -187,7 +187,7 @@ Resources:
     Properties:
       Handler: io.github.salamahin.stemma.apis.serverless.aws.ListStemmas::apply
       Events:
-        AdminExhibition:
+        ApiEvent:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
@@ -200,7 +200,7 @@ Resources:
     Properties:
       Handler: io.github.salamahin.stemma.apis.serverless.aws.DeleteStemma::apply
       Events:
-        AdminExhibition:
+        ApiEvent:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
@@ -213,7 +213,7 @@ Resources:
     Properties:
       Handler: io.github.salamahin.stemma.apis.serverless.aws.CreateNewStemma::apply
       Events:
-        AdminExhibition:
+        ApiEvent:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
@@ -226,7 +226,7 @@ Resources:
     Properties:
       Handler: io.github.salamahin.stemma.apis.serverless.aws.Stemma::apply
       Events:
-        AdminExhibition:
+        ApiEvent:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
@@ -239,7 +239,7 @@ Resources:
     Properties:
       Handler: io.github.salamahin.stemma.apis.serverless.aws.DeletePerson::apply
       Events:
-        AdminExhibition:
+        ApiEvent:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
@@ -252,7 +252,7 @@ Resources:
     Properties:
       Handler: io.github.salamahin.stemma.apis.serverless.aws.UpdatePerson::apply
       Events:
-        AdminExhibition:
+        ApiEvent:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
@@ -265,7 +265,7 @@ Resources:
     Properties:
       Handler: io.github.salamahin.stemma.apis.serverless.aws.CreateInvitationToken::apply
       Events:
-        AdminExhibition:
+        ApiEvent:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
@@ -278,7 +278,7 @@ Resources:
     Properties:
       Handler: io.github.salamahin.stemma.apis.serverless.aws.BearInvitationStemma::apply
       Events:
-        AdminExhibition:
+        ApiEvent:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
@@ -291,7 +291,7 @@ Resources:
     Properties:
       Handler: io.github.salamahin.stemma.apis.serverless.aws.CreateFamily::apply
       Events:
-        AdminExhibition:
+        ApiEvent:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
@@ -304,7 +304,7 @@ Resources:
     Properties:
       Handler: io.github.salamahin.stemma.apis.serverless.aws.UpdateFamily::apply
       Events:
-        AdminExhibition:
+        ApiEvent:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
@@ -317,7 +317,7 @@ Resources:
     Properties:
       Handler: io.github.salamahin.stemma.apis.serverless.aws.DeleteFamily::apply
       Events:
-        AdminExhibition:
+        ApiEvent:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
