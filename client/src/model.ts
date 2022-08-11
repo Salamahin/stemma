@@ -57,7 +57,7 @@ export class Model {
         const response = await fetch(`${this.endpoint}/stemmas`, {
             method: 'POST',
             headers: this.commonHeader,
-            body: "placeholder"
+            body: '{"payload": "placeholder"}'
         })
         return await this.parseResponse<OwnedStemmas>(response);
     }

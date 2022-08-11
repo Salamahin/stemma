@@ -185,33 +185,7 @@ Resources:
     Metadata:
       BuildMethod: makefile
     Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.ListStemmas::apply
-      Events:
-        ApiEvent:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /stemmas
-            Method: post
-  DeleteStemmaFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.DeleteStemma::apply
-      Events:
-        ApiEvent:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /stemma
-            Method: delete
-  CreateNewStemmaFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.CreateNewStemma::apply
+      Handler: io.github.salamahin.stemma.apis.serverless.aws.StemmaLambda::apply
       Events:
         ApiEvent:
           Type: HttpApi
@@ -219,110 +193,6 @@ Resources:
             ApiId: !Ref MyApi
             Path: /stemma
             Method: post
-  StemmaFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.GetStemma::apply
-      Events:
-        ApiEvent:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /get-stemma
-            Method: post
-  DeletePersonFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.DeletePerson::apply
-      Events:
-        ApiEvent:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /person
-            Method: delete
-  UpdatePersonFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.UpdatePerson::apply
-      Events:
-        ApiEvent:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /person
-            Method: put
-  CreateInvitationTokenFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.CreateInvitationToken::apply
-      Events:
-        ApiEvent:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /create-invite
-            Method: post
-  BearInvitationTokenFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.BearInvitationStemma::apply
-      Events:
-        ApiEvent:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /invite
-            Method: post
-  CreateFamilyFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.CreateFamily::apply
-      Events:
-        ApiEvent:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /family
-            Method: post
-  UpdateFamilyFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.UpdateFamily::apply
-      Events:
-        ApiEvent:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /family
-            Method: put
-  DeleteFamilyFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.DeleteFamily::apply
-      Events:
-        ApiEvent:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MyApi
-            Path: /family
-            Method: delete
 
 Outputs:
   ApiEndpoint:
