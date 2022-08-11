@@ -192,7 +192,7 @@ Resources:
           Properties:
             ApiId: !Ref MyApi
             Path: /stemmas
-            Method: get
+            Method: post
   DeleteStemmaFunction:
     Type: AWS::Serverless::Function
     Metadata:

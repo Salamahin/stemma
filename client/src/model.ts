@@ -55,7 +55,7 @@ export class Model {
 
     async listStemmas() {
         const response = await fetch(`${this.endpoint}/stemmas`, {
-            method: 'GET',
+            method: 'POST',
             headers: this.commonHeader,
             body: ""
         })
