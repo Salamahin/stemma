@@ -224,7 +224,7 @@ Resources:
     Metadata:
       BuildMethod: makefile
     Properties:
-      Handler: io.github.salamahin.stemma.apis.serverless.aws.Stemma::apply
+      Handler: io.github.salamahin.stemma.apis.serverless.aws.GetStemma::apply
       Events:
         AdminExhibition:
           Type: HttpApi
