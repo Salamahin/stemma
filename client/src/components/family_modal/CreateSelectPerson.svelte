@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Stemma, PersonDefinition } from "../../model";
+  import { Stemma, CreateNewPerson, PersonDescription } from "../../model";
   import { StemmaIndex } from "../../stemmaIndex";
   import Select from "svelte-select";
   import Carousel from "svelte-carousel";
@@ -10,7 +10,7 @@
   export let stemmaIndex: StemmaIndex;
   export let stemma: Stemma;
 
-  let namesakes: PersonDefinition[] = [];
+  let namesakes: (CreateNewPerson | PersonDescription)[] = [];
   let peopleNames: string[];
 
   let clearIcon = ClearIcon;

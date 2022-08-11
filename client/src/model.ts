@@ -1,5 +1,5 @@
 //requests
-export type PersonDefinition = ExistingPerson | CreateNewPerson
+export type PersonDefinition = { ExistingPerson?: ExistingPerson, CreateNewPerson?: CreateNewPerson }
 export type ExistingPerson = { id: string }
 export type CreateNewPerson = { name: string, birthDate?: string, deathDate?: string, bio?: string }
 
@@ -85,9 +85,9 @@ export class Model {
 
     private makeFamily(parents: PersonDefinition[], children: PersonDefinition[]) {
         let cf = {
-            parent1: parents.length > 0 ? this.sanitize(parents[0]) : null,
-            parent2: parents.length > 1 ? this.sanitize(parents[1]) : null,
-            children: children.map(c => this.sanitize(c)),
+            parent1: parents.length > 0 ? this.sanitize(parents[0]) as PersonDefinition : null,
+            parent2: parents.length > 1 ? this.sanitize(parents[1]) as PersonDefinition : null,
+            children: children.map(c => this.sanitize(c) as PersonDefinition),
         };
 
         return cf as CreateFamily

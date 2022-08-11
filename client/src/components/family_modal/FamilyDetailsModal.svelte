@@ -1,5 +1,5 @@
 <script context="module" lang="ts">
-    import { FamilyDescription, PersonDefinition } from "../../model";
+    import { CreateNewPerson, FamilyDescription, PersonDefinition, PersonDescription } from "../../model";
     import * as bootstrap from "bootstrap";
 
     export type GetOrCreateFamily = {
@@ -26,8 +26,8 @@
     let selected = null;
     let familyId = null;
 
-    let parents: PersonDefinition[] = [];
-    let children: PersonDefinition[] = [];
+    let parents: (CreateNewPerson | PersonDescription)[] = [];
+    let children: (CreateNewPerson | PersonDescription)[] = [];
 
     let selectedParentsCount, selectedChildrenCount;
     let readOnly: boolean;
@@ -73,9 +73,18 @@
         showFamilyComposition();
     }
 
+    function toPersonDefinition(pd: CreateNewPerson | PersonDescription): PersonDefinition {
+        if ("id" in pd) return { ExistingPerson: { id: pd.id } };
+        else return { CreateNewPerson: pd as CreateNewPerson };
+    }
+
     function saveFamily() {
-        if (familyId == null) dispatch("familyAdded", { parents: parents, children: children });
-        else dispatch("familyUpdated", { familyId: familyId, parents: parents, children: children });
+        let pp = parents.map((p) => toPersonDefinition(p));
+        let cc = children.map((c) => toPersonDefinition(c));
+
+        if (familyId == null) dispatch("familyAdded", { parents: pp, children: cc });
+        else dispatch("familyUpdated", { familyId: familyId, parents: pp, children: cc });
+        
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     }
 
