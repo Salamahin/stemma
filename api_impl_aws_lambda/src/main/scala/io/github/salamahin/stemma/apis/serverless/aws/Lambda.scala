@@ -17,17 +17,23 @@ abstract class Lambda[In, Out](implicit jsonDecoder: JsonDecoder[In], jsonEncode
 
     val request = ZIO
       .attempt(new String(Base64.getDecoder.decode(input.getBody)))
+      .map { body =>
+        logger.debug(s"Received request body: ${body}")
+        body
+      }
       .flatMap(str => ZIO.fromEither(str.fromJson[In]))
       .mapError(err => RequestDeserializationProblem(s"Failed to deser the request, details: ${err}"))
 
     val zio = for {
       (email, body) <- email <&> request
       res           <- run(email, body)
-    } yield res
+      json          = res.toJson
+      _             = logger.debug(s"Generated response: ${json}")
+    } yield json
 
     Unsafe.unsafe { implicit u =>
       Runtime.default.unsafe.run(zio) match {
-        case Exit.Success(value) => value.toJson
+        case Exit.Success(json) => json
         case Exit.Failure(cause) =>
           logger.error(s"Unexpected error", cause.squash)
           throw new IllegalStateException(cause.squash)

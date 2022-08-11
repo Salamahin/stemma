@@ -1,9 +1,10 @@
 package io.github.salamahin.stemma.service
 
 import gremlin.scala.ScalaGraph
-import io.github.salamahin.stemma.domain.{InvalidInviteToken, InviteToken, User}
+import io.github.salamahin.stemma.domain.{InvalidInviteToken, User}
 import io.github.salamahin.stemma.tinkerpop.StemmaRepository
 import io.github.salamahin.stemma.tinkerpop.Transaction.transactionSafe
+import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
 import zio.{IO, Random, UIO, URLayer, ZIO, ZLayer}
 
 import java.security.MessageDigest
@@ -11,6 +12,13 @@ import java.util
 import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
+
+case class InviteToken(inviteesEmail: String, targetPersonId: String, entropy: String)
+
+object InviteToken {
+  implicit val decoder: JsonDecoder[InviteToken] = DeriveJsonDecoder.gen[InviteToken]
+  implicit val encoder: JsonEncoder[InviteToken] = DeriveJsonEncoder.gen[InviteToken]
+}
 
 trait UserService {
   def createInviteToken(inviteeEmail: String, associatedPersonId: String): UIO[String]

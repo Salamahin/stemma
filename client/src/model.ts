@@ -54,28 +54,28 @@ export class Model {
     }
 
     async listStemmas() {
-        const response = await fetch(`${this.endpoint}/stemmas`, {
+        const response = await fetch(`${this.endpoint}/stemma`, {
             method: 'POST',
             headers: this.commonHeader,
-            body: "placeholder"
+            body: '{"ListStemmaRequest": {}}'
         })
         return await this.parseResponse<OwnedStemmas>(response);
     }
 
     async removeStemma(stemmaId) {
         const response = await fetch(`${this.endpoint}/stemma`, {
-            method: 'DELETE',
+            method: 'POST',
             headers: this.commonHeader,
-            body: stemmaId
+            body: `{"DeleteStemmaRequest": {"stemmaId": "${stemmaId}"}}`
         })
         return await this.parseResponse<OwnedStemmas>(response);
     }
 
     async getStemma(stemmaId: string) {
-        const response = await fetch(`${this.endpoint}/get-stemma`, {
+        const response = await fetch(`${this.endpoint}/stemma`, {
             method: 'POST',
             headers: this.commonHeader,
-            body: stemmaId
+            body: `{"GetStemmaRequest": {"stemmaId": "${stemmaId}"}}`
         })
         return await this.parseResponse<Stemma>(response);
     }
@@ -87,7 +87,7 @@ export class Model {
             "children": children.map(c => this.sanitize(c))
         }
 
-        const response = await fetch(`${this.endpoint}/family`, {
+        const response = await fetch(`${this.endpoint}/stemma`, {
             method: 'POST',
             headers: this.commonHeader,
             body: JSON.stringify({ stemmaId: stemmaId, familyDescr: request })
@@ -103,8 +103,8 @@ export class Model {
             "children": children.map(c => this.sanitize(c))
         }
 
-        const response = await fetch(`${this.endpoint}/family`, {
-            method: 'PUT',
+        const response = await fetch(`${this.endpoint}/stemma`, {
+            method: 'POST',
             headers: this.commonHeader,
             body: JSON.stringify({ stemmaId: stemmaId, familyId: familyId, familyDescr: request })
         })
@@ -123,8 +123,8 @@ export class Model {
     }
 
     async removePerson(stemmaId: string, personId: string) {
-        const response = await fetch(`${this.endpoint}/person`, {
-            method: 'DELETE',
+        const response = await fetch(`${this.endpoint}/stemma`, {
+            method: 'POST',
             headers: this.commonHeader,
             body: JSON.stringify({ stemmaId: stemmaId, personId: personId })
         })
@@ -133,7 +133,7 @@ export class Model {
     }
 
     async createInvintation(stemmaId: string, personId: string, email: string) {
-        const response = await fetch(`${this.endpoint}/create-invite`, {
+        const response = await fetch(`${this.endpoint}/stemma`, {
             method: 'POST',
             body: JSON.stringify({ targetPersonId: personId, targetPersonEmail: email }),
             headers: this.commonHeader
@@ -143,8 +143,8 @@ export class Model {
     }
 
     async proposeInvitationToken(token: string) {
-        const response = await fetch(`${this.endpoint}/invite`, {
-            method: 'PUT',
+        const response = await fetch(`${this.endpoint}/stemma`, {
+            method: 'POST',
             body: decodeURIComponent(token),
             headers: this.commonHeader
         })
@@ -153,8 +153,8 @@ export class Model {
     }
 
     async removeFamily(stemmaId: string, familyId: string) {
-        const response = await fetch(`${this.endpoint}/family`, {
-            method: 'DELETE',
+        const response = await fetch(`${this.endpoint}/stemma`, {
+            method: 'POST',
             headers: this.commonHeader,
             body: JSON.stringify({ stemmaId: stemmaId, familyId: familyId })
         })
@@ -163,8 +163,8 @@ export class Model {
     }
 
     async updatePerson(stemmaId: string, personId: string, descr: NewPerson) {
-        const response = await fetch(`${this.endpoint}/person`, {
-            method: 'PUT',
+        const response = await fetch(`${this.endpoint}/stemma`, {
+            method: 'POST',
             headers: this.commonHeader,
             body: JSON.stringify((
                 {
