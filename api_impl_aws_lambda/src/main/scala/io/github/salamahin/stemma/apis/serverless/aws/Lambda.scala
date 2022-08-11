@@ -4,15 +4,10 @@ import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
 import com.typesafe.scalalogging.LazyLogging
 import io.github.salamahin.stemma.domain.{RequestDeserializationProblem, StemmaError}
-import zio.json.{DecoderOps, DeriveJsonEncoder, EncoderOps, JsonDecoder, JsonEncoder}
+import zio.json.{DecoderOps, EncoderOps, JsonDecoder, JsonEncoder}
 import zio.{Exit, Runtime, Unsafe, ZIO}
 
 import java.util.Base64
-
-case class AwsLambdaException(errorType: String, httpStatus: Int, requestId: String, message: StemmaError)
-object AwsLambdaException {
-  implicit val enc = DeriveJsonEncoder.gen[AwsLambdaException]
-}
 
 abstract class Lambda[In, Out](implicit jsonDecoder: JsonDecoder[In], jsonEncoder: JsonEncoder[Out]) extends LazyLogging {
   def run(email: String, request: In): ZIO[Any, StemmaError, Out]
@@ -41,7 +36,7 @@ abstract class Lambda[In, Out](implicit jsonDecoder: JsonDecoder[In], jsonEncode
         case Exit.Success(json) => json
         case Exit.Failure(cause) =>
           logger.error(s"Unexpected error", cause.squash)
-          AwsLambdaException("BadRequest", 400, context.getAwsRequestId, cause.failureOption.get).toJson
+          throw cause.squash
       }
     }
   }
