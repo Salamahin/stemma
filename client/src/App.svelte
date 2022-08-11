@@ -51,22 +51,22 @@
                 .then(() => {
                     urlParams.delete("inviteToken");
                     window.history.pushState({}, document.title, window.location.pathname);
-                    model.listStemmas().then((stemmas) => (ownedStemmasDescriptions = stemmas.stemmas));
+                    expect = model.listStemmas().then((stemmas) => (ownedStemmasDescriptions = stemmas.stemmas));
                 });
         } else {
-            model.listStemmas().then((stemmas) => (ownedStemmasDescriptions = stemmas.stemmas));
+            expect = model.listStemmas().then((stemmas) => (ownedStemmasDescriptions = stemmas.stemmas));
         }
     }
 
     function handleNewStemma(name: string) {
-        model.addStemma(name).then((newStemmaDescription) => {
+        expect = model.addStemma(name).then((newStemmaDescription) => {
             ownedStemmasDescriptions = [...ownedStemmasDescriptions, newStemmaDescription];
             selectedStemmaDescription = newStemmaDescription;
         });
     }
 
     function handleNewFamilyCreation(request: GetOrCreateFamily) {
-        model.createFamily(selectedStemmaDescription.id, request.parents, request.children).then((s) => (selectedStemma = s));
+        expect = model.createFamily(selectedStemmaDescription.id, request.parents, request.children).then((s) => (selectedStemma = s));
     }
 
     function hadlePersonUpdated(request: UpdatePerson) {
@@ -79,20 +79,21 @@
             originalPerson.deathDate != request.description.deathDate ||
             originalPerson.name != request.description.name ||
             originalPerson.bio != request.description.bio
-        )
-            model.updatePerson(selectedStemmaDescription.id, request.id, request.description).then((s) => (selectedStemma = s));
+        ) {
+            expect = model.updatePerson(selectedStemmaDescription.id, request.id, request.description).then((s) => (selectedStemma = s));
+        }
     }
 
     function handleFamilyUpdated(request: GetOrCreateFamily) {
-        model.updateFamily(selectedStemmaDescription.id, request.familyId, request.parents, request.children).then((s) => (selectedStemma = s));
+        expect = model.updateFamily(selectedStemmaDescription.id, request.familyId, request.parents, request.children).then((s) => (selectedStemma = s));
     }
 
     function handleFamilyRemoved(familyId: string) {
-        model.removeFamily(selectedStemmaDescription.id, familyId).then((s) => (selectedStemma = s));
+        expect = model.removeFamily(selectedStemmaDescription.id, familyId).then((s) => (selectedStemma = s));
     }
 
     function handlePersonRemoved(personId: string) {
-        model.removePerson(selectedStemmaDescription.id, personId).then((s) => (selectedStemma = s));
+        expect = model.removePerson(selectedStemmaDescription.id, personId).then((s) => (selectedStemma = s));
         pinnedPeople = pinnedPeople.remove(personId);
     }
 
@@ -105,11 +106,11 @@
     }
 
     function handleStemmaRemoval(stemmaId) {
-        model.removeStemma(stemmaId).then((st) => (ownedStemmasDescriptions = st.stemmas));
+        expect = model.removeStemma(stemmaId).then((st) => (ownedStemmasDescriptions = st.stemmas));
     }
 
     function handleInvitationCreation(e: CreateInviteLink) {
-        model.createInvintation(e.personId, e.email).then((link) => inviteModal.setInviteLink(link));
+        expect = model.createInvintation(e.personId, e.email).then((link) => inviteModal.setInviteLink(link));
     }
 
     function updateEverythingOnStemmaChange(stemmaId: string, stemma: Stemma) {
@@ -163,7 +164,12 @@
 
 {#if signedIn}
     {#await expect}
-        <Circle2 />
+        <div class="vh-100">
+            <div class="await-placeholder d-flex flex-column">
+                <Circle2 />
+                <p class="text-center mt-2">Секунду</p>
+            </div>
+        </div>
     {:then}
         <Navbar
             bind:ownedStemmasDescriptions
@@ -222,7 +228,8 @@
         background-size: cover;
     }
 
-    .authenticate-holder {
+    .authenticate-holder,
+    .await-placeholder {
         display: flex;
         justify-content: center;
         align-items: center;
