@@ -56,7 +56,8 @@ export class Model {
     async listStemmas() {
         const response = await fetch(`${this.endpoint}/stemmas`, {
             method: 'GET',
-            headers: this.commonHeader
+            headers: this.commonHeader,
+            body: ""
         })
         return await this.parseResponse<OwnedStemmas>(response);
     }
