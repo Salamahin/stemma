@@ -1,11 +1,11 @@
 <script context="module" lang="ts">
-    import { Family, NewPerson, StoredPerson } from "../../model";
+    import { FamilyDescription, PersonDefinition } from "../../model";
     import * as bootstrap from "bootstrap";
 
     export type GetOrCreateFamily = {
         familyId?: string;
-        parents: (NewPerson | StoredPerson)[];
-        children: (NewPerson | StoredPerson)[];
+        parents: PersonDefinition[];
+        children: PersonDefinition[];
     };
 </script>
 
@@ -26,8 +26,8 @@
     let selected = null;
     let familyId = null;
 
-    let parents: (NewPerson | StoredPerson)[] = [];
-    let children: (NewPerson | StoredPerson)[] = [];
+    let parents: PersonDefinition[] = [];
+    let children: PersonDefinition[] = [];
 
     let selectedParentsCount, selectedChildrenCount;
     let readOnly: boolean;
@@ -37,7 +37,7 @@
     export let stemma: Stemma;
     export let stemmaIndex: StemmaIndex;
 
-    export function showExistingFamily(details: Family) {
+    export function showExistingFamily(details: FamilyDescription) {
         familyId = details.id;
         parents = details.parents.map((pid) => stemmaIndex.person(pid));
         children = details.children.map((cid) => stemmaIndex.person(cid));

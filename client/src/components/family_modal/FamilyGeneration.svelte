@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { NewPerson, StoredPerson } from "../../model";
+  import { CreateNewPerson, PersonDescription } from "../../model";
 
-  export let selectedPeople: (StoredPerson | NewPerson)[] = [];
+  export let selectedPeople: (PersonDescription | CreateNewPerson)[] = [];
   export let readOnly: boolean;
 
   function remove(index: number) {

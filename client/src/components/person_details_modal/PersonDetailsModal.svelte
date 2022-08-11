@@ -1,15 +1,15 @@
 <script context="module" lang="ts">
-    import { StoredPerson, NewPerson } from "../../model";
+    import { PersonDescription, CreateNewPerson } from "../../model";
 
     export type UpdatePerson = {
         id: string;
         pin: boolean;
-        description: NewPerson;
+        description: CreateNewPerson;
     };
 
     export type ShowPerson = {
         pin: boolean;
-        description: StoredPerson;
+        description: PersonDescription;
     };
 </script>
 

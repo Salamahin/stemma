@@ -5,7 +5,7 @@
     import FamilySelectionModal, { GetOrCreateFamily } from "./components/family_modal/FamilyDetailsModal.svelte";
     import PersonSelectionModal, { UpdatePerson } from "./components/person_details_modal/PersonDetailsModal.svelte";
     import FullStemma from "./components/FullStemma.svelte";
-    import { Model, StemmaDescription, User, Stemma, StoredPerson, Family } from "./model";
+    import { Model, StemmaDescription, User, Stemma, PersonDescription, FamilyDescription } from "./model";
     import { StemmaIndex } from "./stemmaIndex";
     import { HiglightLineages } from "./highlight";
     import { PinnedPeopleStorage } from "./pinnedPeopleStorage";
@@ -93,11 +93,11 @@
         pinnedPeople = pinnedPeople.remove(personId);
     }
 
-    function handlePersonSelection(personDetails: StoredPerson) {
+    function handlePersonSelection(personDetails: PersonDescription) {
         personSelectionModal.showPersonDetails({ description: personDetails, pin: pinnedPeople.isPinned(personDetails.id) });
     }
 
-    function handleFamilySelection(familyDetails: Family) {
+    function handleFamilySelection(familyDetails: FamilyDescription) {
         familySelectionModal.showExistingFamily(familyDetails);
     }
 
@@ -106,7 +106,7 @@
     }
 
     function handleInvitationCreation(e: CreateInviteLink) {
-        model.createInvintation(selectedStemmaDescription.id, e.personId, e.email).then((link) => inviteModal.setInviteLink(link));
+        model.createInvintation(e.personId, e.email).then((link) => inviteModal.setInviteLink(link));
     }
 
     function updateEverythingOnStemmaChange(stemmaId: string, stemma: Stemma) {

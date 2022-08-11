@@ -8,13 +8,12 @@
 <script lang="ts">
     import Select from "svelte-select";
     import * as bootstrap from "bootstrap";
-    import { Stemma, StoredPerson } from "../../model";
+    import { Stemma, PersonDescription } from "../../model";
     import ClearIcon from "../misc/ClearIconTranslated.svelte";
     import { createEventDispatcher } from "svelte";
     import { StemmaIndex } from "../../stemmaIndex";
     import Carousel from "svelte-carousel";
     import VisualPersonDescription from "../misc/VisualPersonDescription.svelte";
-    import { onMount } from "svelte";
 
     let modalEl;
     let copyBtn;
@@ -22,7 +21,7 @@
     export let stemmaIndex: StemmaIndex;
     export let stemma: Stemma;
 
-    let namesakes: StoredPerson[] = [];
+    let namesakes: PersonDescription[] = [];
     let peopleNames: string[];
 
     let clearIcon = ClearIcon;

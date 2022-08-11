@@ -1,45 +1,60 @@
-export type NewPerson = {
-    name: string;
-    birthDate?: string;
-    deathDate?: string;
-    bio?: string
+//requests
+export type PersonDefinition = ExistingPerson | CreateNewPerson
+export type ExistingPerson = { id: string }
+export type CreateNewPerson = { name: string, birthDate?: string, deathDate?: string, bio?: string }
+
+export type CreateFamily = { parent1?: PersonDefinition, parent2?: PersonDefinition, children: Array<PersonDefinition> }
+
+export type CreateFamilyRequest = { stemmaId: string, familyDescr: CreateFamily }
+export type CreateInvitationTokenRequest = { targetPersonId: string, targetPersonEmail: string }
+export type CreateNewStemmaRequest = { stemmaName: string }
+export type DeleteFamilyRequest = { stemmaId: string, familyId: string }
+export type DeletePersonRequest = { stemmaId: string, personId: string }
+export type GetStemmaRequest = { stemmaId: string }
+export type DeleteStemmaRequest = { stemmaId: string }
+export type UpdatePersonRequest = { stemmaId: string, personId: string, personDescr: CreateNewPerson }
+export type UpdateFamilyRequest = { stemmaId: string, familyId: string, familyDescr: CreateFamily }
+export type BearInvitationRequest = { encodedToken: string }
+export type ListStemmasRequest = {}
+
+type CompositeRequest = {
+    CreateFamilyRequest?: CreateFamilyRequest,
+    UpdateFamilyRequest?: UpdateFamilyRequest,
+    DeleteFamilyRequest?: DeleteFamilyRequest,
+    CreateInvitationTokenRequest?: CreateInvitationTokenRequest,
+    BearInvitationRequest?: BearInvitationRequest,
+    CreateNewStemmaRequest?: CreateNewStemmaRequest,
+    GetStemmaRequest?: GetStemmaRequest,
+    DeleteStemmaRequest?: DeleteStemmaRequest,
+    ListStemmasRequest?: ListStemmasRequest,
+    DeletePersonRequest?: DeletePersonRequest,
+    UpdatePersonRequest?: UpdatePersonRequest,
 }
 
-export type StoredPerson = {
-    id: string;
-    name: string;
-    birthDate?: string;
-    deathDate?: string;
-    bio?: string;
-    readOnly: boolean
+
+//responses
+export type ChownEffect = { affectedFamilies: Array<string>, affectedPeople: Array<string> }
+export type FamilyDescription = { id: string, parents: Array<string>, children: Array<string>, readOnly: boolean }
+export type InviteToken = { token: string }
+export type OwnedStemmasDescription = { stemmas: Array<StemmaDescription> }
+export type Stemma = { people: Array<PersonDescription>, families: Array<FamilyDescription> }
+export type StemmaDescription = { id: string, name: string, removable: Boolean }
+export type PersonDescription = { id: string, name: string, birthDate?: string, deathDate?: string, bio?: string, readOnly: boolean }
+export type TokenAccepted = {}
+
+type CompositeResponse = {
+    ChownEffect?: ChownEffect,
+    FamilyDescription?: FamilyDescription,
+    InviteToken?: InviteToken,
+    OwnedStemmasDescription?: OwnedStemmasDescription,
+    Stemma?: Stemma,
+    StemmaDescription?: StemmaDescription,
+    PersonDescription?: PersonDescription,
+    TokenAccepted?: TokenAccepted
 }
 
-export type Family = {
-    id: string;
-    parents: string[];
-    children: string[];
-    readOnly: boolean
-}
-
-export type Stemma = {
-    people: StoredPerson[];
-    families: Family[];
-}
-
-export type User = {
-    id_token: string;
-    image_url: string;
-    name: string;
-};
-
-export type StemmaDescription = {
-    id: string,
-    name: string
-}
-
-export type OwnedStemmas = {
-    stemmas: StemmaDescription[]
-}
+//aux
+export type User = { id_token: string }
 
 export class Model {
     endpoint: string;
@@ -53,144 +68,85 @@ export class Model {
         }
     }
 
-    async listStemmas() {
-        const response = await fetch(`${this.endpoint}/stemma`, {
-            method: 'POST',
-            headers: this.commonHeader,
-            body: '{"ListStemmaRequest": {}}'
-        })
-        return await this.parseResponse<OwnedStemmas>(response);
+    async listStemmas(): Promise<OwnedStemmasDescription> {
+        const response = await this.sendRequest({ ListStemmasRequest: {} })
+        return (await this.parseResponse(response)).OwnedStemmasDescription;
     }
 
-    async removeStemma(stemmaId) {
-        const response = await fetch(`${this.endpoint}/stemma`, {
-            method: 'POST',
-            headers: this.commonHeader,
-            body: `{"DeleteStemmaRequest": {"stemmaId": "${stemmaId}"}}`
-        })
-        return await this.parseResponse<OwnedStemmas>(response);
+    async removeStemma(stemmaId: string): Promise<OwnedStemmasDescription> {
+        const response = await this.sendRequest({ DeleteStemmaRequest: { stemmaId: stemmaId } })
+        return (await this.parseResponse(response)).OwnedStemmasDescription;
     }
 
-    async getStemma(stemmaId: string) {
-        const response = await fetch(`${this.endpoint}/stemma`, {
-            method: 'POST',
-            headers: this.commonHeader,
-            body: `{"GetStemmaRequest": {"stemmaId": "${stemmaId}"}}`
-        })
-        return await this.parseResponse<Stemma>(response);
+    async getStemma(stemmaId: string): Promise<Stemma> {
+        const response = await this.sendRequest({ GetStemmaRequest: { stemmaId: stemmaId } })
+        return (await this.parseResponse(response)).Stemma;
     }
 
-    async createFamily(stemmaId: string, parents: (NewPerson | StoredPerson)[], children: (NewPerson | StoredPerson)[]) {
-        let request = {
-            "parent1": parents.length > 0 ? this.sanitize(parents[0]) : null,
-            "parent2": parents.length > 1 ? this.sanitize(parents[1]) : null,
-            "children": children.map(c => this.sanitize(c))
-        }
+    private makeFamily(parents: PersonDefinition[], children: PersonDefinition[]) {
+        let cf = {
+            parent1: parents.length > 0 ? this.sanitize(parents[0]) : null,
+            parent2: parents.length > 1 ? this.sanitize(parents[1]) : null,
+            children: children.map(c => this.sanitize(c)),
+        };
 
-        const response = await fetch(`${this.endpoint}/stemma`, {
-            method: 'POST',
-            headers: this.commonHeader,
-            body: JSON.stringify({ stemmaId: stemmaId, familyDescr: request })
-        })
-
-        return await this.parseResponse<Stemma>(response);
+        return cf as CreateFamily
     }
 
-    async updateFamily(stemmaId: string, familyId: string, parents: (NewPerson | StoredPerson)[], children: (NewPerson | StoredPerson)[]) {
-        let request = {
-            "parent1": parents.length > 0 ? this.sanitize(parents[0]) : null,
-            "parent2": parents.length > 1 ? this.sanitize(parents[1]) : null,
-            "children": children.map(c => this.sanitize(c))
-        }
-
-        const response = await fetch(`${this.endpoint}/stemma`, {
-            method: 'POST',
-            headers: this.commonHeader,
-            body: JSON.stringify({ stemmaId: stemmaId, familyId: familyId, familyDescr: request })
-        })
-
-        return await this.parseResponse<Stemma>(response);
+    async createFamily(stemmaId: string, parents: PersonDefinition[], children: PersonDefinition[]): Promise<Stemma> {
+        const response = await this.sendRequest({ CreateFamilyRequest: { stemmaId: stemmaId, familyDescr: this.makeFamily(parents, children) } })
+        return (await this.parseResponse(response)).Stemma;
     }
 
-    async addStemma(name: string) {
-        const response = await fetch(`${this.endpoint}/stemma`, {
-            method: 'POST',
-            headers: this.commonHeader,
-            body: name
-        })
-
-        return await this.parseResponse<StemmaDescription>(response);
+    async updateFamily(stemmaId: string, familyId: string, parents: PersonDefinition[], children: PersonDefinition[]): Promise<Stemma> {
+        const response = await this.sendRequest({ UpdateFamilyRequest: { stemmaId: stemmaId, familyId: familyId, familyDescr: this.makeFamily(parents, children) } })
+        return (await this.parseResponse(response)).Stemma;
     }
 
-    async removePerson(stemmaId: string, personId: string) {
-        const response = await fetch(`${this.endpoint}/stemma`, {
-            method: 'POST',
-            headers: this.commonHeader,
-            body: JSON.stringify({ stemmaId: stemmaId, personId: personId })
-        })
-
-        return await this.parseResponse<Stemma>(response);
+    async addStemma(name: string): Promise<StemmaDescription> {
+        const response = await this.sendRequest({ CreateNewStemmaRequest: { stemmaName: name } })
+        return (await this.parseResponse(response)).StemmaDescription;
     }
 
-    async createInvintation(stemmaId: string, personId: string, email: string) {
-        const response = await fetch(`${this.endpoint}/stemma`, {
-            method: 'POST',
-            body: JSON.stringify({ targetPersonId: personId, targetPersonEmail: email }),
-            headers: this.commonHeader
-        })
-
-        return await this.parseResponse<string>(response).then(token => `${location.origin}/?inviteToken=${encodeURIComponent(token)}`);
+    async removePerson(stemmaId: string, personId: string): Promise<Stemma> {
+        const response = await this.sendRequest({ DeletePersonRequest: { stemmaId: stemmaId, personId: personId } })
+        return (await this.parseResponse(response)).Stemma;
     }
 
-    async proposeInvitationToken(token: string) {
-        const response = await fetch(`${this.endpoint}/stemma`, {
-            method: 'POST',
-            body: decodeURIComponent(token),
-            headers: this.commonHeader
-        })
-
-        await this.discardResponse(response);
+    async createInvintation(personId: string, email: string): Promise<string> {
+        const response = await this.sendRequest({ CreateInvitationTokenRequest: { targetPersonId: personId, targetPersonEmail: email } })
+        const token = (await this.parseResponse(response)).InviteToken
+        return `${location.origin}/?inviteToken=${encodeURIComponent(token.token)}`
     }
 
-    async removeFamily(stemmaId: string, familyId: string) {
-        const response = await fetch(`${this.endpoint}/stemma`, {
-            method: 'POST',
-            headers: this.commonHeader,
-            body: JSON.stringify({ stemmaId: stemmaId, familyId: familyId })
-        })
-
-        return await this.parseResponse<Stemma>(response);
+    async proposeInvitationToken(token: string): Promise<TokenAccepted> {
+        const response = await this.sendRequest({ BearInvitationRequest: { encodedToken: token } })
+        return (await this.parseResponse(response)).TokenAccepted
     }
 
-    async updatePerson(stemmaId: string, personId: string, descr: NewPerson) {
-        const response = await fetch(`${this.endpoint}/stemma`, {
-            method: 'POST',
-            headers: this.commonHeader,
-            body: JSON.stringify((
-                {
-                    stemmaId: stemmaId, personId: personId, personDescr: {
-                        name: descr.name,
-                        birthDate: descr.birthDate ? descr.birthDate : null,
-                        deathDate: descr.deathDate ? descr.deathDate : null,
-                        bio: descr.bio ? descr.bio : null
-                    }
-                }))
-        })
-
-        return await this.parseResponse<Stemma>(response);
+    async removeFamily(stemmaId: string, familyId: string): Promise<Stemma> {
+        const response = await this.sendRequest({ DeleteFamilyRequest: { stemmaId: stemmaId, familyId: familyId } })
+        return (await this.parseResponse(response)).Stemma
     }
 
-    private async parseResponse<T>(response: Response) {
+    async updatePerson(stemmaId: string, personId: string, descr: CreateNewPerson): Promise<Stemma> {
+        const response = await this.sendRequest({ UpdatePersonRequest: { stemmaId: stemmaId, personId: personId, personDescr: descr } })
+        return (await this.parseResponse(response)).Stemma
+    }
+
+    private async parseResponse(response: Response) {
         const json = await response.json();
         if (!response.ok)
             throw new Error(`Unexpected response: ${json}`)
-        return json as T;
+        return json as CompositeResponse;
     }
 
-    private async discardResponse(response: Response) {
-        const json = await response.json();
-        if (!response.ok)
-            throw new Error(`Unexpected response: ${json}`)
+    private async sendRequest(request: CompositeRequest) {
+        return await fetch(`${this.endpoint}/stemma`, {
+            method: 'POST',
+            headers: this.commonHeader,
+            body: JSON.stringify(request)
+        })
     }
 
     private sanitize(obj) {
