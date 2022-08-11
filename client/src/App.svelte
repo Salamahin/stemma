@@ -35,6 +35,8 @@
     let highlight: HiglightLineages;
     let pinnedPeople: PinnedPeopleStorage;
 
+    let expect: Promise<any> = new Promise((resolve, reject) => resolve({}));
+
     function handleSignIn(user: User) {
         signedIn = true;
         model = new Model(stemma_backend_url, user);

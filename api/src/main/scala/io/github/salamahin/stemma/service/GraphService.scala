@@ -20,6 +20,7 @@ object GraphService extends LazyLogging {
       addPropertyDirect("jdbc.username", jdbcConfiguration.jdbcUser)
       addPropertyDirect("jdbc.password", jdbcConfiguration.jdbcPassword)
       addPropertyDirect("sqlg.dataSource", classOf[SqlgHikariDataSource].getCanonicalName)
+      addPropertyDirect("maxPoolSize", 2)
     }
 
     import gremlin.scala._
