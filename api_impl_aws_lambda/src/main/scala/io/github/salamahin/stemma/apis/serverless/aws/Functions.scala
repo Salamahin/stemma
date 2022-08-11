@@ -7,12 +7,24 @@ import io.github.salamahin.stemma.apis.serverless.aws.Layers.layers
 import io.github.salamahin.stemma.domain._
 import zio.ZIO
 
+import java.time.Instant
+
 class ListStemmas extends Lambda {
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = runUnsafe {
     API
       .listStemmas(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"))
       .provideSomeLayer(layers)
   }
+}
+
+object ListStemmasApp extends App with Lambda {
+  println(Instant.now)
+  runUnsafe {
+    API
+      .listStemmas("user@email.com")
+      .provideSomeLayer(layers)
+  }
+  println(Instant.now)
 }
 
 class BearInvitationStemma extends Lambda {

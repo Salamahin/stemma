@@ -113,7 +113,7 @@ class StemmaRepository {
     User(userId, email)
   }
 
-  def chown(ts: TraversalSource, startPersonId: String, newOwnerId: String): ChownEffect = {
+  def chown(ts: TraversalSource, startPersonId: String): ChownEffect = {
     val familyIds = mutable.ListBuffer.empty[String]
     val personIds = mutable.ListBuffer.empty[String]
 

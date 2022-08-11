@@ -230,7 +230,7 @@ Resources:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
-            Path: /stemma/get
+            Path: /get-stemma
             Method: post
   DeletePersonFunction:
     Type: AWS::Serverless::Function
@@ -269,7 +269,7 @@ Resources:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
-            Path: /invite/create
+            Path: /create-invite
             Method: post
   BearInvitationTokenFunction:
     Type: AWS::Serverless::Function
