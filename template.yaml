@@ -84,7 +84,7 @@ Resources:
           ViewerProtocolPolicy: redirect-to-https
         DefaultRootObject: index.html
         Origins:
-          - DomainName: !GetAtt appbucket.DomainName
+          - DomainName: !GetAtt appbucket.RegionalDomainName
             Id: "appbucket"
             S3OriginConfig:
               OriginAccessIdentity: !Join
