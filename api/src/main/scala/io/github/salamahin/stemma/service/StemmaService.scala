@@ -7,21 +7,21 @@ import io.github.salamahin.stemma.tinkerpop.Transaction._
 import zio._
 
 
-class StemmaService(graph: ScalaGraph, ops: StemmaRepository) extends AbstractStemmaService {
+class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
   import cats.syntax.apply._
   import cats.syntax.traverse._
 
-  override def createStemma(userId: String, name: String) =
+  def createStemma(userId: String, name: String) =
     ZIO.fromEither(transaction(graph) { tx =>
       val stemmaId = ops.newStemma(tx, name)
       ops.makeGraphOwner(tx, userId, stemmaId).map(_ => stemmaId)
     })
 
-  override def listOwnedStemmas(userId: String) = ZIO.fromEither(ops.listStemmas(graph.traversal, userId)).map(OwnedStemmasDescription.apply)
+  def listOwnedStemmas(userId: String) = ZIO.fromEither(ops.listStemmas(graph.traversal, userId)).map(OwnedStemmasDescription.apply)
 
-  override def removeStemma(userId: String, stemmaId: String) = ZIO.fromEither(transaction(graph)(ts => ops.removeStemma(ts, stemmaId, userId)))
+  def removeStemma(userId: String, stemmaId: String) = ZIO.fromEither(transaction(graph)(ts => ops.removeStemma(ts, stemmaId, userId)))
 
-  override def createFamily(userId: String, stemmaId: String, family: CreateFamily): IO[StemmaError, FamilyDescription] =
+  def createFamily(userId: String, stemmaId: String, family: CreateFamily): IO[StemmaError, FamilyDescription] =
     ZIO.fromEither(validateFamily(family) *> transaction(graph) { ts => createFamilyAndSetRelations(ts, stemmaId, userId, family) })
 
   private def createFamilyAndSetRelations(ts: TraversalSource, stemmaId: String, ownerId: String, family: CreateFamily) = {
@@ -37,7 +37,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) extends AbstractSt
     ops.makeFamilyOwner(ts, ownerId, familyId) *> setFamilyRelations(ts, stemmaId, ownerId, familyId, (p1 ++ p2).toSeq, children)
   }
 
-  override def updateFamily(userId: String, familyId: String, family: CreateFamily): IO[StemmaError, FamilyDescription] = ZIO.fromEither(
+  def updateFamily(userId: String, familyId: String, family: CreateFamily): IO[StemmaError, FamilyDescription] = ZIO.fromEither(
     transaction(graph)(ts =>
       for {
         isOwner <- ops.isFamilyOwner(ts, userId, familyId)
@@ -105,7 +105,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) extends AbstractSt
     (checkMembersCount(f) *> checkDuplicatedIds(f)).map(_ => f)
   }
 
-  override def removePerson(userId: String, personId: String) = ZIO.fromEither(
+  def removePerson(userId: String, personId: String) = ZIO.fromEither(
     transaction(graph)(ts =>
       for {
         isOwner <- ops.isPersonOwner(ts, userId, personId)
@@ -129,7 +129,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) extends AbstractSt
     } yield ()
   }
 
-  override def removeFamily(userId: String, familyId: String) =
+  def removeFamily(userId: String, familyId: String) =
     ZIO.fromEither(transaction(graph) { tx =>
       for {
         isOwner <- ops.isFamilyOwner(tx, userId, familyId)
@@ -137,7 +137,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) extends AbstractSt
       } yield ()
     })
 
-  override def updatePerson(userId: String, personId: String, description: CreateNewPerson) =
+  def updatePerson(userId: String, personId: String, description: CreateNewPerson) =
     ZIO.fromEither(transaction(graph) { tx =>
       for {
         isOwner <- ops.isPersonOwner(tx, userId, personId)
@@ -145,7 +145,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) extends AbstractSt
       } yield ()
     })
 
-  override def stemma(userId: String, stemmaId: String) =
+  def stemma(userId: String, stemmaId: String) =
     ZIO.fromEither(transaction(graph) { tx =>
       for {
         isOwner <- ops.isStemmaOwner(tx, userId, stemmaId)
@@ -153,7 +153,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) extends AbstractSt
       } yield stemma
     })
 
-  override def chown(toUserId: String, targetPersonId: String) = ZIO.fromEither(
+  def chown(toUserId: String, targetPersonId: String) = ZIO.fromEither(
     transaction(graph)(ts => {
       for {
         person <- ops.describePerson(ts, targetPersonId)
@@ -165,7 +165,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) extends AbstractSt
     })
   )
 
-  override def ownsPerson(userId: String, personId: String): IO[StemmaError, Boolean] = ZIO.fromEither(ops.isPersonOwner(graph.traversal, userId, personId))
+  def ownsPerson(userId: String, personId: String): IO[StemmaError, Boolean] = ZIO.fromEither(ops.isPersonOwner(graph.traversal, userId, personId))
 }
 
 object StemmaService {
