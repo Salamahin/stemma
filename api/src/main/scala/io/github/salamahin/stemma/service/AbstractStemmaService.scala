@@ -219,5 +219,9 @@ abstract class SlickStemmaService extends Tables {
 
   def chown(toUserId: String, targetPersonId: String): Unit = ???
 
-  def ownsPerson(userId: String, personId: String): IO[StemmaError, Boolean] = ???
+  def ownsPerson(userId: String, personId: String) = ZIO.fromFuture { implicit ec =>
+    db.run(
+      peopleOwners.filter(po => po.ownerId === userId && po.personId === personId).exists.result
+    )
+  }
 }
