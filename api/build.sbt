@@ -11,6 +11,8 @@ libraryDependencies ++= Seq(
   "org.umlg"                   % "sqlg-core"              % Versions.sqlgV,
   "org.umlg"                   % "sqlg-postgres-dialect"  % Versions.sqlgV,
   "org.umlg"                   % "sqlg-hikari"            % Versions.sqlgV,
+  "com.typesafe.slick" %% "slick" % "3.4.0-RC3",
+  "com.typesafe.slick" %% "slick-hikaricp" % "3.4.0-RC3",
   "org.postgresql"             % "postgresql"             % "42.4.1",
   "com.typesafe.scala-logging" %% "scala-logging"         % "3.9.4",
   "ch.qos.logback"             % "logback-classic"        % "1.2.11",

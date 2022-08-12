@@ -1,15 +1,11 @@
 package io.github.salamahin.stemma.tinkerpop
 
-import gremlin.scala._
 import io.github.salamahin.stemma.domain._
-import io.github.salamahin.stemma.tinkerpop
-import io.github.salamahin.stemma.tinkerpop.StemmaRepository._
+import io.github.salamahin.stemma.tinkerpop.StemmaRepository.relations
 
-import java.sql.{Connection, PreparedStatement}
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import scala.collection.mutable
+import java.sql.Connection
 import scala.util.Using
+import scala.util.Using.Releasable
 
 /*
   Stemma
@@ -31,6 +27,7 @@ import scala.util.Using
   birthDate
   deathDate
   bio
+  stemmaId
 
 
   Family
@@ -41,29 +38,32 @@ import scala.util.Using
 
   StemmaOwner
   -------
-  stemmaId
+  resourceId
   ownerId
 
 
   FamilyOwner
   -------
-  familyId
+  resourceId
   ownerId
 
 
   PersonOwner
   -------
-  personId
+  resourceId
   ownerId
 
 
   PersonFamily
   -------
-  personId
   familyId
+  personId
+  type
  */
 
-class StemmaRepository {
+class AtomicStemmaOps {
+  import cats.syntax.either._
+
   private val isStemmaOwner = "select * from StemmaOwner where stemmaId = ? and ownerId = ?"
   private val isPersonOwner = "select * from PersonOwner where personId = ? and ownerId = ?"
   private val isFamilyOwner = "select * from FamilyOwner where familyId = ? and ownerId = ?"
@@ -83,336 +83,169 @@ class StemmaRepository {
 
   private val createFamily = "insert into Family values (?)"
 
-  private def execute[T](conn: Connection, query: String)(exec: PreparedStatement => Either[StemmaError, T]) = {
-    import cats.syntax.either._
-    Using(conn.prepareStatement(query)) { exec }
+  private def attempt[T: Releasable, K](t: T)(use: T => Either[StemmaError, K]) =
+    Using(t) { use }
       .toEither
-      .leftMap(exc => UnknownError(exc))
+      .leftMap(exc => UnknownError(exc): StemmaError)
       .flatten
-  }
 
-  def listStemmas(ts: TraversalSource, ownerId: String): Either[NoSuchUserId, List[StemmaDescription]] =
-    ts.V(ownerId)
-      .headOption()
-      .toRight(NoSuchUserId(ownerId))
-      .map { owner =>
-        owner
-          .out(relations.ownerOf)
-          .where(_.hasLabel(types.stemma))
-          .map { v => StemmaDescription(v.id().toString, v.property(stemmaKeys.name).value(), thereAreNoOtherOwners(owner, v)) }
-          .toList()
+  def listStemmas(conn: Connection, ownerId: String): Either[NoSuchUserId, List[StemmaDescription]] = ???
+
+  def removeStemma(conn: Connection, stemmaId: String, userId: String): Either[StemmaError, Unit] = ???
+
+  def stemma(conn: Connection, stemmaId: String, userId: String): Stemma = ???
+
+  def updatePerson(conn: Connection, id: String, description: CreateNewPerson): Either[NoSuchPersonId, Unit] = ???
+
+  def newFamily(conn: Connection, stemmaId: String): String = ???
+
+  def findFamily(conn: Connection, parent1: String, parent2: String) = ???
+
+  def findFamily(conn: Connection, parent1: String) = ???
+
+  def getOrCreateUser(conn: Connection, email: String): User = ???
+
+  def chown(conn: Connection, startPersonId: String): ChownEffect = ???
+
+  def newStemma(conn: Connection, name: String): String = ???
+
+  def removeChildRelation(conn: Connection, familyId: String, personId: String): Either[StemmaError, Unit] = ???
+
+  def removeSpouseRelation(conn: Connection, familyId: String, personId: String): Either[StemmaError, Unit] = ???
+
+  def newPerson(conn: Connection, stemmaId: String, descr: CreateNewPerson): String = ???
+
+  def makeChildRelation(conn: Connection, familyId: String, personId: String): Either[StemmaError, Unit] = ???
+//    setRelation(ts, personId, familyId, relations.childOf)(childShouldBelongToSingleFamily)
+
+  def makeSpouseRelation(conn: Connection, familyId: String, personId: String): Either[StemmaError, Unit] = ???
+
+  def removeFamily(conn: Connection, id: String): Either[NoSuchFamilyId, Unit] = ???
+
+  def removePerson(conn: Connection, id: String): Either[NoSuchPersonId, Unit] = ???
+
+  def describePerson(conn: Connection, id: String): Either[StemmaError, ExtendedPersonDescription] = {
+    val query = s"""
+        |SELECT p.id, p.name, p.birhtDate, p.deathDate, p.bio, p.stemmaId, childF.familyId, spouseF.familyIds, o.ownersIds
+        |FROM Person p
+        |LEFT OUTER JOIN PeronFamily childF
+        |LEFT OUTER JOIN (SELECT personId, array_agg(familyId) AS familyIds GROUP BY personId WHERE type = ${relations.spouseOf}) spouseF
+        |LEFT OUTER JOIN (SELECT resourceId, array_agg(ownerId) AS ownersIds GROUP BY resourceId) o
+        |ON (p.id = childF.personId AND childF.type = ${relations.childOf})
+        |AND (p.id = spouseF.personId)
+        |WHERE p.id = ?""".stripMargin
+
+    attempt(conn prepareStatement query) { q =>
+      q.setString(0, id)
+
+      attempt(q.executeQuery()) { rs =>
+        if (!rs.next()) Left(NoSuchPersonId(id))
+        else
+          Right(
+            ExtendedPersonDescription(
+              CreateNewPerson(
+                rs.getString("p.name"),
+                Option(rs.getDate("p.birthDate")).map(_.toLocalDate),
+                Option(rs.getDate("p.deathDate")).map(_.toLocalDate),
+                Option(rs.getString("p.bio"))
+              ),
+              Option(rs.getString("childF.familyId")),
+              rs.getArray("spouseF.familyIds").asInstanceOf[Array[String]].toList,
+              rs.getString("p.stemmaId"),
+              rs.getArray("o.ownersIds").asInstanceOf[Array[String]].toList
+            )
+          )
       }
-
-  def removeStemma(ts: TraversalSource, stemmaId: String, userId: String): Either[StemmaError, Unit] = {
-    for {
-      isOwner          <- isStemmaOwner(ts, userId, stemmaId)
-      stemmaV          = ts.V(stemmaId).head()
-      hasNoOtherOwners = thereAreNoOtherOwners(ts.V(userId).head(), stemmaV)
-
-      _ <- if (isOwner && hasNoOtherOwners) Right(stemmaV.remove()) else Left(IsNotTheOnlyStemmaOwner(stemmaId))
-    } yield ()
+    }
   }
 
-  def stemma(ts: TraversalSource, stemmaId: String, userId: String): Stemma = {
-    val people = ts
-      .V()
-      .hasLabel(types.person)
-      .has(keys.stemmaId, stemmaId)
-      .map { person =>
-        val name      = person.property(personKeys.name).value()
-        val birthDate = person.property(personKeys.birthDate).toOption.map(LocalDate.parse)
-        val deathDate = person.property(personKeys.deathDate).toOption.map(LocalDate.parse)
-        val bio       = person.property(personKeys.bio).toOption
-        val isOwner   = isOwnerOf(ts, userId, person)
+  def describeFamily(conn: Connection, id: String): Either[StemmaError, ExtendedFamilyDescription] = {
+    val query = s"""
+        |SELECT
+        |  f.id,
+        |  f.stemmaId,
+        |  array_remove(array_agg(CASE WHEN p.type = ${relations.childOf} THEN p.id ELSE NULL END), NULL) AS children_ids,
+        |  array_remove(array_agg(CASE WHEN p.type = ${relations.spouseOf} THEN p.id ELSE NULL END), NULL) AS parent_ids
+        |FROM Family f 
+        |LEFT OUTER JOIN PersonFamily p 
+        |ON f.id = p.familyId 
+        |GROUP BY f.id, f.stemmaId 
+        |WHERE f.id = ?""".stripMargin
 
-        PersonDescription(person.id().toString, name, birthDate, deathDate, bio, !isOwner)
+    attempt(conn prepareStatement query) { q =>
+      q.setString(0, id)
+
+      attempt(q.executeQuery()) { rs =>
+        var stemmaId: String       = null
+        var parents: List[String]  = Nil
+        var children: List[String] = Nil
+
+        if (!rs.next()) Left(NoSuchFamilyId(id))
+        else
+          Right(
+            ExtendedFamilyDescription(
+              rs.getString("f.id"),
+              rs.getArray("childrenIds").asInstanceOf[Array[String]].toList,
+              rs.getArray("parent_ids").asInstanceOf[Array[String]].toList,
+              rs.getString("f.stemmaId")
+            )
+          )
       }
-      .toList()
-
-    val families = ts
-      .V()
-      .hasLabel(types.family)
-      .has(keys.stemmaId, stemmaId)
-      .map { family =>
-        val parents  = family.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
-        val children = family.inE(relations.childOf).otherV().id().map(_.toString).toList()
-        val isOwner  = isOwnerOf(ts, userId, family)
-
-        FamilyDescription(family.id().toString, parents, children, !isOwner)
-      }
-      .toList()
-
-    Stemma(people, families)
+    }
   }
 
-  def updatePerson(ts: TraversalSource, id: String, description: CreateNewPerson): Either[NoSuchPersonId, Unit] = {
-    for {
-      person <- ts.V(id).headOption().toRight(NoSuchPersonId(id))
-      _      = person.setProperty(personKeys.name, description.name)
-      _      = description.birthDate.map(_.toString).foreach(person.setProperty(personKeys.birthDate, _))
-      _      = description.deathDate.map(_.toString).foreach(person.setProperty(personKeys.deathDate, _))
-      _      = description.bio.foreach(person.setProperty(personKeys.bio, _))
-    } yield ()
+  def isFamilyOwner(conn: Connection, userId: String, familyId: String): Either[StemmaError, Boolean] =
+    isResourceOwner(conn, userId, familyId, "FamilyOwner")
+
+  def isPersonOwner(conn: Connection, userId: String, personId: String): Either[StemmaError, Boolean] =
+    isResourceOwner(conn, userId, personId, "PersonOwner")
+
+  def isStemmaOwner(conn: Connection, userId: String, stemmaId: String): Either[StemmaError, Boolean] = {
+    isResourceOwner(conn, userId, stemmaId, "StemmaOwner")
   }
-
-  def newFamily(ts: TraversalSource, stemmaId: String): String = {
-    val family = ts.addV(types.family).head()
-    family.setProperty(keys.stemmaId, stemmaId)
-    family.id().toString
-  }
-
-  def findFamily(ts: TraversalSource, parent1: String, parent2: String) = {
-    ts.V(parent1)
-      .out(relations.spouseOf)
-      .where(_.in(relations.spouseOf).map(_.id().toString).is(parent2))
-      .headOption()
-      .map(_.id().toString)
-  }
-
-  def findFamily(ts: TraversalSource, parent1: String) = {
-    ts.V(parent1)
-      .out(relations.spouseOf)
-      .where(_.in(relations.spouseOf).count().is(P.eq(1)))
-      .headOption()
-      .map(_.id().toString)
-  }
-
-  def getOrCreateUser(ts: TraversalSource, email: String): User = {
-    val userId = ts
-      .V()
-      .hasLabel(types.user)
-      .has(userKeys.email, email)
-      .headOption()
-      .getOrElse {
-        val newUser = ts.addV(types.user).head()
-        newUser.setProperty(userKeys.email, email)
-        newUser
-      }
-      .id()
-      .toString
-
-    User(userId, email)
-  }
-
-  def chown(ts: TraversalSource, startPersonId: String): ChownEffect = {
-    val familyIds = mutable.ListBuffer.empty[String]
-    val personIds = mutable.ListBuffer.empty[String]
-
-    def ancestorFamilies(family: GremlinScala[Vertex]) =
-      family.repeat(f => f.in(relations.spouseOf).out(relations.childOf)).emit()
-
-    def dependentFamilies(family: GremlinScala[Vertex]) =
-      family.repeat(f => f.in(relations.childOf).out(relations.spouseOf)).emit()
-
-    val initFamily = ts.V(startPersonId).out(relations.childOf, relations.spouseOf)
-    initFamily
-      .unionFlat(
-        p => ancestorFamilies(p),
-        p => dependentFamilies(p),
-        p => p
-      )
-      .dedup()
-      .sideEffect(family => familyIds += family.id().toString)
-      .in(relations.childOf, relations.spouseOf)
-      .dedup()
-      .sideEffect(person => personIds += person.id().toString)
-      .iterate()
-
-    ChownEffect(familyIds.toList, personIds.toList)
-  }
-
-  def newStemma(ts: TraversalSource, name: String): String = {
-    val graph = ts.addV(types.stemma).head()
-    graph.setProperty(stemmaKeys.name, name)
-    graph.id().toString
-  }
-
-  def removeChildRelation(ts: TraversalSource, familyId: String, personId: String): Either[StemmaError, Unit] =
-    removeRelation(ts, familyId, personId, relations.childOf)(ChildDoesNotBelongToFamily)
-
-  def removeSpouseRelation(ts: TraversalSource, familyId: String, personId: String): Either[StemmaError, Unit] =
-    removeRelation(ts, familyId, personId, relations.spouseOf)(SpouseDoesNotBelongToFamily)
-
-  private def removeRelation(ts: TraversalSource, familyId: String, personId: String, relation: String)(
-    noSuchRelation: (String, String) => StemmaError
-  ) =
-    for {
-      person <- ts.V(personId).headOption().toRight(NoSuchPersonId(personId))
-      family <- ts.V(familyId).headOption().toRight(NoSuchFamilyId(familyId))
-
-      _ <- person
-            .outE(relation)
-            .where(_.otherV().hasId(family.id()))
-            .headOption()
-            .map(_.remove())
-            .toRight(noSuchRelation(familyId, personId))
-    } yield ()
-
-  def newPerson(ts: TraversalSource, stemmaId: String, descr: CreateNewPerson): String = {
-    val personVertex = ts.addV(types.person).head()
-
-    personVertex.setProperty(personKeys.name, descr.name)
-    personVertex.setProperty(keys.stemmaId, stemmaId)
-    descr.birthDate.map(dateFormat.format(_)) foreach (personVertex.setProperty(personKeys.birthDate, _))
-    descr.deathDate.map(dateFormat.format(_)) foreach (personVertex.setProperty(personKeys.deathDate, _))
-    descr.bio foreach (personVertex.setProperty(personKeys.bio, _))
-
-    personVertex.id().toString
-  }
-
-  private def setRelation(ts: TraversalSource, from: String, to: String, relation: String)(checks: RelationRestriction*): Either[StemmaError, Unit] = {
-    import cats.syntax.traverse._
-
-    val fromV = ts.V(from).head()
-    val toV   = ts.V(to).head()
-
-    if (fromV.out(relation).is(toV).exists()) Right((): Unit)
-    else checks.toList.map(_.between(fromV, toV)).sequence.map(_ => fromV.addEdge(relation, toV))
-  }
-
-  def makeChildRelation(ts: TraversalSource, familyId: String, personId: String): Either[StemmaError, Unit] =
-    setRelation(ts, personId, familyId, relations.childOf)(childShouldBelongToSingleFamily)
-
-  def makeSpouseRelation(ts: TraversalSource, familyId: String, personId: String): Either[StemmaError, Unit] =
-    setRelation(ts, personId, familyId, relations.spouseOf)()
-
-  def removeFamily(ts: TraversalSource, id: String): Either[NoSuchFamilyId, Unit] = ts.V(id).headOption().map(_.remove()).toRight(NoSuchFamilyId(id))
-
-  def removePerson(ts: TraversalSource, id: String): Either[NoSuchPersonId, Unit] = ts.V(id).headOption().map(_.remove()).toRight(NoSuchPersonId(id))
-
-  def describePerson(ts: TraversalSource, id: String): Either[NoSuchPersonId, ExtendedPersonDescription] = {
-    ts.V(id)
-      .headOption()
-      .map { p =>
-        val spouseOf = p.outE(relations.spouseOf).otherV().map(_.id().toString).toList()
-        val childOf  = p.outE(relations.childOf).otherV().map(_.id().toString).headOption()
-        val ownerId  = p.inE(relations.ownerOf).otherV().map(_.id().toString).head()
-        val stemmaId = p.property(keys.stemmaId).value()
-
-        val personDescr = CreateNewPerson(
-          p.property(personKeys.name).value(),
-          p.property(personKeys.birthDate).toOption.map(LocalDate.parse),
-          p.property(personKeys.deathDate).toOption.map(LocalDate.parse),
-          p.property(personKeys.bio).toOption
-        )
-
-        tinkerpop.ExtendedPersonDescription(personDescr, childOf, spouseOf, stemmaId, ownerId)
-      }
-      .toRight(NoSuchPersonId(id))
-  }
-
-  def describeFamily(ts: TraversalSource, id: String): Either[NoSuchFamilyId, ExtendedFamilyDescription] =
-    ts.V(id)
-      .headOption()
-      .map { f =>
-        val stemmaId = f.property(keys.stemmaId).value()
-        val parents  = f.inE(relations.spouseOf).otherV().id().map(_.toString).toList()
-        val children = f.inE(relations.childOf).otherV().id().map(_.toString).toList()
-
-        ExtendedFamilyDescription(f.id().toString, parents, children, stemmaId)
-      }
-      .toRight(NoSuchFamilyId(id))
-
-  private def isOwnerOf(ts: TraversalSource, userId: String, resourceId: String)(resourceNotFound: String => StemmaError) =
-    for {
-      user     <- ts.V(userId).headOption().toRight(NoSuchUserId(userId))
-      resource <- ts.V(resourceId).headOption().toRight(resourceNotFound(resourceId))
-      isOwner  = user.outE(relations.ownerOf).where(_.otherV().is(resource)).headOption().isDefined
-    } yield isOwner
-
-  private def isOwnerOf(ts: TraversalSource, userId: String, resource: Vertex) = {
-    val user = ts.V(userId).head()
-    user.outE(relations.ownerOf).where(_.otherV().is(resource)).headOption().isDefined
-  }
-
-  def isFamilyOwner(ts: TraversalSource, userId: String, familyId: String): Either[StemmaError, Boolean] =
-    isOwnerOf(ts, userId, familyId)(NoSuchFamilyId)
-
-  def isPersonOwner(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Boolean] =
-    isOwnerOf(ts, userId, personId)(NoSuchPersonId)
-
-  def isStemmaOwner(ts: TraversalSource, userId: String, stemmaId: String): Either[StemmaError, Boolean] =
-    isOwnerOf(ts, userId, stemmaId)(NoSuchStemmaId)
 
   def makeExistingFamilyOwner(conn: Connection, userId: String, familyId: String): Either[StemmaError, Unit] =
-    execute(conn, "insert into FamilyOwner values(?, ?)") { q =>
-      q.setString(0, familyId)
-      q.setString(1, userId)
-
-      if (q.execute()) Right() else Left(IsAlreadyAnOwner(userId, familyId, "family"))
-    }
+    makeOwner(conn, userId, familyId, "FamilyOwner", "family")
 
   def makeExistingPersonOwner(conn: Connection, userId: String, personId: String): Either[StemmaError, Unit] =
-    execute(conn, "insert into PersonOwner values(?, ?)") { q =>
-      q.setString(0, personId)
-      q.setString(1, userId)
-
-      if (q.execute()) Right() else Left(IsAlreadyAnOwner(userId, personId, "person"))
-    }
+    makeOwner(conn, userId, personId, "PersonOwner", "person")
 
   def makeExistingGraphOwner(conn: Connection, userId: String, stemmaId: String): Either[StemmaError, Unit] = {
-    execute(conn, "insert into StemmaOwner values(?, ?)") { q =>
-      q.setString(0, stemmaId)
-      q.setString(1, userId)
+    makeOwner(conn, userId, stemmaId, "StemmaOwner", "stemma")
+  }
 
-      if (q.execute()) Right() else Left(IsAlreadyAnOwner(userId, stemmaId, "stemma"))
+  private def isResourceOwner(conn: Connection, userId: String, resourceId: String, ownershipTable: String) = {
+    val query = s"""
+         |SELECT u.id, o.ownerId
+         |FROM (select id from User where id = ?) u
+         |LEFT OUTER JOIN (SELECT ownerId FROM $ownershipTable WHERE ownerId = ? AND resourceId = ?) o
+         |ON u.id = o.ownerId""".stripMargin
+
+    attempt(conn prepareStatement query) { q =>
+      q.setString(0, userId)
+      q.setString(1, userId)
+      q.setString(0, resourceId)
+
+      attempt(q.executeQuery()) { rs =>
+        if (!rs.next()) Left(NoSuchUserId(userId))
+        else Right(rs.getString("o.ownerId") != null)
+      }
     }
   }
 
-  private def thereAreNoOtherOwners(currentOwner: Vertex, target: Vertex) =
-    target
-      .inE(relations.ownerOf)
-      .where(_.otherV().is(P.neq(currentOwner)))
-      .headOption()
-      .isEmpty
+  private def makeOwner(conn: Connection, userId: String, resourceId: String, resourceTable: String, resourceType: String) = {
+    attempt(conn prepareStatement s"insert into $resourceTable values(?, ?)") { q =>
+      q.setString(0, resourceId)
+      q.setString(1, userId)
+
+      if (q.execute()) Right() else Left(IsAlreadyAnOwner(userId, resourceId, resourceType))
+    }
+  }
 }
 
-private object StemmaRepository {
-  trait RelationRestriction {
-    def between(from: Vertex, to: Vertex): Either[StemmaError, Unit]
-  }
-
-  val childShouldBelongToSingleFamily: RelationRestriction = (child: Vertex, family: Vertex) => {
-    child
-      .outE(relations.childOf)
-      .where(_.otherV().is(P.neq(family)))
-      .otherV()
-      .map(otherFamily => Left(ChildAlreadyBelongsToFamily(otherFamily.id().toString, child.id().toString)))
-      .headOption()
-      .getOrElse(Right((): Unit))
-  }
-
-  val dateFormat = DateTimeFormatter.ISO_DATE
-
-  object keys {
-    val stemmaId: Key[String] = Key[String]("stemmaId")
-  }
-
-  object personKeys {
-    val name: Key[String]      = Key[String]("name")
-    val birthDate: Key[String] = Key[String]("birthDate")
-    val deathDate: Key[String] = Key[String]("deathDate")
-    val bio: Key[String]       = Key[String]("bio")
-  }
-
-  object userKeys {
-    val email: Key[String] = Key[String]("email")
-  }
-
-  object stemmaKeys {
-    val name: Key[String] = Key[String]("name")
-  }
-
-  object types {
-    val person = "person"
-    val family = "family"
-    val user   = "user"
-    val stemma = "stemma"
-  }
-
+private object AtomicStemmaOps {
   object relations {
     val childOf  = "childOf"
     val spouseOf = "spouseOf"
-    val ownerOf  = "ownerOf"
   }
 }
