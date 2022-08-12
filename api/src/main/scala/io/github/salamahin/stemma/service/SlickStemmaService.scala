@@ -2,7 +2,7 @@ package io.github.salamahin.stemma.service
 import io.github.salamahin.stemma.domain.{Stemma => DomainStemma, _}
 import io.github.salamahin.stemma.tinkerpop.Tables
 import slick.jdbc.JdbcProfile
-import zio.{IO, ZIO}
+import zio.{Task, ZIO}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -16,6 +16,17 @@ abstract class SlickStemmaService extends Tables {
   private val child  = "child"
 
   val db: backend.DatabaseDef
+
+  def getOrCreateUser(email: String) = ZIO.fromFuture { implicit ec =>
+    val userId = stemmaUsers returning stemmaUsers.map(_.id)
+
+    val query = (for {
+      maybeUserId <- stemmaUsers.filter(_.email === email).map(_.id).result.headOption
+      userId      <- maybeUserId.map(id => DBIO.successful(id)).getOrElse(userId += StemmaUser(email = email))
+    } yield User(userId, email)).transactionally
+
+    db run query
+  }
 
   private def checkStemmaAccess(stemmaId: String, userId: String)(implicit ec: ExecutionContext) = {
     val ownedStemma = stemmaOwners.filter(so => so.ownerId === userId && so.stemmaId === stemmaId)
@@ -217,7 +228,7 @@ abstract class SlickStemmaService extends Tables {
     db run query
   }
 
-  def chown(toUserId: String, targetPersonId: String): Unit = ???
+  def chown(toUserId: String, targetPersonId: String): Task[ChownEffect] = ???
 
   def ownsPerson(userId: String, personId: String) = ZIO.fromFuture { implicit ec =>
     db.run(
