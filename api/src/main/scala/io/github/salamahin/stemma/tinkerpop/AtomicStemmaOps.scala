@@ -5,11 +5,92 @@ import io.github.salamahin.stemma.domain._
 import io.github.salamahin.stemma.tinkerpop
 import io.github.salamahin.stemma.tinkerpop.StemmaRepository._
 
+import java.sql.{Connection, PreparedStatement}
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import scala.collection.mutable
+import scala.util.Using
+
+/*
+  Stemma
+  ------
+  id
+  name
+
+
+  User
+  ------
+  id
+  email
+
+
+  Person
+  ------
+  id
+  name
+  birthDate
+  deathDate
+  bio
+
+
+  Family
+  -------
+  id
+  stemmaId
+
+
+  StemmaOwner
+  -------
+  stemmaId
+  ownerId
+
+
+  FamilyOwner
+  -------
+  familyId
+  ownerId
+
+
+  PersonOwner
+  -------
+  personId
+  ownerId
+
+
+  PersonFamily
+  -------
+  personId
+  familyId
+ */
 
 class StemmaRepository {
+  private val isStemmaOwner = "select * from StemmaOwner where stemmaId = ? and ownerId = ?"
+  private val isPersonOwner = "select * from PersonOwner where personId = ? and ownerId = ?"
+  private val isFamilyOwner = "select * from FamilyOwner where familyId = ? and ownerId = ?"
+
+  private val removeStemma = "delete from Stemma where id = ?"
+  private val removePerson = "delete from Person where id = ?"
+  private val removeFamily = "delete from Family where id = ?"
+
+  private val createPerson = "insert into Person values(?, ?, ?, ?)"
+  private val updatePerson = "update Person set name = ?, birthDate = ?, deathDate = ?, bio = ? where id = ?"
+
+  private val createUser      = "insert into User values(?, ?)"
+  private val findUserByEmail = "select id from User where email = ?"
+
+  private val removePersonToFamily = "delete from PersonFamily where familyId = ?"
+  private val addPersonToStemma    = "insert into PersonFamily values (?, ?)"
+
+  private val createFamily = "insert into Family values (?)"
+
+  private def execute[T](conn: Connection, query: String)(exec: PreparedStatement => Either[StemmaError, T]) = {
+    import cats.syntax.either._
+    Using(conn.prepareStatement(query)) { exec }
+      .toEither
+      .leftMap(exc => UnknownError(exc))
+      .flatten
+  }
+
   def listStemmas(ts: TraversalSource, ownerId: String): Either[NoSuchUserId, List[StemmaDescription]] =
     ts.V(ownerId)
       .headOption()
@@ -253,14 +334,30 @@ class StemmaRepository {
   def isStemmaOwner(ts: TraversalSource, userId: String, stemmaId: String): Either[StemmaError, Boolean] =
     isOwnerOf(ts, userId, stemmaId)(NoSuchStemmaId)
 
-  def makeFamilyOwner(ts: TraversalSource, userId: String, familyId: String): Either[StemmaError, Unit] =
-    setRelation(ts, userId, familyId, relations.ownerOf)()
+  def makeExistingFamilyOwner(conn: Connection, userId: String, familyId: String): Either[StemmaError, Unit] =
+    execute(conn, "insert into FamilyOwner values(?, ?)") { q =>
+      q.setString(0, familyId)
+      q.setString(1, userId)
 
-  def makePersonOwner(ts: TraversalSource, userId: String, personId: String): Either[StemmaError, Unit] =
-    setRelation(ts, userId, personId, relations.ownerOf)()
+      if (q.execute()) Right() else Left(IsAlreadyAnOwner(userId, familyId, "family"))
+    }
 
-  def makeGraphOwner(ts: TraversalSource, userId: String, stemmaId: String): Either[StemmaError, Unit] =
-    setRelation(ts, userId, stemmaId, relations.ownerOf)()
+  def makeExistingPersonOwner(conn: Connection, userId: String, personId: String): Either[StemmaError, Unit] =
+    execute(conn, "insert into PersonOwner values(?, ?)") { q =>
+      q.setString(0, personId)
+      q.setString(1, userId)
+
+      if (q.execute()) Right() else Left(IsAlreadyAnOwner(userId, personId, "person"))
+    }
+
+  def makeExistingGraphOwner(conn: Connection, userId: String, stemmaId: String): Either[StemmaError, Unit] = {
+    execute(conn, "insert into StemmaOwner values(?, ?)") { q =>
+      q.setString(0, stemmaId)
+      q.setString(1, userId)
+
+      if (q.execute()) Right() else Left(IsAlreadyAnOwner(userId, stemmaId, "stemma"))
+    }
+  }
 
   private def thereAreNoOtherOwners(currentOwner: Vertex, target: Vertex) =
     target

@@ -13,7 +13,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
   def createStemma(userId: String, name: String) =
     ZIO.fromEither(transaction(graph) { tx =>
       val stemmaId = ops.newStemma(tx, name)
-      ops.makeGraphOwner(tx, userId, stemmaId).map(_ => stemmaId)
+      ops.makeExistingGraphOwner(tx, userId, stemmaId).map(_ => stemmaId)
     })
 
   def listOwnedStemmas(userId: String) = ZIO.fromEither(ops.listStemmas(graph.traversal, userId)).map(OwnedStemmasDescription.apply)
@@ -33,7 +33,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
       case _                                                              => None
     }).getOrElse(ops.newFamily(ts, stemmaId))
 
-    ops.makeFamilyOwner(ts, ownerId, familyId) *> setFamilyRelations(ts, stemmaId, ownerId, familyId, (p1 ++ p2).toSeq, children)
+    ops.makeExistingFamilyOwner(ts, ownerId, familyId) *> setFamilyRelations(ts, stemmaId, ownerId, familyId, (p1 ++ p2).toSeq, children)
   }
 
   def updateFamily(userId: String, familyId: String, family: CreateFamily): IO[StemmaError, FamilyDescription] = ZIO.fromEither(
@@ -69,7 +69,7 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
         case p: CreateNewPerson =>
           val personId = ops.newPerson(ts, stemmaId, p)
           ops
-            .makePersonOwner(ts, ownerId, personId)
+            .makeExistingPersonOwner(ts, ownerId, personId)
             .map(_ => personId)
       }
 
@@ -157,9 +157,9 @@ class StemmaService(graph: ScalaGraph, ops: StemmaRepository) {
       for {
         person <- ops.describePerson(ts, targetPersonId)
         effect = ops.chown(ts, targetPersonId)
-        _      <- ops.makeGraphOwner(ts, toUserId, person.stemmaId)
-        _      <- effect.affectedPeople.traverse(p => ops.makePersonOwner(ts, toUserId, p))
-        _      <- effect.affectedFamilies.traverse(f => ops.makeFamilyOwner(ts, toUserId, f))
+        _      <- ops.makeExistingGraphOwner(ts, toUserId, person.stemmaId)
+        _      <- effect.affectedPeople.traverse(p => ops.makeExistingPersonOwner(ts, toUserId, p))
+        _      <- effect.affectedFamilies.traverse(f => ops.makeExistingFamilyOwner(ts, toUserId, f))
       } yield effect
     })
   )

@@ -27,6 +27,8 @@ case class IsNotTheOnlyStemmaOwner(stemmaId: String) extends Throwable with Stem
 case class InvalidInviteToken() extends Throwable with StemmaError
 case class ForeignInviteToken() extends Throwable with StemmaError
 
+case class IsAlreadyAnOwner(personId: String, resourceId: String, resourceType: String) extends StemmaError
+
 object StemmaError {
   implicit val throwableEnc: JsonEncoder[Throwable] = JsonEncoder.string.contramap(th => ExceptionUtils.getStackTrace(th))
   implicit val encoder: JsonEncoder[StemmaError]    = DeriveJsonEncoder.gen[StemmaError]
