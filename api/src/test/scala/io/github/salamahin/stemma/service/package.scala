@@ -1,8 +1,6 @@
 package io.github.salamahin.stemma
 
 import gremlin.scala.ScalaGraph
-import org.apache.commons.configuration2.BaseConfiguration
-import org.umlg.sqlg.structure.SqlgGraph
 import zio.{ULayer, ZIO, ZLayer}
 
 import java.io.File
@@ -20,16 +18,11 @@ package object service {
                    ZIO.succeed(File.createTempFile("stemma", ".tmp"))
                  )(file => ZIO.succeed(file.delete()))
 
-      graph = {
-        import gremlin.scala._
-        val config = new BaseConfiguration {
-          addPropertyDirect("jdbc.url", s"jdbc:h2:${tempFile.getPath};LOCK_TIMEOUT=3000")
-          addPropertyDirect("jdbc.username", "SA")
-          addPropertyDirect("jdbc.password", "")
-        }
+      graph = GraphService.configure(new JdbcConfiguration {
+        override val jdbcUrl: String      = s"jdbc:h2:${tempFile.getPath};LOCK_TIMEOUT=3000"
+        override val jdbcUser: String     = "SA"
+        override val jdbcPassword: String = ""
+      })
 
-        val g: SqlgGraph = SqlgGraph.open(config)
-        g.asScala()
-      }
     } yield TempGraphService(graph))
 }
