@@ -16,7 +16,7 @@ case class ChildAlreadyBelongsToFamily(familyId: Long, personId: Long) extends T
 case class ChildDoesNotBelongToFamily(familyId: Long, childId: Long)   extends Throwable with StemmaError
 case class SpouseDoesNotBelongToFamily(familyId: Long, personId: Long) extends Throwable with StemmaError
 case class IncompleteFamily()                                          extends Throwable with StemmaError
-case class DuplicatedIds(duplicatedIds: Seq[Long])                     extends Throwable with StemmaError
+case class DuplicatedIds(duplicatedIds: Long)                          extends Throwable with StemmaError
 
 case class AccessToFamilyDenied(familyId: Long) extends Throwable with StemmaError
 case class AccessToPersonDenied(personId: Long) extends Throwable with StemmaError

@@ -95,30 +95,30 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families)(hasSameElements("(James) parentsOf (Jane, John)" :: Nil))).provideSome(storageService, Scope.default)
   }
+
+  private val duplicatedIdsForbidden = test("cant update a family when there are duplicated ids in members") {
+    (for {
+      s <- ZIO.service[SlickStemmaService]
+
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
+      stemmaId        <- s.createStemma(userId, "test stemma")
+
+      FamilyDescription(familyId, jamesId :: Nil, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
+      err                                                           <- s.updateFamily(userId, familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
+    } yield assertTrue(err == DuplicatedIds(jamesId))).provideSome(storageService, Scope.default)
+  }
 //
-//  private val duplicatedIdsForbidden = test("cant update a family when there are duplicated ids in members") {
-//    for {
-//      s <- storageService
-//
-//      User(userId, _) <- s.getOrCreateUser("user@test.com")
-//      stemmaId        <- s.createStemma(userId, "test stemma")
-//
-//      FamilyDescription(familyId, jamesId :: Nil, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
-//      err                                                           <- s.updateFamily(userId, familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
-//    } yield assertTrue(err == DuplicatedIds(jamesId :: Nil))
-//  }
-//
-//  private val aChildCanBelongToASingleFamilyOnly = test("a child must belong to a single family") {
-//    for {
-//      s <- storageService
-//
-//      User(userId, _) <- s.getOrCreateUser("user@test.com")
-//      stemmaId        <- s.createStemma(userId, "test stemma")
-//
-//      FamilyDescription(firstFamilyId, _, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
-//      err                                                   <- s.createFamily(userId, stemmaId, family(createJane)(existing(jillId))).flip
-//    } yield assertTrue(err == ChildAlreadyBelongsToFamily(firstFamilyId, jillId))
-//  }
+  private val aChildCanBelongToASingleFamilyOnly = test("a child must belong to a single family") {
+    (for {
+      s <- ZIO.service[SlickStemmaService]
+
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
+      stemmaId        <- s.createStemma(userId, "test stemma")
+
+      FamilyDescription(firstFamilyId, _, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
+      err                                                   <- s.createFamily(userId, stemmaId, family(createJane)(existing(jillId))).flip
+    } yield assertTrue(err == ChildAlreadyBelongsToFamily(firstFamilyId, jillId))).provideSome(storageService, Scope.default)
+  }
 //
 //  private val canRemovePerson = test("when removing a person hist child & spouse relations are removed as well") {
 //    for {
@@ -373,8 +373,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 //      aPersonCanBeSpouseInDifferentFamilies,
       cantCreateFamilyOfSingleParent,
       cantCreateFamilyOfSingleChild,
-//      duplicatedIdsForbidden,
-//      aChildCanBelongToASingleFamilyOnly,
+      duplicatedIdsForbidden,
+      aChildCanBelongToASingleFamilyOnly,
 //      usersHaveSeparateGraphs,
 //      cantUpdatePersonIfNotAnOwner,
 //      cantUpdateFamilyIfNotAnOwner,
@@ -382,7 +382,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 //      whenUpdatingFamilyAllMembersShouldBelongToGraph,
 //      canChangeOwnershipInRecursiveManner,
       appendChildrenToFullExistingFamily,
-      appendChildrenToIncompleteExistingFamily,
+      appendChildrenToIncompleteExistingFamily
 //      whenThereAreSeveralOwnersThenStemmaIsNotRemovable,
 //      canRemoveStemmaIfOnlyOwner
     )
