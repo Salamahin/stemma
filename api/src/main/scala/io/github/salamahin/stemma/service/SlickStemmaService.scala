@@ -15,7 +15,9 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
 
   private val db = Database.forURL(url = jdbcConfiguration.jdbcUrl, user = jdbcConfiguration.jdbcUser, password = jdbcConfiguration.jdbcPassword)
 
-  def createSchema = ZIO.fromFuture { implicit ec => db run (qStemmaUsers.schema ++ qStemmas.schema ++ qPeople.schema ++ qFamilies.schema ++ qPeopleFamilies.schema ++ qFamiliesOwners.schema ++ qPeopleOwners.schema ++ qStemmaOwners.schema).create }
+  def createSchema = ZIO.fromFuture { implicit ec =>
+    db run (qStemmaUsers.schema ++ qStemmas.schema ++ qPeople.schema ++ qFamilies.schema ++ qPeopleFamilies.schema ++ qFamiliesOwners.schema ++ qPeopleOwners.schema ++ qStemmaOwners.schema ++ qSpouses.schema ++ qChildren.schema).create
+  }
 
   def close() = ZIO.succeed(db.close())
 
@@ -123,7 +125,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
   }
 
   private def linkFamilyMembers(userId: Long, stemmaId: Long, familyId: Long, family: CreateFamily)(implicit ec: ExecutionContext) = {
-    val parents = (family.parent1 ++ family.parent2).toList
+    val parents  = (family.parent1 ++ family.parent2).toList
     val children = family.children
 
     val familyIsComplete = if ((parents.size + children.size) < 2) DBIO.failed(IncompleteFamily()) else DBIO.successful((): Unit)
@@ -136,12 +138,12 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
       .getOrElse(DBIO.successful((): Unit))
 
     for {
-      _ <- familyIsComplete
-      _ <- noDuplicatedIds
+      _  <- familyIsComplete
+      _  <- noDuplicatedIds
       ps <- DBIO sequence parents.map(p => getOrCreatePerson(stemmaId, userId, p))
       cs <- DBIO sequence children.map(p => getOrCreatePerson(stemmaId, userId, p))
-      _ <- DBIO sequence ps.map(p => qPeopleFamilies.insertOrUpdate(PersonFamily(p, familyId, spouse)))
-      _ <- DBIO sequence cs.map(c => qPeopleFamilies.insertOrUpdate(PersonFamily(c, familyId, child)))
+      _  <- DBIO sequence ps.map(p => qPeopleFamilies.insertOrUpdate(PersonFamily(p, familyId, spouse)))
+      _  <- DBIO sequence cs.map(c => qPeopleFamilies.insertOrUpdate(PersonFamily(c, familyId, child)))
     } yield FamilyDescription(familyId, ps, cs, true)
   }
 
