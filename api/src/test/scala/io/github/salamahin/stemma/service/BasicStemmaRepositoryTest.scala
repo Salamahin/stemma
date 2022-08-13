@@ -339,36 +339,36 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 //      assertTrue(accessorReadOnlyP == Map(jabe -> false, jane -> false, jeff -> false, july -> false, josh -> false, jared -> true, jill -> false, jess -> false, john -> false))
 //  }
 //
-//  val whenThereAreSeveralOwnersThenStemmaIsNotRemovable = test("when there are several owners then chart is not removable") {
-//    for {
-//      s                   <- storageService
-//      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
-//      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
-//
-//      stemmaId                                  <- s.createStemma(creatorId, "my first stemma")
-//      FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJane)(createJill))
-//
-//      _ <- s.chown(accessorId, jillId)
-//
-//      creatorStemmas  <- s.listOwnedStemmas(creatorId)
-//      accessorStemmas <- s.listOwnedStemmas(accessorId)
-//    } yield assertTrue(
-//      creatorStemmas.stemmas.forall(s => !s.removable),
-//      accessorStemmas.stemmas.forall(s => !s.removable)
-//    )
-//  }
-//
-//  val canRemoveStemmaIfOnlyOwner = test("if only owner then can remove owned stemma") {
-//    for {
-//      s                  <- storageService
-//      User(creatorId, _) <- s.getOrCreateUser("user1@test.com")
-//
-//      stemmaId <- s.createStemma(creatorId, "my first stemma")
-//      _        <- s.removeStemma(creatorId, stemmaId)
-//
-//      stemmas <- s.listOwnedStemmas(creatorId)
-//    } yield assertTrue(stemmas.stemmas.isEmpty)
-//  }
+  val whenThereAreSeveralOwnersThenStemmaIsNotRemovable = test("when there are several owners then chart is not removable") {
+    (for {
+      s                   <- ZIO.service[SlickStemmaService]
+      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
+      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
+
+      stemmaId                                  <- s.createStemma(creatorId, "my first stemma")
+      FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJane)(createJill))
+
+      _ <- s.chown(accessorId, jillId)
+
+      creatorStemmas  <- s.listOwnedStemmas(creatorId)
+      accessorStemmas <- s.listOwnedStemmas(accessorId)
+    } yield assertTrue(
+      creatorStemmas.stemmas.forall(s => !s.removable),
+      accessorStemmas.stemmas.forall(s => !s.removable)
+    )).provideSome(storageService, Scope.default)
+  }
+
+  val canRemoveStemmaIfOnlyOwner = test("if only owner then can remove owned stemma") {
+    (for {
+      s                   <- ZIO.service[SlickStemmaService]
+      User(creatorId, _) <- s.getOrCreateUser("user1@test.com")
+
+      stemmaId <- s.createStemma(creatorId, "my first stemma")
+      _        <- s.removeStemma(creatorId, stemmaId)
+
+      stemmas <- s.listOwnedStemmas(creatorId)
+    } yield assertTrue(stemmas.stemmas.isEmpty)).provideSome(storageService, Scope.default)
+  }
 
   override def spec =
     suite("StemmaService: basic ops & rules")(
@@ -389,8 +389,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       whenUpdatingFamilyAllMembersShouldBelongToGraph,
 //      canChangeOwnershipInRecursiveManner,
       appendChildrenToFullExistingFamily,
-      appendChildrenToIncompleteExistingFamily
-//      whenThereAreSeveralOwnersThenStemmaIsNotRemovable,
-//      canRemoveStemmaIfOnlyOwner
+      appendChildrenToIncompleteExistingFamily,
+      whenThereAreSeveralOwnersThenStemmaIsNotRemovable,
+      canRemoveStemmaIfOnlyOwner
     )
 }
