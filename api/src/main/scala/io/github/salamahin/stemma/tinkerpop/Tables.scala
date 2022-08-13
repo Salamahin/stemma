@@ -17,14 +17,14 @@ trait Tables {
   case class StemmaOwner(ownerId: Long, resourceId: Long)
   case class PersonFamily(personId: Long, familyId: Long, tpe: String)
 
-  val stemmaUsers    = TableQuery[StemmaUsers]
-  val stemmas        = TableQuery[Stemmas]
-  val people         = TableQuery[People]
-  val families       = TableQuery[Families]
-  val peopleFamilies = TableQuery[PersonFamilies]
-  val familiesOwners = TableQuery[FamiliesOwners]
-  val peopleOwners   = TableQuery[PeopleOwners]
-  val stemmaOwners   = TableQuery[StemmaOwners]
+  val qStemmaUsers    = TableQuery[StemmaUsers]
+  val qStemmas        = TableQuery[Stemmas]
+  val qPeople         = TableQuery[People]
+  val qFamilies       = TableQuery[Families]
+  val qPeopleFamilies = TableQuery[PersonFamilies]
+  val qFamiliesOwners = TableQuery[FamiliesOwners]
+  val qPeopleOwners   = TableQuery[PeopleOwners]
+  val qStemmaOwners   = TableQuery[StemmaOwners]
 
   class StemmaUsers(tag: Tag) extends Table[StemmaUser](tag, "StemmaUsers") {
     def id    = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -48,7 +48,7 @@ trait Tables {
     def bio       = column[Option[String]]("bio")
     def stemmaId  = column[Long]("stemmaId")
 
-    def fkPersonStemma = foreignKey("FK_Person_Stemma", stemmaId, stemmas)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
+    def fkPersonStemma = foreignKey("FK_Person_Stemma", stemmaId, qStemmas)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
 
     override def * = (id, name, birthDate, deathDate, bio, stemmaId).mapTo[Person]
   }
@@ -57,7 +57,7 @@ trait Tables {
     def id       = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def stemmaId = column[Long]("stemmaId")
 
-    def fkFamilyStemma = foreignKey("FK_Family_Stemma", stemmaId, stemmas)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
+    def fkFamilyStemma = foreignKey("FK_Family_Stemma", stemmaId, qStemmas)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
 
     override def * = (id, stemmaId).mapTo[Family]
   }
@@ -69,8 +69,8 @@ trait Tables {
 
     def pk = primaryKey("pk", (personId, familyId))
 
-    def fkPersonFamiliesPerson = foreignKey("FK_PersonFamilies_Person", personId, people)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
-    def fkPersonFamiliesFamily = foreignKey("FK_PersonFamilies_Family", familyId, families)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
+    def fkPersonFamiliesPerson = foreignKey("FK_PersonFamilies_Person", personId, qPeople)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
+    def fkPersonFamiliesFamily = foreignKey("FK_PersonFamilies_Family", familyId, qFamilies)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
 
     override def * = (personId, familyId, tpe).mapTo[PersonFamily]
   }
@@ -81,8 +81,8 @@ trait Tables {
 
     def pk = primaryKey("PK_FamilyOwner", (ownerId, familyId))
 
-    def fkOwnerUser      = foreignKey("FK_FamilyOwner_User", ownerId, stemmaUsers)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
-    def fkResourceFamily = foreignKey("FK_FamilyOwner_Family", familyId, families)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
+    def fkOwnerUser      = foreignKey("FK_FamilyOwner_User", ownerId, qStemmaUsers)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
+    def fkResourceFamily = foreignKey("FK_FamilyOwner_Family", familyId, qFamilies)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
 
     override def * = (ownerId, familyId).mapTo[FamilyOwner]
   }
@@ -93,8 +93,8 @@ trait Tables {
 
     def pk = primaryKey("PK_PersonOwner", (ownerId, personId))
 
-    def fkOwnerUser      = foreignKey("FK_PersonOwner_User", ownerId, stemmaUsers)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
-    def fkResourcePerson = foreignKey("FK_PersonOwner_Person", personId, people)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
+    def fkOwnerUser      = foreignKey("FK_PersonOwner_User", ownerId, qStemmaUsers)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
+    def fkResourcePerson = foreignKey("FK_PersonOwner_Person", personId, qPeople)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
 
     override def * = (ownerId, personId).mapTo[PersonOwner]
   }
@@ -105,8 +105,8 @@ trait Tables {
 
     def pk = primaryKey("PK_StemmaOwner", (ownerId, stemmaId))
 
-    def fkOwnerUser      = foreignKey("FK_StemmaOwner_User", ownerId, stemmaUsers)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
-    def fkResourcePerson = foreignKey("FK_StemmaOwner_Stemma", stemmaId, stemmas)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
+    def fkOwnerUser      = foreignKey("FK_StemmaOwner_User", ownerId, qStemmaUsers)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
+    def fkResourcePerson = foreignKey("FK_StemmaOwner_Stemma", stemmaId, qStemmas)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
 
     override def * = (ownerId, stemmaId).mapTo[StemmaOwner]
   }

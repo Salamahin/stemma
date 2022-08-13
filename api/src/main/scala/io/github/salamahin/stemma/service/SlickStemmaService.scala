@@ -15,15 +15,15 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
 
   private val db = Database.forURL(url = jdbcConfiguration.jdbcUrl, user = jdbcConfiguration.jdbcUser, password = jdbcConfiguration.jdbcPassword)
 
-  def createSchema = ZIO.fromFuture { implicit ec => db run (stemmaUsers.schema ++ stemmas.schema ++ people.schema ++ families.schema ++ peopleFamilies.schema ++ familiesOwners.schema ++ peopleOwners.schema ++ stemmaOwners.schema).create }
+  def createSchema = ZIO.fromFuture { implicit ec => db run (qStemmaUsers.schema ++ qStemmas.schema ++ qPeople.schema ++ qFamilies.schema ++ qPeopleFamilies.schema ++ qFamiliesOwners.schema ++ qPeopleOwners.schema ++ qStemmaOwners.schema).create }
 
   def close() = ZIO.succeed(db.close())
 
   def getOrCreateUser(email: String) = ZIO.fromFuture { implicit ec =>
-    val userId = stemmaUsers returning stemmaUsers.map(_.id)
+    val userId = qStemmaUsers returning qStemmaUsers.map(_.id)
 
     val query = (for {
-      maybeUserId <- stemmaUsers.filter(_.email === email).map(_.id).result.headOption
+      maybeUserId <- qStemmaUsers.filter(_.email === email).map(_.id).result.headOption
       userId      <- maybeUserId.map(id => DBIO.successful(id)).getOrElse(userId += StemmaUser(email = email))
     } yield User(userId, email)).transactionally
 
@@ -31,7 +31,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
   }
 
   private def checkStemmaAccess(stemmaId: Long, userId: Long)(implicit ec: ExecutionContext) = {
-    val ownedStemma = stemmaOwners.filter(so => so.ownerId === userId && so.stemmaId === stemmaId)
+    val ownedStemma = qStemmaOwners.filter(so => so.ownerId === userId && so.stemmaId === stemmaId)
 
     for {
       isOwner <- ownedStemma.exists.result
@@ -40,7 +40,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
   }
 
   private def checkPersonAccess(personId: Long, userId: Long)(implicit ec: ExecutionContext) = {
-    val ownedPeople = peopleOwners.filter(po => po.ownerId === userId && po.personId === personId)
+    val ownedPeople = qPeopleOwners.filter(po => po.ownerId === userId && po.personId === personId)
 
     for {
       isOwner <- ownedPeople.exists.result
@@ -49,7 +49,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
   }
 
   private def checkFamilyAccess(familyId: Long, userId: Long)(implicit ec: ExecutionContext) = {
-    val ownedPeople = familiesOwners.filter(fo => fo.ownerId === userId && fo.familyId === familyId)
+    val ownedPeople = qFamiliesOwners.filter(fo => fo.ownerId === userId && fo.familyId === familyId)
 
     for {
       isOwner <- ownedPeople.exists.result
@@ -59,23 +59,23 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
 
   def createStemma(userId: Long, name: String) = ZIO.fromFuture { implicit ec =>
     val query = (for {
-      newStemmaId <- (stemmas returning stemmas.map(_.id)) += Stemma(name = name)
-      _           <- stemmaOwners += StemmaOwner(userId, newStemmaId)
+      newStemmaId <- (qStemmas returning qStemmas.map(_.id)) += Stemma(name = name)
+      _           <- qStemmaOwners += StemmaOwner(userId, newStemmaId)
     } yield newStemmaId).transactionally
 
     db run query
   }
 
   def listOwnedStemmas(userId: Long) = ZIO.fromFuture { implicit ec =>
-    val ownedStemmas = stemmaOwners.filter(_.ownerId === userId).map(_.stemmaId)
+    val ownedStemmas = qStemmaOwners.filter(_.ownerId === userId).map(_.stemmaId)
 
-    val ownersCounted = (ownedStemmas join stemmaOwners on (_ === _.stemmaId))
+    val ownersCounted = (ownedStemmas join qStemmaOwners on (_ === _.stemmaId))
       .groupBy(_._1)
       .map {
         case (stemmaId, owners) => (stemmaId, owners.map(_._2.ownerId).size)
       }
 
-    val stemmasWithRemovableFlag = (stemmas join ownersCounted on ((l, r) => l.id === r._1))
+    val stemmasWithRemovableFlag = (qStemmas join ownersCounted on ((l, r) => l.id === r._1))
       .map {
         case (stemma, (_, numberOwners)) => (stemma.id, stemma.name, numberOwners === 1)
       }
@@ -88,7 +88,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
   }
 
   def removeStemma(userId: Long, stemmaId: Long) = ZIO.fromFuture { implicit ec =>
-    val isOnlyOwner = stemmaOwners
+    val isOnlyOwner = qStemmaOwners
       .filter(_.stemmaId === stemmaId)
       .groupBy(_.stemmaId)
       .map {
@@ -100,7 +100,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
       singleOwner <- isOnlyOwner.result.map(_.head)
       _           <- if (singleOwner) DBIO.successful((): Unit) else DBIO.failed(IsNotTheOnlyStemmaOwner(stemmaId))
 
-      _ <- stemmas.filter(_.id === stemmaId).delete
+      _ <- qStemmas.filter(_.id === stemmaId).delete
     } yield ()).transactionally
 
     db run query
@@ -111,14 +111,14 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
 
     case CreateNewPerson(name, birthDate, deathDate, bio) =>
       for {
-        newPersonId <- (people returning people.map(_.id)) += Person(
+        newPersonId <- (qPeople returning qPeople.map(_.id)) += Person(
                         name = name,
                         birthDate = birthDate,
                         deathDate = deathDate,
                         bio = bio,
                         stemmaId = stemmaId
                       )
-        _ <- peopleOwners += PersonOwner(userId, newPersonId)
+        _ <- qPeopleOwners += PersonOwner(userId, newPersonId)
       } yield newPersonId
   }
 
@@ -140,13 +140,13 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
       _ <- noDuplicatedIds
       ps <- DBIO sequence parents.map(p => getOrCreatePerson(stemmaId, userId, p))
       cs <- DBIO sequence children.map(p => getOrCreatePerson(stemmaId, userId, p))
-      _ <- DBIO sequence ps.map(p => peopleFamilies.insertOrUpdate(PersonFamily(p, familyId, spouse)))
-      _ <- DBIO sequence cs.map(c => peopleFamilies.insertOrUpdate(PersonFamily(c, familyId, child)))
+      _ <- DBIO sequence ps.map(p => qPeopleFamilies.insertOrUpdate(PersonFamily(p, familyId, spouse)))
+      _ <- DBIO sequence cs.map(c => qPeopleFamilies.insertOrUpdate(PersonFamily(c, familyId, child)))
     } yield FamilyDescription(familyId, ps, cs, true)
   }
 
   private def unlinkFamilyMembers(familyId: Long)(implicit ec: ExecutionContext) = {
-    peopleFamilies.filter(_.familyId === familyId).delete
+    qPeopleFamilies.filter(_.familyId === familyId).delete
   }
 
   private def tryFindMatchingFamily(parents: Seq[PersonDefinition], userId: Long)(implicit ec: ExecutionContext) = {
@@ -156,16 +156,16 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
 
     def familyWithSingleParent = {
       for {
-        familyId <- peopleFamilies.filter(_.personId === existingParentsIds.head).map(_.familyId).result.head
+        familyId <- qPeopleFamilies.filter(_.personId === existingParentsIds.head).map(_.familyId).result.head
         _        <- checkFamilyAccess(familyId, userId)
       } yield Some(familyId)
     }
 
     def familyWithBothParents = {
       for {
-        familyId <- peopleFamilies
+        familyId <- qPeopleFamilies
                      .filter(_.personId === existingParentsIds(0))
-                     .join(peopleFamilies.filter(_.personId === existingParentsIds(1)))
+                     .join(qPeopleFamilies.filter(_.personId === existingParentsIds(1)))
                      .on(_.familyId === _.familyId)
                      .map {
                        case (fo, _) => fo.familyId
@@ -184,8 +184,8 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
   def createFamily(userId: Long, stemmaId: Long, family: CreateFamily) = ZIO.fromFuture { implicit ec =>
     def createNewFamily =
       for {
-        fid <- (families returning families.map(_.id)) += Family(stemmaId = stemmaId)
-        _   <- familiesOwners += FamilyOwner(userId, fid)
+        fid <- (qFamilies returning qFamilies.map(_.id)) += Family(stemmaId = stemmaId)
+        _   <- qFamiliesOwners += FamilyOwner(userId, fid)
       } yield fid
 
     val query = (for {
@@ -204,7 +204,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
       _ <- checkFamilyAccess(familyId, userId)
       _ <- unlinkFamilyMembers(familyId)
 
-      stemmaId    <- families.filter(_.id === familyId).map(_.stemmaId).result.head
+      stemmaId    <- qFamilies.filter(_.id === familyId).map(_.stemmaId).result.head
       familyDescr <- linkFamilyMembers(userId, stemmaId, familyId, family)
     } yield familyDescr).transactionally
 
@@ -214,7 +214,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
   def removePerson(userId: Long, personId: Long) = ZIO.fromFuture { implicit ec =>
     val query = (for {
       _ <- checkPersonAccess(personId, userId)
-      _ <- people.filter(_.id === personId).delete
+      _ <- qPeople.filter(_.id === personId).delete
     } yield ()).transactionally
 
     db run query
@@ -224,7 +224,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
     val query = (for {
       _ <- checkFamilyAccess(familyId, userId)
       _ <- unlinkFamilyMembers(familyId)
-      _ <- families.filter(_.id === familyId).delete
+      _ <- qFamilies.filter(_.id === familyId).delete
     } yield ()).transactionally
 
     db run query
@@ -233,8 +233,8 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
   def updatePerson(userId: Long, personId: Long, description: CreateNewPerson) = ZIO.fromFuture { implicit ec =>
     val query = (for {
       _        <- checkPersonAccess(personId, userId)
-      stemmaId <- people.filter(_.id === personId).map(_.stemmaId).result.head
-      _        <- people.insertOrUpdate(Person(personId, description.name, description.birthDate, description.deathDate, description.bio, stemmaId))
+      stemmaId <- qPeople.filter(_.id === personId).map(_.stemmaId).result.head
+      _        <- qPeople.insertOrUpdate(Person(personId, description.name, description.birthDate, description.deathDate, description.bio, stemmaId))
     } yield ()).transactionally
 
     db run query
@@ -242,10 +242,10 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
 
   def stemma(userId: Long, stemmaId: Long) = ZIO.fromFuture { implicit ec =>
     val joined =
-      (families.filter(_.stemmaId === stemmaId) join peopleFamilies on (_.id === _.familyId)
-        join people on (_._2.personId === _.id)
-        joinLeft peopleOwners.filter(_.ownerId === userId) on (_._2.id === _.personId)
-        joinLeft familiesOwners.filter(_.ownerId === userId) on (_._1._1._1.id === _.familyId))
+      (qFamilies.filter(_.stemmaId === stemmaId) join qPeopleFamilies on (_.id === _.familyId)
+        join qPeople on (_._2.personId === _.id)
+        joinLeft qPeopleOwners.filter(_.ownerId === userId) on (_._2.id === _.personId)
+        joinLeft qFamiliesOwners.filter(_.ownerId === userId) on (_._1._1._1.id === _.familyId))
 
     val stemmaQuery = joined
       .result
@@ -284,7 +284,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
 
   def ownsPerson(userId: Long, personId: Long) = ZIO.fromFuture { implicit ec =>
     db.run(
-      peopleOwners.filter(po => po.ownerId === userId && po.personId === personId).exists.result
+      qPeopleOwners.filter(po => po.ownerId === userId && po.personId === personId).exists.result
     )
   }
 }
