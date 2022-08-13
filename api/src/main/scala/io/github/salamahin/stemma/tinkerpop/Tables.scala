@@ -15,7 +15,6 @@ trait Tables {
   case class FamilyOwner(ownerId: Long, resourceId: Long)
   case class PersonOwner(ownerId: Long, resourceId: Long)
   case class StemmaOwner(ownerId: Long, resourceId: Long)
-  case class PersonFamily(personId: Long, familyId: Long, tpe: String)
   case class Spouse(personId: Long, familyId: Long)
   case class Child(personId: Long, familyId: Long)
 
@@ -23,7 +22,6 @@ trait Tables {
   val qStemmas        = TableQuery[TStemmas]
   val qPeople         = TableQuery[TPeople]
   val qFamilies       = TableQuery[TFamilies]
-  val qPeopleFamilies = TableQuery[TPersonFamilies]
   val qFamiliesOwners = TableQuery[TFamiliesOwners]
   val qPeopleOwners   = TableQuery[TPeopleOwners]
   val qStemmaOwners   = TableQuery[TStemmaOwners]
@@ -64,19 +62,6 @@ trait Tables {
     def fkFamilyStemma = foreignKey("FK_Family_Stemma", stemmaId, qStemmas)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
 
     override def * = (id, stemmaId).mapTo[Family]
-  }
-
-  class TPersonFamilies(tag: Tag) extends Table[PersonFamily](tag, "PersonFamily") {
-    def personId = column[Long]("personId")
-    def familyId = column[Long]("familyId")
-    def tpe      = column[String]("type")
-
-    def pk = primaryKey("pk", (personId, familyId))
-
-    def fkPersonFamiliesPerson = foreignKey("FK_PersonFamilies_Person", personId, qPeople)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
-    def fkPersonFamiliesFamily = foreignKey("FK_PersonFamilies_Family", familyId, qFamilies)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
-
-    override def * = (personId, familyId, tpe).mapTo[PersonFamily]
   }
 
   class TFamiliesOwners(tag: Tag) extends Table[FamilyOwner](tag, "FamilyOwner") {

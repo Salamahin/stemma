@@ -16,7 +16,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
   private val db = Database.forURL(url = jdbcConfiguration.jdbcUrl, user = jdbcConfiguration.jdbcUser, password = jdbcConfiguration.jdbcPassword)
 
   def createSchema = ZIO.fromFuture { implicit ec =>
-    db run (qStemmaUsers.schema ++ qStemmas.schema ++ qPeople.schema ++ qFamilies.schema ++ qPeopleFamilies.schema ++ qFamiliesOwners.schema ++ qPeopleOwners.schema ++ qStemmaOwners.schema ++ qSpouses.schema ++ qChildren.schema).create
+    db run (qStemmaUsers.schema ++ qStemmas.schema ++ qPeople.schema ++ qFamilies.schema ++ qFamiliesOwners.schema ++ qPeopleOwners.schema ++ qStemmaOwners.schema ++ qSpouses.schema ++ qChildren.schema).create
   }
 
   def close() = ZIO.succeed(db.close())
@@ -137,19 +137,29 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
       .map(ids => DBIO.failed(DuplicatedIds(ids.head)))
       .getOrElse(DBIO.successful((): Unit))
 
+    //for some reason slick compiles an incorrect query when insertOrUpdate on the table where all the columns are
+    //composite key, so this a way how to overcome the problem
+    def createSpouseRelationIfNotExist(personId: Long) =
+      for {
+        exists <- qSpouses.filter(s => s.familyId === familyId && s.personId === personId).exists.result
+        _      <- if (!exists) qSpouses += Spouse(personId, familyId) else DBIO.successful((): Unit)
+      } yield ()
+
     for {
       _  <- familyIsComplete
       _  <- noDuplicatedIds
       ps <- DBIO sequence parents.map(p => getOrCreatePerson(stemmaId, userId, p))
       cs <- DBIO sequence children.map(p => getOrCreatePerson(stemmaId, userId, p))
-      _  <- DBIO sequence ps.map(p => qPeopleFamilies.insertOrUpdate(PersonFamily(p, familyId, spouse)))
-      _  <- DBIO sequence cs.map(c => qPeopleFamilies.insertOrUpdate(PersonFamily(c, familyId, child)))
+      _  <- DBIO sequence ps.map(createSpouseRelationIfNotExist)
+      _  <- DBIO sequence cs.map(c => qChildren.insertOrUpdate(Child(c, familyId)))
     } yield FamilyDescription(familyId, ps, cs, true)
   }
 
-  private def unlinkFamilyMembers(familyId: Long)(implicit ec: ExecutionContext) = {
-    qPeopleFamilies.filter(_.familyId === familyId).delete
-  }
+  private def unlinkFamilyMembers(familyId: Long)(implicit ec: ExecutionContext) =
+    for {
+      _ <- qSpouses.filter(_.familyId === familyId).delete
+      _ <- qChildren.filter(_.familyId === familyId).delete
+    } yield ()
 
   private def tryFindMatchingFamily(parents: Seq[PersonDefinition], userId: Long)(implicit ec: ExecutionContext) = {
     val existingParentsIds = parents.collect {
@@ -158,16 +168,16 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
 
     def familyWithSingleParent = {
       for {
-        familyId <- qPeopleFamilies.filter(_.personId === existingParentsIds.head).map(_.familyId).result.head
+        familyId <- qSpouses.filter(_.personId === existingParentsIds.head).map(_.familyId).result.head
         _        <- checkFamilyAccess(familyId, userId)
       } yield Some(familyId)
     }
 
     def familyWithBothParents = {
       for {
-        familyId <- qPeopleFamilies
+        familyId <- qSpouses
                      .filter(_.personId === existingParentsIds(0))
-                     .join(qPeopleFamilies.filter(_.personId === existingParentsIds(1)))
+                     .join(qSpouses.filter(_.personId === existingParentsIds(1)))
                      .on(_.familyId === _.familyId)
                      .map {
                        case (fo, _) => fo.familyId
@@ -243,13 +253,16 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
   }
 
   def stemma(userId: Long, stemmaId: Long) = ZIO.fromFuture { implicit ec =>
-    val joined =
-      (qFamilies.filter(_.stemmaId === stemmaId) join qPeopleFamilies on (_.id === _.familyId)
-        join qPeople on (_._2.personId === _.id)
-        joinLeft qPeopleOwners.filter(_.ownerId === userId) on (_._2.id === _.personId)
-        joinLeft qFamiliesOwners.filter(_.ownerId === userId) on (_._1._1._1.id === _.familyId))
+    val fs     = qFamilies.filter(_.stemmaId === stemmaId)
+    val ownedP = qPeopleOwners.filter(_.ownerId === userId)
+    val ownedF = qFamiliesOwners.filter(_.ownerId === userId)
 
-    val stemmaQuery = joined
+    val ps = (fs join qSpouses on (_.id === _.familyId) joinLeft ownedP on (_._2.personId === _.personId)).map { case ((f, m), o)  => (f.id, m.personId, o, true) }
+    val cs = (fs join qChildren on (_.id === _.familyId) joinLeft ownedP on (_._2.personId === _.personId)).map { case ((f, m), o) => (f.id, m.personId, o, false) }
+
+    val flatStemma = (ps union cs) join qPeople on (_._2 === _.id) joinLeft ownedF on (_._1._1 === _.familyId)
+
+    val stemmaQuery = flatStemma
       .result
       .map { data =>
         val familyReadOnly = mutable.Map.empty[Long, Boolean]
@@ -258,13 +271,13 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
         val peopleAcc      = mutable.ListBuffer.empty[PersonDescription]
 
         data.foreach {
-          case ((((f, pf), p), po), fo) =>
-            peopleAcc += PersonDescription(p.id, p.name, p.birthDate, p.deathDate, p.bio, po.isEmpty)
+          case (((fid, personId, isPersonOwner, isSpouse), person), isFamilyOwner) =>
+            peopleAcc += PersonDescription(person.id, person.name, person.birthDate, person.deathDate, person.bio, isPersonOwner.isEmpty)
 
-            familyReadOnly(f.id) = fo.isEmpty
+            familyReadOnly(fid) = isFamilyOwner.isEmpty
 
-            if (pf.tpe == spouse) familySpouses(pf.familyId) = familySpouses(pf.familyId) + pf.personId
-            else familyChildren(pf.familyId) = familyChildren(pf.familyId) + pf.personId
+            if (isSpouse) familySpouses(fid) = familySpouses(fid) + personId
+            else familyChildren(fid) = familyChildren(fid) + personId
         }
 
         val families = familyReadOnly.map {
