@@ -10,8 +10,6 @@ import scala.concurrent.ExecutionContext
 class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables with PostgresProfile {
   import api._
 
-  private val spouse = "spouse"
-  private val child  = "child"
 
   private val db = Database.forURL(url = jdbcConfiguration.jdbcUrl, user = jdbcConfiguration.jdbcUser, password = jdbcConfiguration.jdbcPassword)
 
