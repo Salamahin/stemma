@@ -207,26 +207,27 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       assert(people.map(_.name))(hasSameElements("Jane" :: "John" :: "Jill" :: "July" :: "James" :: Nil)))
       .provideSome(storageService, Scope.default)
   }
-//
-//  private val usersHaveSeparateGraphs = test("users might have separated stemmas") {
-//    for {
-//      s               <- storageService
-//      User(userId, _) <- s.getOrCreateUser("user1@test.com")
-//
-//      userStemmaId1 <- s.createStemma(userId, "first stemma")
-//      _             <- s.createFamily(userId, userStemmaId1, family(createJane, createJohn)(createJosh, createJill))
-//
-//      userStemmaId2 <- s.createStemma(userId, "second stemma")
-//      _             <- s.createFamily(userId, userStemmaId2, family(createJake)(createJuly, createJames))
-//
-//      OwnedStemmasDescription(stemmas) <- s.listOwnedStemmas(userId)
-//
-//      render(stemma1) <- s.stemma(userId, userStemmaId1)
-//      render(stemma2) <- s.stemma(userId, userStemmaId2)
-//    } yield assert(stemmas)(hasSameElements(StemmaDescription(userStemmaId1, "first stemma", true) :: StemmaDescription(userStemmaId2, "second stemma", true) :: Nil)) &&
-//      assert(stemma1)(hasSameElements("(Jane, John) parentsOf (Jill, Josh)" :: Nil)) &&
-//      assert(stemma2)(hasSameElements("(Jake) parentsOf (James, July)" :: Nil))
-//  }
+
+  private val usersHaveSeparateGraphs = test("users might have separated stemmas") {
+    (for {
+      s               <- ZIO.service[SlickStemmaService]
+      User(userId, _) <- s.getOrCreateUser("user1@test.com")
+
+      userStemmaId1 <- s.createStemma(userId, "first stemma")
+      _             <- s.createFamily(userId, userStemmaId1, family(createJane, createJohn)(createJosh, createJill))
+
+      userStemmaId2 <- s.createStemma(userId, "second stemma")
+      _             <- s.createFamily(userId, userStemmaId2, family(createJake)(createJuly, createJames))
+
+      OwnedStemmasDescription(stemmas) <- s.listOwnedStemmas(userId)
+
+      render(stemma1) <- s.stemma(userId, userStemmaId1)
+      render(stemma2) <- s.stemma(userId, userStemmaId2)
+    } yield assert(stemmas)(hasSameElements(StemmaDescription(userStemmaId1, "first stemma", true) :: StemmaDescription(userStemmaId2, "second stemma", true) :: Nil)) &&
+      assert(stemma1)(hasSameElements("(Jane, John) parentsOf (Jill, Josh)" :: Nil)) &&
+      assert(stemma2)(hasSameElements("(Jake) parentsOf (James, July)" :: Nil)))
+      .provideSome(storageService, Scope.default)
+  }
 //
 //  private val cantUpdatePersonIfNotAnOwner = test("cant update or remove a person that dont own") {
 //    for {
@@ -379,7 +380,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       cantCreateFamilyOfSingleChild,
       duplicatedIdsForbidden,
       aChildCanBelongToASingleFamilyOnly,
-//      usersHaveSeparateGraphs,
+      usersHaveSeparateGraphs,
 //      cantUpdatePersonIfNotAnOwner,
 //      cantUpdateFamilyIfNotAnOwner,
 //      cantRequestStemmaIfNotGraphOwner,

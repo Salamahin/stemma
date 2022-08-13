@@ -10,7 +10,6 @@ import scala.concurrent.ExecutionContext
 class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables with PostgresProfile {
   import api._
 
-
   private val db = Database.forURL(url = jdbcConfiguration.jdbcUrl, user = jdbcConfiguration.jdbcUser, password = jdbcConfiguration.jdbcPassword)
 
   def createSchema = ZIO.fromFuture { implicit ec =>
@@ -202,7 +201,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
       } yield fid
 
     val query = (for {
-      _             <- checkStemmaAccess(userId, stemmaId)
+      _             <- checkStemmaAccess(stemmaId, userId)
       maybeFamilyId <- tryFindMatchingFamily((family.parent1 ++ family.parent2).toSeq, userId)
       familyId      <- maybeFamilyId.map(DBIO.successful).getOrElse(createNewFamily)
 
