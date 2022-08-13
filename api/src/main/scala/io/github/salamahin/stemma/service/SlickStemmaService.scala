@@ -174,31 +174,26 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
       case ExistingPerson(id) => id
     }
 
-    def familyWithSingleParent = {
-      for {
-        familyId <- qSpouses.filter(_.personId === existingParentsIds.head).map(_.familyId).result.head
-        _        <- checkFamilyAccess(familyId, userId)
-      } yield Some(familyId)
-    }
+    def personFamilies(pId: Long, allPIds: Set[Long]) =
+      (qSpouses.filter(_.personId === pId).map(_.familyId) join qSpouses on (_ === _.familyId))
+        .result
+        .map { families =>
+          families
+            .map {
+              case (fid, spouse) => (fid, spouse.personId)
+            }
+            .groupBy(_._1)
+            .collectFirst {
+              case (fId, f) if f.map(_._2).toSet == allPIds => fId
+            }
+        }
 
-    def familyWithBothParents = {
+    if (parents.isEmpty || parents.size != existingParentsIds.size) DBIO.successful(None)
+    else
       for {
-        familyId <- qSpouses
-                     .filter(_.personId === existingParentsIds(0))
-                     .join(qSpouses.filter(_.personId === existingParentsIds(1)))
-                     .on(_.familyId === _.familyId)
-                     .map {
-                       case (fo, _) => fo.familyId
-                     }
-                     .result
-                     .head
-        _ <- checkFamilyAccess(familyId, userId)
-      } yield Some(familyId)
-    }
-
-    if (existingParentsIds.size == parents.size && parents.size == 1) familyWithSingleParent
-    else if (existingParentsIds.size == parents.size && parents.size == 2) familyWithBothParents
-    else DBIO.successful(None)
+        maybeFamilyId <- personFamilies(existingParentsIds.head, existingParentsIds.toSet)
+        _             <- if (maybeFamilyId.nonEmpty) checkFamilyAccess(maybeFamilyId.get, userId) else DBIO.successful((): Unit)
+      } yield maybeFamilyId
   }
 
   def createFamily(userId: Long, stemmaId: Long, family: CreateFamily) = ZIO.fromFuture { implicit ec =>

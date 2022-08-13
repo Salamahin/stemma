@@ -132,22 +132,24 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       _                                              <- s.removePerson(userId, jillId)
 
       render(families) <- s.stemma(userId, stemmaId)
-    } yield assert(families)(hasSameElements("(Jane, John) parentsOf (James)" :: "(Josh) parentsOf (Jake)" :: Nil))).provideSome(storageService, Scope.default)
+    } yield assert(families)(hasSameElements("(Jane, John) parentsOf (James)" :: "(Josh) parentsOf (Jake)" :: Nil)))
+      .provideSome(storageService, Scope.default)
   }
-//
-//  private val aPersonCanBeSpouseInDifferentFamilies = test("one can have several families as a spouse") {
-//    for {
-//      s <- storageService
-//
-//      User(userId, _) <- s.getOrCreateUser("user@test.com")
-//      stemmaId        <- s.createStemma(userId, "test stemma")
-//
-//      FamilyDescription(_, jamesId :: _, _, _) <- s.createFamily(userId, stemmaId, family(createJames, createJane)(createJill))
-//      _                                        <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJuly))
-//
-//      render(families) <- s.stemma(userId, stemmaId)
-//    } yield assert(families)(hasSameElements("(James, Jane) parentsOf (Jill)" :: "(James) parentsOf (July)" :: Nil))
-//  }
+
+  private val aPersonCanBeSpouseInDifferentFamilies = test("one can have several families as a spouse") {
+    (for {
+      s <- ZIO.service[SlickStemmaService]
+
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
+      stemmaId        <- s.createStemma(userId, "test stemma")
+
+      FamilyDescription(_, jamesId :: _, _, _) <- s.createFamily(userId, stemmaId, family(createJames, createJane)(createJill))
+      _                                        <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJuly))
+
+      render(families) <- s.stemma(userId, stemmaId)
+    } yield assert(families)(hasSameElements("(James, Jane) parentsOf (Jill)" :: "(James) parentsOf (July)" :: Nil)))
+      .provideSome(storageService, Scope.default)
+  }
 //
 //  private val leavingSingleMemberOfFamilyDropsEmptyFamilies = test("when the only member of family left the family is removed") {
 //    for {
@@ -370,7 +372,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 //      leavingSingleMemberOfFamilyDropsEmptyFamilies,
 //      canUpdateExistingPerson,
 //      canUpdateExistingFamily,
-//      aPersonCanBeSpouseInDifferentFamilies,
+      aPersonCanBeSpouseInDifferentFamilies,
       cantCreateFamilyOfSingleParent,
       cantCreateFamilyOfSingleChild,
       duplicatedIdsForbidden,
