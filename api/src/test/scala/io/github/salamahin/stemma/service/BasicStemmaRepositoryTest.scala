@@ -120,7 +120,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
     } yield assertTrue(err == ChildAlreadyBelongsToFamily(firstFamilyId, jillId))).provideSome(storageService, Scope.default)
   }
 
-  private val canRemovePerson = test("when removing a person hist child & spouse relations are removed as well") {
+  private val canRemovePerson = test("when removing a person his child & spouse relations are removed as well") {
     (for {
       s <- ZIO.service[SlickStemmaService]
 
@@ -150,22 +150,23 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
     } yield assert(families)(hasSameElements("(James, Jane) parentsOf (Jill)" :: "(James) parentsOf (July)" :: Nil)))
       .provideSome(storageService, Scope.default)
   }
-//
-//  private val leavingSingleMemberOfFamilyDropsEmptyFamilies = test("when the only member of family left the family is removed") {
-//    for {
-//      s <- storageService
-//
-//      User(userId, _) <- s.getOrCreateUser("user@test.com")
-//      stemmaId        <- s.createStemma(userId, "test stemma")
-//
-//      FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
-//      _                                         <- s.createFamily(userId, stemmaId, family(existing(jillId))(createJuly))
-//
-//      _ <- s.removePerson(userId, jillId)
-//
-//      Stemma(people, families) <- s.stemma(userId, stemmaId)
-//    } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "July" :: Nil))
-//  }
+
+  private val leavingSingleMemberOfFamilyDropsEmptyFamilies = test("when the only member of family left the family is removed") {
+    (for {
+      s <- ZIO.service[SlickStemmaService]
+
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
+      stemmaId        <- s.createStemma(userId, "test stemma")
+
+      FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
+      _                                         <- s.createFamily(userId, stemmaId, family(existing(jillId))(createJuly))
+
+      _ <- s.removePerson(userId, jillId)
+
+      Stemma(people, families) <- s.stemma(userId, stemmaId)
+    } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "July" :: Nil)))
+      .provideSome(storageService, Scope.default)
+  }
 //
 //  private val canUpdateExistingPerson = test("can update existing person") {
 //    for {
@@ -369,7 +370,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
     suite("StemmaService: basic ops & rules")(
       canCreateFamily,
       canRemovePerson,
-//      leavingSingleMemberOfFamilyDropsEmptyFamilies,
+      leavingSingleMemberOfFamilyDropsEmptyFamilies,
 //      canUpdateExistingPerson,
 //      canUpdateExistingFamily,
       aPersonCanBeSpouseInDifferentFamilies,
