@@ -167,29 +167,29 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
     } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "July" :: Nil)))
       .provideSome(storageService, Scope.default)
   }
-//
-//  private val canUpdateExistingPerson = test("can update existing person") {
-//    for {
-//      s <- storageService
-//
-//      User(userId, _) <- s.getOrCreateUser("user@test.com")
-//      stemmaId        <- s.createStemma(userId, "test stemma")
-//
-//      FamilyDescription(_, janeId :: Nil, _, _) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
-//
-//      _ <- s.updatePerson(userId, janeId, createJohn)
-//
-//      st @ Stemma(people, _) <- s.stemma(userId, stemmaId)
-//      render(families)       = st
-//    } yield assertTrue(families == List("(John) parentsOf (Jill)")) && assertTrue(
-//      people.exists(p =>
-//        p.name == "John" &&
-//          p.id == janeId &&
-//          p.birthDate.contains(johnsBirthDay) &&
-//          p.deathDate.contains(johnsDeathDay)
-//      )
-//    )
-//  }
+
+  private val canUpdateExistingPerson = test("can update existing person") {
+    (for {
+      s <- ZIO.service[SlickStemmaService]
+
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
+      stemmaId        <- s.createStemma(userId, "test stemma")
+
+      FamilyDescription(_, janeId :: Nil, _, _) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
+
+      _ <- s.updatePerson(userId, janeId, createJohn)
+
+      st @ Stemma(people, _) <- s.stemma(userId, stemmaId)
+      render(families)       = st
+    } yield assertTrue(families == List("(John) parentsOf (Jill)")) && assertTrue(
+      people.exists(p =>
+        p.name == "John" &&
+          p.id == janeId &&
+          p.birthDate.contains(johnsBirthDay) &&
+          p.deathDate.contains(johnsDeathDay)
+      )
+    )).provideSome(storageService, Scope.default)
+  }
 //
 //  private val canUpdateExistingFamily = test("when updating a family members are not removed") {
 //    for {
@@ -371,7 +371,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       canCreateFamily,
       canRemovePerson,
       leavingSingleMemberOfFamilyDropsEmptyFamilies,
-//      canUpdateExistingPerson,
+      canUpdateExistingPerson,
 //      canUpdateExistingFamily,
       aPersonCanBeSpouseInDifferentFamilies,
       cantCreateFamilyOfSingleParent,
