@@ -56,6 +56,10 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
     } yield ()
   }
 
+  private def checkStemmaCorrectness(personId: Long, stemmaId: Long)(implicit ec: ExecutionContext) = {
+    qPeople.filter(_.id === personId).map(_.stemmaId).result.head.flatMap(sId => if (sId != stemmaId) DBIO.failed(NoSuchPersonId(personId)) else DBIO.successful((): Unit))
+  }
+
   def createStemma(userId: Long, name: String) = ZIO.fromFuture { implicit ec =>
     val query = (for {
       newStemmaId <- (qStemmas returning qStemmas.map(_.id)) += Stemma(name = name)
@@ -106,7 +110,11 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
   }
 
   private def getOrCreatePerson(stemmaId: Long, userId: Long, pd: PersonDefinition)(implicit ec: ExecutionContext) = pd match {
-    case ExistingPerson(id) => checkPersonAccess(id, userId).map(_ => id)
+    case ExistingPerson(id) =>
+      for {
+        _ <- checkPersonAccess(id, userId)
+        _ <- checkStemmaCorrectness(id, stemmaId)
+      } yield id
 
     case CreateNewPerson(name, birthDate, deathDate, bio) =>
       for {

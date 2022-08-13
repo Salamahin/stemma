@@ -231,7 +231,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
   private val cantUpdatePersonIfNotAnOwner = test("cant update or remove a person that dont own") {
     (for {
-      s               <- ZIO.service[SlickStemmaService]
+      s                   <- ZIO.service[SlickStemmaService]
       User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
       User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
 
@@ -244,47 +244,48 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       assertTrue(personUpdateErr == AccessToPersonDenied(janeId)))
       .provideSome(storageService, Scope.default)
   }
-//
-//  private val cantUpdateFamilyIfNotAnOwner = test("cant update or remove a family that dont own") {
-//    for {
-//      s                   <- storageService
-//      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
-//      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
-//
-//      stemmaId                             <- s.createStemma(creatorId, "my first stemma")
-//      FamilyDescription(familyId, _, _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
-//
-//      familyRemoveErr <- s.removeFamily(accessorId, familyId).flip
-//      familyUpdateErr <- s.updateFamily(accessorId, familyId, family(createJames)(createJuly)).flip
-//    } yield assertTrue(familyRemoveErr == AccessToFamilyDenied(familyId)) &&
-//      assertTrue(familyUpdateErr == AccessToFamilyDenied(familyId))
-//  }
-//
-//  private val whenUpdatingFamilyAllMembersShouldBelongToGraph = test("when updating a family with existing person there should be no members of different stemmas") {
-//    for {
-//      s               <- storageService
-//      User(userId, _) <- s.getOrCreateUser("user@test.com")
-//
-//      stemma1Id <- s.createStemma(userId, "my first stemma")
-//      stemma2Id <- s.createStemma(userId, "my second stemma")
-//
-//      FamilyDescription(_, janeId :: johnId :: Nil, joshId :: jillId :: Nil, _) <- s.createFamily(userId, stemma1Id, family(createJane, createJohn)(createJosh, createJill))
-//      familyCreationErr                                                         <- s.createFamily(userId, stemma2Id, family(existing(janeId), existing(johnId))(existing(joshId), existing(jillId))).flip
-//    } yield assertTrue(familyCreationErr == NoSuchPersonId(janeId))
-//  }
-//
-//  private val cantRequestStemmaIfNotGraphOwner = test("cant request stemma if not a stemma owner") {
-//    for {
-//      s                   <- storageService
-//      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
-//      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
-//
-//      stemmaId <- s.createStemma(creatorId, "my first stemma")
-//      _        <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
-//
-//      stemmaRequestErr <- s.stemma(accessorId, stemmaId).flip
-//    } yield assertTrue(stemmaRequestErr == AccessToStemmaDenied(stemmaId))
-//  }
+
+  private val cantUpdateFamilyIfNotAnOwner = test("cant update or remove a family that dont own") {
+    (for {
+      s                   <- ZIO.service[SlickStemmaService]
+      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
+      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
+
+      stemmaId                             <- s.createStemma(creatorId, "my first stemma")
+      FamilyDescription(familyId, _, _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
+
+      familyRemoveErr <- s.removeFamily(accessorId, familyId).flip
+      familyUpdateErr <- s.updateFamily(accessorId, familyId, family(createJames)(createJuly)).flip
+    } yield assertTrue(familyRemoveErr == AccessToFamilyDenied(familyId)) &&
+      assertTrue(familyUpdateErr == AccessToFamilyDenied(familyId)))
+      .provideSome(storageService, Scope.default)
+  }
+
+  private val whenUpdatingFamilyAllMembersShouldBelongToGraph = test("when updating a family with existing person there should be no members of different stemmas") {
+    (for {
+      s               <- ZIO.service[SlickStemmaService]
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
+
+      stemma1Id <- s.createStemma(userId, "my first stemma")
+      stemma2Id <- s.createStemma(userId, "my second stemma")
+
+      FamilyDescription(_, janeId :: johnId :: Nil, joshId :: jillId :: Nil, _) <- s.createFamily(userId, stemma1Id, family(createJane, createJohn)(createJosh, createJill))
+      familyCreationErr                                                         <- s.createFamily(userId, stemma2Id, family(existing(janeId), existing(johnId))(existing(joshId), existing(jillId))).flip
+    } yield assertTrue(familyCreationErr == NoSuchPersonId(janeId))).provideSome(storageService, Scope.default)
+  }
+
+  private val cantRequestStemmaIfNotGraphOwner = test("cant request stemma if not a stemma owner") {
+    (for {
+      s                   <- ZIO.service[SlickStemmaService]
+      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
+      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
+
+      stemmaId <- s.createStemma(creatorId, "my first stemma")
+      _        <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
+
+      stemmaRequestErr <- s.stemma(accessorId, stemmaId).flip
+    } yield assertTrue(stemmaRequestErr == AccessToStemmaDenied(stemmaId))).provideSome(storageService, Scope.default)
+  }
 //
 //  private def readOnlyP(people: Seq[PersonDescription])   = people.map(p => (p.id, p.readOnly)).toMap
 //  private def readOnlyF(families: Seq[FamilyDescription]) = families.map(p => (p.id, p.readOnly)).toMap
@@ -383,9 +384,9 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       aChildCanBelongToASingleFamilyOnly,
       usersHaveSeparateGraphs,
       cantUpdatePersonIfNotAnOwner,
-//      cantUpdateFamilyIfNotAnOwner,
-//      cantRequestStemmaIfNotGraphOwner,
-//      whenUpdatingFamilyAllMembersShouldBelongToGraph,
+      cantUpdateFamilyIfNotAnOwner,
+      cantRequestStemmaIfNotGraphOwner,
+      whenUpdatingFamilyAllMembersShouldBelongToGraph,
 //      canChangeOwnershipInRecursiveManner,
       appendChildrenToFullExistingFamily,
       appendChildrenToIncompleteExistingFamily
