@@ -226,12 +226,29 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
     db run query
   }
 
+  def debug(descr: String)(implicit ec: ExecutionContext) =
+    for {
+      people   <- qPeople.result
+      families <- qFamilies.result
+      parents  <- qSpouses.result
+      children <- qChildren.result
+    } yield {
+      println("=============================")
+      println(descr)
+      println("=============================")
+      people.foreach(println)
+      families.foreach(println)
+      parents.foreach(println)
+      children.foreach(println)
+      println()
+    }
+
   def removePerson(userId: Long, personId: Long) = ZIO.fromFuture { implicit ec =>
     def dropEmptyFamilies = {
-      val emptyFamilies = (qSpouses.map(x => (x.familyId, x.personId)) union qChildren.map(x => (x.familyId, x.personId)))
+      val emptyFamilies = (qSpouses.map(x => (x.familyId, x.personId)) unionAll qChildren.map(x => (x.familyId, x.personId)))
         .groupBy(_._1)
         .map {
-          case (q, agg) => (q, agg.size)
+          case (q, agg) => (q, agg.length)
         }
         .filter(_._2 < 2)
         .map(_._1)
@@ -289,8 +306,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
       val familySpouses  = mutable.Map.empty[Long, mutable.Set[Long]].withDefaultValue(mutable.Set.empty)
       val familyChildren = mutable.Map.empty[Long, mutable.Set[Long]].withDefaultValue(mutable.Set.empty)
 
-      ps
-        .groupBy {
+      ps.groupBy {
           case (fid, memberId, familyReadOnly) => fid
         }
         .foreach {
@@ -299,8 +315,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
             familyReadOnly(fid) = members.head._3
         }
 
-      cs
-        .groupBy {
+      cs.groupBy {
           case (fid, memberId, familyReadOnly) => fid
         }
         .foreach {
