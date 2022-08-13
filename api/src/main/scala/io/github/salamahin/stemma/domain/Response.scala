@@ -6,13 +6,13 @@ import java.time.LocalDate
 
 sealed trait Response
 
-case class ChownEffect(affectedFamilies: Seq[String], affectedPeople: Seq[String])                                                                         extends Response
-case class FamilyDescription(id: String, parents: List[String], children: List[String], readOnly: Boolean)                                                 extends Response
+case class ChownEffect(affectedFamilies: Seq[Long], affectedPeople: Seq[Long])                                                                         extends Response
+case class FamilyDescription(id: Long, parents: List[Long], children: List[Long], readOnly: Boolean)                                                 extends Response
 case class InviteToken(token: String)                                                                                                                      extends Response
 case class OwnedStemmasDescription(stemmas: Seq[StemmaDescription])                                                                                        extends Response
 case class Stemma(people: List[PersonDescription], families: List[FamilyDescription])                                                                      extends Response
-case class StemmaDescription(id: String, name: String, removable: Boolean)                                                                                 extends Response
-case class PersonDescription(id: String, name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate], bio: Option[String], readOnly: Boolean) extends Response
+case class StemmaDescription(id: Long, name: String, removable: Boolean)                                                                                 extends Response
+case class PersonDescription(id: Long, name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate], bio: Option[String], readOnly: Boolean) extends Response
 case class TokenAccepted()                                                                                                                                 extends Response
 
 object FamilyDescription {

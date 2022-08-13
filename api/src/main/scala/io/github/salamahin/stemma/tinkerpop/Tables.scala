@@ -8,14 +8,14 @@ trait Tables {
   this: JdbcProfile =>
   import api._
 
-  case class StemmaUser(id: String = "", email: String)
-  case class Stemma(id: String = "", name: String)
-  case class Person(id: String = "", name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate], bio: Option[String], stemmaId: String)
-  case class Family(id: String = "", stemmaId: String)
-  case class FamilyOwner(ownerId: String, resourceId: String)
-  case class PersonOwner(ownerId: String, resourceId: String)
-  case class StemmaOwner(ownerId: String, resourceId: String)
-  case class PersonFamily(personId: String, familyId: String, tpe: String)
+  case class StemmaUser(id: Long = 0, email: String)
+  case class Stemma(id: Long = 0, name: String)
+  case class Person(id: Long = 0, name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate], bio: Option[String], stemmaId: Long)
+  case class Family(id: Long = 0, stemmaId: Long)
+  case class FamilyOwner(ownerId: Long, resourceId: Long)
+  case class PersonOwner(ownerId: Long, resourceId: Long)
+  case class StemmaOwner(ownerId: Long, resourceId: Long)
+  case class PersonFamily(personId: Long, familyId: Long, tpe: String)
 
   val stemmaUsers    = TableQuery[StemmaUsers]
   val stemmas        = TableQuery[Stemmas]
@@ -27,26 +27,26 @@ trait Tables {
   val stemmaOwners   = TableQuery[StemmaOwners]
 
   class StemmaUsers(tag: Tag) extends Table[StemmaUser](tag, "StemmaUsers") {
-    def id    = column[String]("id", O.PrimaryKey, O.AutoInc)
+    def id    = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def email = column[String]("email", O.Unique)
 
-    def * = (id, email).mapTo[StemmaUser]
+    override def * = (id, email).mapTo[StemmaUser]
   }
 
   class Stemmas(tag: Tag) extends Table[Stemma](tag, "Stemmas") {
-    def id   = column[String]("id", O.PrimaryKey, O.AutoInc)
+    def id   = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def name = column[String]("name")
 
     override def * = (id, name).mapTo[Stemma]
   }
 
   class People(tag: Tag) extends Table[Person](tag, "Person") {
-    def id        = column[String]("id", O.PrimaryKey, O.AutoInc)
+    def id        = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def name      = column[String]("name")
     def birthDate = column[Option[LocalDate]]("birthDate")
     def deathDate = column[Option[LocalDate]]("deathDate")
     def bio       = column[Option[String]]("bio")
-    def stemmaId  = column[String]("stemmaId")
+    def stemmaId  = column[Long]("stemmaId")
 
     def fkPersonStemma = foreignKey("FK_Person_Stemma", stemmaId, stemmas)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
 
@@ -54,8 +54,8 @@ trait Tables {
   }
 
   class Families(tag: Tag) extends Table[Family](tag, "Family") {
-    def id       = column[String]("id", O.PrimaryKey, O.AutoInc)
-    def stemmaId = column[String]("stemmaId")
+    def id       = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def stemmaId = column[Long]("stemmaId")
 
     def fkFamilyStemma = foreignKey("FK_Family_Stemma", stemmaId, stemmas)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
 
@@ -63,8 +63,8 @@ trait Tables {
   }
 
   class PersonFamilies(tag: Tag) extends Table[PersonFamily](tag, "PersonFamily") {
-    def personId = column[String]("personId")
-    def familyId = column[String]("familyId")
+    def personId = column[Long]("personId")
+    def familyId = column[Long]("familyId")
     def tpe      = column[String]("type")
 
     def pk = primaryKey("pk", (personId, familyId))
@@ -76,10 +76,10 @@ trait Tables {
   }
 
   class FamiliesOwners(tag: Tag) extends Table[FamilyOwner](tag, "FamilyOwner") {
-    def ownerId  = column[String]("ownerId")
-    def familyId = column[String]("familyId")
+    def ownerId  = column[Long]("ownerId")
+    def familyId = column[Long]("familyId")
 
-    def pk = primaryKey("pk", (ownerId, familyId))
+    def pk = primaryKey("PK_FamilyOwner", (ownerId, familyId))
 
     def fkOwnerUser      = foreignKey("FK_FamilyOwner_User", ownerId, stemmaUsers)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
     def fkResourceFamily = foreignKey("FK_FamilyOwner_Family", familyId, families)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
@@ -88,10 +88,10 @@ trait Tables {
   }
 
   class PeopleOwners(tag: Tag) extends Table[PersonOwner](tag, "PersonOwner") {
-    def ownerId  = column[String]("ownerId")
-    def personId = column[String]("personId")
+    def ownerId  = column[Long]("ownerId")
+    def personId = column[Long]("personId")
 
-    def pk = primaryKey("pk", (ownerId, personId))
+    def pk = primaryKey("PK_PersonOwner", (ownerId, personId))
 
     def fkOwnerUser      = foreignKey("FK_PersonOwner_User", ownerId, stemmaUsers)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
     def fkResourcePerson = foreignKey("FK_PersonOwner_Person", personId, people)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
@@ -100,10 +100,10 @@ trait Tables {
   }
 
   class StemmaOwners(tag: Tag) extends Table[StemmaOwner](tag, "StemmaOwner") {
-    def ownerId  = column[String]("ownerId")
-    def stemmaId = column[String]("stemmaId")
+    def ownerId  = column[Long]("ownerId")
+    def stemmaId = column[Long]("stemmaId")
 
-    def pk = primaryKey("pk", (ownerId, stemmaId))
+    def pk = primaryKey("PK_StemmaOwner", (ownerId, stemmaId))
 
     def fkOwnerUser      = foreignKey("FK_StemmaOwner_User", ownerId, stemmaUsers)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
     def fkResourcePerson = foreignKey("FK_StemmaOwner_Stemma", stemmaId, stemmas)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
