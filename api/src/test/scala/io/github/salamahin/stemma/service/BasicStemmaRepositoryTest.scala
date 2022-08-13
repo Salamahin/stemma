@@ -228,21 +228,22 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       assert(stemma2)(hasSameElements("(Jake) parentsOf (James, July)" :: Nil)))
       .provideSome(storageService, Scope.default)
   }
-//
-//  private val cantUpdatePersonIfNotAnOwner = test("cant update or remove a person that dont own") {
-//    for {
-//      s                   <- storageService
-//      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
-//      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
-//
-//      stemmaId                                <- s.createStemma(creatorId, "my first stemma")
-//      FamilyDescription(_, janeId :: _, _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
-//
-//      personRemoveErr <- s.removePerson(accessorId, janeId).flip
-//      personUpdateErr <- s.updatePerson(accessorId, janeId, createJuly).flip
-//    } yield assertTrue(personRemoveErr == AccessToPersonDenied(janeId)) &&
-//      assertTrue(personUpdateErr == AccessToPersonDenied(janeId))
-//  }
+
+  private val cantUpdatePersonIfNotAnOwner = test("cant update or remove a person that dont own") {
+    (for {
+      s               <- ZIO.service[SlickStemmaService]
+      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
+      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
+
+      stemmaId                                <- s.createStemma(creatorId, "my first stemma")
+      FamilyDescription(_, janeId :: _, _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
+
+      personRemoveErr <- s.removePerson(accessorId, janeId).flip
+      personUpdateErr <- s.updatePerson(accessorId, janeId, createJuly).flip
+    } yield assertTrue(personRemoveErr == AccessToPersonDenied(janeId)) &&
+      assertTrue(personUpdateErr == AccessToPersonDenied(janeId)))
+      .provideSome(storageService, Scope.default)
+  }
 //
 //  private val cantUpdateFamilyIfNotAnOwner = test("cant update or remove a family that dont own") {
 //    for {
@@ -381,7 +382,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       duplicatedIdsForbidden,
       aChildCanBelongToASingleFamilyOnly,
       usersHaveSeparateGraphs,
-//      cantUpdatePersonIfNotAnOwner,
+      cantUpdatePersonIfNotAnOwner,
 //      cantUpdateFamilyIfNotAnOwner,
 //      cantRequestStemmaIfNotGraphOwner,
 //      whenUpdatingFamilyAllMembersShouldBelongToGraph,
