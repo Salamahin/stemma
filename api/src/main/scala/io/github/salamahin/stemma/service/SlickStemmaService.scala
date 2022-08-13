@@ -145,13 +145,21 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
         _      <- if (!exists) qSpouses += Spouse(personId, familyId) else DBIO.successful((): Unit)
       } yield ()
 
+    def createChildRelationIfThereAreNoOtherFamilies(personId: Long) =
+      for {
+        childFamilies <- qChildren.filter(_.personId === personId).map(_.familyId).result
+        _ <- if (childFamilies.isEmpty) qChildren += Child(personId, familyId)
+            else if (childFamilies.size == 1 && childFamilies.head == familyId) DBIO.successful((): Unit)
+            else DBIO.failed(ChildAlreadyBelongsToFamily(childFamilies.find(_ != familyId).get, personId))
+      } yield ()
+
     for {
       _  <- familyIsComplete
       _  <- noDuplicatedIds
       ps <- DBIO sequence parents.map(p => getOrCreatePerson(stemmaId, userId, p))
       cs <- DBIO sequence children.map(p => getOrCreatePerson(stemmaId, userId, p))
       _  <- DBIO sequence ps.map(createSpouseRelationIfNotExist)
-      _  <- DBIO sequence cs.map(c => qChildren.insertOrUpdate(Child(c, familyId)))
+      _  <- DBIO sequence cs.map(createChildRelationIfThereAreNoOtherFamilies)
     } yield FamilyDescription(familyId, ps, cs, true)
   }
 

@@ -113,8 +113,10 @@ trait Tables {
   }
 
   class TChildren(tag: Tag) extends Table[Child](tag, "Child") {
-    def personId = column[Long]("personId", O.PrimaryKey)
+    def personId = column[Long]("personId")
     def familyId = column[Long]("familyId")
+
+    def pk = primaryKey("PK_Child", (personId, familyId))
 
     def fkChildPerson = foreignKey("FK_Child_Person", personId, qPeople)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
     def fkChildFamily = foreignKey("FK_Child_Family", familyId, qFamilies)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
