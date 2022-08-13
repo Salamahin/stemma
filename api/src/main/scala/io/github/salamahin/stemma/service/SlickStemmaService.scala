@@ -5,8 +5,7 @@ import slick.jdbc.PostgresProfile
 import zio.{Task, ZIO}
 
 import scala.collection.mutable
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.ExecutionContext
 
 class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables with PostgresProfile {
   import api._
@@ -124,14 +123,15 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
   }
 
   private def linkFamilyMembers(userId: Long, stemmaId: Long, familyId: Long, family: CreateFamily)(implicit ec: ExecutionContext) = {
-    val parents  = (family.parent1 ++ family.parent2).map(p => getOrCreatePerson(stemmaId, userId, p)).toList
-    val children = family.children.map(p => getOrCreatePerson(stemmaId, userId, p))
+    val parents  = (family.parent1 ++ family.parent2).toList
+    val children = family.children
 
     for {
-      ps <- DBIO sequence parents
-      cs <- DBIO sequence children
-      _  <- DBIO sequence ps.map(p => peopleFamilies += PersonFamily(p, familyId, spouse))
-      _  <- DBIO sequence cs.map(c => peopleFamilies += PersonFamily(c, familyId, child))
+      _  <- if ((parents.size + children.size) < 2) DBIO.failed(IncompleteFamily()) else DBIO.successful((): Unit)
+      ps <- DBIO sequence parents.map(p => getOrCreatePerson(stemmaId, userId, p))
+      cs <- DBIO sequence children.map(p => getOrCreatePerson(stemmaId, userId, p))
+      _  <- DBIO sequence ps.map(p => peopleFamilies.insertOrUpdate(PersonFamily(p, familyId, spouse)))
+      _  <- DBIO sequence cs.map(c => peopleFamilies.insertOrUpdate(PersonFamily(c, familyId, child)))
     } yield FamilyDescription(familyId, ps, cs, true)
   }
 
@@ -139,11 +139,50 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
     peopleFamilies.filter(_.familyId === familyId).delete
   }
 
+  private def tryFindMatchingFamily(parents: Seq[PersonDefinition], userId: Long)(implicit ec: ExecutionContext) = {
+    val existingParentsIds = parents.collect {
+      case ExistingPerson(id) => id
+    }
+
+    def familyWithSingleParent = {
+      for {
+        familyId <- peopleFamilies.filter(_.personId === existingParentsIds.head).map(_.familyId).result.head
+        _        <- checkFamilyAccess(familyId, userId)
+      } yield Some(familyId)
+    }
+
+    def familyWithBothParents = {
+      for {
+        familyId <- peopleFamilies
+                     .filter(_.personId === existingParentsIds(0))
+                     .join(peopleFamilies.filter(_.personId === existingParentsIds(1)))
+                     .on(_.familyId === _.familyId)
+                     .map {
+                       case (fo, _) => fo.familyId
+                     }
+                     .result
+                     .head
+        _ <- checkFamilyAccess(familyId, userId)
+      } yield Some(familyId)
+    }
+
+    if (existingParentsIds.size == parents.size && parents.size == 1) familyWithSingleParent
+    else if (existingParentsIds.size == parents.size && parents.size == 2) familyWithBothParents
+    else DBIO.successful(None)
+  }
+
   def createFamily(userId: Long, stemmaId: Long, family: CreateFamily) = ZIO.fromFuture { implicit ec =>
+    def createNewFamily =
+      for {
+        fid <- (families returning families.map(_.id)) += Family(stemmaId = stemmaId)
+        _   <- familiesOwners += FamilyOwner(userId, fid)
+      } yield fid
+
     val query = (for {
-      _           <- checkStemmaAccess(userId, stemmaId)
-      familyId    <- (families returning families.map(_.id)) += Family(stemmaId = stemmaId)
-      _           <- familiesOwners += FamilyOwner(userId, familyId)
+      _             <- checkStemmaAccess(userId, stemmaId)
+      maybeFamilyId <- tryFindMatchingFamily((family.parent1 ++ family.parent2).toSeq, userId)
+      familyId      <- maybeFamilyId.map(DBIO.successful).getOrElse(createNewFamily)
+
       familyDescr <- linkFamilyMembers(userId, stemmaId, familyId, family)
     } yield familyDescr).transactionally
 

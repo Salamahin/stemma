@@ -46,54 +46,55 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
     }).provideSome(storageService, Scope.default)
   }
 
-//  private val cantCreateFamilyOfSingleParent = test("there cant be a family with a single parent and no children") {
-//    for {
-//      s <- storageService
-//
-//      User(userId, _) <- s.getOrCreateUser("user@test.com")
-//      stemmaId        <- s.createStemma(userId, "test stemma")
-//
-//      err <- s.createFamily(userId, stemmaId, family(createJohn)()).flip
-//    } yield assertTrue(err == IncompleteFamily())
-//  }
-//
-//  private val cantCreateFamilyOfSingleChild = test("there cant be a family with no parents and a single child") {
-//    for {
-//      s <- storageService
-//
-//      User(userId, _) <- s.getOrCreateUser("user@test.com")
-//      stemmaId        <- s.createStemma(userId, "test stemma")
-//
-//      err <- s.createFamily(userId, stemmaId, family()(createJill)).flip
-//    } yield assertTrue(err == IncompleteFamily())
-//  }
-//
-//  private val appendChildrenToFullExistingFamily = test("when family description contains existing parents that already have a full family then children appended to that family") {
-//    for {
-//      s               <- storageService
-//      User(userId, _) <- s.getOrCreateUser("user@test.com")
-//      stemmaId        <- s.createStemma(userId, "test stemma")
-//
-//      FamilyDescription(_, jamesId :: _, _, _)       <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
-//      FamilyDescription(_, _ :: jillId :: Nil, _, _) <- s.createFamily(userId, stemmaId, family(existing(jamesId), createJill)(createJohn))
-//      _                                              <- s.createFamily(userId, stemmaId, family(existing(jamesId), existing(jillId))(createJosh))
-//
-//      render(families) <- s.stemma(userId, stemmaId)
-//    } yield assert(families)(hasSameElements("(James, Jill) parentsOf (John, Josh)" :: "(James) parentsOf (Jane)" :: Nil))
-//  }
-//
-//  private val appendChildrenToIncompleteExistingFamily = test("when family description contains a single parent then newely added with same single parent appended to that family") {
-//    for {
-//      s               <- storageService
-//      User(userId, _) <- s.getOrCreateUser("user@test.com")
-//      stemmaId        <- s.createStemma(userId, "test stemma")
-//
-//      FamilyDescription(_, jamesId :: _, _, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
-//      _                                        <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJohn))
-//
-//      render(families) <- s.stemma(userId, stemmaId)
-//    } yield assert(families)(hasSameElements("(James) parentsOf (Jane, John)" :: Nil))
-//  }
+  private val cantCreateFamilyOfSingleParent = test("there cant be a family with a single parent and no children") {
+    (for {
+      s <- ZIO.service[SlickStemmaService]
+
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
+      stemmaId        <- s.createStemma(userId, "test stemma")
+
+      err <- s.createFamily(userId, stemmaId, family(createJohn)()).flip
+    } yield assertTrue(err == IncompleteFamily())).provideSome(storageService, Scope.default)
+  }
+
+  private val cantCreateFamilyOfSingleChild = test("there cant be a family with no parents and a single child") {
+    (for {
+      s <- ZIO.service[SlickStemmaService]
+
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
+      stemmaId        <- s.createStemma(userId, "test stemma")
+
+      err <- s.createFamily(userId, stemmaId, family()(createJill)).flip
+    } yield assertTrue(err == IncompleteFamily())).provideSome(storageService, Scope.default)
+  }
+
+  private val appendChildrenToFullExistingFamily = test("when family description contains existing parents that already have a full family then children appended to that family") {
+    (for {
+      s               <- ZIO.service[SlickStemmaService]
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
+      stemmaId        <- s.createStemma(userId, "test stemma")
+
+      FamilyDescription(_, jamesId :: _, _, _)       <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
+      FamilyDescription(_, _ :: jillId :: Nil, _, _) <- s.createFamily(userId, stemmaId, family(existing(jamesId), createJill)(createJohn))
+      _                                              <- s.createFamily(userId, stemmaId, family(existing(jamesId), existing(jillId))(createJosh))
+
+      render(families) <- s.stemma(userId, stemmaId)
+    } yield assert(families)(hasSameElements("(James, Jill) parentsOf (John, Josh)" :: "(James) parentsOf (Jane)" :: Nil)))
+      .provideSome(storageService, Scope.default)
+  }
+
+  private val appendChildrenToIncompleteExistingFamily = test("when family description contains a single parent then newely added with same single parent appended to that family") {
+    (for {
+      s               <- ZIO.service[SlickStemmaService]
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
+      stemmaId        <- s.createStemma(userId, "test stemma")
+
+      FamilyDescription(_, jamesId :: _, _, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
+      _                                        <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJohn))
+
+      render(families) <- s.stemma(userId, stemmaId)
+    } yield assert(families)(hasSameElements("(James) parentsOf (Jane, John)" :: Nil))).provideSome(storageService, Scope.default)
+  }
 //
 //  private val duplicatedIdsForbidden = test("cant update a family when there are duplicated ids in members") {
 //    for {
@@ -364,14 +365,14 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
   override def spec =
     suite("StemmaService: basic ops & rules")(
-      canCreateFamily
+      canCreateFamily,
 //      canRemovePerson,
 //      leavingSingleMemberOfFamilyDropsEmptyFamilies,
 //      canUpdateExistingPerson,
 //      canUpdateExistingFamily,
 //      aPersonCanBeSpouseInDifferentFamilies,
-//      cantCreateFamilyOfSingleParent,
-//      cantCreateFamilyOfSingleChild,
+      cantCreateFamilyOfSingleParent,
+      cantCreateFamilyOfSingleChild,
 //      duplicatedIdsForbidden,
 //      aChildCanBelongToASingleFamilyOnly,
 //      usersHaveSeparateGraphs,
@@ -380,8 +381,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 //      cantRequestStemmaIfNotGraphOwner,
 //      whenUpdatingFamilyAllMembersShouldBelongToGraph,
 //      canChangeOwnershipInRecursiveManner,
-//      appendChildrenToFullExistingFamily,
-//      appendChildrenToIncompleteExistingFamily,
+      appendChildrenToFullExistingFamily,
+      appendChildrenToIncompleteExistingFamily,
 //      whenThereAreSeveralOwnersThenStemmaIsNotRemovable,
 //      canRemoveStemmaIfOnlyOwner
     )
