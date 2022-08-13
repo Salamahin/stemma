@@ -123,15 +123,25 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
   }
 
   private def linkFamilyMembers(userId: Long, stemmaId: Long, familyId: Long, family: CreateFamily)(implicit ec: ExecutionContext) = {
-    val parents  = (family.parent1 ++ family.parent2).toList
+    val parents = (family.parent1 ++ family.parent2).toList
     val children = family.children
 
+    val familyIsComplete = if ((parents.size + children.size) < 2) DBIO.failed(IncompleteFamily()) else DBIO.successful((): Unit)
+    val noDuplicatedIds = (parents ++ children)
+      .collect { case ExistingPerson(id) => id }
+      .groupBy(identity)
+      .values
+      .find(_.size > 1)
+      .map(ids => DBIO.failed(DuplicatedIds(ids.head)))
+      .getOrElse(DBIO.successful((): Unit))
+
     for {
-      _  <- if ((parents.size + children.size) < 2) DBIO.failed(IncompleteFamily()) else DBIO.successful((): Unit)
+      _ <- familyIsComplete
+      _ <- noDuplicatedIds
       ps <- DBIO sequence parents.map(p => getOrCreatePerson(stemmaId, userId, p))
       cs <- DBIO sequence children.map(p => getOrCreatePerson(stemmaId, userId, p))
-      _  <- DBIO sequence ps.map(p => peopleFamilies.insertOrUpdate(PersonFamily(p, familyId, spouse)))
-      _  <- DBIO sequence cs.map(c => peopleFamilies.insertOrUpdate(PersonFamily(c, familyId, child)))
+      _ <- DBIO sequence ps.map(p => peopleFamilies.insertOrUpdate(PersonFamily(p, familyId, spouse)))
+      _ <- DBIO sequence cs.map(c => peopleFamilies.insertOrUpdate(PersonFamily(c, familyId, child)))
     } yield FamilyDescription(familyId, ps, cs, true)
   }
 
