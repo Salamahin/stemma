@@ -36,7 +36,7 @@
 
         d3.selectAll("path.pin").remove();
         pinnedPeople.allPinned().forEach((personId) => {
-            d3.select("#" + normalizeId(personId))
+            d3.select("#" + normalizeId("person", personId))
                 .append("path")
                 .attr("d", pin)
                 .attr("class", "pin")
@@ -51,7 +51,7 @@
 
     export function zoomToNode(id: string) {
         var scaleZoom = 2;
-        var nodeDatum = d3.select("#" + normalizeId(id)).datum();
+        var nodeDatum = d3.select("#" + normalizeId("person", id)).datum();
 
         svg.transition()
             .duration(750)

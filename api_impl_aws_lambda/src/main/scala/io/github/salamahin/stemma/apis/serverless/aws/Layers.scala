@@ -13,7 +13,15 @@ object Layers {
     ZIO
       .service[JdbcConfiguration]
       .map(conf => {
-        ss = new SlickStemmaService(conf)
+        ss = new SlickStemmaService(
+          conf,
+          Map(
+            "connectionPool"      -> "HikariCP",
+            "numThreads"          -> "5",
+            "maxConnections"      -> "5",
+            "keepAliveConnection" -> "true"
+          )
+        )
         ss
       })
   )

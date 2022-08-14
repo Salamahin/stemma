@@ -4,6 +4,7 @@ import io.github.salamahin.stemma.storage.Tables
 import slick.jdbc.PostgresProfile
 import zio.{Scope, Task, ZIO, ZLayer}
 
+import java.util.Properties
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 
@@ -32,10 +33,18 @@ object StorageService {
   }
 }
 
-class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables with PostgresProfile with StorageService {
+class SlickStemmaService(jdbcConfiguration: JdbcConfiguration, extraProps: Map[String, String] = Map.empty) extends Tables with PostgresProfile with StorageService {
   import api._
 
-  private val db = Database.forURL(url = jdbcConfiguration.jdbcUrl, user = jdbcConfiguration.jdbcUser, password = jdbcConfiguration.jdbcPassword)
+  import scala.jdk.CollectionConverters._
+  private val db = Database.forURL(
+    url = jdbcConfiguration.jdbcUrl,
+    user = jdbcConfiguration.jdbcUser,
+    password = jdbcConfiguration.jdbcPassword,
+    new Properties() {
+      putAll(extraProps.asJava)
+    }
+  )
 
   override def createSchema: Task[Unit] = ZIO.fromFuture { implicit ec =>
     db run (qStemmaUsers.schema ++ qStemmas.schema ++ qPeople.schema ++ qFamilies.schema ++ qFamiliesOwners.schema ++ qPeopleOwners.schema ++ qStemmaOwners.schema ++ qSpouses.schema ++ qChildren.schema).create
