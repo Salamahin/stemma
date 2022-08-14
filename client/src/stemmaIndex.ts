@@ -1,38 +1,38 @@
-import { Family, Stemma, StoredPerson } from "./model";
+import { Stemma, FamilyDescription, PersonDescription } from "./model";
 
 export type Generation = {
     generation: number,
-    relativies: Set<string>
-    families: Set<string>
+    relativies: Set<number>
+    families: Set<number>
 };
 
-type FamilyDescription = {
-    familyId: string,
-    members: string[],
-    otherMembers: string[]
+type DirectedFamilyDescription = {
+    familyId: number,
+    members: number[],
+    otherMembers: number[]
 }
 
 type PersonalGeneration = {
-    personId: string,
+    personId: number,
     depth: number
 }
 
 type FamilyMembers = {
-    familyId: string
-    members: string[]
+    familyId: number
+    members: number[]
 }
 
 
 export class StemmaIndex {
-    private _parentToChildren: Map<string, FamilyDescription[]>
-    private _childToParents: Map<string, FamilyDescription[]>
+    private _parentToChildren: Map<number, DirectedFamilyDescription[]>
+    private _childToParents: Map<number, DirectedFamilyDescription[]>
     private _marriages: FamilyMembers[]
     private _uncles: FamilyMembers[]
-    private _families: Map<string, Family>
+    private _families: Map<number, FamilyDescription>
 
-    private _people: Map<string, StoredPerson>
-    private _namesakes: Map<string, string[]>
-    private _lineage: Map<string, Generation>
+    private _people: Map<number, PersonDescription>
+    private _namesakes: Map<string, number[]>
+    private _lineage: Map<number, Generation>
     private _maxGeneration: number
 
     private groupByKey<K, V>(array: Array<readonly [K, V]>) {
@@ -65,13 +65,13 @@ export class StemmaIndex {
 
         this._namesakes = new Map(this.groupByKey(stemma.people.map(p => [p.name, p.id])))
         this._people = new Map(stemma.people.map(p => [p.id, p]))
-        this._lineage = new Map<string, Generation>(stemma.people.map(p => [p.id, this.buildLineage(p)]))
+        this._lineage = new Map(stemma.people.map(p => [p.id, this.buildLineage(p)]))
         this._maxGeneration = Math.max(...[...this._lineage.values()].map(p => p.generation));
     }
 
-    private computeLineage(personId: string, relation: Map<string, FamilyDescription[]>) {
-        var foundRelatieves: string[] = []
-        var foundFamilies: string[] = []
+    private computeLineage(personId: number, relation: Map<number, DirectedFamilyDescription[]>) {
+        var foundRelatieves: number[] = []
+        var foundFamilies: number[] = []
         var toLookUp = [{ personId: personId, depth: 0 }]
         var maxDepth = 0
 
@@ -99,7 +99,7 @@ export class StemmaIndex {
         }
     }
 
-    private buildLineage(p: StoredPerson): Generation {
+    private buildLineage(p: PersonDescription): Generation {
         let dependees = this.computeLineage(p.id, this._parentToChildren)
         let ancestors = this.computeLineage(p.id, this._childToParents)
 
@@ -112,15 +112,15 @@ export class StemmaIndex {
         }
     }
 
-    lineage(personId: string): Generation {
+    lineage(personId: number): Generation {
         return this._lineage.has(personId) ? this._lineage.get(personId) : { generation: 0, relativies: new Set(), families: new Set() }
     }
 
-    family(familyId: string) {
+    family(familyId: number) {
         return this._families.get(familyId)
     }
 
-    relativies(personId: string) {
+    relativies(personId: number) {
         let ps = this._parentToChildren.has(personId)
             ? this._parentToChildren.get(personId).flatMap(x => [...x.members, ...x.otherMembers]).map(p => this._people.get(p))
             : []
@@ -132,7 +132,7 @@ export class StemmaIndex {
         return [...new Set([...ps, ...cs, this._people.get(personId)])]
     }
 
-    relatedFamilies(personId: string) {
+    relatedFamilies(personId: number) {
         let dc = this._parentToChildren.has(personId) ? this._parentToChildren.get(personId) : []
         let dp = this._childToParents.has(personId) ? this._childToParents.get(personId) : []
 
@@ -142,19 +142,19 @@ export class StemmaIndex {
         ]
     }
 
-    private hasAllMembers(members: string[], pool: Set<string>) {
+    private hasAllMembers(members: number[], pool: Set<number>) {
         return members.length != 0 && members.filter(m => pool.has(m)).length == members.length
     }
 
-    private has2Members(members: string[], pool: Set<string>) {
+    private has2Members(members: number[], pool: Set<number>) {
         return members.length != 0 && members.filter(m => pool.has(m)).length > 1
     }
 
-    marriages(peopleIds: Set<string>) {
+    marriages(peopleIds: Set<number>) {
         return this._marriages.filter(fd => fd.members.length > 1 && this.hasAllMembers(fd.members, peopleIds)).map(fd => fd.familyId)
     }
 
-    uncleFamilies(peopleIds: Set<string>) {
+    uncleFamilies(peopleIds: Set<number>) {
         return this._uncles.filter(fd => this.has2Members(fd.members, peopleIds)).map(fd => fd.familyId)
     }
 
@@ -162,7 +162,7 @@ export class StemmaIndex {
         return this._namesakes.has(personName) ? this._namesakes.get(personName).map(p => this._people.get(p)) : []
     }
 
-    person(personId: string) {
+    person(personId: number) {
         return this._people.get(personId)
     }
 

@@ -1,7 +1,7 @@
 
 export class PinnedPeopleStorage {
     private stemmaId;
-    private pinnedPeople: Set<string>
+    private pinnedPeople: Set<number>
 
     constructor(stemmaId: string) {
         this.stemmaId = `pinned.${stemmaId}`
@@ -20,13 +20,13 @@ export class PinnedPeopleStorage {
         localStorage.setItem(this.stemmaId, value)
     }
 
-    add(personId: string) {
+    add(personId: number) {
         this.pinnedPeople.add(personId)
         this.save()
         return this;
     }
 
-    remove(personId: string) {
+    remove(personId: number) {
         this.pinnedPeople.delete(personId)
         this.save()
         return this;
@@ -36,7 +36,7 @@ export class PinnedPeopleStorage {
         return [...this.pinnedPeople]
     }
 
-    isPinned(personId: string) {
+    isPinned(personId: number) {
         return this.pinnedPeople.has(personId)
     }
 }

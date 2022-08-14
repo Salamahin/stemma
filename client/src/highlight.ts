@@ -1,36 +1,36 @@
 import { StemmaIndex } from "./stemmaIndex";
 
 export interface Highlight {
-    personIsHighlighted(personId: string): boolean
-    familyIsHighlighted(familyId: string): boolean
+    personIsHighlighted(personId: number): boolean
+    familyIsHighlighted(familyId: number): boolean
 }
 
 export class HighlightAll implements Highlight {
-    personIsHighlighted(personId: string): boolean {
+    personIsHighlighted(personId: number): boolean {
         return true
     }
 
-    familyIsHighlighted(familyId: string): boolean {
+    familyIsHighlighted(familyId: number): boolean {
         return true
     }
 }
 
 type LineageData = {
-    from: string
-    relatedPeople: Set<string>
-    relatedFamilies: Set<string>
+    from: number
+    relatedPeople: Set<number>
+    relatedFamilies: Set<number>
 }
 
 export class HiglightLineages implements Highlight {
     private lineagesData: LineageData[]
     private index: StemmaIndex
 
-    private allPeople: Set<string>
-    private allFamilies: Set<string>
-    private allMariages: Set<string>
-    private allUncleFamilies: Set<string>
+    private allPeople: Set<number>
+    private allFamilies: Set<number>
+    private allMariages: Set<number>
+    private allUncleFamilies: Set<number>
 
-    constructor(index: StemmaIndex, people: string[]) {
+    constructor(index: StemmaIndex, people: number[]) {
         this.index = index
         this.lineagesData = people.map(personId => this.personToLineageData(personId))
 
@@ -58,24 +58,24 @@ export class HiglightLineages implements Highlight {
         return {
             from: familyId,
             relatedPeople: new Set([...family.children, ...family.parents]),
-            relatedFamilies: new Set<string>([familyId])
+            relatedFamilies: new Set([familyId])
         }
     }
 
-    personIsHighlighted(personId: string): boolean {
+    personIsHighlighted(personId: number): boolean {
         return !this.lineagesData.length || this.allPeople.has(personId)
     }
 
-    familyIsHighlighted(familyId: string): boolean {
+    familyIsHighlighted(familyId: number): boolean {
         return !this.lineagesData.length || this.allFamilies.has(familyId) || this.allMariages.has(familyId) || this.allUncleFamilies.has(familyId)
     }
 
-    pushPerson(personId: string) {
+    pushPerson(personId: number) {
         this.lineagesData.push(this.personToLineageData(personId))
         this.remakeCashes()
     }
 
-    pushFamily(familyId: string) {
+    pushFamily(familyId: number) {
         this.lineagesData.push(this.familyToLineageData(familyId))
         this.remakeCashes()
     }

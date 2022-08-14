@@ -1,6 +1,6 @@
 <script context="module" lang="ts">
     export type CreateInviteLink = {
-        personId: string;
+        personId: number;
         email: string;
     };
 </script>

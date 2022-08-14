@@ -19,7 +19,7 @@ trait StorageService {
   def removeFamily(userId: Long, familyId: Long): Task[Unit]
   def updatePerson(userId: Long, personId: Long, description: CreateNewPerson): Task[Unit]
   def stemma(userId: Long, stemmaId: Long): Task[DomainStemma]
-  def chown(userId: Long, stemmaId: Long, toUserId: Long, targetPersonId: Long): Task[ChownEffect]
+  def chown(userId: Long, stemmaId: Long, targetPersonId: Long): Task[ChownEffect]
   def ownsPerson(userId: Long, personId: Long): Task[Boolean]
 }
 
@@ -381,15 +381,13 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
     )
     """.as[Long]
 
-  override def chown(userId: Long, stemmaId: Long, toUserId: Long, targetPersonId: Long): Task[ChownEffect] = ZIO.fromFuture { implicit ec =>
+  override def chown(userId: Long, stemmaId: Long, targetPersonId: Long): Task[ChownEffect] = ZIO.fromFuture { implicit ec =>
     val action = (for {
-      _               <- checkStemmaAccess(stemmaId, userId)
-      _               <- checkPersonAccess(targetPersonId, userId)
       relatedFamilies <- selectDirectFamilies(targetPersonId)
       affectedPeople  <- (qSpouses.filter(_.familyId inSet relatedFamilies).map(_.personId) union qChildren.filter(_.familyId inSet relatedFamilies).map(_.personId)).result
-      _               <- DBIO.sequence(relatedFamilies.map(fid => qFamiliesOwners += FamilyOwner(toUserId, fid)))
-      _               <- DBIO.sequence(affectedPeople.map(pid => qPeopleOwners += PersonOwner(toUserId, pid)))
-      _               <- qStemmaOwners += StemmaOwner(toUserId, stemmaId)
+      _               <- DBIO.sequence(relatedFamilies.map(fid => qFamiliesOwners += FamilyOwner(userId, fid)))
+      _               <- DBIO.sequence(affectedPeople.map(pid => qPeopleOwners += PersonOwner(userId, pid)))
+      _               <- qStemmaOwners += StemmaOwner(userId, stemmaId)
     } yield ChownEffect(relatedFamilies, affectedPeople)).transactionally
 
     db run action

@@ -16,8 +16,8 @@ case class CreateFamilyRequest(stemmaId: Long, familyDescr: CreateFamily)       
 case class UpdateFamilyRequest(stemmaId: Long, familyId: Long, familyDescr: CreateFamily) extends Request
 case class DeleteFamilyRequest(stemmaId: Long, familyId: Long)                            extends Request
 
-case class CreateInvitationTokenRequest(targetPersonId: Long, targetPersonEmail: String) extends Request
-case class BearInvitationRequest(encodedToken: String)                                   extends Request
+case class CreateInvitationTokenRequest(stemmaId: Long, targetPersonId: Long, targetPersonEmail: String) extends Request
+case class BearInvitationRequest(encodedToken: String)                                                   extends Request
 
 case class CreateNewStemmaRequest(stemmaName: String) extends Request
 case class GetStemmaRequest(stemmaId: Long)           extends Request

@@ -8,13 +8,8 @@ case class UnknownError(cause: Throwable)               extends Throwable(cause)
 case class RequestDeserializationProblem(descr: String) extends Throwable with StemmaError
 
 case class NoSuchPersonId(id: Long) extends Throwable with StemmaError
-case class NoSuchFamilyId(id: Long) extends Throwable with StemmaError
-case class NoSuchStemmaId(id: Long) extends Throwable with StemmaError
-case class NoSuchUserId(id: Long)   extends Throwable with StemmaError
 
 case class ChildAlreadyBelongsToFamily(familyId: Long, personId: Long) extends Throwable with StemmaError
-case class ChildDoesNotBelongToFamily(familyId: Long, childId: Long)   extends Throwable with StemmaError
-case class SpouseDoesNotBelongToFamily(familyId: Long, personId: Long) extends Throwable with StemmaError
 case class IncompleteFamily()                                          extends Throwable with StemmaError
 case class DuplicatedIds(duplicatedIds: Long)                          extends Throwable with StemmaError
 

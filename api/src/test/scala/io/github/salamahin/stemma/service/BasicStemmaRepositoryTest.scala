@@ -300,7 +300,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       FamilyDescription(f3, jared :: _, _, _)          <- s.createFamily(creatorId, stemmaId, family(createJared)(existing(josh)))
       FamilyDescription(f4, _, jess :: john :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(existing(jill))(createJess, createJohn))
 
-      ChownEffect(affectedFamilies, affectedPeople) <- s.chown(creatorId, stemmaId, accessorId, josh)
+      ChownEffect(affectedFamilies, affectedPeople) <- s.chown(accessorId, stemmaId, josh)
       accessorStemma                                <- s.stemma(accessorId, stemmaId)
 
     } yield assertTrue(affectedFamilies.toSet == Set(f2, f3, f4)) &&
@@ -333,7 +333,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       stemmaId                                  <- s.createStemma(creatorId, "my first stemma")
       FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJane)(createJill))
 
-      _ <- s.chown(creatorId, stemmaId, accessorId, jillId)
+      _ <- s.chown(accessorId, stemmaId, jillId)
 
       creatorStemmas  <- s.listOwnedStemmas(creatorId)
       accessorStemmas <- s.listOwnedStemmas(accessorId)

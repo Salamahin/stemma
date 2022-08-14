@@ -28,7 +28,7 @@ object UserServiceTest extends ZIOSpecDefault with Requests with RenderStemma {
 
       FamilyDescription(_, _, joshId :: _, _) <- ss.createFamily(user1.userId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
 
-      token        <- us.createInviteToken("invitee@test.com", joshId)
+      token        <- us.createInviteToken("invitee@test.com", stemmaId, joshId)
       decodedToken <- us.decodeInviteToken(token)
     } yield assertTrue(decodedToken.inviteesEmail == "invitee@test.com") && assertTrue(decodedToken.targetPersonId == joshId))
       .provideSome(Scope.default, testcontainersStorage)

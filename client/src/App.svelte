@@ -88,11 +88,11 @@
         expect = model.updateFamily(selectedStemmaDescription.id, request.familyId, request.parents, request.children).then((s) => (selectedStemma = s));
     }
 
-    function handleFamilyRemoved(familyId: string) {
+    function handleFamilyRemoved(familyId: number) {
         expect = model.removeFamily(selectedStemmaDescription.id, familyId).then((s) => (selectedStemma = s));
     }
 
-    function handlePersonRemoved(personId: string) {
+    function handlePersonRemoved(personId: number) {
         expect = model.removePerson(selectedStemmaDescription.id, personId).then((s) => (selectedStemma = s));
         pinnedPeople = pinnedPeople.remove(personId);
     }
@@ -110,7 +110,7 @@
     }
 
     function handleInvitationCreation(e: CreateInviteLink) {
-        expect = model.createInvintation(e.personId, e.email).then((link) => inviteModal.setInviteLink(link));
+        expect = model.createInvintation(selectedStemmaDescription.id, e.personId, e.email).then((link) => inviteModal.setInviteLink(link));
     }
 
     function updateEverythingOnStemmaChange(stemmaId: string, stemma: Stemma) {
