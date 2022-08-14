@@ -17,5 +17,13 @@ libraryDependencies ++= Seq(
   "org.scalatest"              %% "scalatest"                         % "3.3.0-SNAP3" % Test
 )
 
+val circeVersion = "0.14.1"
+
+libraryDependencies ++= Seq(
+  "io.circe" %% "circe-core",
+  "io.circe" %% "circe-generic",
+  "io.circe" %% "circe-parser"
+).map(_ % circeVersion)
+
 enablePlugins(PackPlugin)
 packMain := Map()
