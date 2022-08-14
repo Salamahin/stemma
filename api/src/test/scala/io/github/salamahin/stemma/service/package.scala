@@ -1,35 +1,24 @@
-//package io.github.salamahin.stemma
-//
-//import gremlin.scala.ScalaGraph
-//import org.apache.commons.configuration2.BaseConfiguration
-//import org.umlg.sqlg.structure.SqlgGraph
-//import zio.{ULayer, ZIO, ZLayer}
-//
-//import java.io.File
-//
-//package object service {
-//  val hardcodedSecret: ULayer[InviteSecrets] = ZLayer.succeed(new InviteSecrets {
-//    override val secretString: String = "secret_string"
-//  })
-//
-//  case class TempGraphService(graph: ScalaGraph) extends GraphService
-//
-//  val tempGraph =
-//    ZLayer.scoped(for {
-//      tempFile <- ZIO.acquireRelease(
-//                   ZIO.succeed(File.createTempFile("stemma", ".tmp"))
-//                 )(file => ZIO.succeed(file.delete()))
-//
-//      graph = {
-//        import gremlin.scala._
-//        val config = new BaseConfiguration {
-//          addPropertyDirect("jdbc.url", s"jdbc:h2:${tempFile.getPath};LOCK_TIMEOUT=3000")
-//          addPropertyDirect("jdbc.username", "SA")
-//          addPropertyDirect("jdbc.password", "")
-//        }
-//
-//        val g: SqlgGraph = SqlgGraph.open(config)
-//        g.asScala()
-//      }
-//    } yield TempGraphService(graph))
-//}
+package io.github.salamahin.stemma
+
+import io.github.scottweaver.models.JdbcInfo
+import io.github.scottweaver.zio.testcontainers.postgres.ZPostgreSQLContainer
+import zio.{Scope, ULayer, ZIO, ZLayer}
+
+package object service {
+  val hardcodedSecret: ULayer[InviteSecrets] = ZLayer.succeed(new InviteSecrets {
+    override val secretString: String = "secret_string"
+  })
+
+  private val jdbcInfo: ULayer[JdbcInfo] = ZPostgreSQLContainer.Settings.default >+> ZPostgreSQLContainer.live
+  val testcontainersStorage: ZLayer[Scope, Throwable, StorageService] = jdbcInfo >>> ZLayer.fromZIO(for {
+    pg <- ZIO.service[JdbcInfo]
+
+    jdbcConf = new JdbcConfiguration {
+      override val jdbcUrl: String      = pg.jdbcUrl
+      override val jdbcUser: String     = pg.username
+      override val jdbcPassword: String = pg.password
+    }
+
+    service <- ZIO.acquireRelease(ZIO.attempt(new SlickStemmaService(jdbcConf)).tap(_.createSchema))(_.close())
+  } yield service)
+}
