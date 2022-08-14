@@ -286,59 +286,60 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       stemmaRequestErr <- s.stemma(accessorId, stemmaId).flip
     } yield assertTrue(stemmaRequestErr == AccessToStemmaDenied(stemmaId))).provideSome(storageService, Scope.default)
   }
-//
-//  private def readOnlyP(people: Seq[PersonDescription])   = people.map(p => (p.id, p.readOnly)).toMap
-//  private def readOnlyF(families: Seq[FamilyDescription]) = families.map(p => (p.id, p.readOnly)).toMap
-//
-//  private val canChangeOwnershipInRecursiveManner = test("ownership change affects spouses, their ancestors and children") {
-//    for {
-//      s                   <- storageService
-//      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
-//      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
-//
-//      /*
-//                f1                     f3
-//       jabe1 -> * <- jane2             * <-- jared7
-//               / \          f2        /
-//          jeff3   july4 --> * <-- josh5
-//                           /
-//                f4        /
-//       .........* <- jill6
-//               / \
-//           jess8   john9
-//
-//       */
-//
-//      stemmaId <- s.createStemma(creatorId, "my first stemma")
-//
-//      FamilyDescription(f1, jabe :: jane :: Nil, jeff :: july :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJabe, createJess)(createJeff, createJuly))
-//      FamilyDescription(f2, josh :: _, jill :: Nil, _)                   <- s.createFamily(creatorId, stemmaId, family(createJosh, existing(july))(createJill))
-//      FamilyDescription(f3, jared :: _, _, _)                            <- s.createFamily(creatorId, stemmaId, family(createJared)(existing(josh)))
-//      FamilyDescription(f4, _, jess :: john :: Nil, _)                   <- s.createFamily(creatorId, stemmaId, family(existing(jill))(createJess, createJohn))
-//
-//      chownEffect <- s.chown(accessorId, jeff)
-//
-//      creatorStemma  <- s.stemma(creatorId, stemmaId)
-//      accessorStemma <- s.stemma(accessorId, stemmaId)
-//
-//      creatorReadOnlyP  = readOnlyP(creatorStemma.people)
-//      accessorReadOnlyP = readOnlyP(accessorStemma.people)
-//
-//      creatorReadOnlyF  = readOnlyF(creatorStemma.families)
-//      accessorReadOnlyF = readOnlyF(accessorStemma.families)
-//
-//    } yield assert(chownEffect.affectedPeople)(hasSameElements(jabe :: jane :: jeff :: july :: josh :: jill :: jess :: john :: Nil)) &&
-//      assert(chownEffect.affectedPeople)(hasNoneOf(jared :: Nil)) &&
-//      assert(chownEffect.affectedFamilies)(hasSameElements(f1 :: f2 :: f4 :: Nil)) &&
-//      assert(chownEffect.affectedFamilies)(hasNoneOf(f3 :: Nil)) &&
-//      //
-//      assertTrue(creatorReadOnlyF.forall { case (_, v) => !v }) &&
-//      assertTrue(creatorReadOnlyP.forall { case (_, v) => !v }) &&
-//      //
-//      assertTrue(accessorReadOnlyF == Map(f1   -> false, f2   -> false, f3   -> true, f4    -> false)) &&
-//      assertTrue(accessorReadOnlyP == Map(jabe -> false, jane -> false, jeff -> false, july -> false, josh -> false, jared -> true, jill -> false, jess -> false, john -> false))
-//  }
-//
+
+  private def readOnlyP(people: Seq[PersonDescription])   = people.map(p => (p.id, p.readOnly)).toMap
+  private def readOnlyF(families: Seq[FamilyDescription]) = families.map(p => (p.id, p.readOnly)).toMap
+
+  private val canChangeOwnershipInRecursiveManner = test("ownership change affects spouses, their ancestors and children") {
+    (for {
+      s                   <- ZIO.service[SlickStemmaService]
+      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
+      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
+
+      /*
+                f1                     f3
+       jabe1 -> * <- jane2             * <-- jared7
+               / \          f2        /
+          jeff3   july4 --> * <-- josh5
+                           /
+                f4        /
+       .........* <- jill6
+               / \
+           jess8   john9
+
+       */
+
+      stemmaId <- s.createStemma(creatorId, "my first stemma")
+
+      FamilyDescription(_, _, _ :: july :: Nil, _)     <- s.createFamily(creatorId, stemmaId, family(createJabe, createJess)(createJeff, createJuly))
+      FamilyDescription(f2, josh :: _, jill :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJosh, existing(july))(createJill))
+      FamilyDescription(f3, jared :: _, _, _)          <- s.createFamily(creatorId, stemmaId, family(createJared)(existing(josh)))
+      FamilyDescription(f4, _, jess :: john :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(existing(jill))(createJess, createJohn))
+
+      ChownEffect(affectedFamilies, affectedPeople) <- s.chown(creatorId, stemmaId, accessorId, josh)
+      accessorStemma                                <- s.stemma(accessorId, stemmaId)
+
+    } yield assertTrue(affectedFamilies.toSet == Set(f2, f3, f4)) &&
+      assertTrue(affectedPeople.toSet == Set(jared, josh, july, jill, jess, john)) &&
+      assert(accessorStemma)(canEditOnlyP(jared, josh, july, jill, jess, john)) &&
+      assert(accessorStemma)(canEditOnlyF(f2, f3, f4)))
+      .provideSome(storageService, Scope.default)
+  }
+
+  private def canEditOnlyP(peopleIds: Long*) = Assertion.assertion[Stemma](s"Can edit only following people: ${peopleIds.mkString(",")}") { st =>
+    st.people
+      .filter(x => !x.readOnly)
+      .map(_.id)
+      .toSet == peopleIds.toSet
+  }
+
+  private def canEditOnlyF(familyIds: Long*) = Assertion.assertion[Stemma](s"Can edit only following families: ${familyIds.mkString(",")}") { st =>
+    st.families
+      .filter(x => !x.readOnly)
+      .map(_.id)
+      .toSet == familyIds.toSet
+  }
+
   val whenThereAreSeveralOwnersThenStemmaIsNotRemovable = test("when there are several owners then chart is not removable") {
     (for {
       s                   <- ZIO.service[SlickStemmaService]
@@ -348,7 +349,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       stemmaId                                  <- s.createStemma(creatorId, "my first stemma")
       FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJane)(createJill))
 
-      _ <- s.chown(accessorId, jillId)
+      _ <- s.chown(creatorId, stemmaId, accessorId, jillId)
 
       creatorStemmas  <- s.listOwnedStemmas(creatorId)
       accessorStemmas <- s.listOwnedStemmas(accessorId)
@@ -360,7 +361,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
   val canRemoveStemmaIfOnlyOwner = test("if only owner then can remove owned stemma") {
     (for {
-      s                   <- ZIO.service[SlickStemmaService]
+      s                  <- ZIO.service[SlickStemmaService]
       User(creatorId, _) <- s.getOrCreateUser("user1@test.com")
 
       stemmaId <- s.createStemma(creatorId, "my first stemma")
@@ -387,7 +388,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       cantUpdateFamilyIfNotAnOwner,
       cantRequestStemmaIfNotGraphOwner,
       whenUpdatingFamilyAllMembersShouldBelongToGraph,
-//      canChangeOwnershipInRecursiveManner,
+      canChangeOwnershipInRecursiveManner,
       appendChildrenToFullExistingFamily,
       appendChildrenToIncompleteExistingFamily,
       whenThereAreSeveralOwnersThenStemmaIsNotRemovable,

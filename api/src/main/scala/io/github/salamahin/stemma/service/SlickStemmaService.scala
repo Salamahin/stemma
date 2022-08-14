@@ -231,23 +231,6 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
     db run query
   }
 
-  def debug(descr: String)(implicit ec: ExecutionContext) =
-    for {
-      people   <- qPeople.result
-      families <- qFamilies.result
-      parents  <- qSpouses.result
-      children <- qChildren.result
-    } yield {
-      println("=============================")
-      println(descr)
-      println("=============================")
-      people.foreach(println)
-      families.foreach(println)
-      parents.foreach(println)
-      children.foreach(println)
-      println()
-    }
-
   def removePerson(userId: Long, personId: Long) = ZIO.fromFuture { implicit ec =>
     def dropEmptyFamilies = {
       val emptyFamilies = (qSpouses.map(x => (x.familyId, x.personId)) unionAll qChildren.map(x => (x.familyId, x.personId)))
@@ -312,7 +295,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
       val familyChildren = mutable.Map.empty[Long, mutable.Set[Long]].withDefaultValue(mutable.Set.empty)
 
       ps.groupBy {
-          case (fid, memberId, familyReadOnly) => fid
+          case (fid, _, _) => fid
         }
         .foreach {
           case (fid, members) =>
@@ -321,7 +304,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
         }
 
       cs.groupBy {
-          case (fid, memberId, familyReadOnly) => fid
+          case (fid, _, _) => fid
         }
         .foreach {
           case (fid, members) =>
@@ -344,7 +327,48 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
     db run query
   }
 
-  def chown(toUserId: Long, targetPersonId: Long): Task[ChownEffect] = ???
+  private def selectDirectFamilies(initPersonId: Long) =
+    sql"""
+(
+      WITH
+      RECURSIVE "Ancestors" AS (
+        SELECT "personId", "childFamily", "parentFamily" FROM "FamilyDescr" WHERE "personId" = $initPersonId
+        UNION
+        SELECT fd."personId", fd."childFamily", fd."parentFamily" FROM "FamilyDescr" fd INNER JOIN "Ancestors" anc ON anc."parentFamily" = fd."childFamily"
+      )
+      , "FamilyDescr" AS (
+        SELECT coalesce(s."personId", c."personId") AS "personId", s."familyId" AS "childFamily", c."familyId" AS "parentFamily"
+        FROM "Spouse" s FULL JOIN "Child" c on s."personId" = c."personId"
+      )
+      SELECT DISTINCT "parentFamily" AS familyId FROM "Ancestors" WHERE "parentFamily" IS NOT NULL
+    ) UNION (
+      with
+      RECURSIVE "Dependees" AS (
+        SELECT "personId", "childFamily", "parentFamily" FROM "FamilyDescr" WHERE "personId" =  $initPersonId
+        UNION
+        SELECT fd."personId", fd."childFamily", fd."parentFamily" FROM "FamilyDescr" fd INNER JOIN "Dependees" dep ON dep."childFamily" = fd."parentFamily"
+      )
+      , "FamilyDescr" AS (
+        SELECT coalesce(s."personId", c."personId") AS "personId", s."familyId" AS "childFamily", c."familyId" AS "parentFamily"
+        FROM "Spouse" s FULL JOIN "Child" c on s."personId" = c."personId"
+      )
+      SELECT DISTINCT "childFamily" AS familyId FROM "Dependees" WHERE "childFamily" IS NOT NULL
+    )
+    """.as[Long]
+
+  def chown(userId: Long, stemmaId: Long, toUserId: Long, targetPersonId: Long): Task[ChownEffect] = ZIO.fromFuture { implicit ec =>
+    val action = (for {
+      _               <- checkStemmaAccess(stemmaId, userId)
+      _               <- checkPersonAccess(targetPersonId, userId)
+      relatedFamilies <- selectDirectFamilies(targetPersonId)
+      affectedPeople  <- (qSpouses.filter(_.familyId inSet relatedFamilies).map(_.personId) union qChildren.filter(_.familyId inSet relatedFamilies).map(_.personId)).result
+      _               <- DBIO.sequence(relatedFamilies.map(fid => qFamiliesOwners += FamilyOwner(toUserId, fid)))
+      _               <- DBIO.sequence(affectedPeople.map(pid => qPeopleOwners += PersonOwner(toUserId, pid)))
+      _               <- qStemmaOwners += StemmaOwner(toUserId, stemmaId)
+    } yield ChownEffect(relatedFamilies, affectedPeople)).transactionally
+
+    db run action
+  }
 
   def ownsPerson(userId: Long, personId: Long) = ZIO.fromFuture { implicit ec =>
     db.run(

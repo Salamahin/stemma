@@ -35,7 +35,7 @@ trait Tables {
     override def * = (id, email).mapTo[StemmaUser]
   }
 
-  class TStemmas(tag: Tag) extends Table[Stemma](tag, "Stemmas") {
+  class TStemmas(tag: Tag) extends Table[Stemma](tag, "Stemma") {
     def id   = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def name = column[String]("name")
 
