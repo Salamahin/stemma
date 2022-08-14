@@ -3,14 +3,14 @@ package io.github.salamahin.stemma.apis.serverless.aws
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
 import com.typesafe.scalalogging.LazyLogging
-import io.github.salamahin.stemma.domain.{RequestDeserializationProblem, StemmaError}
+import io.github.salamahin.stemma.domain.RequestDeserializationProblem
 import zio.json.{DecoderOps, EncoderOps, JsonDecoder, JsonEncoder}
 import zio.{Exit, Runtime, Unsafe, ZIO}
 
 import java.util.Base64
 
 abstract class Lambda[In, Out](implicit jsonDecoder: JsonDecoder[In], jsonEncoder: JsonEncoder[Out]) extends LazyLogging {
-  def run(email: String, request: In): ZIO[Any, StemmaError, Out]
+  def run(email: String, request: In): ZIO[Any, Throwable, Out]
 
   final def apply(input: APIGatewayV2HTTPEvent, context: Context) = {
     val email = ZIO.succeed(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"))

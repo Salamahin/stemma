@@ -19,6 +19,6 @@ package object service {
       override val jdbcPassword: String = pg.password
     }
 
-    service <- ZIO.acquireRelease(ZIO.attempt(new SlickStemmaService(jdbcConf)).tap(_.createSchema))(_.close())
+    service <- ZIO.acquireRelease(ZIO.attempt(new SlickStemmaService(jdbcConf)).tap(_.createSchema))(x => ZIO.succeed(x.close()))
   } yield service)
 }

@@ -1,4 +1,4 @@
-package io.github.salamahin.stemma.tinkerpop
+package io.github.salamahin.stemma.storage
 
 import io.github.salamahin.stemma.domain.CreateNewPerson
 

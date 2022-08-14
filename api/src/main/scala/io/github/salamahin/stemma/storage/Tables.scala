@@ -1,4 +1,4 @@
-package io.github.salamahin.stemma.tinkerpop
+package io.github.salamahin.stemma.storage
 
 import slick.jdbc.JdbcProfile
 

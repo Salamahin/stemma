@@ -3,7 +3,7 @@ export class PinnedPeopleStorage {
     private stemmaId;
     private pinnedPeople: Set<number>
 
-    constructor(stemmaId: string) {
+    constructor(stemmaId: number) {
         this.stemmaId = `pinned.${stemmaId}`
     }
 

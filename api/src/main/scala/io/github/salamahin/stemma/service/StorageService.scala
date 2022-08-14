@@ -1,6 +1,6 @@
 package io.github.salamahin.stemma.service
 import io.github.salamahin.stemma.domain.{Stemma => DomainStemma, _}
-import io.github.salamahin.stemma.tinkerpop.Tables
+import io.github.salamahin.stemma.storage.Tables
 import slick.jdbc.PostgresProfile
 import zio.{Scope, Task, ZIO, ZLayer}
 
@@ -27,7 +27,7 @@ object StorageService {
   val slick: ZLayer[Scope with JdbcConfiguration, Throwable, StorageService] = ZLayer.fromZIO {
     for {
       conf    <- ZIO.service[JdbcConfiguration]
-      service <- ZIO.acquireRelease(ZIO.attempt(new SlickStemmaService(conf)))(c => c.close())
+      service <- ZIO.acquireRelease(ZIO.attempt(new SlickStemmaService(conf)))(c => ZIO.succeed(c.close()))
     } yield service
   }
 }
@@ -41,7 +41,7 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration) extends Tables wi
     db run (qStemmaUsers.schema ++ qStemmas.schema ++ qPeople.schema ++ qFamilies.schema ++ qFamiliesOwners.schema ++ qPeopleOwners.schema ++ qStemmaOwners.schema ++ qSpouses.schema ++ qChildren.schema).create
   }
 
-  def close() = ZIO.succeed(db.close())
+  def close() = db.close()
 
   override def getOrCreateUser(email: String): Task[User] = ZIO.fromFuture { implicit ec =>
     val userId = qStemmaUsers returning qStemmaUsers.map(_.id)
