@@ -4,7 +4,6 @@ import io.github.salamahin.stemma.storage.Tables
 import slick.jdbc.PostgresProfile
 import zio.{Scope, Task, ZIO, ZLayer}
 
-import java.util.Properties
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 
@@ -25,26 +24,15 @@ trait StorageService {
 }
 
 object StorageService {
-  val slick: ZLayer[Scope with JdbcConfiguration, Throwable, StorageService] = ZLayer.fromZIO {
-    for {
-      conf    <- ZIO.service[JdbcConfiguration]
-      service <- ZIO.acquireRelease(ZIO.attempt(new SlickStemmaService(conf)))(c => ZIO.succeed(c.close()))
-    } yield service
+  val slick: ZLayer[Scope, Throwable, StorageService] = ZLayer.fromZIO {
+    ZIO.acquireRelease(ZIO.attempt(new ConfiguredStemmaService))(c => ZIO.succeed(c.close()))
   }
 }
 
-class SlickStemmaService(jdbcConfiguration: JdbcConfiguration, extraProps: Map[String, String] = Map.empty) extends Tables with PostgresProfile with StorageService {
+abstract class SlickStemmaService() extends Tables with PostgresProfile with StorageService {
   import api._
 
-  import scala.jdk.CollectionConverters._
-  private val db = Database.forURL(
-    url = jdbcConfiguration.jdbcUrl,
-    user = jdbcConfiguration.jdbcUser,
-    password = jdbcConfiguration.jdbcPassword,
-    new Properties() {
-      putAll(extraProps.asJava)
-    }
-  )
+  val db: backend.DatabaseDef
 
   override def createSchema: Task[Unit] = ZIO.fromFuture { implicit ec =>
     db run (qStemmaUsers.schema ++ qStemmas.schema ++ qPeople.schema ++ qFamilies.schema ++ qFamiliesOwners.schema ++ qPeopleOwners.schema ++ qStemmaOwners.schema ++ qSpouses.schema ++ qChildren.schema).create
@@ -407,4 +395,9 @@ class SlickStemmaService(jdbcConfiguration: JdbcConfiguration, extraProps: Map[S
       qPeopleOwners.filter(po => po.ownerId === userId && po.personId === personId).exists.result
     )
   }
+}
+
+class ConfiguredStemmaService extends SlickStemmaService {
+  import api._
+  override val db = Database.forConfig("dbConfig")
 }

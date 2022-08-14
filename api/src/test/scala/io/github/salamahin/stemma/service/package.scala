@@ -10,15 +10,17 @@ package object service {
   })
 
   private val jdbcInfo: ULayer[JdbcInfo] = ZPostgreSQLContainer.Settings.default >+> ZPostgreSQLContainer.live
-  val testcontainersStorage: ZLayer[Scope, Throwable, StorageService] = jdbcInfo >>> ZLayer.fromZIO(for {
-    pg <- ZIO.service[JdbcInfo]
+  val testcontainersStorage: ZLayer[Scope, Throwable, StorageService] = jdbcInfo >>> ZLayer.fromZIO(
+    for {
+      pg <- ZIO.service[JdbcInfo]
+      service <- ZIO.acquireRelease(
+                  ZIO.attempt(new HardcodedStemmaService(pg.jdbcUrl, pg.username, pg.password)).tap(_.createSchema)
+                )(x => ZIO.succeed(x.close()))
+    } yield service
+  )
 
-    jdbcConf = new JdbcConfiguration {
-      override val jdbcUrl: String      = pg.jdbcUrl
-      override val jdbcUser: String     = pg.username
-      override val jdbcPassword: String = pg.password
-    }
-
-    service <- ZIO.acquireRelease(ZIO.attempt(new SlickStemmaService(jdbcConf)).tap(_.createSchema))(x => ZIO.succeed(x.close()))
-  } yield service)
+  class HardcodedStemmaService(url: String, user: String, password: String) extends SlickStemmaService {
+    import api._
+    override val db: backend.DatabaseDef = Database.forURL(url, user, password)
+  }
 }
