@@ -2,9 +2,6 @@ import svelte from 'rollup-plugin-svelte';
 import commonjs from '@rollup/plugin-commonjs';
 import resolve from '@rollup/plugin-node-resolve';
 import livereload from 'rollup-plugin-livereload';
-import {
-    terser
-} from 'rollup-plugin-terser';
 import sveltePreprocess from 'svelte-preprocess';
 import typescript from '@rollup/plugin-typescript';
 import css from 'rollup-plugin-css-only';
@@ -12,6 +9,7 @@ import copy from 'rollup-plugin-copy';
 import {
     less
 } from 'svelte-preprocess-less';
+import { terser } from "rollup-plugin-terser";
 
 const production = !process.env.ROLLUP_WATCH;
 
@@ -64,15 +62,27 @@ export default {
         copy({
             targets: [{
                     src: "node_modules/bootstrap/dist/css/bootstrap.min.css",
-                    dest: "public/vendor/bootstrap/css",
+                    dest: "public/build/vendor/bootstrap/css",
                 },
                 {
                     src: "node_modules/bootstrap-icons/font/bootstrap-icons.css",
-                    dest: "public/vendor/bootstrap-icons/font",
+                    dest: "public/build/vendor/bootstrap-icons/font",
                 },
                 {
                     src: "node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff2",
-                    dest: "public/vendor/bootstrap-icons/font/fonts",
+                    dest: "public/build/vendor/bootstrap-icons/font/fonts",
+                },
+                {
+                    src: "public/assets",
+                    dest: "public/build/",
+                },
+                {
+                    src: "public/*.html",
+                    dest: "public/build/",
+                },
+                {
+                    src: "public/*.css",
+                    dest: "public/build/",
                 }
             ]
         }),
@@ -91,6 +101,7 @@ export default {
             sourceMap: !production,
             inlineSources: !production
         }),
+        terser(),
 
         // In dev mode, call `npm run start` once
         // the bundle has been generated
