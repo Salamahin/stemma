@@ -36,6 +36,8 @@
     let highlight: HiglightLineages;
     let pinnedPeople: PinnedPeopleStorage;
 
+    let waiting: Promise<any> = null;
+
     function handleSignIn(user: User) {
         signedIn = true;
         model = new Model(stemma_backend_url, user);
@@ -49,22 +51,22 @@
                 .then(() => {
                     urlParams.delete("inviteToken");
                     window.history.pushState({}, document.title, window.location.pathname);
-                    model.listStemmas().then((stemmas) => (ownedStemmasDescriptions = stemmas.stemmas));
+                    waiting = model.listStemmas().then((stemmas) => (ownedStemmasDescriptions = stemmas.stemmas));
                 });
         } else {
-            model.listStemmas().then((stemmas) => (ownedStemmasDescriptions = stemmas.stemmas));
+            waiting = model.listStemmas().then((stemmas) => (ownedStemmasDescriptions = stemmas.stemmas));
         }
     }
 
     function handleNewStemma(name: string) {
-        model.addStemma(name).then((newStemmaDescription) => {
+        waiting = model.addStemma(name).then((newStemmaDescription) => {
             ownedStemmasDescriptions = [...ownedStemmasDescriptions, newStemmaDescription];
             selectedStemmaDescription = newStemmaDescription;
         });
     }
 
     function handleNewFamilyCreation(request: GetOrCreateFamily) {
-        model.createFamily(selectedStemmaDescription.id, request.parents, request.children).then((s) => (selectedStemma = s));
+        waiting = model.createFamily(selectedStemmaDescription.id, request.parents, request.children).then((s) => (selectedStemma = s));
     }
 
     function hadlePersonUpdated(request: UpdatePerson) {
@@ -78,20 +80,20 @@
             originalPerson.name != request.description.name ||
             originalPerson.bio != request.description.bio
         ) {
-            model.updatePerson(selectedStemmaDescription.id, request.id, request.description).then((s) => (selectedStemma = s));
+            waiting = model.updatePerson(selectedStemmaDescription.id, request.id, request.description).then((s) => (selectedStemma = s));
         }
     }
 
     function handleFamilyUpdated(request: GetOrCreateFamily) {
-        model.updateFamily(selectedStemmaDescription.id, request.familyId, request.parents, request.children).then((s) => (selectedStemma = s));
+        waiting = model.updateFamily(selectedStemmaDescription.id, request.familyId, request.parents, request.children).then((s) => (selectedStemma = s));
     }
 
     function handleFamilyRemoved(familyId: number) {
-        model.removeFamily(selectedStemmaDescription.id, familyId).then((s) => (selectedStemma = s));
+        waiting = model.removeFamily(selectedStemmaDescription.id, familyId).then((s) => (selectedStemma = s));
     }
 
     function handlePersonRemoved(personId: number) {
-        model.removePerson(selectedStemmaDescription.id, personId).then((s) => (selectedStemma = s));
+        waiting = model.removePerson(selectedStemmaDescription.id, personId).then((s) => (selectedStemma = s));
         pinnedPeople = pinnedPeople.remove(personId);
     }
 
@@ -104,11 +106,11 @@
     }
 
     function handleStemmaRemoval(stemmaId) {
-        model.removeStemma(stemmaId).then((st) => (ownedStemmasDescriptions = st.stemmas));
+        waiting = model.removeStemma(stemmaId).then((st) => (ownedStemmasDescriptions = st.stemmas));
     }
 
     function handleInvitationCreation(e: CreateInviteLink) {
-        model.createInvintation(selectedStemmaDescription.id, e.personId, e.email).then((link) => inviteModal.setInviteLink(link));
+        waiting = model.createInvintation(selectedStemmaDescription.id, e.personId, e.email).then((link) => inviteModal.setInviteLink(link));
     }
 
     function updateEverythingOnStemmaChange(stemmaId: number, stemma: Stemma) {
@@ -135,7 +137,7 @@
     }
 
     $: if (selectedStemmaDescription)
-        model.getStemma(selectedStemmaDescription.id).then((s) => {
+        waiting = model.getStemma(selectedStemmaDescription.id).then((s) => {
             let { si, pp, hg } = updateEverythingOnStemmaChange(selectedStemmaDescription.id, s);
 
             selectedStemma = s;
@@ -201,6 +203,16 @@
     />
 
     <InviteModal bind:this={inviteModal} stemma={selectedStemma} {stemmaIndex} on:invite={(e) => handleInvitationCreation(e.detail)} />
+
+    {#await waiting}
+        <div class="position-relative">
+            <div class="position-absolute bottom-0 end-0">
+                <div style="min-width:100px; min-height:100px">
+                    <Circle2 />
+                </div>
+            </div>
+        </div>
+    {/await}
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
@@ -217,8 +229,7 @@
         background-size: cover;
     }
 
-    .authenticate-holder,
-    .await-placeholder {
+    .authenticate-holder {
         display: flex;
         justify-content: center;
         align-items: center;
