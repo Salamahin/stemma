@@ -42,7 +42,7 @@
                                                 href="#"
                                                 on:click={() => (selectedStemmaDescription = s)}>{s.name}</a
                                             >
-                                            {#if s.id != selectedStemmaDescription.id}
+                                            {#if s.id != selectedStemmaDescription.id && s.removable}
                                                 <button type="button" class="btn btn-danger btn-sm" on:click={(e) => dispatch("removeStemma", s)}
                                                     ><i class="bi bi-trash" /></button
                                                 >
