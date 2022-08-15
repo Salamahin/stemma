@@ -6,7 +6,7 @@
 
     export let google_client_id;
 
-    window.onload = function () {
+    window.initClient = function () {
         google.accounts.id.initialize({
             client_id: google_client_id,
             callback: handleCredentialResponse,
@@ -27,6 +27,7 @@
 </script>
 
 <svelte:head>
+    <script defer async src="https://accounts.google.com/gsi/client" onload="initClient()"></script>
     <meta name="google-signin-client_id" content={google_client_id} />
 </svelte:head>
 
