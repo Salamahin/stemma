@@ -1,18 +1,20 @@
 <script>
     import { createEventDispatcher } from "svelte";
     import jwt_decode from "jwt-decode";
+    import { onMount } from "svelte";
 
     const dispatch = createEventDispatcher();
 
     export let google_client_id;
 
-    window.initClient = function () {
-        google.accounts.id.initialize({
-            client_id: google_client_id,
-            callback: handleCredentialResponse,
-            auto_select: true
-        });
-        google.accounts.id.prompt();
+    let gsiLoaded, mounted;
+
+    onMount(() => {
+        mounted = true;
+    });
+
+    window.gsiLoad = function () {
+        gsiLoaded = true;
     };
 
     function handleCredentialResponse(response) {
@@ -24,18 +26,35 @@
             id_token: response.credential,
         });
     }
+
+    $: if (gsiLoaded && mounted) {
+        google.accounts.id.initialize({
+            client_id: google_client_id,
+            callback: handleCredentialResponse,
+            auto_select: true,
+        });
+        google.accounts.id.prompt((notification) => {
+            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                google.accounts.id.renderButton(
+                    document.getElementById("signin"),
+                    { theme: "outline", size: "large"  }
+                );
+            }
+        });
+    }
 </script>
 
 <svelte:head>
-    <script defer async src="https://accounts.google.com/gsi/client" onload="initClient()"></script>
+    <script defer async src="https://accounts.google.com/gsi/client" onload="gsiLoad()"></script>
     <meta name="google-signin-client_id" content={google_client_id} />
 </svelte:head>
 
 <div class="main-container">
-    <div>
+    <div class="d-flex justify-content-center align-items-center flex-column">
         <h1>project stemma</h1>
-        <div class="d-flex justify-content-center">
-            <img src="assets/icon.webp" alt="" width="100" height="100">
+        <img src="assets/icon.webp" alt="" width="100" height="100" />
+        <div class="mt-5" style="max-width:250px">
+            <div id="signin" />
         </div>
     </div>
 </div>

@@ -207,7 +207,7 @@
     {#await waiting}
         <div class="position-relative">
             <div class="position-absolute bottom-0 end-0">
-                <div style="min-width:100px; min-height:100px">
+                <div style="min-width:150px; min-height:150px">
                     <Circle2 />
                 </div>
             </div>
