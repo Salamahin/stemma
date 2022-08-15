@@ -147,10 +147,8 @@ export function makeDrag(svg, simulation) {
     svg.select("g.main").selectAll("g").call(drag());
 }
 
-export function normalizeId(id) {
-    return id
-        .replace(/\./g, "_")
-        .replace(/\:/g, "_")
+export function normalizeId(suffix, id) {
+    return `${suffix}_${id}`
 }
 
 export function mergeData(svg, nodes, relations, widht, height) {
@@ -181,7 +179,7 @@ export function mergeData(svg, nodes, relations, widht, height) {
         .data(nodes, (n) => n.id)
         .join(
             (enter) => {
-                let g = enter.append("g").attr("id", n => normalizeId(n.id));
+                let g = enter.append("g").attr("id", n => normalizeId("person", n.id));
                 g.append("circle");
                 g.append("text");
             },

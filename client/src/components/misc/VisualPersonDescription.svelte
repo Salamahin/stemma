@@ -1,12 +1,12 @@
 <script lang="ts">
-    import { NewPerson, StoredPerson } from "../../model";
+    import { CreateNewPerson, PersonDescription } from "../../model";
     import { StemmaIndex } from "../../stemmaIndex";
     import { onMount } from "svelte";
     import { configureSimulation, initChart, makeDrag, makeNodesAndRelations, mergeData, renderChart } from "../../graphTools";
     import { HighlightAll } from "../../highlight";
 
     export let chartId;
-    export let selectedPerson: StoredPerson | NewPerson;
+    export let selectedPerson: PersonDescription | CreateNewPerson;
     export let stemmaIndex: StemmaIndex;
 
     let svg;

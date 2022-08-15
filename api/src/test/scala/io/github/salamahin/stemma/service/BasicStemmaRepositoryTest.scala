@@ -1,19 +1,16 @@
 package io.github.salamahin.stemma.service
 
 import io.github.salamahin.stemma.domain._
-import zio.ZIO
-import zio.test.Assertion.{hasNoneOf, hasSameElements}
+import zio.test.Assertion.hasSameElements
 import zio.test._
+import zio.{Scope, ZIO}
 
 object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with RenderStemma {
-  private val services = (ZIO.service[StemmaService] zip ZIO.service[UserService])
-    .provide(tempGraph, hardcodedSecret, StemmaService.live, UserService.live, TestRandom.deterministic)
-
   private val canCreateFamily = test("can create different family with both parents and several children") {
-    for {
-      (s, a) <- services
+    (for {
+      s <- ZIO.service[StorageService]
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
       _ <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill, createJosh))
@@ -30,35 +27,35 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
           "() parentsOf (Jane, John)" ::
           Nil
       )
-    }
+    }).provideSome(testcontainersStorage, Scope.default)
   }
 
   private val cantCreateFamilyOfSingleParent = test("there cant be a family with a single parent and no children") {
-    for {
-      (s, a) <- services
+    (for {
+      s <- ZIO.service[StorageService]
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
       err <- s.createFamily(userId, stemmaId, family(createJohn)()).flip
-    } yield assertTrue(err == IncompleteFamily())
+    } yield assertTrue(err == IncompleteFamily())).provideSome(testcontainersStorage, Scope.default)
   }
 
   private val cantCreateFamilyOfSingleChild = test("there cant be a family with no parents and a single child") {
-    for {
-      (s, a) <- services
+    (for {
+      s <- ZIO.service[StorageService]
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
       err <- s.createFamily(userId, stemmaId, family()(createJill)).flip
-    } yield assertTrue(err == IncompleteFamily())
+    } yield assertTrue(err == IncompleteFamily())).provideSome(testcontainersStorage, Scope.default)
   }
 
   private val appendChildrenToFullExistingFamily = test("when family description contains existing parents that already have a full family then children appended to that family") {
-    for {
-      (s, a)          <- services
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+    (for {
+      s               <- ZIO.service[StorageService]
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
       FamilyDescription(_, jamesId :: _, _, _)       <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
@@ -66,51 +63,52 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       _                                              <- s.createFamily(userId, stemmaId, family(existing(jamesId), existing(jillId))(createJosh))
 
       render(families) <- s.stemma(userId, stemmaId)
-    } yield assert(families)(hasSameElements("(James, Jill) parentsOf (John, Josh)" :: "(James) parentsOf (Jane)" :: Nil))
+    } yield assert(families)(hasSameElements("(James, Jill) parentsOf (John, Josh)" :: "(James) parentsOf (Jane)" :: Nil)))
+      .provideSome(testcontainersStorage, Scope.default)
   }
 
   private val appendChildrenToIncompleteExistingFamily = test("when family description contains a single parent then newely added with same single parent appended to that family") {
-    for {
-      (s, a)          <- services
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+    (for {
+      s               <- ZIO.service[StorageService]
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
       FamilyDescription(_, jamesId :: _, _, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
       _                                        <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJohn))
 
       render(families) <- s.stemma(userId, stemmaId)
-    } yield assert(families)(hasSameElements("(James) parentsOf (Jane, John)" :: Nil))
+    } yield assert(families)(hasSameElements("(James) parentsOf (Jane, John)" :: Nil))).provideSome(testcontainersStorage, Scope.default)
   }
 
   private val duplicatedIdsForbidden = test("cant update a family when there are duplicated ids in members") {
-    for {
-      (s, a) <- services
+    (for {
+      s <- ZIO.service[StorageService]
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
       FamilyDescription(familyId, jamesId :: Nil, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
       err                                                           <- s.updateFamily(userId, familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
-    } yield assertTrue(err == DuplicatedIds(jamesId :: Nil))
+    } yield assertTrue(err == DuplicatedIds(jamesId))).provideSome(testcontainersStorage, Scope.default)
   }
 
   private val aChildCanBelongToASingleFamilyOnly = test("a child must belong to a single family") {
-    for {
-      (s, a) <- services
+    (for {
+      s <- ZIO.service[StorageService]
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
       FamilyDescription(firstFamilyId, _, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
       err                                                   <- s.createFamily(userId, stemmaId, family(createJane)(existing(jillId))).flip
-    } yield assertTrue(err == ChildAlreadyBelongsToFamily(firstFamilyId, jillId))
+    } yield assertTrue(err == ChildAlreadyBelongsToFamily(firstFamilyId, jillId))).provideSome(testcontainersStorage, Scope.default)
   }
 
-  private val canRemovePerson = test("when removing a person hist child & spouse relations are removed as well") {
-    for {
-      (s, a) <- services
+  private val canRemovePerson = test("when removing a person his child & spouse relations are removed as well") {
+    (for {
+      s <- ZIO.service[StorageService]
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
       FamilyDescription(_, _, jillId :: _ :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill, createJames))
@@ -118,28 +116,30 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       _                                              <- s.removePerson(userId, jillId)
 
       render(families) <- s.stemma(userId, stemmaId)
-    } yield assert(families)(hasSameElements("(Jane, John) parentsOf (James)" :: "(Josh) parentsOf (Jake)" :: Nil))
+    } yield assert(families)(hasSameElements("(Jane, John) parentsOf (James)" :: "(Josh) parentsOf (Jake)" :: Nil)))
+      .provideSome(testcontainersStorage, Scope.default)
   }
 
   private val aPersonCanBeSpouseInDifferentFamilies = test("one can have several families as a spouse") {
-    for {
-      (s, a) <- services
+    (for {
+      s <- ZIO.service[StorageService]
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
       FamilyDescription(_, jamesId :: _, _, _) <- s.createFamily(userId, stemmaId, family(createJames, createJane)(createJill))
       _                                        <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJuly))
 
       render(families) <- s.stemma(userId, stemmaId)
-    } yield assert(families)(hasSameElements("(James, Jane) parentsOf (Jill)" :: "(James) parentsOf (July)" :: Nil))
+    } yield assert(families)(hasSameElements("(James, Jane) parentsOf (Jill)" :: "(James) parentsOf (July)" :: Nil)))
+      .provideSome(testcontainersStorage, Scope.default)
   }
 
   private val leavingSingleMemberOfFamilyDropsEmptyFamilies = test("when the only member of family left the family is removed") {
-    for {
-      (s, a) <- services
+    (for {
+      s <- ZIO.service[StorageService]
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
       FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
@@ -148,14 +148,15 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       _ <- s.removePerson(userId, jillId)
 
       Stemma(people, families) <- s.stemma(userId, stemmaId)
-    } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "July" :: Nil))
+    } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "July" :: Nil)))
+      .provideSome(testcontainersStorage, Scope.default)
   }
 
   private val canUpdateExistingPerson = test("can update existing person") {
-    for {
-      (s, a) <- services
+    (for {
+      s <- ZIO.service[StorageService]
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
       FamilyDescription(_, janeId :: Nil, _, _) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
@@ -171,14 +172,14 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
           p.birthDate.contains(johnsBirthDay) &&
           p.deathDate.contains(johnsDeathDay)
       )
-    )
+    )).provideSome(testcontainersStorage, Scope.default)
   }
 
   private val canUpdateExistingFamily = test("when updating a family members are not removed") {
-    for {
-      (s, a) <- services
+    (for {
+      s <- ZIO.service[StorageService]
 
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
       FamilyDescription(familyId, _ :: johnId :: Nil, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill))
@@ -187,13 +188,14 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       st @ Stemma(people, _) <- s.stemma(userId, stemmaId)
       render(families)       = st
     } yield assertTrue(families == List("(John, July) parentsOf (James, Jill)")) &&
-      assert(people.map(_.name))(hasSameElements("Jane" :: "John" :: "Jill" :: "July" :: "James" :: Nil))
+      assert(people.map(_.name))(hasSameElements("Jane" :: "John" :: "Jill" :: "July" :: "James" :: Nil)))
+      .provideSome(testcontainersStorage, Scope.default)
   }
 
   private val usersHaveSeparateGraphs = test("users might have separated stemmas") {
-    for {
-      (s, a)          <- services
-      User(userId, _) <- a.getOrCreateUser("user1@test.com")
+    (for {
+      s               <- ZIO.service[StorageService]
+      User(userId, _) <- s.getOrCreateUser("user1@test.com")
 
       userStemmaId1 <- s.createStemma(userId, "first stemma")
       _             <- s.createFamily(userId, userStemmaId1, family(createJane, createJohn)(createJosh, createJill))
@@ -207,14 +209,15 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       render(stemma2) <- s.stemma(userId, userStemmaId2)
     } yield assert(stemmas)(hasSameElements(StemmaDescription(userStemmaId1, "first stemma", true) :: StemmaDescription(userStemmaId2, "second stemma", true) :: Nil)) &&
       assert(stemma1)(hasSameElements("(Jane, John) parentsOf (Jill, Josh)" :: Nil)) &&
-      assert(stemma2)(hasSameElements("(Jake) parentsOf (James, July)" :: Nil))
+      assert(stemma2)(hasSameElements("(Jake) parentsOf (James, July)" :: Nil)))
+      .provideSome(testcontainersStorage, Scope.default)
   }
 
   private val cantUpdatePersonIfNotAnOwner = test("cant update or remove a person that dont own") {
-    for {
-      (s, a)              <- services
-      User(creatorId, _)  <- a.getOrCreateUser("user1@test.com")
-      User(accessorId, _) <- a.getOrCreateUser("user2@test.com")
+    (for {
+      s                   <- ZIO.service[StorageService]
+      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
+      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
 
       stemmaId                                <- s.createStemma(creatorId, "my first stemma")
       FamilyDescription(_, janeId :: _, _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
@@ -222,14 +225,15 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       personRemoveErr <- s.removePerson(accessorId, janeId).flip
       personUpdateErr <- s.updatePerson(accessorId, janeId, createJuly).flip
     } yield assertTrue(personRemoveErr == AccessToPersonDenied(janeId)) &&
-      assertTrue(personUpdateErr == AccessToPersonDenied(janeId))
+      assertTrue(personUpdateErr == AccessToPersonDenied(janeId)))
+      .provideSome(testcontainersStorage, Scope.default)
   }
 
   private val cantUpdateFamilyIfNotAnOwner = test("cant update or remove a family that dont own") {
-    for {
-      (s, a)              <- services
-      User(creatorId, _)  <- a.getOrCreateUser("user1@test.com")
-      User(accessorId, _) <- a.getOrCreateUser("user2@test.com")
+    (for {
+      s                   <- ZIO.service[StorageService]
+      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
+      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
 
       stemmaId                             <- s.createStemma(creatorId, "my first stemma")
       FamilyDescription(familyId, _, _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
@@ -237,43 +241,44 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       familyRemoveErr <- s.removeFamily(accessorId, familyId).flip
       familyUpdateErr <- s.updateFamily(accessorId, familyId, family(createJames)(createJuly)).flip
     } yield assertTrue(familyRemoveErr == AccessToFamilyDenied(familyId)) &&
-      assertTrue(familyUpdateErr == AccessToFamilyDenied(familyId))
+      assertTrue(familyUpdateErr == AccessToFamilyDenied(familyId)))
+      .provideSome(testcontainersStorage, Scope.default)
   }
 
   private val whenUpdatingFamilyAllMembersShouldBelongToGraph = test("when updating a family with existing person there should be no members of different stemmas") {
-    for {
-      (s, a)          <- services
-      User(userId, _) <- a.getOrCreateUser("user@test.com")
+    (for {
+      s               <- ZIO.service[StorageService]
+      User(userId, _) <- s.getOrCreateUser("user@test.com")
 
       stemma1Id <- s.createStemma(userId, "my first stemma")
       stemma2Id <- s.createStemma(userId, "my second stemma")
 
       FamilyDescription(_, janeId :: johnId :: Nil, joshId :: jillId :: Nil, _) <- s.createFamily(userId, stemma1Id, family(createJane, createJohn)(createJosh, createJill))
       familyCreationErr                                                         <- s.createFamily(userId, stemma2Id, family(existing(janeId), existing(johnId))(existing(joshId), existing(jillId))).flip
-    } yield assertTrue(familyCreationErr == NoSuchPersonId(janeId))
+    } yield assertTrue(familyCreationErr == NoSuchPersonId(janeId))).provideSome(testcontainersStorage, Scope.default)
   }
 
   private val cantRequestStemmaIfNotGraphOwner = test("cant request stemma if not a stemma owner") {
-    for {
-      (s, a)              <- services
-      User(creatorId, _)  <- a.getOrCreateUser("user1@test.com")
-      User(accessorId, _) <- a.getOrCreateUser("user2@test.com")
+    (for {
+      s                   <- ZIO.service[StorageService]
+      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
+      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
 
       stemmaId <- s.createStemma(creatorId, "my first stemma")
       _        <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
 
       stemmaRequestErr <- s.stemma(accessorId, stemmaId).flip
-    } yield assertTrue(stemmaRequestErr == AccessToStemmaDenied(stemmaId))
+    } yield assertTrue(stemmaRequestErr == AccessToStemmaDenied(stemmaId))).provideSome(testcontainersStorage, Scope.default)
   }
 
   private def readOnlyP(people: Seq[PersonDescription])   = people.map(p => (p.id, p.readOnly)).toMap
   private def readOnlyF(families: Seq[FamilyDescription]) = families.map(p => (p.id, p.readOnly)).toMap
 
   private val canChangeOwnershipInRecursiveManner = test("ownership change affects spouses, their ancestors and children") {
-    for {
-      (s, a)              <- services
-      User(creatorId, _)  <- a.getOrCreateUser("user1@test.com")
-      User(accessorId, _) <- a.getOrCreateUser("user2@test.com")
+    (for {
+      s                   <- ZIO.service[StorageService]
+      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
+      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
 
       /*
                 f1                     f3
@@ -290,63 +295,64 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
       stemmaId <- s.createStemma(creatorId, "my first stemma")
 
-      FamilyDescription(f1, jabe :: jane :: Nil, jeff :: july :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJabe, createJess)(createJeff, createJuly))
-      FamilyDescription(f2, josh :: _, jill :: Nil, _)                   <- s.createFamily(creatorId, stemmaId, family(createJosh, existing(july))(createJill))
-      FamilyDescription(f3, jared :: _, _, _)                            <- s.createFamily(creatorId, stemmaId, family(createJared)(existing(josh)))
-      FamilyDescription(f4, _, jess :: john :: Nil, _)                   <- s.createFamily(creatorId, stemmaId, family(existing(jill))(createJess, createJohn))
+      FamilyDescription(_, _, _ :: july :: Nil, _)     <- s.createFamily(creatorId, stemmaId, family(createJabe, createJess)(createJeff, createJuly))
+      FamilyDescription(f2, josh :: _, jill :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJosh, existing(july))(createJill))
+      FamilyDescription(f3, jared :: _, _, _)          <- s.createFamily(creatorId, stemmaId, family(createJared)(existing(josh)))
+      FamilyDescription(f4, _, jess :: john :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(existing(jill))(createJess, createJohn))
 
-      chownEffect <- s.chown(accessorId, jeff)
+      ChownEffect(affectedFamilies, affectedPeople) <- s.chown(accessorId, stemmaId, josh)
+      accessorStemma                                <- s.stemma(accessorId, stemmaId)
 
-      creatorStemma  <- s.stemma(creatorId, stemmaId)
-      accessorStemma <- s.stemma(accessorId, stemmaId)
+    } yield assertTrue(affectedFamilies.toSet == Set(f2, f3, f4)) &&
+      assertTrue(affectedPeople.toSet == Set(jared, josh, july, jill, jess, john)) &&
+      assert(accessorStemma)(canEditOnlyP(jared, josh, july, jill, jess, john)) &&
+      assert(accessorStemma)(canEditOnlyF(f2, f3, f4)))
+      .provideSome(testcontainersStorage, Scope.default)
+  }
 
-      creatorReadOnlyP  = readOnlyP(creatorStemma.people)
-      accessorReadOnlyP = readOnlyP(accessorStemma.people)
+  private def canEditOnlyP(peopleIds: Long*) = Assertion.assertion[Stemma](s"Can edit only following people: ${peopleIds.mkString(",")}") { st =>
+    st.people
+      .filter(x => !x.readOnly)
+      .map(_.id)
+      .toSet == peopleIds.toSet
+  }
 
-      creatorReadOnlyF  = readOnlyF(creatorStemma.families)
-      accessorReadOnlyF = readOnlyF(accessorStemma.families)
-
-    } yield assert(chownEffect.affectedPeople)(hasSameElements(jabe :: jane :: jeff :: july :: josh :: jill :: jess :: john :: Nil)) &&
-      assert(chownEffect.affectedPeople)(hasNoneOf(jared :: Nil)) &&
-      assert(chownEffect.affectedFamilies)(hasSameElements(f1 :: f2 :: f4 :: Nil)) &&
-      assert(chownEffect.affectedFamilies)(hasNoneOf(f3 :: Nil)) &&
-      //
-      assertTrue(creatorReadOnlyF.forall { case (_, v) => !v }) &&
-      assertTrue(creatorReadOnlyP.forall { case (_, v) => !v }) &&
-      //
-      assertTrue(accessorReadOnlyF == Map(f1  -> false, f2   -> false, f3   -> true, f4    -> false)) &&
-      assertTrue(accessorReadOnlyP == Map(jabe -> false, jane -> false, jeff -> false, july -> false, josh -> false, jared -> true, jill -> false, jess -> false, john -> false))
+  private def canEditOnlyF(familyIds: Long*) = Assertion.assertion[Stemma](s"Can edit only following families: ${familyIds.mkString(",")}") { st =>
+    st.families
+      .filter(x => !x.readOnly)
+      .map(_.id)
+      .toSet == familyIds.toSet
   }
 
   val whenThereAreSeveralOwnersThenStemmaIsNotRemovable = test("when there are several owners then chart is not removable") {
-    for {
-      (s, a)              <- services
-      User(creatorId, _)  <- a.getOrCreateUser("user1@test.com")
-      User(accessorId, _) <- a.getOrCreateUser("user2@test.com")
+    (for {
+      s                   <- ZIO.service[StorageService]
+      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
+      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
 
       stemmaId                                  <- s.createStemma(creatorId, "my first stemma")
       FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJane)(createJill))
 
-      _ <- s.chown(accessorId, jillId)
+      _ <- s.chown(accessorId, stemmaId, jillId)
 
       creatorStemmas  <- s.listOwnedStemmas(creatorId)
       accessorStemmas <- s.listOwnedStemmas(accessorId)
     } yield assertTrue(
       creatorStemmas.stemmas.forall(s => !s.removable),
       accessorStemmas.stemmas.forall(s => !s.removable)
-    )
+    )).provideSome(testcontainersStorage, Scope.default)
   }
 
   val canRemoveStemmaIfOnlyOwner = test("if only owner then can remove owned stemma") {
-    for {
-      (s, a)             <- services
-      User(creatorId, _) <- a.getOrCreateUser("user1@test.com")
+    (for {
+      s                  <- ZIO.service[StorageService]
+      User(creatorId, _) <- s.getOrCreateUser("user1@test.com")
 
       stemmaId <- s.createStemma(creatorId, "my first stemma")
       _        <- s.removeStemma(creatorId, stemmaId)
 
       stemmas <- s.listOwnedStemmas(creatorId)
-    } yield assertTrue(stemmas.stemmas.isEmpty)
+    } yield assertTrue(stemmas.stemmas.isEmpty)).provideSome(testcontainersStorage, Scope.default)
   }
 
   override def spec =

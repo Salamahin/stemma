@@ -21,7 +21,7 @@ trait Requests {
   val createJabe           = CreateNewPerson("Jabe", None, None, None)
   val createJared          = CreateNewPerson("Jared", None, None, None)
 
-  def existing(id: String) = ExistingPerson(id)
+  def existing(id: Long) = ExistingPerson(id)
 
   def family(parents: PersonDefinition*)(children: PersonDefinition*) = parents.toList match {
     case Nil             => CreateFamily(None, None, children.toList)

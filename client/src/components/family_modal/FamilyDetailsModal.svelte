@@ -3,7 +3,7 @@
     import * as bootstrap from "bootstrap";
 
     export type GetOrCreateFamily = {
-        familyId?: string;
+        familyId?: number;
         parents: PersonDefinition[];
         children: PersonDefinition[];
     };
@@ -84,7 +84,7 @@
 
         if (familyId == null) dispatch("familyAdded", { parents: pp, children: cc });
         else dispatch("familyUpdated", { familyId: familyId, parents: pp, children: cc });
-        
+
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     }
 

@@ -1,11 +1,7 @@
 package io.github.salamahin.stemma.service
-
-import gremlin.scala.ScalaGraph
 import io.github.salamahin.stemma.domain.{InvalidInviteToken, User}
-import io.github.salamahin.stemma.tinkerpop.StemmaRepository
-import io.github.salamahin.stemma.tinkerpop.Transaction.transactionSafe
 import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
-import zio.{IO, Random, UIO, URLayer, ZIO, ZLayer}
+import zio.{Random, Task, URLayer, ZIO, ZLayer}
 
 import java.security.MessageDigest
 import java.util
@@ -13,7 +9,7 @@ import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
-case class InviteToken(inviteesEmail: String, targetPersonId: String, entropy: String)
+case class InviteToken(inviteesEmail: String, stemmaId: Long, targetPersonId: Long, entropy: String)
 
 object InviteToken {
   implicit val decoder: JsonDecoder[InviteToken] = DeriveJsonDecoder.gen[InviteToken]
@@ -21,26 +17,24 @@ object InviteToken {
 }
 
 trait UserService {
-  def createInviteToken(inviteeEmail: String, associatedPersonId: String): UIO[String]
-  def decodeInviteToken(token: String): IO[InvalidInviteToken, InviteToken]
-  def getOrCreateUser(email: String): UIO[User]
+  def createInviteToken(inviteeEmail: String, stemmaId: Long, associatedPersonId: Long): Task[String]
+  def decodeInviteToken(token: String): Task[InviteToken]
+  def getOrCreateUser(email: String): Task[User]
 }
 
 object UserService {
 
-  val live: URLayer[InviteSecrets with GraphService with Random, UserService] = ZLayer(for {
-    graph  <- ZIO.service[GraphService]
-    secret <- ZIO.service[InviteSecrets]
-    rnd    <- ZIO.service[Random]
-  } yield new UserServiceImpl(secret.secretString, graph.graph, new StemmaRepository, rnd))
-
-  private class UserServiceImpl(secret: String, graph: ScalaGraph, ops: StemmaRepository, rnd: Random) extends UserService {
+  val live: URLayer[InviteSecrets with StorageService with Random, UserService] = ZLayer(for {
+    storage <- ZIO.service[StorageService]
+    secret  <- ZIO.service[InviteSecrets]
+    rnd     <- ZIO.service[Random]
+  } yield new UserService {
     import zio.json._
 
-    override def createInviteToken(inviteeEmail: String, associatedPersonId: String): UIO[String] = {
+    override def createInviteToken(inviteeEmail: String, stemmaId: Long, associatedPersonId: Long): Task[String] = {
       rnd.nextString(20).map { entropy =>
-        val token = InviteToken(inviteeEmail, associatedPersonId, entropy)
-        encrypt(secret, token.toJson)
+        val token = InviteToken(inviteeEmail, stemmaId, associatedPersonId, entropy)
+        encrypt(secret.secretString, token.toJson)
       }
     }
 
@@ -62,7 +56,7 @@ object UserService {
 
     override def decodeInviteToken(token: String) =
       for {
-        decrypted <- ZIO.attempt(decrypt(secret, token)).orElseFail(InvalidInviteToken())
+        decrypted <- ZIO.attempt(decrypt(secret.secretString, token)).orElseFail(InvalidInviteToken())
         parsed    <- ZIO.fromEither(decrypted.fromJson[InviteToken]).orElseFail(InvalidInviteToken())
       } yield parsed
 
@@ -73,8 +67,6 @@ object UserService {
       new String(cipher.doFinal(Base64.getDecoder.decode(encryptedValue)))
     }
 
-    override def getOrCreateUser(email: String): UIO[User] = ZIO.succeed {
-      transactionSafe(graph) { tx => ops.getOrCreateUser(tx, email) }
-    }
-  }
+    override def getOrCreateUser(email: String) = storage.getOrCreateUser(email)
+  })
 }

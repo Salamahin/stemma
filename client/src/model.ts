@@ -1,19 +1,19 @@
 //requests
 export type PersonDefinition = { ExistingPerson?: ExistingPerson, CreateNewPerson?: CreateNewPerson }
-export type ExistingPerson = { id: string }
+export type ExistingPerson = { id: number }
 export type CreateNewPerson = { name: string, birthDate?: string, deathDate?: string, bio?: string }
 
 export type CreateFamily = { parent1?: PersonDefinition, parent2?: PersonDefinition, children: Array<PersonDefinition> }
 
-export type CreateFamilyRequest = { stemmaId: string, familyDescr: CreateFamily }
-export type CreateInvitationTokenRequest = { targetPersonId: string, targetPersonEmail: string }
+export type CreateFamilyRequest = { stemmaId: number, familyDescr: CreateFamily }
+export type CreateInvitationTokenRequest = { stemmaId: number, targetPersonId: number, targetPersonEmail: string }
 export type CreateNewStemmaRequest = { stemmaName: string }
-export type DeleteFamilyRequest = { stemmaId: string, familyId: string }
-export type DeletePersonRequest = { stemmaId: string, personId: string }
-export type GetStemmaRequest = { stemmaId: string }
-export type DeleteStemmaRequest = { stemmaId: string }
-export type UpdatePersonRequest = { stemmaId: string, personId: string, personDescr: CreateNewPerson }
-export type UpdateFamilyRequest = { stemmaId: string, familyId: string, familyDescr: CreateFamily }
+export type DeleteFamilyRequest = { stemmaId: number, familyId: number }
+export type DeletePersonRequest = { stemmaId: number, personId: number }
+export type GetStemmaRequest = { stemmaId: number }
+export type DeleteStemmaRequest = { stemmaId: number }
+export type UpdatePersonRequest = { stemmaId: number, personId: number, personDescr: CreateNewPerson }
+export type UpdateFamilyRequest = { stemmaId: number, familyId: number, familyDescr: CreateFamily }
 export type BearInvitationRequest = { encodedToken: string }
 export type ListStemmasRequest = {}
 
@@ -33,13 +33,13 @@ type CompositeRequest = {
 
 
 //responses
-export type ChownEffect = { affectedFamilies: Array<string>, affectedPeople: Array<string> }
-export type FamilyDescription = { id: string, parents: Array<string>, children: Array<string>, readOnly: boolean }
+export type ChownEffect = { affectedFamilies: Array<number>, affectedPeople: Array<number> }
+export type FamilyDescription = { id: number, parents: Array<number>, children: Array<number>, readOnly: boolean }
 export type InviteToken = { token: string }
 export type OwnedStemmasDescription = { stemmas: Array<StemmaDescription> }
 export type Stemma = { people: Array<PersonDescription>, families: Array<FamilyDescription> }
-export type StemmaDescription = { id: string, name: string, removable: Boolean }
-export type PersonDescription = { id: string, name: string, birthDate?: string, deathDate?: string, bio?: string, readOnly: boolean }
+export type StemmaDescription = { id: number, name: string, removable: Boolean }
+export type PersonDescription = { id: number, name: string, birthDate?: string, deathDate?: string, bio?: string, readOnly: boolean }
 export type TokenAccepted = {}
 
 type CompositeResponse = {
@@ -73,12 +73,12 @@ export class Model {
         return (await this.parseResponse(response)).OwnedStemmasDescription;
     }
 
-    async removeStemma(stemmaId: string): Promise<OwnedStemmasDescription> {
+    async removeStemma(stemmaId: number): Promise<OwnedStemmasDescription> {
         const response = await this.sendRequest({ DeleteStemmaRequest: { stemmaId: stemmaId } })
         return (await this.parseResponse(response)).OwnedStemmasDescription;
     }
 
-    async getStemma(stemmaId: string): Promise<Stemma> {
+    async getStemma(stemmaId: number): Promise<Stemma> {
         const response = await this.sendRequest({ GetStemmaRequest: { stemmaId: stemmaId } })
         return (await this.parseResponse(response)).Stemma;
     }
@@ -93,12 +93,12 @@ export class Model {
         return cf as CreateFamily
     }
 
-    async createFamily(stemmaId: string, parents: PersonDefinition[], children: PersonDefinition[]): Promise<Stemma> {
+    async createFamily(stemmaId: number, parents: PersonDefinition[], children: PersonDefinition[]): Promise<Stemma> {
         const response = await this.sendRequest({ CreateFamilyRequest: { stemmaId: stemmaId, familyDescr: this.makeFamily(parents, children) } })
         return (await this.parseResponse(response)).Stemma;
     }
 
-    async updateFamily(stemmaId: string, familyId: string, parents: PersonDefinition[], children: PersonDefinition[]): Promise<Stemma> {
+    async updateFamily(stemmaId: number, familyId: number, parents: PersonDefinition[], children: PersonDefinition[]): Promise<Stemma> {
         const response = await this.sendRequest({ UpdateFamilyRequest: { stemmaId: stemmaId, familyId: familyId, familyDescr: this.makeFamily(parents, children) } })
         return (await this.parseResponse(response)).Stemma;
     }
@@ -108,13 +108,13 @@ export class Model {
         return (await this.parseResponse(response)).StemmaDescription;
     }
 
-    async removePerson(stemmaId: string, personId: string): Promise<Stemma> {
+    async removePerson(stemmaId: number, personId: number): Promise<Stemma> {
         const response = await this.sendRequest({ DeletePersonRequest: { stemmaId: stemmaId, personId: personId } })
         return (await this.parseResponse(response)).Stemma;
     }
 
-    async createInvintation(personId: string, email: string): Promise<string> {
-        const response = await this.sendRequest({ CreateInvitationTokenRequest: { targetPersonId: personId, targetPersonEmail: email } })
+    async createInvintation(stemmaId: number, personId: number, email: string): Promise<string> {
+        const response = await this.sendRequest({ CreateInvitationTokenRequest: { stemmaId: stemmaId, targetPersonId: personId, targetPersonEmail: email } })
         const token = (await this.parseResponse(response)).InviteToken
         return `${location.origin}/?inviteToken=${encodeURIComponent(token.token)}`
     }
@@ -124,12 +124,12 @@ export class Model {
         return (await this.parseResponse(response)).TokenAccepted
     }
 
-    async removeFamily(stemmaId: string, familyId: string): Promise<Stemma> {
+    async removeFamily(stemmaId: number, familyId: number): Promise<Stemma> {
         const response = await this.sendRequest({ DeleteFamilyRequest: { stemmaId: stemmaId, familyId: familyId } })
         return (await this.parseResponse(response)).Stemma
     }
 
-    async updatePerson(stemmaId: string, personId: string, descr: CreateNewPerson): Promise<Stemma> {
+    async updatePerson(stemmaId: number, personId: number, descr: CreateNewPerson): Promise<Stemma> {
         const response = await this.sendRequest({ UpdatePersonRequest: { stemmaId: stemmaId, personId: personId, personDescr: descr } })
         return (await this.parseResponse(response)).Stemma
     }
