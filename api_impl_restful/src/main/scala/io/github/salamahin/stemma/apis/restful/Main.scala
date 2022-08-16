@@ -33,7 +33,7 @@ object Main extends LazyLogging with HandleApiRequests with ZIOAppDefault {
           .toResponse
     }
 
-  def oauthed[R, E](onSuccess: String => HttpApp[R, E]): Http[R with UserService with OAuthService, E, Request, Response] =
+  def authenticated[R, E](onSuccess: String => HttpApp[R, E]): Http[R with UserService with OAuthService, E, Request, Response] =
     Http
       .fromFunctionZIO[Request] { request =>
         val parseToken = ZIO
@@ -66,10 +66,15 @@ object Main extends LazyLogging with HandleApiRequests with ZIOAppDefault {
     allowedOrigins = _ contains "localhost"
   )
 
-  override def run: ZIO[ZIOAppArgs with Scope, Any, Any] =
-    Server
-      .start(8090, oauthed(stemmaApi) @@ cors(corsConfig))
-      .exitCode
+  override def run: ZIO[ZIOAppArgs with Scope, Any, Any] = {
+    (for {
+      storage <- ZIO.service[StorageService]
+      _       <- storage.createSchema
+      _       = logger.debug("Schema created")
+      f       <- Server.start(8090, authenticated(stemmaApi) @@ cors(corsConfig)).exitCode.fork
+      _       = logger.info("Server ready")
+      _       <- f.join
+    } yield ())
       .provideSome(
         ZLayer.succeed(Random.RandomLive),
         InviteSecrets.fromEnv,
@@ -78,4 +83,5 @@ object Main extends LazyLogging with HandleApiRequests with ZIOAppDefault {
         UserService.live,
         StorageService.slick
       )
+  }
 }
