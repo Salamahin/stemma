@@ -46,6 +46,10 @@ export default {
         file: 'public/build/bundle.js'
     },
     plugins: [
+        replace({
+            GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+            STEMMA_BACKEND_URL: process.env.STEMMA_BACKEND_URL,
+        }),
         svelte({
             preprocess: sveltePreprocess({
                 sourceMap: !production,
@@ -65,6 +69,10 @@ export default {
                     dest: "public/vendor/bootstrap/css",
                 },
                 {
+                    src: "node_modules/bootstrap/dist/js/bootstrap.bundle.min.css",
+                    dest: "public/vendor/bootstrap/js",
+                },
+                {
                     src: "node_modules/bootstrap-icons/font/bootstrap-icons.css",
                     dest: "public/vendor/bootstrap-icons/font",
                 },
@@ -73,12 +81,6 @@ export default {
                     dest: "public/vendor/bootstrap-icons/font/fonts",
                 }
             ]
-        }),
-
-        replace({
-            preventAssignment: true,
-            GOOGLE_CLIENT_ID: JSON.stringify(process.env.GOOGLE_CLIENT_ID),
-            STEMMA_BACKEND_URL: JSON.stringify(process.env.STEMMA_BACKEND_URL)
         }),
 
         resolve({

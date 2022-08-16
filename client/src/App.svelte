@@ -173,6 +173,11 @@
         on:invite={() => inviteModal.showInvintation()}
     />
 
+    <div class="alert alert-success alert-dismissible fade show">
+        <button type="button" class="btn-close" data-bs-dismiss="alert" />
+        <strong>Success!</strong> This alert box could indicate a successful or positive action.
+    </div>
+
     <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={(e) => handleNewStemma(e.detail)} />
 
     <RemoveStemmaModal bind:this={removeStemmaModal} on:stemmaRemoved={(e) => handleStemmaRemoval(e.detail)} />

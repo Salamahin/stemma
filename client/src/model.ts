@@ -142,7 +142,8 @@ export class Model {
     }
 
     private async sendRequest(request: CompositeRequest) {
-        return await fetch(`${this.endpoint}/stemma`, {
+        let url = `${this.endpoint}/stemma`
+        return await fetch(url, {
             method: 'POST',
             headers: this.commonHeader,
             body: JSON.stringify(request)
