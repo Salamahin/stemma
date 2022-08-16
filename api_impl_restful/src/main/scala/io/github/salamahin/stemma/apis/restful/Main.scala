@@ -28,7 +28,10 @@ object Main extends LazyLogging with HandleApiRequests with ZIOAppDefault {
       case req @ Method.POST -> !! / "stemma" =>
         req
           .bodyAsString
-          .flatMap(body => ZIO.fromEither(body.fromJson[DomainRequest]).mapError(err => new IllegalArgumentException(err)))
+          .flatMap(body => {
+            logger.debug(s"New request: ${body}")
+            ZIO.fromEither(body.fromJson[DomainRequest]).mapError(err => new IllegalArgumentException(err))
+          })
           .flatMap(req => handle(email, req))
           .toResponse
     }
@@ -61,15 +64,12 @@ object Main extends LazyLogging with HandleApiRequests with ZIOAppDefault {
       }
       .flatten
 
-  private val corsConfig = CorsConfig(
-    anyOrigin = false,
-    allowedOrigins = _ contains "localhost"
-  )
+  private val corsConfig = CorsConfig(anyOrigin = true)
 
   override def run: ZIO[ZIOAppArgs with Scope, Any, Any] = {
     (for {
       storage <- ZIO.service[StorageService]
-      _       <- storage.createSchema
+//      _       <- storage.createSchema
       _       = logger.debug("Schema created")
       f       <- Server.start(8090, authenticated(stemmaApi) @@ cors(corsConfig)).exitCode.fork
       _       = logger.info("Server ready")

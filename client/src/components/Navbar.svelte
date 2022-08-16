@@ -7,14 +7,12 @@
     export let lookupPersonName;
 
     const dispatch = createEventDispatcher();
-
-    $: if (!selectedStemmaDescription && ownedStemmasDescriptions && ownedStemmasDescriptions.length) selectedStemmaDescription = ownedStemmasDescriptions[0];
 </script>
 
 <header>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#"><img src="assets/icon.webp" alt="" width="40" height="40">  Stemma</a>
+            <a class="navbar-brand" href="#"><img src="assets/icon.webp" alt="" width="40" height="40" /> Stemma</a>
             <button
                 class="navbar-toggler"
                 type="button"
