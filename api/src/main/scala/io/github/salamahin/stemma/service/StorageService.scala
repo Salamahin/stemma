@@ -35,7 +35,7 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
   val db: backend.DatabaseDef
 
   override def createSchema: Task[Unit] = ZIO.fromFuture { implicit ec =>
-    db run (qStemmaUsers.schema ++ qStemmas.schema ++ qPeople.schema ++ qFamilies.schema ++ qFamiliesOwners.schema ++ qPeopleOwners.schema ++ qStemmaOwners.schema ++ qSpouses.schema ++ qChildren.schema).create
+    db run (qStemmaUsers.schema ++ qStemmas.schema ++ qPeople.schema ++ qFamilies.schema ++ qFamiliesOwners.schema ++ qPeopleOwners.schema ++ qStemmaOwners.schema ++ qSpouses.schema ++ qChildren.schema).createIfNotExists
   }
 
   def close() = db.close()
