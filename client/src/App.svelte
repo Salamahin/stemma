@@ -13,6 +13,7 @@
     import RemoveStemmaModal from "./components/delete_stemma_modal/RemoveStemmaModal.svelte";
     import InviteModal, { CreateInviteLink } from "./components/invite_modal/InviteModal.svelte";
     import { Circle2 } from "svelte-loading-spinners";
+    import AboutModal from "./components/about/About.svelte";
 
     export let google_client_id;
     export let stemma_backend_url;
@@ -23,6 +24,7 @@
     let stemmaChart;
     let removeStemmaModal;
     let inviteModal;
+    let aboutModal;
 
     let model: Model;
     let signedIn = false;
@@ -78,7 +80,7 @@
 
     function updateStemmaDescriptions(stemmas) {
         ownedStemmasDescriptions = stemmas;
-        if(!selectedStemmaDescription) selectedStemmaDescription = stemmas[0]
+        if (!selectedStemmaDescription) selectedStemmaDescription = stemmas[0];
     }
 
     function handleNewStemma(name: string) {
@@ -260,6 +262,7 @@
         on:createNewFamily={() => familySelectionModal.promptNewFamily()}
         on:removeStemma={(e) => removeStemmaModal.askForConfirmation(e.detail)}
         on:invite={() => inviteModal.showInvintation()}
+        on:about={() => aboutModal.show()}
     />
 
     {#if errorOccured}
@@ -299,6 +302,7 @@
     />
 
     <InviteModal bind:this={inviteModal} stemma={selectedStemma} {stemmaIndex} on:invite={(e) => handleInvitationCreation(e.detail)} />
+    <AboutModal bind:this={aboutModal} />
 
     {#await waiting}
         <div class="position-relative">

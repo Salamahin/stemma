@@ -67,10 +67,10 @@ object Main extends LazyLogging with HandleApiRequests with ZIOAppDefault {
 
   private val corsConfig = CorsConfig(anyOrigin = true)
 
-  override def run: ZIO[ZIOAppArgs with Scope, Any, Any] =
-    Server
+  override def run: ZIO[ZIOAppArgs with Scope, Any, Any] = {
+    (ZIO.service[StorageService].flatMap(_.createSchema).flip *> Server
       .start(8090, authenticated(stemmaApi) @@ cors(corsConfig))
-      .exitCode
+      .exitCode)
       .provideSome(
         ZLayer.succeed(Random.RandomLive),
         InviteSecrets.fromEnv,
@@ -79,4 +79,5 @@ object Main extends LazyLogging with HandleApiRequests with ZIOAppDefault {
         UserService.live,
         StorageService.slick
       )
+  }
 }
