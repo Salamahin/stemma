@@ -79,7 +79,7 @@
                             />
                         </li>
                         <li class="nav-item">
-                            <a class="nav-item nav-link active" href="#">О проекте</a>
+                            <a class="nav-item nav-link active" href="#" on:click={() => dispatch("about")}>О проекте</a>
                         </li>
                     </ul>
                 </div>
