@@ -130,7 +130,7 @@ export class Model {
     }
 
     async updatePerson(stemmaId: number, personId: number, descr: CreateNewPerson): Promise<Stemma> {
-        const response = await this.sendRequest({ UpdatePersonRequest: { stemmaId: stemmaId, personId: personId, personDescr: descr } })
+        const response = await this.sendRequest({ UpdatePersonRequest: { stemmaId: stemmaId, personId: personId, personDescr: this.sanitize(descr) } })
         return (await this.parseResponse(response)).Stemma
     }
 
