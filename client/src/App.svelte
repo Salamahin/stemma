@@ -174,9 +174,7 @@
 
     $: if (waiting) {
         isWaiting = true;
-        console.log("waiting...");
         waiting.then(() => {
-            console.log("done!");
             isWaiting = false;
         });
     }
