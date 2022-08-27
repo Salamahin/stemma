@@ -28,7 +28,6 @@
 
     let model: Model;
     let signedIn = false;
-    let errorOccured = false;
 
     let ownedStemmasDescriptions: StemmaDescription[];
     let selectedStemmaDescription: StemmaDescription;
@@ -39,7 +38,11 @@
     let highlight: HiglightLineages;
     let pinnedPeople: PinnedPeopleStorage;
 
-    let waiting: Promise<any> = null;
+    let waiting: Promise<any> = new Promise((resolve, reject) => {
+        resolve("ready!");
+    });
+
+    let isWaiting: boolean = false;
 
     function handleSignIn(user: User) {
         signedIn = true;
@@ -48,33 +51,13 @@
         const urlParams = new URLSearchParams(window.location.search);
 
         if (urlParams.has("inviteToken")) {
-            errorOccured = false;
-            model
-                .proposeInvitationToken(urlParams.get("inviteToken"))
-                .catch((err) => {
-                    errorOccured = true;
-                    throw err;
-                })
-                .then(() => {
-                    urlParams.delete("inviteToken");
-                    window.history.pushState({}, document.title, window.location.pathname);
-                    waiting = model
-                        .listStemmas()
-                        .catch((err) => {
-                            errorOccured = true;
-                            throw err;
-                        })
-                        .then((stemmas) => updateStemmaDescriptions(stemmas.stemmas));
-                });
+            model.proposeInvitationToken(urlParams.get("inviteToken")).then(() => {
+                urlParams.delete("inviteToken");
+                window.history.pushState({}, document.title, window.location.pathname);
+                waiting = model.listStemmas().then((stemmas) => updateStemmaDescriptions(stemmas.stemmas));
+            });
         } else {
-            errorOccured = false;
-            waiting = model
-                .listStemmas()
-                .catch((err) => {
-                    errorOccured = true;
-                    throw err;
-                })
-                .then((stemmas) => updateStemmaDescriptions(stemmas.stemmas));
+            waiting = model.listStemmas().then((stemmas) => updateStemmaDescriptions(stemmas.stemmas));
         }
     }
 
@@ -84,28 +67,14 @@
     }
 
     function handleNewStemma(name: string) {
-        errorOccured = false;
-        waiting = model
-            .addStemma(name)
-            .catch((err) => {
-                errorOccured = true;
-                throw err;
-            })
-            .then((newStemmaDescription) => {
-                ownedStemmasDescriptions = [...ownedStemmasDescriptions, newStemmaDescription];
-                selectedStemmaDescription = newStemmaDescription;
-            });
+        waiting = model.addStemma(name).then((newStemmaDescription) => {
+            ownedStemmasDescriptions = [...ownedStemmasDescriptions, newStemmaDescription];
+            selectedStemmaDescription = newStemmaDescription;
+        });
     }
 
     function handleNewFamilyCreation(request: GetOrCreateFamily) {
-        errorOccured = false;
-        waiting = model
-            .createFamily(selectedStemmaDescription.id, request.parents, request.children)
-            .catch((err) => {
-                errorOccured = true;
-                throw err;
-            })
-            .then((s) => (selectedStemma = s));
+        waiting = model.createFamily(selectedStemmaDescription.id, request.parents, request.children).then((s) => (selectedStemma = s));
     }
 
     function hadlePersonUpdated(request: UpdatePerson) {
@@ -119,48 +88,20 @@
             originalPerson.name != request.description.name ||
             originalPerson.bio != request.description.bio
         ) {
-            errorOccured = false;
-            waiting = model
-                .updatePerson(selectedStemmaDescription.id, request.id, request.description)
-                .catch((err) => {
-                    errorOccured = true;
-                    throw err;
-                })
-                .then((s) => (selectedStemma = s));
+            waiting = model.updatePerson(selectedStemmaDescription.id, request.id, request.description).then((s) => (selectedStemma = s));
         }
     }
 
     function handleFamilyUpdated(request: GetOrCreateFamily) {
-        errorOccured = false;
-        waiting = model
-            .updateFamily(selectedStemmaDescription.id, request.familyId, request.parents, request.children)
-            .catch((err) => {
-                errorOccured = true;
-                throw err;
-            })
-            .then((s) => (selectedStemma = s));
+        waiting = model.updateFamily(selectedStemmaDescription.id, request.familyId, request.parents, request.children).then((s) => (selectedStemma = s));
     }
 
     function handleFamilyRemoved(familyId: number) {
-        errorOccured = false;
-        waiting = model
-            .removeFamily(selectedStemmaDescription.id, familyId)
-            .catch((err) => {
-                errorOccured = true;
-                throw err;
-            })
-            .then((s) => (selectedStemma = s));
+        waiting = model.removeFamily(selectedStemmaDescription.id, familyId).then((s) => (selectedStemma = s));
     }
 
     function handlePersonRemoved(personId: number) {
-        errorOccured = false;
-        waiting = model
-            .removePerson(selectedStemmaDescription.id, personId)
-            .catch((err) => {
-                errorOccured = true;
-                throw err;
-            })
-            .then((s) => (selectedStemma = s));
+        waiting = model.removePerson(selectedStemmaDescription.id, personId).then((s) => (selectedStemma = s));
         pinnedPeople = pinnedPeople.remove(personId);
     }
 
@@ -173,25 +114,11 @@
     }
 
     function handleStemmaRemoval(stemmaId) {
-        errorOccured = false;
-        waiting = model
-            .removeStemma(stemmaId)
-            .catch((err) => {
-                errorOccured = true;
-                throw err;
-            })
-            .then((st) => (ownedStemmasDescriptions = st.stemmas));
+        waiting = model.removeStemma(stemmaId).then((st) => (ownedStemmasDescriptions = st.stemmas));
     }
 
     function handleInvitationCreation(e: CreateInviteLink) {
-        errorOccured = false;
-        waiting = model
-            .createInvintation(selectedStemmaDescription.id, e.personId, e.email)
-            .catch((err) => {
-                errorOccured = true;
-                throw err;
-            })
-            .then((link) => inviteModal.setInviteLink(link));
+        waiting = model.createInvintation(selectedStemmaDescription.id, e.personId, e.email).then((link) => inviteModal.setInviteLink(link));
     }
 
     function updateEverythingOnStemmaChange(stemmaId: number, stemma: Stemma) {
@@ -218,21 +145,14 @@
     }
 
     $: if (selectedStemmaDescription) {
-        errorOccured = false;
-        waiting = model
-            .getStemma(selectedStemmaDescription.id)
-            .catch((err) => {
-                errorOccured = true;
-                throw err;
-            })
-            .then((s) => {
-                let { si, pp, hg } = updateEverythingOnStemmaChange(selectedStemmaDescription.id, s);
+        waiting = model.getStemma(selectedStemmaDescription.id).then((s) => {
+            let { si, pp, hg } = updateEverythingOnStemmaChange(selectedStemmaDescription.id, s);
 
-                selectedStemma = s;
-                stemmaIndex = si;
-                pinnedPeople = pp;
-                highlight = hg;
-            });
+            selectedStemma = s;
+            stemmaIndex = si;
+            pinnedPeople = pp;
+            highlight = hg;
+        });
     }
 
     $: if (ownedStemmasDescriptions && ownedStemmasDescriptions.length == 0) {
@@ -247,31 +167,22 @@
 
     $: if (pinnedPeople) highlight = updateHighlightOnPinnedPeopleChange(pinnedPeople);
 
-    $: if (lookupPersonName) {
+    $: if (lookupPersonName && stemmaChart) {
         let results = fuzzysort.go(lookupPersonName, selectedStemma.people, { key: "name" });
         if (results.length) stemmaChart.zoomToNode(results[0].obj.id);
+    }
+
+    $: if (waiting) {
+        isWaiting = true;
+        console.log("waiting...");
+        waiting.then(() => {
+            console.log("done!");
+            isWaiting = false;
+        });
     }
 </script>
 
 {#if signedIn}
-    <Navbar
-        bind:ownedStemmasDescriptions
-        bind:selectedStemmaDescription
-        bind:lookupPersonName
-        on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
-        on:createNewFamily={() => familySelectionModal.promptNewFamily()}
-        on:removeStemma={(e) => removeStemmaModal.askForConfirmation(e.detail)}
-        on:invite={() => inviteModal.showInvintation()}
-        on:about={() => aboutModal.show()}
-    />
-
-    {#if errorOccured}
-        <div class="alert alert-danger alert-dismissible fade mt-2 mx-2 show">
-            <button type="button" class="btn-close" data-bs-dismiss="alert" />
-            <strong>Упс!</strong> Что-то пошло не так, попробуйте перезагрузить страницу
-        </div>
-    {/if}
-
     <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={(e) => handleNewStemma(e.detail)} />
 
     <RemoveStemmaModal bind:this={removeStemmaModal} on:stemmaRemoved={(e) => handleStemmaRemoval(e.detail)} />
@@ -291,26 +202,46 @@
         on:personUpdated={(e) => hadlePersonUpdated(e.detail)}
     />
 
-    <FullStemma
-        bind:this={stemmaChart}
-        stemma={selectedStemma}
-        {stemmaIndex}
-        {highlight}
-        {pinnedPeople}
-        on:personSelected={(e) => handlePersonSelection(e.detail)}
-        on:familySelected={(e) => handleFamilySelection(e.detail)}
-    />
-
     <InviteModal bind:this={inviteModal} stemma={selectedStemma} {stemmaIndex} on:invite={(e) => handleInvitationCreation(e.detail)} />
     <AboutModal bind:this={aboutModal} />
 
+    <Navbar
+        bind:ownedStemmasDescriptions
+        bind:selectedStemmaDescription
+        bind:lookupPersonName
+        bind:disabled={isWaiting}
+        on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
+        on:createNewFamily={() => familySelectionModal.promptNewFamily()}
+        on:removeStemma={(e) => removeStemmaModal.askForConfirmation(e.detail)}
+        on:invite={() => inviteModal.showInvintation()}
+        on:about={() => aboutModal.show()}
+    />
+
+    {#if isWaiting}
+        <div class="position-absolute top-50 start-50 translate-middle">
+            <Circle2 />
+            <p class="mt-2">Минуту...</p>
+        </div>
+    {:else}
+        <FullStemma
+            bind:this={stemmaChart}
+            stemma={selectedStemma}
+            {stemmaIndex}
+            {highlight}
+            {pinnedPeople}
+            on:personSelected={(e) => handlePersonSelection(e.detail)}
+            on:familySelected={(e) => handleFamilySelection(e.detail)}
+        />
+    {/if}
+
     {#await waiting}
-        <div class="position-relative">
-            <div class="position-absolute bottom-0 end-0">
-                <div style="min-width:150px; min-height:150px">
-                    <Circle2 />
-                </div>
-            </div>
+        <!-- svelte-ignore empty-block -->
+    {:then}
+        <!-- svelte-ignore empty-block -->
+    {:catch}
+        <div class="alert alert-danger alert-dismissible fade mt-2 mx-2 show">
+            <button type="button" class="btn-close" data-bs-dismiss="alert" />
+            <strong>Упс!</strong> Что-то пошло не так, попробуйте перезагрузить страницу
         </div>
     {/await}
 {:else}
