@@ -27,7 +27,7 @@
         reconfigureGraph(nodes, relations);
     }
 
-    $: if (highlight && pinnedPeople && stemmaIndex) {
+    $: if (highlight && pinnedPeople && stemmaIndex && svg) {
         renderFullStemma();
     }
 
