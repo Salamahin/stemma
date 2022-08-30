@@ -271,9 +271,6 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
     } yield assertTrue(stemmaRequestErr == AccessToStemmaDenied(stemmaId))).provideSome(testcontainersStorage, Scope.default)
   }
 
-  private def readOnlyP(people: Seq[PersonDescription])   = people.map(p => (p.id, p.readOnly)).toMap
-  private def readOnlyF(families: Seq[FamilyDescription]) = families.map(p => (p.id, p.readOnly)).toMap
-
   private val canChangeOwnershipInRecursiveManner = test("ownership change affects spouses, their ancestors and children") {
     (for {
       s                   <- ZIO.service[StorageService]

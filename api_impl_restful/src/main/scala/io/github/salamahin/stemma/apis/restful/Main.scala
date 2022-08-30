@@ -1,25 +1,23 @@
 package io.github.salamahin.stemma.apis.restful
 
 import com.typesafe.scalalogging.LazyLogging
-import io.github.salamahin.stemma.apis.HandleApiRequests
+import io.github.salamahin.stemma.apis.{ApiService, HandleApiRequestService}
 import io.github.salamahin.stemma.domain.{StemmaError, UnknownError, Request => DomainRequest}
 import io.github.salamahin.stemma.service.{InviteSecrets, StorageService, UserService}
 import zhttp.http.Middleware.cors
 import zhttp.http._
 import zhttp.http.middleware.Cors.CorsConfig
 import zhttp.service.Server
-import zio.{Random, Scope, ZIO, ZIOAppArgs, ZIOAppDefault, ZLayer}
+import zio.{Duration, Random, Scope, ZIO, ZIOAppArgs, ZIOAppDefault, ZLayer}
 
-object Main extends LazyLogging with HandleApiRequests with ZIOAppDefault {
+object Main extends LazyLogging with ZIOAppDefault {
   import zio.json._
 
-  private def httpResponse[R, T: JsonEncoder](effect: ZIO[R, Throwable, T]) =
+  private def httpResponse[R, T: JsonEncoder](effect: ZIO[R, StemmaError, T]) =
     effect
-      .mapError(err => {
-        logger.error(s"Service error: $err"); err
-      })
-      .mapBoth(
-        error => HttpError.BadRequest((UnknownError(error): StemmaError).toJson),
+      .tapError(err => ZIO.succeed(logger.error(s"Service error: $err")))
+      .fold(
+        error => Response.json(error.toJson),
         result => Response.json(result.toJson)
       )
 
@@ -29,11 +27,17 @@ object Main extends LazyLogging with HandleApiRequests with ZIOAppDefault {
         httpResponse {
           req
             .bodyAsString
-            .flatMap(body => {
-              logger.debug(s"New request: ${body}")
-              ZIO.fromEither(body.fromJson[DomainRequest]).mapError(err => new IllegalArgumentException(err))
-            })
-            .flatMap(req => handle(email, req))
+            .orDie
+            .tap(body => ZIO.succeed(logger.debug(s"New request: $body")))
+            .flatMap(body =>
+              ZIO.fromEither {
+                import cats.syntax.either._
+                body
+                  .fromJson[DomainRequest]
+                  .leftMap(err => UnknownError(new IllegalArgumentException(err))): Either[StemmaError, DomainRequest]
+              }
+            )
+            .flatMap(req => ZIO.service[HandleApiRequestService].flatMap(_.handle(email, req).delay(Duration.fromSeconds(2))))
         }
     }
 
@@ -77,7 +81,9 @@ object Main extends LazyLogging with HandleApiRequests with ZIOAppDefault {
         GoogleSecrets.fromEnv,
         OAuthService.googleSignIn,
         UserService.live,
-        StorageService.slick
+        StorageService.slick,
+        HandleApiRequestService.live,
+        ApiService.live
       )
   }
 }

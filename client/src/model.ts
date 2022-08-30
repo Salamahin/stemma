@@ -1,3 +1,5 @@
+import { StemmaIndex } from "./stemmaIndex"
+
 //requests
 export type PersonDefinition = { ExistingPerson?: ExistingPerson, CreateNewPerson?: CreateNewPerson }
 export type ExistingPerson = { id: number }
@@ -42,6 +44,20 @@ export type StemmaDescription = { id: number, name: string, removable: Boolean }
 export type PersonDescription = { id: number, name: string, birthDate?: string, deathDate?: string, bio?: string, readOnly: boolean }
 export type TokenAccepted = {}
 
+//errors
+export type UnknownError = { cause: string }
+export type RequestDeserializationProblem = { descr: string }
+export type NoSuchPersonId = { id: number }
+export type ChildAlreadyBelongsToFamily = { familyId: number, personId: number }
+export type IncompleteFamily = {}
+export type DuplicatedIds = { duplicatedIds: number }
+export type AccessToFamilyDenied = { familyId: number }
+export type AccessToPersonDenied = { personId: number }
+export type AccessToStemmaDenied = { stemmaId: number }
+export type IsNotTheOnlyStemmaOwner = { stemmaId: number }
+export type InvalidInviteToken = {}
+export type ForeignInviteToken = {}
+
 type CompositeResponse = {
     ChownEffect?: ChownEffect,
     FamilyDescription?: FamilyDescription,
@@ -50,7 +66,19 @@ type CompositeResponse = {
     Stemma?: Stemma,
     StemmaDescription?: StemmaDescription,
     PersonDescription?: PersonDescription,
-    TokenAccepted?: TokenAccepted
+    TokenAccepted?: TokenAccepted,
+    UnknownError?: UnknownError,
+    RequestDeserializationProblem?: RequestDeserializationProblem,
+    NoSuchPersonId?: NoSuchPersonId,
+    ChildAlreadyBelongsToFamily?: ChildAlreadyBelongsToFamily,
+    IncompleteFamily?: IncompleteFamily,
+    DuplicatedIds?: DuplicatedIds,
+    AccessToFamilyDenied?: AccessToFamilyDenied,
+    AccessToPersonDenied?: AccessToPersonDenied,
+    AccessToStemmaDenied?: AccessToStemmaDenied,
+    IsNotTheOnlyStemmaOwner?: IsNotTheOnlyStemmaOwner,
+    InvalidInviteToken?: InvalidInviteToken,
+    ForeignInviteToken?: ForeignInviteToken
 }
 
 //aux
@@ -70,7 +98,8 @@ export class Model {
 
     async listStemmas(): Promise<OwnedStemmasDescription> {
         const response = await this.sendRequest({ ListStemmasRequest: {} })
-        return (await this.parseResponse(response)).OwnedStemmasDescription;
+        const x = await this.parseResponse(response, null)
+        return x.OwnedStemmasDescription
     }
 
     async removeStemma(stemmaId: number): Promise<OwnedStemmasDescription> {
@@ -80,7 +109,7 @@ export class Model {
 
     async getStemma(stemmaId: number): Promise<Stemma> {
         const response = await this.sendRequest({ GetStemmaRequest: { stemmaId: stemmaId } })
-        return (await this.parseResponse(response)).Stemma;
+        return (await this.parseResponse(response, null)).Stemma;
     }
 
     private makeFamily(parents: PersonDefinition[], children: PersonDefinition[]) {
@@ -93,52 +122,52 @@ export class Model {
         return cf as CreateFamily
     }
 
-    async createFamily(stemmaId: number, parents: PersonDefinition[], children: PersonDefinition[]): Promise<Stemma> {
+    async createFamily(stemmaId: number, parents: PersonDefinition[], children: PersonDefinition[], stemmaIndex: StemmaIndex): Promise<Stemma> {
         const response = await this.sendRequest({ CreateFamilyRequest: { stemmaId: stemmaId, familyDescr: this.makeFamily(parents, children) } })
-        return (await this.parseResponse(response)).Stemma;
+        return (await this.parseResponse(response, stemmaIndex)).Stemma;
     }
 
-    async updateFamily(stemmaId: number, familyId: number, parents: PersonDefinition[], children: PersonDefinition[]): Promise<Stemma> {
+    async updateFamily(stemmaId: number, familyId: number, parents: PersonDefinition[], children: PersonDefinition[],  stemmaIndex: StemmaIndex): Promise<Stemma> {
         const response = await this.sendRequest({ UpdateFamilyRequest: { stemmaId: stemmaId, familyId: familyId, familyDescr: this.makeFamily(parents, children) } })
-        return (await this.parseResponse(response)).Stemma;
+        return (await this.parseResponse(response, stemmaIndex)).Stemma;
     }
 
     async addStemma(name: string): Promise<StemmaDescription> {
         const response = await this.sendRequest({ CreateNewStemmaRequest: { stemmaName: name } })
-        return (await this.parseResponse(response)).StemmaDescription;
+        return (await this.parseResponse(response, null)).StemmaDescription;
     }
 
-    async removePerson(stemmaId: number, personId: number): Promise<Stemma> {
+    async removePerson(stemmaId: number, personId: number, stemmaIndex: StemmaIndex): Promise<Stemma> {
         const response = await this.sendRequest({ DeletePersonRequest: { stemmaId: stemmaId, personId: personId } })
-        return (await this.parseResponse(response)).Stemma;
+        return (await this.parseResponse(response, stemmaIndex)).Stemma;
     }
 
-    async createInvintation(stemmaId: number, personId: number, email: string): Promise<string> {
+    async createInvintation(stemmaId: number, personId: number, email: string, stemmaIndex: StemmaIndex): Promise<string> {
         const response = await this.sendRequest({ CreateInvitationTokenRequest: { stemmaId: stemmaId, targetPersonId: personId, targetPersonEmail: email } })
-        const token = (await this.parseResponse(response)).InviteToken
+        const token = (await this.parseResponse(response, stemmaIndex)).InviteToken
         return `${location.origin}/?inviteToken=${encodeURIComponent(token.token)}`
     }
 
     async proposeInvitationToken(token: string): Promise<TokenAccepted> {
         const response = await this.sendRequest({ BearInvitationRequest: { encodedToken: token } })
-        return (await this.parseResponse(response)).TokenAccepted
+        return (await this.parseResponse(response, null)).TokenAccepted
     }
 
     async removeFamily(stemmaId: number, familyId: number): Promise<Stemma> {
         const response = await this.sendRequest({ DeleteFamilyRequest: { stemmaId: stemmaId, familyId: familyId } })
-        return (await this.parseResponse(response)).Stemma
+        return (await this.parseResponse(response, null)).Stemma
     }
 
-    async updatePerson(stemmaId: number, personId: number, descr: CreateNewPerson): Promise<Stemma> {
-        const response = await this.sendRequest({ UpdatePersonRequest: { stemmaId: stemmaId, personId: personId, personDescr: this.sanitize(descr) } })
-        return (await this.parseResponse(response)).Stemma
+    async updatePerson(stemmaId: number, personId: number, descr: CreateNewPerson, stemmaIndex: StemmaIndex): Promise<Stemma> {
+        const response = await this.sendRequest({ UpdatePersonRequest: { stemmaId: stemmaId, personId: personId, personDescr: this.sanitize(descr) as CreateNewPerson } })
+        return (await this.parseResponse(response, stemmaIndex)).Stemma
     }
 
-    private async parseResponse(response: Response) {
+    private async parseResponse(response: Response, stemmaIndex? : StemmaIndex) {
         const json = await response.json();
         if (!response.ok)
             throw new Error(`Unexpected response: ${json}`)
-        return json as CompositeResponse;
+        return this.translateError(json as CompositeResponse, stemmaIndex);
     }
 
     private async sendRequest(request: CompositeRequest) {
@@ -147,6 +176,32 @@ export class Model {
             headers: this.commonHeader,
             body: JSON.stringify(request)
         })
+    }
+
+    private describePerson(id: number, stemmaIndex?: StemmaIndex) {
+        if (!stemmaIndex) return "[НЕТ ОПИСАНИЯ]"
+        try {
+            let pd = stemmaIndex.person(id)
+            return `[${pd.name}]`
+        } catch (err) {
+            return "[НЕТ ОПИСАНИЯ]"
+        }
+    }
+
+    private translateError(response: CompositeResponse, stemmaIndex?: StemmaIndex) {
+        if (response.UnknownError) throw new Error("Что-то пошло не так. Попробуйте перезагрузить страницу")
+        if (response.RequestDeserializationProblem) throw new Error("Невалидный запрос, как у тебя удалось-то такой послать вообще?!")
+        if (response.NoSuchPersonId) throw new Error(`Вы указали неизвестного человека ${this.describePerson(response.NoSuchPersonId.id), stemmaIndex}, возможно, его уже удалили?`)
+        if (response.ChildAlreadyBelongsToFamily) throw new Error(`У ${this.describePerson(response.ChildAlreadyBelongsToFamily.personId, stemmaIndex)}, уже есть родители, вы не можете добавить его в семью`)
+        if (response.IncompleteFamily) throw new Error("Нельзя создать семью, в которой меньше 2 людей")
+        if (response.DuplicatedIds) throw new Error(`Нельзя указать одного и того же человека ${this.describePerson(response.DuplicatedIds.duplicatedIds, stemmaIndex)} в семье дважды`)
+        if (response.AccessToFamilyDenied) throw new Error("Действие с семьей запрещено")
+        if (response.AccessToPersonDenied) throw new Error(`Действие с человеком ${this.describePerson(response.AccessToPersonDenied.personId, stemmaIndex)} запрещено`)
+        if (response.AccessToStemmaDenied) throw new Error("Действие с родословной запрещено")
+        if (response.InvalidInviteToken) throw new Error("Проверьте правильность ссылки-приглашения")
+        if (response.ForeignInviteToken) throw new Error("Похоже, вы используете чужую ссылку-приглашение")
+
+        return response
     }
 
     private sanitize(obj) {

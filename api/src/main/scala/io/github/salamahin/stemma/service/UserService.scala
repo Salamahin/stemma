@@ -1,7 +1,7 @@
 package io.github.salamahin.stemma.service
-import io.github.salamahin.stemma.domain.{InvalidInviteToken, User}
+import io.github.salamahin.stemma.domain.{InvalidInviteToken, StemmaError, User}
 import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
-import zio.{Random, Task, URLayer, ZIO, ZLayer}
+import zio.{IO, Random, Task, UIO, URLayer, ZIO, ZLayer}
 
 import java.security.MessageDigest
 import java.util
@@ -17,9 +17,9 @@ object InviteToken {
 }
 
 trait UserService {
-  def createInviteToken(inviteeEmail: String, stemmaId: Long, associatedPersonId: Long): Task[String]
-  def decodeInviteToken(token: String): Task[InviteToken]
-  def getOrCreateUser(email: String): Task[User]
+  def createInviteToken(inviteeEmail: String, stemmaId: Long, associatedPersonId: Long): UIO[String]
+  def decodeInviteToken(token: String): IO[StemmaError, InviteToken]
+  def getOrCreateUser(email: String): UIO[User]
 }
 
 object UserService {
@@ -31,7 +31,7 @@ object UserService {
   } yield new UserService {
     import zio.json._
 
-    override def createInviteToken(inviteeEmail: String, stemmaId: Long, associatedPersonId: Long): Task[String] = {
+    override def createInviteToken(inviteeEmail: String, stemmaId: Long, associatedPersonId: Long): UIO[String] = {
       rnd.nextString(20).map { entropy =>
         val token = InviteToken(inviteeEmail, stemmaId, associatedPersonId, entropy)
         encrypt(secret.secretString, token.toJson)
@@ -54,7 +54,7 @@ object UserService {
       new SecretKeySpec(keySpec, "AES")
     }
 
-    override def decodeInviteToken(token: String) =
+    override def decodeInviteToken(token: String): IO[StemmaError, InviteToken] =
       for {
         decrypted <- ZIO.attempt(decrypt(secret.secretString, token)).orElseFail(InvalidInviteToken())
         parsed    <- ZIO.fromEither(decrypted.fromJson[InviteToken]).orElseFail(InvalidInviteToken())
