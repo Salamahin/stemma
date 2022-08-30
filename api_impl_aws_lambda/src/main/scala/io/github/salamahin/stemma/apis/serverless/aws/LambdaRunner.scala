@@ -25,6 +25,7 @@ abstract class LambdaRunner[In, Out](implicit jsonDecoder: JsonDecoder[In], json
       (email, body) <- email <&> request
       res           <- run(email, body)
     } yield res)
+      .tapError(err => ZIO.succeed(logger.error("Error occurred", err)))
       .fold(
         err => err.toJson,
         res => res.toJson

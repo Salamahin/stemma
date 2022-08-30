@@ -1,3 +1,5 @@
+import { StemmaIndex } from "./stemmaIndex"
+
 //requests
 export type PersonDefinition = { ExistingPerson?: ExistingPerson, CreateNewPerson?: CreateNewPerson }
 export type ExistingPerson = { id: number }
@@ -42,6 +44,20 @@ export type StemmaDescription = { id: number, name: string, removable: Boolean }
 export type PersonDescription = { id: number, name: string, birthDate?: string, deathDate?: string, bio?: string, readOnly: boolean }
 export type TokenAccepted = {}
 
+//errors
+export type UnknownError = { cause: string }
+export type RequestDeserializationProblem = { descr: string }
+export type NoSuchPersonId = { id: number }
+export type ChildAlreadyBelongsToFamily = { familyId: number, personId: number }
+export type IncompleteFamily = {}
+export type DuplicatedIds = { duplicatedIds: number }
+export type AccessToFamilyDenied = { familyId: number }
+export type AccessToPersonDenied = { personId: number }
+export type AccessToStemmaDenied = { stemmaId: number }
+export type IsNotTheOnlyStemmaOwner = { stemmaId: number }
+export type InvalidInviteToken = {}
+export type ForeignInviteToken = {}
+
 type CompositeResponse = {
     ChownEffect?: ChownEffect,
     FamilyDescription?: FamilyDescription,
@@ -50,7 +66,19 @@ type CompositeResponse = {
     Stemma?: Stemma,
     StemmaDescription?: StemmaDescription,
     PersonDescription?: PersonDescription,
-    TokenAccepted?: TokenAccepted
+    TokenAccepted?: TokenAccepted,
+    UnknownError?: UnknownError,
+    RequestDeserializationProblem?: RequestDeserializationProblem,
+    NoSuchPersonId?: NoSuchPersonId,
+    ChildAlreadyBelongsToFamily?: ChildAlreadyBelongsToFamily,
+    IncompleteFamily?: IncompleteFamily,
+    DuplicatedIds?: DuplicatedIds,
+    AccessToFamilyDenied?: AccessToFamilyDenied,
+    AccessToPersonDenied?: AccessToPersonDenied,
+    AccessToStemmaDenied?: AccessToStemmaDenied,
+    IsNotTheOnlyStemmaOwner?: IsNotTheOnlyStemmaOwner,
+    InvalidInviteToken?: InvalidInviteToken,
+    ForeignInviteToken?: ForeignInviteToken
 }
 
 //aux
@@ -59,9 +87,11 @@ export type User = { id_token: string }
 export class Model {
     endpoint: string;
     commonHeader;
+    stemmaIndex: StemmaIndex;
 
-    constructor(endpoint: string, user: User) {
+    constructor(endpoint: string, user: User, stemmaIndex?: StemmaIndex) {
         this.endpoint = endpoint
+        this.stemmaIndex = stemmaIndex
         this.commonHeader = {
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
             'Authorization': `Bearer ${user.id_token}`
@@ -130,7 +160,7 @@ export class Model {
     }
 
     async updatePerson(stemmaId: number, personId: number, descr: CreateNewPerson): Promise<Stemma> {
-        const response = await this.sendRequest({ UpdatePersonRequest: { stemmaId: stemmaId, personId: personId, personDescr: this.sanitize(descr) } })
+        const response = await this.sendRequest({ UpdatePersonRequest: { stemmaId: stemmaId, personId: personId, personDescr: this.sanitize(descr) as CreateNewPerson } })
         return (await this.parseResponse(response)).Stemma
     }
 
@@ -138,7 +168,7 @@ export class Model {
         const json = await response.json();
         if (!response.ok)
             throw new Error(`Unexpected response: ${json}`)
-        return json as CompositeResponse;
+        return this.translateError(json as CompositeResponse);
     }
 
     private async sendRequest(request: CompositeRequest) {
@@ -147,6 +177,32 @@ export class Model {
             headers: this.commonHeader,
             body: JSON.stringify(request)
         })
+    }
+
+    private describePerson(id: number) {
+        if (!this.stemmaIndex) return "[НЕ ИНИЦИАЛИЗИРОВАННО]"
+        try {
+            let pd = this.stemmaIndex.person(id)
+            return `[${pd.name}]`
+        } catch (ignored) {
+            return "[НЕТ ОПИСАНИЯ]"
+        }
+    }
+
+    private translateError(response: CompositeResponse) {
+        if (response.UnknownError) throw new Error("Что-то пошло не так. Попробуйте перезагрузить страницу")
+        if (response.RequestDeserializationProblem) throw new Error("Невалидный запрос, как у тебя удалось-то такой послать вообще?!")
+        if (response.NoSuchPersonId) throw new Error(`Вы указали неизвестного человека ${this.describePerson(response.NoSuchPersonId.id)}, возможно, его уже удалили?`)
+        if (response.ChildAlreadyBelongsToFamily) throw new Error(`У ${response.ChildAlreadyBelongsToFamily.personId} уже есть родители, вы не можете добавить его в семью`)
+        if (response.IncompleteFamily) throw new Error("Нельзя создать семью, в которой меньше 2 людей")
+        if (response.DuplicatedIds) throw new Error(`Нельзя указать одного и того же человека ${this.describePerson(response.DuplicatedIds.duplicatedIds)} в семье дважды`)
+        if (response.AccessToFamilyDenied) throw new Error("Действие с семьей запрещено")
+        if (response.AccessToPersonDenied) throw new Error(`Действие с человеком ${this.describePerson(response.AccessToPersonDenied.personId)} запрещено`)
+        if (response.AccessToStemmaDenied) throw new Error("Действие с родословной запрещено")
+        if (response.InvalidInviteToken) throw new Error("Проверьте правильность ссылки-приглашения")
+        if (response.ForeignInviteToken) throw new Error("Похоже, вы используете чужую ссылку-приглашение")
+
+        return response
     }
 
     private sanitize(obj) {

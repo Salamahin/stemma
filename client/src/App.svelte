@@ -27,6 +27,7 @@
     let aboutModal;
 
     let model: Model;
+    let user: User;
     let signedIn = false;
 
     let ownedStemmasDescriptions: StemmaDescription[];
@@ -44,9 +45,10 @@
 
     let isWaiting: boolean = false;
 
-    function handleSignIn(user: User) {
+    function handleSignIn(signedInUser: User) {
         signedIn = true;
-        model = new Model(stemma_backend_url, user);
+        user = signedInUser;
+        model = new Model(stemma_backend_url, user, null);
 
         const urlParams = new URLSearchParams(window.location.search);
 
@@ -152,6 +154,7 @@
             stemmaIndex = si;
             pinnedPeople = pp;
             highlight = hg;
+            model = new Model(stemma_backend_url, user, stemmaIndex);
         });
     }
 
@@ -163,6 +166,7 @@
         let { si, hg } = updateIndexAndHighlightOnStemmaChange(selectedStemma);
         stemmaIndex = si;
         highlight = hg;
+        model = new Model(stemma_backend_url, user, stemmaIndex);
     }
 
     $: if (pinnedPeople) highlight = updateHighlightOnPinnedPeopleChange(pinnedPeople);
@@ -236,10 +240,11 @@
         <!-- svelte-ignore empty-block -->
     {:then}
         <!-- svelte-ignore empty-block -->
-    {:catch}
+    {:catch error}
         <div class="alert alert-danger alert-dismissible fade mt-2 mx-2 show">
             <button type="button" class="btn-close" data-bs-dismiss="alert" />
-            <strong>Упс!</strong> Что-то пошло не так, попробуйте перезагрузить страницу
+            <strong>Ошибка!</strong>
+            {error.message}
         </div>
     {/await}
 {:else}
