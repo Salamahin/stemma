@@ -189,8 +189,6 @@ export class Model {
     }
 
     private translateError(response: CompositeResponse, stemmaIndex?: StemmaIndex) {
-        console.log(response)
-        
         if (response.UnknownError) throw new Error("Что-то пошло не так. Попробуйте перезагрузить страницу")
         if (response.RequestDeserializationProblem) throw new Error("Невалидный запрос, как у тебя удалось-то такой послать вообще?!")
         if (response.NoSuchPersonId) throw new Error(`Вы указали неизвестного человека ${this.describePerson(response.NoSuchPersonId.id), stemmaIndex}, возможно, его уже удалили?`)
