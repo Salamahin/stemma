@@ -330,58 +330,62 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
       }
 
   override def stemma(userId: Long, stemmaId: Long): IO[StemmaError, DomainStemma] =
-    ZIO.fromFuture { implicit ec =>
-      val fs     = qFamilies.filter(_.stemmaId === stemmaId)
-      val ownedF = qFamiliesOwners.filter(_.ownerId === userId)
+    ZIO
+      .fromFuture { implicit ec =>
+        val fs     = qFamilies.filter(_.stemmaId === stemmaId)
+        val ownedF = qFamiliesOwners.filter(_.ownerId === userId)
 
-      val parents  = (fs join qSpouses on (_.id === _.familyId) joinLeft ownedF on (_._1.id === _.familyId)).map { case ((f, m), o)  => (f.id, m.personId, o.isEmpty) }
-      val children = (fs join qChildren on (_.id === _.familyId) joinLeft ownedF on (_._1.id === _.familyId)).map { case ((f, m), o) => (f.id, m.personId, o.isEmpty) }
+        val parents  = (fs join qSpouses on (_.id === _.familyId) joinLeft ownedF on (_._1.id === _.familyId)).map { case ((f, m), o)  => (f.id, m.personId, o.isEmpty) }
+        val children = (fs join qChildren on (_.id === _.familyId) joinLeft ownedF on (_._1.id === _.familyId)).map { case ((f, m), o) => (f.id, m.personId, o.isEmpty) }
 
-      val stemmaQuery = for {
-        pp <- (qPeople.filter(_.stemmaId === stemmaId) joinLeft qPeopleOwners.filter(_.ownerId === userId) on (_.id === _.personId)).result
-        ps <- parents.result
-        cs <- children.result
-      } yield {
-        val people = pp.map {
-          case (tp, isOwner) => PersonDescription(tp.id, tp.name, tp.birthDate, tp.deathDate, tp.bio, isOwner.isEmpty)
+        val stemmaQuery = for {
+          pp <- (qPeople.filter(_.stemmaId === stemmaId) joinLeft qPeopleOwners.filter(_.ownerId === userId) on (_.id === _.personId)).result
+          ps <- parents.result
+          cs <- children.result
+        } yield {
+          val people = pp.map {
+            case (tp, isOwner) => PersonDescription(tp.id, tp.name, tp.birthDate, tp.deathDate, tp.bio, isOwner.isEmpty)
+          }
+
+          val familyReadOnly = mutable.Map.empty[Long, Boolean]
+          val familySpouses  = mutable.Map.empty[Long, mutable.Set[Long]].withDefaultValue(mutable.Set.empty)
+          val familyChildren = mutable.Map.empty[Long, mutable.Set[Long]].withDefaultValue(mutable.Set.empty)
+
+          ps.groupBy {
+              case (fid, _, _) => fid
+            }
+            .foreach {
+              case (fid, members) =>
+                familySpouses(fid) = familySpouses(fid) ++ members.map(_._2)
+                familyReadOnly(fid) = members.head._3
+            }
+
+          cs.groupBy {
+              case (fid, _, _) => fid
+            }
+            .foreach {
+              case (fid, members) =>
+                familyChildren(fid) = familyChildren(fid) ++ members.map(_._2)
+                familyReadOnly(fid) = members.head._3
+            }
+
+          val families = familyReadOnly.map {
+            case (familyId, readOnly) => FamilyDescription(familyId, familySpouses(familyId).toList, familyChildren(familyId).toList, readOnly)
+          }
+
+          DomainStemma(people.toList, families.toList)
         }
 
-        val familyReadOnly = mutable.Map.empty[Long, Boolean]
-        val familySpouses  = mutable.Map.empty[Long, mutable.Set[Long]].withDefaultValue(mutable.Set.empty)
-        val familyChildren = mutable.Map.empty[Long, mutable.Set[Long]].withDefaultValue(mutable.Set.empty)
+        val query = for {
+          _      <- checkStemmaAccess(stemmaId, userId)
+          stemma <- stemmaQuery
+        } yield stemma
 
-        ps.groupBy {
-            case (fid, _, _) => fid
-          }
-          .foreach {
-            case (fid, members) =>
-              familySpouses(fid) = familySpouses(fid) ++ members.map(_._2)
-              familyReadOnly(fid) = members.head._3
-          }
-
-        cs.groupBy {
-            case (fid, _, _) => fid
-          }
-          .foreach {
-            case (fid, members) =>
-              familyChildren(fid) = familyChildren(fid) ++ members.map(_._2)
-              familyReadOnly(fid) = members.head._3
-          }
-
-        val families = familyReadOnly.map {
-          case (familyId, readOnly) => FamilyDescription(familyId, familySpouses(familyId).toList, familyChildren(familyId).toList, readOnly)
-        }
-
-        DomainStemma(people.toList, families.toList)
+        db run query
       }
-
-      val query = for {
-        _      <- checkStemmaAccess(stemmaId, userId)
-        stemma <- stemmaQuery
-      } yield stemma
-
-      db run query
-    }.orDie
+      .refineOrDie {
+        case stemmaError: StemmaError => stemmaError
+      }
 
   private def selectDirectFamilies(initPersonId: Long) =
     sql"""
