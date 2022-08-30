@@ -8,7 +8,7 @@ import zhttp.http.Middleware.cors
 import zhttp.http._
 import zhttp.http.middleware.Cors.CorsConfig
 import zhttp.service.Server
-import zio.{Random, Scope, ZIO, ZIOAppArgs, ZIOAppDefault, ZLayer}
+import zio.{Duration, Random, Scope, ZIO, ZIOAppArgs, ZIOAppDefault, ZLayer}
 
 object Main extends LazyLogging with ZIOAppDefault {
   import zio.json._
@@ -37,7 +37,7 @@ object Main extends LazyLogging with ZIOAppDefault {
                   .leftMap(err => UnknownError(new IllegalArgumentException(err))): Either[StemmaError, DomainRequest]
               }
             )
-            .flatMap(req => ZIO.service[HandleApiRequestService].flatMap(_.handle(email, req)))
+            .flatMap(req => ZIO.service[HandleApiRequestService].flatMap(_.handle(email, req).delay(Duration.fromSeconds(2))))
         }
     }
 

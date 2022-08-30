@@ -87,11 +87,9 @@ export type User = { id_token: string }
 export class Model {
     endpoint: string;
     commonHeader;
-    stemmaIndex: StemmaIndex;
 
-    constructor(endpoint: string, user: User, stemmaIndex?: StemmaIndex) {
+    constructor(endpoint: string, user: User) {
         this.endpoint = endpoint
-        this.stemmaIndex = stemmaIndex
         this.commonHeader = {
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
             'Authorization': `Bearer ${user.id_token}`
@@ -100,7 +98,8 @@ export class Model {
 
     async listStemmas(): Promise<OwnedStemmasDescription> {
         const response = await this.sendRequest({ ListStemmasRequest: {} })
-        return (await this.parseResponse(response)).OwnedStemmasDescription;
+        const x = await this.parseResponse(response, null)
+        return x.OwnedStemmasDescription
     }
 
     async removeStemma(stemmaId: number): Promise<OwnedStemmasDescription> {
@@ -110,7 +109,7 @@ export class Model {
 
     async getStemma(stemmaId: number): Promise<Stemma> {
         const response = await this.sendRequest({ GetStemmaRequest: { stemmaId: stemmaId } })
-        return (await this.parseResponse(response)).Stemma;
+        return (await this.parseResponse(response, null)).Stemma;
     }
 
     private makeFamily(parents: PersonDefinition[], children: PersonDefinition[]) {
@@ -123,52 +122,52 @@ export class Model {
         return cf as CreateFamily
     }
 
-    async createFamily(stemmaId: number, parents: PersonDefinition[], children: PersonDefinition[]): Promise<Stemma> {
+    async createFamily(stemmaId: number, parents: PersonDefinition[], children: PersonDefinition[], stemmaIndex: StemmaIndex): Promise<Stemma> {
         const response = await this.sendRequest({ CreateFamilyRequest: { stemmaId: stemmaId, familyDescr: this.makeFamily(parents, children) } })
-        return (await this.parseResponse(response)).Stemma;
+        return (await this.parseResponse(response, stemmaIndex)).Stemma;
     }
 
-    async updateFamily(stemmaId: number, familyId: number, parents: PersonDefinition[], children: PersonDefinition[]): Promise<Stemma> {
+    async updateFamily(stemmaId: number, familyId: number, parents: PersonDefinition[], children: PersonDefinition[],  stemmaIndex: StemmaIndex): Promise<Stemma> {
         const response = await this.sendRequest({ UpdateFamilyRequest: { stemmaId: stemmaId, familyId: familyId, familyDescr: this.makeFamily(parents, children) } })
-        return (await this.parseResponse(response)).Stemma;
+        return (await this.parseResponse(response, stemmaIndex)).Stemma;
     }
 
     async addStemma(name: string): Promise<StemmaDescription> {
         const response = await this.sendRequest({ CreateNewStemmaRequest: { stemmaName: name } })
-        return (await this.parseResponse(response)).StemmaDescription;
+        return (await this.parseResponse(response, null)).StemmaDescription;
     }
 
-    async removePerson(stemmaId: number, personId: number): Promise<Stemma> {
+    async removePerson(stemmaId: number, personId: number, stemmaIndex: StemmaIndex): Promise<Stemma> {
         const response = await this.sendRequest({ DeletePersonRequest: { stemmaId: stemmaId, personId: personId } })
-        return (await this.parseResponse(response)).Stemma;
+        return (await this.parseResponse(response, stemmaIndex)).Stemma;
     }
 
-    async createInvintation(stemmaId: number, personId: number, email: string): Promise<string> {
+    async createInvintation(stemmaId: number, personId: number, email: string, stemmaIndex: StemmaIndex): Promise<string> {
         const response = await this.sendRequest({ CreateInvitationTokenRequest: { stemmaId: stemmaId, targetPersonId: personId, targetPersonEmail: email } })
-        const token = (await this.parseResponse(response)).InviteToken
+        const token = (await this.parseResponse(response, stemmaIndex)).InviteToken
         return `${location.origin}/?inviteToken=${encodeURIComponent(token.token)}`
     }
 
     async proposeInvitationToken(token: string): Promise<TokenAccepted> {
         const response = await this.sendRequest({ BearInvitationRequest: { encodedToken: token } })
-        return (await this.parseResponse(response)).TokenAccepted
+        return (await this.parseResponse(response, null)).TokenAccepted
     }
 
     async removeFamily(stemmaId: number, familyId: number): Promise<Stemma> {
         const response = await this.sendRequest({ DeleteFamilyRequest: { stemmaId: stemmaId, familyId: familyId } })
-        return (await this.parseResponse(response)).Stemma
+        return (await this.parseResponse(response, null)).Stemma
     }
 
-    async updatePerson(stemmaId: number, personId: number, descr: CreateNewPerson): Promise<Stemma> {
+    async updatePerson(stemmaId: number, personId: number, descr: CreateNewPerson, stemmaIndex: StemmaIndex): Promise<Stemma> {
         const response = await this.sendRequest({ UpdatePersonRequest: { stemmaId: stemmaId, personId: personId, personDescr: this.sanitize(descr) as CreateNewPerson } })
-        return (await this.parseResponse(response)).Stemma
+        return (await this.parseResponse(response, stemmaIndex)).Stemma
     }
 
-    private async parseResponse(response: Response) {
+    private async parseResponse(response: Response, stemmaIndex? : StemmaIndex) {
         const json = await response.json();
         if (!response.ok)
             throw new Error(`Unexpected response: ${json}`)
-        return this.translateError(json as CompositeResponse);
+        return this.translateError(json as CompositeResponse, stemmaIndex);
     }
 
     private async sendRequest(request: CompositeRequest) {
@@ -179,25 +178,27 @@ export class Model {
         })
     }
 
-    private describePerson(id: number) {
-        if (!this.stemmaIndex) return "[НЕ ИНИЦИАЛИЗИРОВАННО]"
+    private describePerson(id: number, stemmaIndex?: StemmaIndex) {
+        if (!stemmaIndex) return "[НЕТ ОПИСАНИЯ]"
         try {
-            let pd = this.stemmaIndex.person(id)
+            let pd = stemmaIndex.person(id)
             return `[${pd.name}]`
-        } catch (ignored) {
+        } catch (err) {
             return "[НЕТ ОПИСАНИЯ]"
         }
     }
 
-    private translateError(response: CompositeResponse) {
+    private translateError(response: CompositeResponse, stemmaIndex?: StemmaIndex) {
+        console.log(response)
+        
         if (response.UnknownError) throw new Error("Что-то пошло не так. Попробуйте перезагрузить страницу")
         if (response.RequestDeserializationProblem) throw new Error("Невалидный запрос, как у тебя удалось-то такой послать вообще?!")
-        if (response.NoSuchPersonId) throw new Error(`Вы указали неизвестного человека ${this.describePerson(response.NoSuchPersonId.id)}, возможно, его уже удалили?`)
-        if (response.ChildAlreadyBelongsToFamily) throw new Error(`У ${response.ChildAlreadyBelongsToFamily.personId} уже есть родители, вы не можете добавить его в семью`)
+        if (response.NoSuchPersonId) throw new Error(`Вы указали неизвестного человека ${this.describePerson(response.NoSuchPersonId.id), stemmaIndex}, возможно, его уже удалили?`)
+        if (response.ChildAlreadyBelongsToFamily) throw new Error(`У ${this.describePerson(response.ChildAlreadyBelongsToFamily.personId, stemmaIndex)}, уже есть родители, вы не можете добавить его в семью`)
         if (response.IncompleteFamily) throw new Error("Нельзя создать семью, в которой меньше 2 людей")
-        if (response.DuplicatedIds) throw new Error(`Нельзя указать одного и того же человека ${this.describePerson(response.DuplicatedIds.duplicatedIds)} в семье дважды`)
+        if (response.DuplicatedIds) throw new Error(`Нельзя указать одного и того же человека ${this.describePerson(response.DuplicatedIds.duplicatedIds, stemmaIndex)} в семье дважды`)
         if (response.AccessToFamilyDenied) throw new Error("Действие с семьей запрещено")
-        if (response.AccessToPersonDenied) throw new Error(`Действие с человеком ${this.describePerson(response.AccessToPersonDenied.personId)} запрещено`)
+        if (response.AccessToPersonDenied) throw new Error(`Действие с человеком ${this.describePerson(response.AccessToPersonDenied.personId, stemmaIndex)} запрещено`)
         if (response.AccessToStemmaDenied) throw new Error("Действие с родословной запрещено")
         if (response.InvalidInviteToken) throw new Error("Проверьте правильность ссылки-приглашения")
         if (response.ForeignInviteToken) throw new Error("Похоже, вы используете чужую ссылку-приглашение")
