@@ -50,6 +50,7 @@
         parents = [];
         children = [];
         readOnly = false;
+        showFamilyComposition()
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
