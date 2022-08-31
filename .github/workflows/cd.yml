@@ -32,8 +32,10 @@ jobs:
     - uses: actions/setup-node@v3
       with:
         node-version: 18
-    - run: npm i
-    - run: npm run build
+    - working-directory: client
+      run: npm i
+    - working-directory: client
+      run: npm run build
       env:
         STEMMA_BACKEND_URL: ${{ secrets.STEMMA_BACKEND_URL }}
         GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
