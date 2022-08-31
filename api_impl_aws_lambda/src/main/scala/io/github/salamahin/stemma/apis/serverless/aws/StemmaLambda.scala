@@ -1,5 +1,6 @@
 package io.github.salamahin.stemma.apis.serverless.aws
 
+import com.typesafe.scalalogging.LazyLogging
 import io.github.salamahin.stemma.apis.serverless.aws.StemmaLambda.handler
 import io.github.salamahin.stemma.apis.{ApiService, HandleApiRequestService}
 import io.github.salamahin.stemma.domain._
@@ -11,8 +12,13 @@ class StemmaLambda extends LambdaRunner[Request, Response] {
   override def run(email: String, request: Request): IO[StemmaError, Response] = handler.flatMap(_.handle(email, request))
 }
 
-object StemmaLambda {
-  private val ss = new ConfiguredStemmaService()
+object StemmaLambda extends LazyLogging {
+  private val ss =
+    try {
+      new ConfiguredStemmaService()
+    } catch {
+      case exc: Throwable => logger.error("Fatal error while making stemma service", exc); throw exc
+    }
 
   sys.addShutdownHook(() => {
     if (ss != null) ss.close()
@@ -28,5 +34,6 @@ object StemmaLambda {
       ApiService.live,
       HandleApiRequestService.live
     )
+    .tapError(err => ZIO.succeed(logger.error("Failed to create deps", err)))
     .orDie
 }
