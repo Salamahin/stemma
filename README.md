@@ -1,10 +1,10 @@
 # stemma
 [![Scala CI](https://github.com/Salamahin/stemma/actions/workflows/ci.yml/badge.svg)](https://github.com/Salamahin/stemma/actions/workflows/ci.yml)
-[![Deploy backend](https://github.com/Salamahin/stemma/actions/workflows/deploy_backend.yml/badge.svg)](https://github.com/Salamahin/stemma/actions/workflows/deploy_backend.yml)
+[![Deploy to AWS](https://github.com/Salamahin/stemma/actions/workflows/cd.yml/badge.svg)](https://github.com/Salamahin/stemma/actions/workflows/cd.yml)
 
-Давайте соберем информацию о всех наших родственниках
 
-Борда https://trello.com/invite/b/ZGWqjKmo/eee45cabf66aa7d377a475169588779d/project-stemma
+# Trello board
+https://trello.com/invite/b/ZGWqjKmo/eee45cabf66aa7d377a475169588779d/project-stemma
 
 
 # Create Google API PROJECT
