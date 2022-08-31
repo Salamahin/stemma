@@ -30,6 +30,8 @@ jobs:
 #    - run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
 
     - uses: actions/setup-node@v3
+      with:
+        node-version: 18
     - run: npm ci
     - run: npm run build
       env:
