@@ -172,14 +172,6 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
       .map(ids => DBIO.failed(DuplicatedIds(ids.head)))
       .getOrElse(DBIO.successful((): Unit))
 
-    //for some reason slick compiles an incorrect query when insertOrUpdate on the table where all the columns are
-    //composite key, so this a way how to overcome the problem
-    def createSpouseRelationIfNotExist(personId: Long) =
-      for {
-        exists <- qSpouses.filter(s => s.familyId === familyId && s.personId === personId).exists.result
-        _      <- if (!exists) qSpouses += Spouse(personId, familyId) else DBIO.successful((): Unit)
-      } yield ()
-
     def createChildRelationIfThereAreNoOtherFamilies(personId: Long) =
       for {
         childFamilies <- qChildren.filter(_.personId === personId).map(_.familyId).result
@@ -193,7 +185,7 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
       _  <- noDuplicatedIds
       ps <- DBIO sequence parents.map(p => getOrCreatePerson(stemmaId, userId, p))
       cs <- DBIO sequence children.map(p => getOrCreatePerson(stemmaId, userId, p))
-      _  <- DBIO sequence ps.map(createSpouseRelationIfNotExist)
+      _  <- DBIO sequence ps.map(p => createSpouseRelationIfNotExist(Spouse(p, familyId)))
       _  <- DBIO sequence cs.map(createChildRelationIfThereAreNoOtherFamilies)
     } yield FamilyDescription(familyId, ps, cs, true)
   }
@@ -405,14 +397,43 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
     ) SELECT DISTINCT "childFamily" AS familyId FROM "Dependees" WHERE "childFamily" IS NOT NULL
     """.as[Long]
 
+  // ==================================================================================================================
+  //for some reason slick compiles an incorrect query when insertOrUpdate on the table where all the columns are
+  //composite key, so this a way how to overcome the problem
+  //see https://github.com/slick/slick/issues/2207
+  private def addOwnerIfNeeded(ow: FamilyOwner)(implicit ec: ExecutionContext) =
+    for {
+      exists <- qFamiliesOwners.filter(fo => fo.ownerId === ow.ownerId && fo.familyId === ow.resourceId).exists.result
+      _      <- if (!exists) qFamiliesOwners += ow else DBIO.successful((): Unit)
+    } yield ()
+
+  private def addOwnerIfNeeded(ow: PersonOwner)(implicit ec: ExecutionContext) =
+    for {
+      exists <- qPeopleOwners.filter(po => po.ownerId === ow.ownerId && po.personId === ow.resourceId).exists.result
+      _      <- if (!exists) qPeopleOwners += ow else DBIO.successful((): Unit)
+    } yield ()
+
+  private def addOwnerIfNeeded(ow: StemmaOwner)(implicit ec: ExecutionContext) =
+    for {
+      exists <- qStemmaOwners.filter(po => po.ownerId === ow.ownerId && po.stemmaId === ow.resourceId).exists.result
+      _      <- if (!exists) qStemmaOwners += ow else DBIO.successful((): Unit)
+    } yield ()
+
+  private def createSpouseRelationIfNotExist(spouse: Spouse)(implicit ec: ExecutionContext) =
+    for {
+      exists <- qSpouses.filter(s => s.familyId === spouse.familyId && s.personId === spouse.personId).exists.result
+      _      <- if (!exists) qSpouses += spouse else DBIO.successful((): Unit)
+    } yield ()
+  // ==================================================================================================================
+
   override def chown(userId: Long, stemmaId: Long, targetPersonId: Long): UIO[ChownEffect] =
     ZIO.fromFuture { implicit ec =>
       val action = (for {
         kinsmenFamilies <- selectKinsmenFamilies(targetPersonId)
         affectedPeople  <- (qSpouses.filter(_.familyId inSet kinsmenFamilies).map(_.personId) union qChildren.filter(_.familyId inSet kinsmenFamilies).map(_.personId)).result
-        _               <- DBIO.sequence(kinsmenFamilies.map(fid => qFamiliesOwners += FamilyOwner(userId, fid)))
-        _               <- DBIO.sequence(affectedPeople.map(pid => qPeopleOwners += PersonOwner(userId, pid)))
-        _               <- qStemmaOwners += StemmaOwner(userId, stemmaId)
+        _               <- DBIO sequence kinsmenFamilies.map(fid => addOwnerIfNeeded(FamilyOwner(userId, fid)))
+        _               <- DBIO sequence affectedPeople.map(pid => addOwnerIfNeeded(PersonOwner(userId, pid)))
+        _               <- addOwnerIfNeeded(StemmaOwner(userId, stemmaId))
       } yield ChownEffect(kinsmenFamilies, affectedPeople)).transactionally
 
       db run action
