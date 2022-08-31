@@ -165,8 +165,10 @@ export class Model {
 
     private async parseResponse(response: Response, stemmaIndex? : StemmaIndex) {
         const json = await response.json();
-        if (!response.ok)
-            throw new Error(`Unexpected response: ${json}`)
+        if (!response.ok) {
+            console.error(json)
+            throw new Error(`Получен неожиданный ответ от сервера. Попробуйте перезагрузить страницу`)
+        }
         return this.translateError(json as CompositeResponse, stemmaIndex);
     }
 
