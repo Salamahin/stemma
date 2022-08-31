@@ -1,4 +1,5 @@
 # stemma
+[![Scala CI](https://github.com/Salamahin/stemma/actions/workflows/ci.yml/badge.svg)](https://github.com/Salamahin/stemma/actions/workflows/ci.yml)
 
 Давайте соберем информацию о всех наших родственниках
 
