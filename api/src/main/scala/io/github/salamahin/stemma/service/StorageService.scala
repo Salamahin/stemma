@@ -387,44 +387,33 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
         case stemmaError: StemmaError => stemmaError
       }
 
-  private def selectDirectFamilies(initPersonId: Long) =
-    sql"""
-(
-      WITH
-      RECURSIVE "Ancestors" AS (
-        SELECT "personId", "childFamily", "parentFamily" FROM "FamilyDescr" WHERE "personId" = $initPersonId
-        UNION
-        SELECT fd."personId", fd."childFamily", fd."parentFamily" FROM "FamilyDescr" fd INNER JOIN "Ancestors" anc ON anc."parentFamily" = fd."childFamily"
-      )
-      , "FamilyDescr" AS (
+  private def selectKinsmenFamilies(initPersonId: Long) = sql"""
+    WITH RECURSIVE 
+    "FamilyDescr" AS (
         SELECT coalesce(s."personId", c."personId") AS "personId", s."familyId" AS "childFamily", c."familyId" AS "parentFamily"
         FROM "Spouse" s FULL JOIN "Child" c on s."personId" = c."personId"
-      )
-      SELECT DISTINCT "parentFamily" AS familyId FROM "Ancestors" WHERE "parentFamily" IS NOT NULL
-    ) UNION (
-      with
-      RECURSIVE "Dependees" AS (
-        SELECT "personId", "childFamily", "parentFamily" FROM "FamilyDescr" WHERE "personId" =  $initPersonId
+    ), 
+    "Ancestors" AS (
+      SELECT "personId", "childFamily", "parentFamily" FROM "FamilyDescr" WHERE "personId" = $initPersonId
+      UNION
+      SELECT fd."personId", fd."childFamily", fd."parentFamily" FROM "FamilyDescr" fd INNER JOIN "Ancestors" anc ON anc."parentFamily" = fd."childFamily"
+    ),
+    "Dependees" AS (
+        SELECT "personId", "childFamily", "parentFamily" FROM "FamilyDescr" WHERE "childFamily" IN (SELECT DISTINCT "parentFamily" FROM "Ancestors" WHERE "parentFamily" IS NOT NULL)
         UNION
         SELECT fd."personId", fd."childFamily", fd."parentFamily" FROM "FamilyDescr" fd INNER JOIN "Dependees" dep ON dep."childFamily" = fd."parentFamily"
-      )
-      , "FamilyDescr" AS (
-        SELECT coalesce(s."personId", c."personId") AS "personId", s."familyId" AS "childFamily", c."familyId" AS "parentFamily"
-        FROM "Spouse" s FULL JOIN "Child" c on s."personId" = c."personId"
-      )
-      SELECT DISTINCT "childFamily" AS familyId FROM "Dependees" WHERE "childFamily" IS NOT NULL
-    )
+    ) SELECT DISTINCT "childFamily" AS familyId FROM "Dependees" WHERE "childFamily" IS NOT NULL
     """.as[Long]
 
   override def chown(userId: Long, stemmaId: Long, targetPersonId: Long): UIO[ChownEffect] =
     ZIO.fromFuture { implicit ec =>
       val action = (for {
-        relatedFamilies <- selectDirectFamilies(targetPersonId)
-        affectedPeople  <- (qSpouses.filter(_.familyId inSet relatedFamilies).map(_.personId) union qChildren.filter(_.familyId inSet relatedFamilies).map(_.personId)).result
-        _               <- DBIO.sequence(relatedFamilies.map(fid => qFamiliesOwners += FamilyOwner(userId, fid)))
+        kinsmenFamilies <- selectKinsmenFamilies(targetPersonId)
+        affectedPeople  <- (qSpouses.filter(_.familyId inSet kinsmenFamilies).map(_.personId) union qChildren.filter(_.familyId inSet kinsmenFamilies).map(_.personId)).result
+        _               <- DBIO.sequence(kinsmenFamilies.map(fid => qFamiliesOwners += FamilyOwner(userId, fid)))
         _               <- DBIO.sequence(affectedPeople.map(pid => qPeopleOwners += PersonOwner(userId, pid)))
         _               <- qStemmaOwners += StemmaOwner(userId, stemmaId)
-      } yield ChownEffect(relatedFamilies, affectedPeople)).transactionally
+      } yield ChownEffect(kinsmenFamilies, affectedPeople)).transactionally
 
       db run action
     }.orDie
