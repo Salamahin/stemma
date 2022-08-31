@@ -278,33 +278,49 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
 
       /*
-                f1                     f3
-       jabe1 -> * <- jane2             * <-- jared7
-               / \          f2        /
-          jeff3   july4 --> * <-- josh5
-                           /
-                f4        /
-       .........* <- jill6
-               / \
-           jess8   john9
 
+                            f1                      f4
+                   jabe1 -> * <- jane2              * <-- john9
+                f2         / \          f3         /
+     jared5 --> * <-- jeff3   july4 --> * <-- josh7
+                 \                       \
+                  jill6                   jess8
        */
 
       stemmaId <- s.createStemma(creatorId, "my first stemma")
 
-      FamilyDescription(_, _, _ :: july :: Nil, _)     <- s.createFamily(creatorId, stemmaId, family(createJabe, createJess)(createJeff, createJuly))
-      FamilyDescription(f2, josh :: _, jill :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJosh, existing(july))(createJill))
-      FamilyDescription(f3, jared :: _, _, _)          <- s.createFamily(creatorId, stemmaId, family(createJared)(existing(josh)))
-      FamilyDescription(f4, _, jess :: john :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(existing(jill))(createJess, createJohn))
+      FamilyDescription(f1, jabe :: jane :: Nil, jeff :: july :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJabe, createJane)(createJeff, createJuly))
+      FamilyDescription(f2, jared :: _, jill :: Nil, _)                  <- s.createFamily(creatorId, stemmaId, family(createJared, existing(jeff))(createJill))
+      FamilyDescription(f3, _ :: josh :: Nil, jess :: Nil, _)            <- s.createFamily(creatorId, stemmaId, family(existing(july), createJosh)(createJess))
+      FamilyDescription(f4, john :: Nil, _, _)                           <- s.createFamily(creatorId, stemmaId, family(createJohn)(existing(josh)))
 
-      ChownEffect(affectedFamilies, affectedPeople) <- s.chown(accessorId, stemmaId, josh)
+      ChownEffect(affectedFamilies, affectedPeople) <- s.chown(accessorId, stemmaId, july)
       accessorStemma                                <- s.stemma(accessorId, stemmaId)
 
-    } yield assertTrue(affectedFamilies.toSet == Set(f2, f3, f4)) &&
-      assertTrue(affectedPeople.toSet == Set(jared, josh, july, jill, jess, john)) &&
-      assert(accessorStemma)(canEditOnlyP(jared, josh, july, jill, jess, john)) &&
-      assert(accessorStemma)(canEditOnlyF(f2, f3, f4)))
-      .provideSome(testcontainersStorage, Scope.default)
+    } yield {
+      val expectedAffectedFamilies = Seq(f1, f2, f3)
+      val expectedAffectedPeople   = Seq(jabe, jane, jeff, jared, jill, july, josh, jess)
+
+      assertTrue(affectedFamilies.toSet == expectedAffectedFamilies.toSet) &&
+      assertTrue(affectedPeople.toSet == expectedAffectedPeople.toSet) &&
+      assert(accessorStemma)(canEditOnlyP(expectedAffectedPeople: _*)) &&
+      assert(accessorStemma)(canEditOnlyF(expectedAffectedFamilies: _*))
+    }).provideSome(testcontainersStorage, Scope.default)
+  }
+
+  private val canChownSeveralTimes = test("can chown several times and wont fail") {
+    (for {
+      s                   <- ZIO.service[StorageService]
+      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
+      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
+
+      stemmaId <- s.createStemma(creatorId, "my first stemma")
+
+      FamilyDescription(_, jabe :: jane :: Nil, jeff :: july :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJabe, createJane)(createJeff, createJuly))
+
+      _ <- s.chown(accessorId, stemmaId, july)
+      _ <- s.chown(accessorId, stemmaId, july)
+    } yield assertCompletes).provideSome(testcontainersStorage, Scope.default)
   }
 
   private def canEditOnlyP(peopleIds: Long*) = Assertion.assertion[Stemma](s"Can edit only following people: ${peopleIds.mkString(",")}") { st =>
@@ -370,6 +386,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       cantRequestStemmaIfNotGraphOwner,
       whenUpdatingFamilyAllMembersShouldBelongToGraph,
       canChangeOwnershipInRecursiveManner,
+      canChownSeveralTimes,
       appendChildrenToFullExistingFamily,
       appendChildrenToIncompleteExistingFamily,
       whenThereAreSeveralOwnersThenStemmaIsNotRemovable,
