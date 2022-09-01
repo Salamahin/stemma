@@ -1,9 +1,9 @@
 testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
 
 libraryDependencies ++= Seq(
-  "com.typesafe.scala-logging" %% "scala-logging"                     % "3.9.5",
   "org.slf4j"                  % "slf4j-api"                          % "2.0.0",
   "ch.qos.logback"             % "logback-classic"                    % "1.2.11",
+  "com.typesafe.scala-logging" %% "scala-logging"                     % "3.9.5",
   "com.amazonaws"              % "aws-lambda-java-core"               % "1.2.1",
   "com.amazonaws"              % "aws-lambda-java-events"             % "3.11.0",
   "org.postgresql"             % "postgresql"                         % "42.5.0",
