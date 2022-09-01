@@ -21,11 +21,14 @@ object StemmaLambda extends LazyLogging {
 
       if (!Files.exists(rootCert)) {
         Files.writeString(rootCert, sys.env("JDBC_CERT"))
+        println("root cert created")
       }
 
       new ConfiguredStemmaService()
     } catch {
-      case exc: Throwable => logger.error("Fatal error while making stemma service", exc); throw exc
+      case exc: Throwable =>
+        exc.printStackTrace()
+        throw exc
     }
 
   sys.addShutdownHook(() => {
