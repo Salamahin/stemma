@@ -44,7 +44,7 @@ export class HiglightLineages implements Highlight {
         this.allUncleFamilies = new Set(this.index.uncleFamilies(this.allPeople))
     }
 
-    private personToLineageData(personId) {
+    private personToLineageData(personId: string) {
         let lineage = this.index.lineage(personId)
         return {
             from: personId,
@@ -53,7 +53,7 @@ export class HiglightLineages implements Highlight {
         }
     }
 
-    private familyToLineageData(familyId) {
+    private familyToLineageData(familyId: string) {
         let family = this.index.family(familyId)
         return {
             from: familyId,
