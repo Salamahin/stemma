@@ -2,7 +2,7 @@
     import { PersonDescription, CreateNewPerson } from "../../model";
 
     export type UpdatePerson = {
-        id: number;
+        id: string;
         pin: boolean;
         description: CreateNewPerson;
     };
@@ -25,7 +25,7 @@
     let birthDate: string;
     let deathDate: string;
     let bio: string;
-    let id: number;
+    let id: string;
     let readOnly: boolean;
 
     function personUpdated() {

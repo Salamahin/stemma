@@ -8,6 +8,9 @@ import io.github.salamahin.stemma.service.{ConfiguredStemmaService, InviteSecret
 import zio.Random.RandomLive
 import zio.{IO, UIO, ZIO, ZLayer}
 
+import java.nio.file.{Files, Paths}
+import java.util.Base64
+
 class StemmaLambda extends LambdaRunner[Request, Response] {
   override def run(email: String, request: Request): IO[StemmaError, Response] = handler.flatMap(_.handle(email, request))
 }
@@ -15,9 +18,19 @@ class StemmaLambda extends LambdaRunner[Request, Response] {
 object StemmaLambda extends LazyLogging {
   private val ss =
     try {
+      val rootCert = Paths.get("/tmp/cockroach-proud-gnoll.crt")
+
+      if (!Files.exists(rootCert)) {
+        val decodedCert = new String(Base64.getDecoder.decode(sys.env("JDBC_CERT")))
+        Files.writeString(rootCert, decodedCert)
+        logger.info("root cert created")
+      }
+
       new ConfiguredStemmaService()
     } catch {
-      case exc: Throwable => logger.error("Fatal error while making stemma service", exc); throw exc
+      case exc: Throwable =>
+        logger.error("Fatal error while initializing StemmaService", exc)
+        throw exc
     }
 
   sys.addShutdownHook(() => {

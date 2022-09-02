@@ -6,14 +6,4 @@ build-MyLayer:
 	mkdir -p $(ARTIFACTS_DIR)/java/lib
 	cp -r api/target/pack/lib/*.jar $(ARTIFACTS_DIR)/java/lib
 
-build-ListStemmasFunction: build-any-lambda
-build-DeleteStemmaFunction: build-any-lambda
-build-CreateNewStemmaFunction: build-any-lambda
 build-StemmaFunction: build-any-lambda
-build-DeletePersonFunction: build-any-lambda
-build-UpdatePersonFunction: build-any-lambda
-build-CreateInvitationTokenFunction: build-any-lambda
-build-BearInvitationTokenFunction: build-any-lambda
-build-CreateFamilyFunction: build-any-lambda
-build-UpdateFamilyFunction: build-any-lambda
-build-DeleteFamilyFunction: build-any-lambda
