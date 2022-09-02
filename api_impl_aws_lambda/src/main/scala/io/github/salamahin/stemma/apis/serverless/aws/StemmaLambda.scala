@@ -21,7 +21,7 @@ object StemmaLambda extends LazyLogging {
 
       if (!Files.exists(rootCert)) {
         Files.writeString(rootCert, sys.env("JDBC_CERT"))
-        println("root cert created")
+        logger.info("root cert created")
       }
 
       new ConfiguredStemmaService()
