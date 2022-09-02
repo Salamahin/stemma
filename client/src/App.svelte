@@ -114,7 +114,7 @@
             .finally(() => (isWaiting = false));
     }
 
-    function handleFamilyRemoved(familyId: number) {
+    function handleFamilyRemoved(familyId: string) {
         isWaiting = true;
         waiting = model
             .removeFamily(selectedStemmaDescription.id, familyId)
@@ -122,7 +122,7 @@
             .finally(() => (isWaiting = false));
     }
 
-    function handlePersonRemoved(personId: number) {
+    function handlePersonRemoved(personId: string) {
         isWaiting = true;
         waiting = model
             .removePerson(selectedStemmaDescription.id, personId, stemmaIndex)
@@ -155,7 +155,7 @@
             .finally(() => (isWaiting = false));
     }
 
-    function updateEverythingOnStemmaChange(stemmaId: number, stemma: Stemma) {
+    function updateEverythingOnStemmaChange(stemmaId: string, stemma: Stemma) {
         let pp = new PinnedPeopleStorage(stemmaId);
         pp.load();
 

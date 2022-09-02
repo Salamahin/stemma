@@ -72,7 +72,7 @@ object ApiService extends LazyLogging {
         _        = logger.info(s"[$user] Creates a new stemma with name ${request.stemmaName}")
         stemmaId <- s.createStemma(user.userId, request.stemmaName)
         _        = logger.info(s"[$user] New stemma with id $stemmaId created")
-      } yield StemmaDescription(stemmaId, request.stemmaName, removable = true)
+      } yield StemmaDescription(stemmaId.toString, request.stemmaName, removable = true)
 
     def stemma(email: String, requst: GetStemmaRequest) =
       for {

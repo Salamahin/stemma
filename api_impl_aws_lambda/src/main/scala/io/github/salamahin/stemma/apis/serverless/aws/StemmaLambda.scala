@@ -21,14 +21,15 @@ object StemmaLambda extends LazyLogging {
       val rootCert = Paths.get("/tmp/cockroach-proud-gnoll.crt")
 
       if (!Files.exists(rootCert)) {
-        Files.writeString(rootCert, sys.env("JDBC_CERT"))
+        val decodedCert = new String(Base64.getDecoder.decode(sys.env("JDBC_CERT")))
+        Files.writeString(rootCert, decodedCert)
         logger.info("root cert created")
       }
 
       new ConfiguredStemmaService()
     } catch {
       case exc: Throwable =>
-        exc.printStackTrace()
+        logger.error("Fatal error while initializing StemmaService", exc)
         throw exc
     }
 

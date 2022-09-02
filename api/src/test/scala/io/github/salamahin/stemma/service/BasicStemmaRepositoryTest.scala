@@ -323,14 +323,14 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
     } yield assertCompletes).provideSome(testcontainersStorage, Scope.default)
   }
 
-  private def canEditOnlyP(peopleIds: Long*) = Assertion.assertion[Stemma](s"Can edit only following people: ${peopleIds.mkString(",")}") { st =>
+  private def canEditOnlyP(peopleIds: String*) = Assertion.assertion[Stemma](s"Can edit only following people: ${peopleIds.mkString(",")}") { st =>
     st.people
       .filter(x => !x.readOnly)
       .map(_.id)
       .toSet == peopleIds.toSet
   }
 
-  private def canEditOnlyF(familyIds: Long*) = Assertion.assertion[Stemma](s"Can edit only following families: ${familyIds.mkString(",")}") { st =>
+  private def canEditOnlyF(familyIds: String*) = Assertion.assertion[Stemma](s"Can edit only following families: ${familyIds.mkString(",")}") { st =>
     st.families
       .filter(x => !x.readOnly)
       .map(_.id)

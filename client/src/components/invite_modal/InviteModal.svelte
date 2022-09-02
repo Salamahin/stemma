@@ -1,6 +1,6 @@
 <script context="module" lang="ts">
     export type CreateInviteLink = {
-        personId: number;
+        personId: string;
         email: string;
     };
 </script>
@@ -16,7 +16,6 @@
     import VisualPersonDescription from "../misc/VisualPersonDescription.svelte";
 
     let modalEl;
-    let copyBtn;
 
     export let stemmaIndex: StemmaIndex;
     export let stemma: Stemma;
