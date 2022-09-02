@@ -9,6 +9,7 @@ import zio.Random.RandomLive
 import zio.{IO, UIO, ZIO, ZLayer}
 
 import java.nio.file.{Files, Paths}
+import java.util.Base64
 
 class StemmaLambda extends LambdaRunner[Request, Response] {
   override def run(email: String, request: Request): IO[StemmaError, Response] = handler.flatMap(_.handle(email, request))

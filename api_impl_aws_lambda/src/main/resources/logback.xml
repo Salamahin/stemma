@@ -9,7 +9,7 @@
         <appender-ref ref="console"/>
     </root>
 
-    <logger name="io.github.salamahin.stemma" level="INFO" additivity="false">
+    <logger name="io.github.salamahin.stemma" level="debug" additivity="false">
         <appender-ref ref="console"/>
     </logger>
 </configuration>
