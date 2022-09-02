@@ -30,7 +30,7 @@ abstract class LambdaRunner[In, Out](implicit jsonDecoder: JsonDecoder[In], json
         err => err.toJson,
         res => res.toJson
       )
-      .tap(resp => ZIO.succeed(logger.debug(s"Generated response: $resp")))
+      .tap(resp => ZIO.succeed(logger.debug(s"Generated response (truncated): ${resp.take(100)}")))
 
     Unsafe.unsafe { implicit u =>
       Runtime.default.unsafe.run(zio) match {
