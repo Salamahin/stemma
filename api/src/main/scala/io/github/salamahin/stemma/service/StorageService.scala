@@ -10,17 +10,17 @@ import scala.concurrent.ExecutionContext
 trait StorageService {
   def createSchema: Task[Unit]
   def getOrCreateUser(email: String): UIO[User]
-  def createStemma(userId: Long, name: String): UIO[Long]
-  def listOwnedStemmas(userId: Long): UIO[OwnedStemmasDescription]
-  def removeStemma(userId: Long, stemmaId: Long): IO[StemmaError, Unit]
-  def createFamily(userId: Long, stemmaId: Long, family: CreateFamily): IO[StemmaError, FamilyDescription]
-  def updateFamily(userId: Long, familyId: Long, family: CreateFamily): IO[StemmaError, FamilyDescription]
-  def removePerson(userId: Long, personId: Long): IO[StemmaError, Unit]
-  def removeFamily(userId: Long, familyId: Long): IO[StemmaError, Unit]
-  def updatePerson(userId: Long, personId: Long, description: CreateNewPerson): IO[StemmaError, Unit]
-  def stemma(userId: Long, stemmaId: Long): IO[StemmaError, DomainStemma]
-  def chown(userId: Long, stemmaId: Long, targetPersonId: Long): UIO[ChownEffect]
-  def ownsPerson(userId: Long, personId: Long): UIO[Boolean]
+  def createStemma(userId: String, name: String): UIO[String]
+  def listOwnedStemmas(userId: String): UIO[OwnedStemmasDescription]
+  def removeStemma(userId: String, stemmaId: String): IO[StemmaError, Unit]
+  def createFamily(userId: String, stemmaId: String, family: CreateFamily): IO[StemmaError, FamilyDescription]
+  def updateFamily(userId: String, familyId: String, family: CreateFamily): IO[StemmaError, FamilyDescription]
+  def removePerson(userId: String, personId: String): IO[StemmaError, Unit]
+  def removeFamily(userId: String, familyId: String): IO[StemmaError, Unit]
+  def updatePerson(userId: String, personId: String, description: CreateNewPerson): IO[StemmaError, Unit]
+  def stemma(userId: String, stemmaId: String): IO[StemmaError, DomainStemma]
+  def chown(userId: String, stemmaId: String, targetPersonId: String): UIO[ChownEffect]
+  def ownsPerson(userId: String, personId: String): UIO[Boolean]
 }
 
 object StorageService {
@@ -47,7 +47,7 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
       val query = (for {
         maybeUserId <- qStemmaUsers.filter(_.email === email).map(_.id).result.headOption
         userId      <- maybeUserId.map(id => DBIO.successful(id)).getOrElse(userId += StemmaUser(email = email))
-      } yield User(userId, email)).transactionally
+      } yield User(userId.toString, email)).transactionally
 
       db run query
     }.orDie
@@ -57,7 +57,7 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
 
     for {
       isOwner <- ownedStemma.exists.result
-      _       <- if (isOwner) DBIO.successful((): Unit) else DBIO.failed(AccessToStemmaDenied(stemmaId))
+      _       <- if (isOwner) DBIO.successful((): Unit) else DBIO.failed(AccessToStemmaDenied(stemmaId.toString))
     } yield ()
   }
 
@@ -66,7 +66,7 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
 
     for {
       isOwner <- ownedPeople.exists.result
-      _       <- if (isOwner) DBIO.successful((): Unit) else DBIO.failed(AccessToPersonDenied(personId))
+      _       <- if (isOwner) DBIO.successful((): Unit) else DBIO.failed(AccessToPersonDenied(personId.toString))
     } yield ()
   }
 
@@ -75,27 +75,27 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
 
     for {
       isOwner <- ownedPeople.exists.result
-      _       <- if (isOwner) DBIO.successful((): Unit) else DBIO.failed(AccessToFamilyDenied(familyId))
+      _       <- if (isOwner) DBIO.successful((): Unit) else DBIO.failed(AccessToFamilyDenied(familyId.toString))
     } yield ()
   }
 
   private def checkStemmaCorrectness(personId: Long, stemmaId: Long)(implicit ec: ExecutionContext) = {
-    qPeople.filter(_.id === personId).map(_.stemmaId).result.head.flatMap(sId => if (sId != stemmaId) DBIO.failed(NoSuchPersonId(personId)) else DBIO.successful((): Unit))
+    qPeople.filter(_.id === personId).map(_.stemmaId).result.head.flatMap(sId => if (sId != stemmaId) DBIO.failed(NoSuchPersonId(personId.toString)) else DBIO.successful((): Unit))
   }
 
-  override def createStemma(userId: Long, name: String): UIO[Long] =
+  override def createStemma(userId: String, name: String): UIO[String] =
     ZIO.fromFuture { implicit ec =>
       val query = (for {
         newStemmaId <- (qStemmas returning qStemmas.map(_.id)) += Stemma(name = name)
-        _           <- qStemmaOwners += StemmaOwner(userId, newStemmaId)
-      } yield newStemmaId).transactionally
+        _           <- qStemmaOwners += StemmaOwner(userId.toLong, newStemmaId)
+      } yield newStemmaId.toString).transactionally
 
       db run query
     }.orDie
 
-  override def listOwnedStemmas(userId: Long): UIO[OwnedStemmasDescription] =
+  override def listOwnedStemmas(userId: String): UIO[OwnedStemmasDescription] =
     ZIO.fromFuture { implicit ec =>
-      val ownedStemmas = qStemmaOwners.filter(_.ownerId === userId).map(_.stemmaId)
+      val ownedStemmas = qStemmaOwners.filter(_.ownerId === userId.toLong).map(_.stemmaId)
 
       val ownersCounted = (ownedStemmas join qStemmaOwners on (_ === _.stemmaId))
         .groupBy(_._1)
@@ -109,28 +109,28 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
         }
         .result
         .map(_.map {
-          case (id, name, removable) => StemmaDescription(id, name, removable)
+          case (id, name, removable) => StemmaDescription(id.toString, name, removable)
         })
 
       db.run(stemmasWithRemovableFlag).map(OwnedStemmasDescription.apply)
     }.orDie
 
-  override def removeStemma(userId: Long, stemmaId: Long): IO[StemmaError, Unit] =
+  override def removeStemma(userId: String, stemmaId: String): IO[StemmaError, Unit] =
     ZIO
       .fromFuture { implicit ec =>
         val isOnlyOwner = qStemmaOwners
-          .filter(_.stemmaId === stemmaId)
+          .filter(_.stemmaId === stemmaId.toLong)
           .groupBy(_.stemmaId)
           .map {
             case (_, groups) => groups.length === 1
           }
 
         val query = (for {
-          _           <- checkStemmaAccess(stemmaId, userId)
+          _           <- checkStemmaAccess(stemmaId.toLong, userId.toLong)
           singleOwner <- isOnlyOwner.result.map(_.head)
           _           <- if (singleOwner) DBIO.successful((): Unit) else DBIO.failed(IsNotTheOnlyStemmaOwner(stemmaId))
 
-          _ <- qStemmas.filter(_.id === stemmaId).delete
+          _ <- qStemmas.filter(_.id === stemmaId.toLong).delete
         } yield ()).transactionally
 
         db run query
@@ -142,9 +142,9 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
   private def getOrCreatePerson(stemmaId: Long, userId: Long, pd: PersonDefinition)(implicit ec: ExecutionContext) = pd match {
     case ExistingPerson(id) =>
       for {
-        _ <- checkPersonAccess(id, userId)
-        _ <- checkStemmaCorrectness(id, stemmaId)
-      } yield id
+        _ <- checkPersonAccess(id.toLong, userId)
+        _ <- checkStemmaCorrectness(id.toLong, stemmaId)
+      } yield id.toLong
 
     case CreateNewPerson(name, birthDate, deathDate, bio) =>
       for {
@@ -169,7 +169,7 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
       .groupBy(identity)
       .values
       .find(_.size > 1)
-      .map(ids => DBIO.failed(DuplicatedIds(ids.head)))
+      .map(ids => DBIO.failed(DuplicatedIds(ids.head.toString)))
       .getOrElse(DBIO.successful((): Unit))
 
     def createChildRelationIfThereAreNoOtherFamilies(personId: Long) =
@@ -177,7 +177,7 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
         childFamilies <- qChildren.filter(_.personId === personId).map(_.familyId).result
         _ <- if (childFamilies.isEmpty) qChildren += Child(personId, familyId)
             else if (childFamilies.size == 1 && childFamilies.head == familyId) DBIO.successful((): Unit)
-            else DBIO.failed(ChildAlreadyBelongsToFamily(childFamilies.find(_ != familyId).get, personId))
+            else DBIO.failed(ChildAlreadyBelongsToFamily(childFamilies.find(_ != familyId).get.toString, personId.toString))
       } yield ()
 
     for {
@@ -187,7 +187,7 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
       cs <- DBIO sequence children.map(p => getOrCreatePerson(stemmaId, userId, p))
       _  <- DBIO sequence ps.map(p => createSpouseRelationIfNotExist(Spouse(p, familyId)))
       _  <- DBIO sequence cs.map(createChildRelationIfThereAreNoOtherFamilies)
-    } yield FamilyDescription(familyId, ps, cs, true)
+    } yield FamilyDescription(familyId.toString, ps.map(_.toString), cs.map(_.toString), true)
   }
 
   private def unlinkFamilyMembers(familyId: Long)(implicit ec: ExecutionContext) =
@@ -198,7 +198,7 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
 
   private def tryFindMatchingFamily(parents: Seq[PersonDefinition], userId: Long)(implicit ec: ExecutionContext) = {
     val existingParentsIds = parents.collect {
-      case ExistingPerson(id) => id
+      case ExistingPerson(id) => id.toLong
     }
 
     def personFamilies(pId: Long, allPIds: Set[Long]) =
@@ -223,21 +223,21 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
       } yield maybeFamilyId
   }
 
-  override def createFamily(userId: Long, stemmaId: Long, family: CreateFamily): IO[StemmaError, FamilyDescription] =
+  override def createFamily(userId: String, stemmaId: String, family: CreateFamily): IO[StemmaError, FamilyDescription] =
     ZIO
       .fromFuture { implicit ec =>
         def createNewFamily =
           for {
-            fid <- (qFamilies returning qFamilies.map(_.id)) += Family(stemmaId = stemmaId)
-            _   <- qFamiliesOwners += FamilyOwner(userId, fid)
+            fid <- (qFamilies returning qFamilies.map(_.id)) += Family(stemmaId = stemmaId.toLong)
+            _   <- qFamiliesOwners += FamilyOwner(userId.toLong, fid)
           } yield fid
 
         val query = (for {
-          _             <- checkStemmaAccess(stemmaId, userId)
-          maybeFamilyId <- tryFindMatchingFamily((family.parent1 ++ family.parent2).toSeq, userId)
+          _             <- checkStemmaAccess(stemmaId.toLong, userId.toLong)
+          maybeFamilyId <- tryFindMatchingFamily((family.parent1 ++ family.parent2).toSeq, userId.toLong)
           familyId      <- maybeFamilyId.map(DBIO.successful).getOrElse(createNewFamily)
 
-          familyDescr <- linkFamilyMembers(userId, stemmaId, familyId, family)
+          familyDescr <- linkFamilyMembers(userId.toLong, stemmaId.toLong, familyId, family)
         } yield familyDescr).transactionally
 
         db run query
@@ -246,15 +246,15 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
         case stemmaError: StemmaError => stemmaError
       }
 
-  override def updateFamily(userId: Long, familyId: Long, family: CreateFamily): IO[StemmaError, FamilyDescription] =
+  override def updateFamily(userId: String, familyId: String, family: CreateFamily): IO[StemmaError, FamilyDescription] =
     ZIO
       .fromFuture { implicit ec =>
         val query = (for {
-          _ <- checkFamilyAccess(familyId, userId)
-          _ <- unlinkFamilyMembers(familyId)
+          _ <- checkFamilyAccess(familyId.toLong, userId.toLong)
+          _ <- unlinkFamilyMembers(familyId.toLong)
 
-          stemmaId    <- qFamilies.filter(_.id === familyId).map(_.stemmaId).result.head
-          familyDescr <- linkFamilyMembers(userId, stemmaId, familyId, family)
+          stemmaId    <- qFamilies.filter(_.id === familyId.toLong).map(_.stemmaId).result.head
+          familyDescr <- linkFamilyMembers(userId.toLong, stemmaId, familyId.toLong, family)
         } yield familyDescr).transactionally
 
         db run query
@@ -263,7 +263,7 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
         case stemmaError: StemmaError => stemmaError
       }
 
-  override def removePerson(userId: Long, personId: Long): IO[StemmaError, Unit] =
+  override def removePerson(userId: String, personId: String): IO[StemmaError, Unit] =
     ZIO
       .fromFuture { implicit ec =>
         def dropEmptyFamilies = {
@@ -280,8 +280,8 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
         }
 
         val query = (for {
-          _ <- checkPersonAccess(personId, userId)
-          _ <- qPeople.filter(_.id === personId).delete
+          _ <- checkPersonAccess(personId.toLong, userId.toLong)
+          _ <- qPeople.filter(_.id === personId.toLong).delete
           _ <- dropEmptyFamilies
         } yield ()).transactionally
 
@@ -291,13 +291,13 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
         case stemmaError: StemmaError => stemmaError
       }
 
-  override def removeFamily(userId: Long, familyId: Long): IO[StemmaError, Unit] =
+  override def removeFamily(userId: String, familyId: String): IO[StemmaError, Unit] =
     ZIO
       .fromFuture { implicit ec =>
         val query = (for {
-          _ <- checkFamilyAccess(familyId, userId)
-          _ <- unlinkFamilyMembers(familyId)
-          _ <- qFamilies.filter(_.id === familyId).delete
+          _ <- checkFamilyAccess(familyId.toLong, userId.toLong)
+          _ <- unlinkFamilyMembers(familyId.toLong)
+          _ <- qFamilies.filter(_.id === familyId.toLong).delete
         } yield ()).transactionally
 
         db run query
@@ -306,13 +306,13 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
         case stemmaError: StemmaError => stemmaError
       }
 
-  override def updatePerson(userId: Long, personId: Long, description: CreateNewPerson): IO[StemmaError, Unit] =
+  override def updatePerson(userId: String, personId: String, description: CreateNewPerson): IO[StemmaError, Unit] =
     ZIO
       .fromFuture { implicit ec =>
         val query = (for {
-          _        <- checkPersonAccess(personId, userId)
-          stemmaId <- qPeople.filter(_.id === personId).map(_.stemmaId).result.head
-          _        <- qPeople.insertOrUpdate(Person(personId, description.name, description.birthDate, description.deathDate, description.bio, stemmaId))
+          _        <- checkPersonAccess(personId.toLong, userId.toLong)
+          stemmaId <- qPeople.filter(_.id === personId.toLong).map(_.stemmaId).result.head
+          _        <- qPeople.insertOrUpdate(Person(personId.toLong, description.name, description.birthDate, description.deathDate, description.bio, stemmaId))
         } yield ()).transactionally
 
         db run query
@@ -321,35 +321,35 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
         case stemmaError: StemmaError => stemmaError
       }
 
-  override def stemma(userId: Long, stemmaId: Long): IO[StemmaError, DomainStemma] =
+  override def stemma(userId: String, stemmaId: String): IO[StemmaError, DomainStemma] =
     ZIO
       .fromFuture { implicit ec =>
-        val fs     = qFamilies.filter(_.stemmaId === stemmaId)
-        val ownedF = qFamiliesOwners.filter(_.ownerId === userId)
+        val fs     = qFamilies.filter(_.stemmaId === stemmaId.toLong)
+        val ownedF = qFamiliesOwners.filter(_.ownerId === userId.toLong)
 
         val parents  = (fs join qSpouses on (_.id === _.familyId) joinLeft ownedF on (_._1.id === _.familyId)).map { case ((f, m), o)  => (f.id, m.personId, o.isEmpty) }
         val children = (fs join qChildren on (_.id === _.familyId) joinLeft ownedF on (_._1.id === _.familyId)).map { case ((f, m), o) => (f.id, m.personId, o.isEmpty) }
 
         val stemmaQuery = for {
-          pp <- (qPeople.filter(_.stemmaId === stemmaId) joinLeft qPeopleOwners.filter(_.ownerId === userId) on (_.id === _.personId)).result
+          pp <- (qPeople.filter(_.stemmaId === stemmaId.toLong) joinLeft qPeopleOwners.filter(_.ownerId === userId.toLong) on (_.id === _.personId)).result
           ps <- parents.result
           cs <- children.result
         } yield {
           val people = pp.map {
-            case (tp, isOwner) => PersonDescription(tp.id, tp.name, tp.birthDate, tp.deathDate, tp.bio, isOwner.isEmpty)
+            case (tp, isOwner) => PersonDescription(tp.id.toString, tp.name, tp.birthDate, tp.deathDate, tp.bio, isOwner.isEmpty)
           }
 
-          val familyReadOnly = mutable.Map.empty[Long, Boolean]
-          val familySpouses  = mutable.Map.empty[Long, mutable.Set[Long]].withDefaultValue(mutable.Set.empty)
-          val familyChildren = mutable.Map.empty[Long, mutable.Set[Long]].withDefaultValue(mutable.Set.empty)
+          val familyReadOnly = mutable.Map.empty[String, Boolean]
+          val familySpouses  = mutable.Map.empty[String, mutable.Set[String]].withDefaultValue(mutable.Set.empty)
+          val familyChildren = mutable.Map.empty[String, mutable.Set[String]].withDefaultValue(mutable.Set.empty)
 
           ps.groupBy {
               case (fid, _, _) => fid
             }
             .foreach {
               case (fid, members) =>
-                familySpouses(fid) = familySpouses(fid) ++ members.map(_._2)
-                familyReadOnly(fid) = members.head._3
+                familySpouses(fid.toString) = familySpouses(fid.toString) ++ members.map(_._2.toString)
+                familyReadOnly(fid.toString) = members.head._3
             }
 
           cs.groupBy {
@@ -357,8 +357,8 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
             }
             .foreach {
               case (fid, members) =>
-                familyChildren(fid) = familyChildren(fid) ++ members.map(_._2)
-                familyReadOnly(fid) = members.head._3
+                familyChildren(fid.toString) = familyChildren(fid.toString) ++ members.map(_._2.toString)
+                familyReadOnly(fid.toString) = members.head._3
             }
 
           val families = familyReadOnly.map {
@@ -369,7 +369,7 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
         }
 
         val query = for {
-          _      <- checkStemmaAccess(stemmaId, userId)
+          _      <- checkStemmaAccess(stemmaId.toLong, userId.toLong)
           stemma <- stemmaQuery
         } yield stemma
 
@@ -426,23 +426,23 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
     } yield ()
   // ==================================================================================================================
 
-  override def chown(userId: Long, stemmaId: Long, targetPersonId: Long): UIO[ChownEffect] =
+  override def chown(userId: String, stemmaId: String, targetPersonId: String): UIO[ChownEffect] =
     ZIO.fromFuture { implicit ec =>
       val action = (for {
-        kinsmenFamilies <- selectKinsmenFamilies(targetPersonId)
+        kinsmenFamilies <- selectKinsmenFamilies(targetPersonId.toLong)
         affectedPeople  <- (qSpouses.filter(_.familyId inSet kinsmenFamilies).map(_.personId) union qChildren.filter(_.familyId inSet kinsmenFamilies).map(_.personId)).result
-        _               <- DBIO sequence kinsmenFamilies.map(fid => addOwnerIfNeeded(FamilyOwner(userId, fid)))
-        _               <- DBIO sequence affectedPeople.map(pid => addOwnerIfNeeded(PersonOwner(userId, pid)))
-        _               <- addOwnerIfNeeded(StemmaOwner(userId, stemmaId))
-      } yield ChownEffect(kinsmenFamilies, affectedPeople)).transactionally
+        _               <- DBIO sequence kinsmenFamilies.map(fid => addOwnerIfNeeded(FamilyOwner(userId.toLong, fid)))
+        _               <- DBIO sequence affectedPeople.map(pid => addOwnerIfNeeded(PersonOwner(userId.toLong, pid)))
+        _               <- addOwnerIfNeeded(StemmaOwner(userId.toLong, stemmaId.toLong))
+      } yield ChownEffect(kinsmenFamilies.map(_.toString), affectedPeople.map(_.toString))).transactionally
 
       db run action
     }.orDie
 
-  override def ownsPerson(userId: Long, personId: Long): UIO[Boolean] =
+  override def ownsPerson(userId: String, personId: String): UIO[Boolean] =
     ZIO.fromFuture { implicit ec =>
       db.run(
-        qPeopleOwners.filter(po => po.ownerId === userId && po.personId === personId).exists.result
+        qPeopleOwners.filter(po => po.ownerId === userId.toLong && po.personId === personId.toLong).exists.result
       )
     }.orDie
 }

@@ -9,7 +9,7 @@ import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
-case class InviteToken(inviteesEmail: String, stemmaId: Long, targetPersonId: Long, entropy: String)
+case class InviteToken(inviteesEmail: String, stemmaId: String, targetPersonId: String, entropy: String)
 
 object InviteToken {
   implicit val decoder: JsonDecoder[InviteToken] = DeriveJsonDecoder.gen[InviteToken]
@@ -17,7 +17,7 @@ object InviteToken {
 }
 
 trait UserService {
-  def createInviteToken(inviteeEmail: String, stemmaId: Long, associatedPersonId: Long): UIO[String]
+  def createInviteToken(inviteeEmail: String, stemmaId: String, associatedPersonId: String): UIO[String]
   def decodeInviteToken(token: String): IO[StemmaError, InviteToken]
   def getOrCreateUser(email: String): UIO[User]
 }
@@ -31,7 +31,7 @@ object UserService {
   } yield new UserService {
     import zio.json._
 
-    override def createInviteToken(inviteeEmail: String, stemmaId: Long, associatedPersonId: Long): UIO[String] = {
+    override def createInviteToken(inviteeEmail: String, stemmaId: String, associatedPersonId: String): UIO[String] = {
       rnd.nextString(20).map { entropy =>
         val token = InviteToken(inviteeEmail, stemmaId, associatedPersonId, entropy)
         encrypt(secret.secretString, token.toJson)

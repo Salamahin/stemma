@@ -14,6 +14,7 @@ Globals:
         JDBC_URL: "{{resolve:secretsmanager:prod/jdbc:SecretString:JDBC_URL}}"
         JDBC_USER: "{{resolve:secretsmanager:prod/jdbc:SecretString:JDBC_USER}}"
         JDBC_PASSWORD: "{{resolve:secretsmanager:prod/jdbc:SecretString:JDBC_PASSWORD}}"
+        JDBC_CERT: "{{resolve:secretsmanager:prod/jdbc:SecretString:JDBC_CERT}}"
         INVITE_SECRET: "{{resolve:secretsmanager:prod/invite:SecretString:INVITE_SECRET}}"
     Layers:
       - !Ref MyLayer
@@ -99,7 +100,15 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
-  BucketPolicy:
+  assetsbucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  AppBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
       PolicyDocument:
@@ -117,14 +126,6 @@ Resources:
                 - !Ref appbucket
                 - /*
       Bucket: !Ref appbucket
-  #  autosetloggroupretention:
-  #    Type: AWS::Serverless::Application
-  #    Properties:
-  #      Location:
-  #        ApplicationId: arn:aws:serverlessrepo:us-east-1:374852340823:applications/auto-set-log-group-retention
-  #        SemanticVersion: 1.5.0
-  #      Parameters:
-  #       RetentionDays: 1
   AccessLogs:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -180,7 +181,7 @@ Resources:
       RetentionPolicy: Delete
     Metadata:
       BuildMethod: makefile
-  ListStemmasFunction:
+  StemmaFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: makefile
@@ -193,6 +194,9 @@ Resources:
             ApiId: !Ref MyApi
             Path: /stemma
             Method: post
+      Policies:
+        - S3FullAccessPolicy:
+            BucketName: stemma-app-backend-assets
 
 Outputs:
   ApiEndpoint:

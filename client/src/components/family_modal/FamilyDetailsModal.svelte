@@ -3,7 +3,7 @@
     import * as bootstrap from "bootstrap";
 
     export type GetOrCreateFamily = {
-        familyId?: number;
+        familyId?: string;
         parents: PersonDefinition[];
         children: PersonDefinition[];
     };

@@ -1,36 +1,36 @@
 import { StemmaIndex } from "./stemmaIndex";
 
 export interface Highlight {
-    personIsHighlighted(personId: number): boolean
-    familyIsHighlighted(familyId: number): boolean
+    personIsHighlighted(personId: string): boolean
+    familyIsHighlighted(familyId: string): boolean
 }
 
 export class HighlightAll implements Highlight {
-    personIsHighlighted(personId: number): boolean {
+    personIsHighlighted(personId: string): boolean {
         return true
     }
 
-    familyIsHighlighted(familyId: number): boolean {
+    familyIsHighlighted(familyId: string): boolean {
         return true
     }
 }
 
 type LineageData = {
-    from: number
-    relatedPeople: Set<number>
-    relatedFamilies: Set<number>
+    from: string
+    relatedPeople: Set<string>
+    relatedFamilies: Set<string>
 }
 
 export class HiglightLineages implements Highlight {
     private lineagesData: LineageData[]
     private index: StemmaIndex
 
-    private allPeople: Set<number>
-    private allFamilies: Set<number>
-    private allMariages: Set<number>
-    private allUncleFamilies: Set<number>
+    private allPeople: Set<string>
+    private allFamilies: Set<string>
+    private allMariages: Set<string>
+    private allUncleFamilies: Set<string>
 
-    constructor(index: StemmaIndex, people: number[]) {
+    constructor(index: StemmaIndex, people: string[]) {
         this.index = index
         this.lineagesData = people.map(personId => this.personToLineageData(personId))
 
@@ -44,7 +44,7 @@ export class HiglightLineages implements Highlight {
         this.allUncleFamilies = new Set(this.index.uncleFamilies(this.allPeople))
     }
 
-    private personToLineageData(personId) {
+    private personToLineageData(personId: string) {
         let lineage = this.index.lineage(personId)
         return {
             from: personId,
@@ -53,7 +53,7 @@ export class HiglightLineages implements Highlight {
         }
     }
 
-    private familyToLineageData(familyId) {
+    private familyToLineageData(familyId: string) {
         let family = this.index.family(familyId)
         return {
             from: familyId,
@@ -62,20 +62,20 @@ export class HiglightLineages implements Highlight {
         }
     }
 
-    personIsHighlighted(personId: number): boolean {
+    personIsHighlighted(personId: string): boolean {
         return !this.lineagesData.length || this.allPeople.has(personId)
     }
 
-    familyIsHighlighted(familyId: number): boolean {
+    familyIsHighlighted(familyId: string): boolean {
         return !this.lineagesData.length || this.allFamilies.has(familyId) || this.allMariages.has(familyId) || this.allUncleFamilies.has(familyId)
     }
 
-    pushPerson(personId: number) {
+    pushPerson(personId: string) {
         this.lineagesData.push(this.personToLineageData(personId))
         this.remakeCashes()
     }
 
-    pushFamily(familyId: number) {
+    pushFamily(familyId: string) {
         this.lineagesData.push(this.familyToLineageData(familyId))
         this.remakeCashes()
     }
