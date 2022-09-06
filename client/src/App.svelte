@@ -52,7 +52,7 @@
 
         if (urlParams.has("inviteToken")) {
             isWaiting = true;
-            model.proposeInvitationToken(urlParams.get("inviteToken")).then(() => {
+            waiting = model.proposeInvitationToken(urlParams.get("inviteToken")).then(() => {
                 urlParams.delete("inviteToken");
                 window.history.pushState({}, document.title, window.location.pathname);
                 waiting = model.listStemmas().then((stemmas) => updateStemmaDescriptions(stemmas.stemmas));

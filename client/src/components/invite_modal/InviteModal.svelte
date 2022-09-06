@@ -73,13 +73,10 @@
                     placeholder="Иванов Иван Иванович"
                     items={peopleNames}
                     isSearchable={true}
-                    isCreatable={true}
+                    isCreatable={false}
                     on:select={(e) => nameChanged(e.detail.value)}
                     on:clear={() => reset()}
                     ClearIcon={clearIcon}
-                    getOptionLabel={(option, filterText) => {
-                        return option.isCreator ? `Создать "${filterText}"` : option["label"];
-                    }}
                     hideEmptyState={true}
                     value={selectedName}
                 />
