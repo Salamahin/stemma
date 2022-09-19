@@ -138,17 +138,22 @@ export function makeDrag(svg, simulation, stemmaId) {
             if (!event.active) simulation.alphaTarget(0.3).restart();
             event.subject.fx = event.subject.x;
             event.subject.fy = event.subject.y;
+            console.log("dragstarted")
         }
 
         function dragged(event) {
             event.subject.fx = event.x;
             event.subject.fy = event.y;
+            console.log("dragged")
         }
 
         function dragended(event) {
             if (!event.active) simulation.alphaTarget(0);
-            event.subject.fx = null;
-            event.subject.fy = null;
+            if (!event.subject.fixed) {
+                event.subject.fx = null;
+                event.subject.fy = null;
+            }
+            console.log("dragend")
 
             if (stemmaId) saveCoordinates(stemmaId)
         }
