@@ -50,17 +50,20 @@
     });
 
     export function zoomToNode(id: string) {
-        var scaleZoom = 2;
-        var nodeDatum = d3.select("#" + normalizeId("person", id)).datum();
+        let scaleZoom = 2;
+        let node = d3.select("#" + normalizeId("person", id));
+        if (node.size()) {
+            let nodeDatum = node.datum();
 
-        svg.transition()
-            .duration(750)
-            .call(
-                zoomHandler.transform,
-                d3.zoomIdentity
-                    .translate(window.innerWidth * 0.5 - scaleZoom * nodeDatum.x, window.innerHeight * 0.5 - scaleZoom * nodeDatum.y)
-                    .scale(scaleZoom)
-            );
+            svg.transition()
+                .duration(750)
+                .call(
+                    zoomHandler.transform,
+                    d3.zoomIdentity
+                        .translate(window.innerWidth * 0.5 - scaleZoom * nodeDatum.x, window.innerHeight * 0.5 - scaleZoom * nodeDatum.y)
+                        .scale(scaleZoom)
+                );
+        }
     }
 
     let simulation;

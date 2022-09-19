@@ -74,7 +74,7 @@ object Main extends LazyLogging with ZIOAppDefault {
   override def run: ZIO[ZIOAppArgs with Scope, Any, Any] = {
     (ZIO.service[StorageService].flatMap(_.createSchema).flip *> Server
       .start(8090, authenticated(stemmaApi) @@ cors(corsConfig))
-      .exitCode)
+      .tapError(err => ZIO.succeed(logger.error("Unexpected error", err))))
       .provideSome(
         ZLayer.succeed(Random.RandomLive),
         InviteSecrets.fromEnv,
