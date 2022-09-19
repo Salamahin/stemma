@@ -39,7 +39,6 @@
     let svg;
 
     $: if (svg && stemma) {
-        console.log(stemmaId)
         loadCoordinates(stemmaId);
         let [nodes, relations] = makeNodesAndRelations(stemma.people, stemma.families);
         reconfigureGraph(nodes, relations);
@@ -71,6 +70,7 @@
                     d.fy = d.y;
                 });
         });
+        simulation.alphaTarget(0.1).restart()
     }
 
     const zoomHandler = d3.zoom().on("zoom", (e) => {

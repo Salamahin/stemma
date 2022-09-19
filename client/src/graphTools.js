@@ -101,10 +101,10 @@ export function configureSimulation(svg, nodes, relations, width, height) {
         .forceSimulation(nodes)
         .force(
             "link",
-            d3.forceLink(relations).id((node) => node.id).distance(85)
+            d3.forceLink(relations).id((node) => node.id).strength(2).distance(85)
         )
-        .force("x", d3.forceX().x(width * 0.5).strength(0.2))
-        .force("y", d3.forceY().y(height * 0.5).strength(0.2))
+        .force("x", d3.forceX().x(width * 0.5).strength(0.05))
+        .force("y", d3.forceY().y(height * 0.5).strength(0.05))
         .force(
             "collide",
             d3.forceCollide().radius((d) => d.r * 20)
@@ -149,7 +149,7 @@ export function makeDrag(svg, simulation, stemmaId) {
             if (!event.active) simulation.alphaTarget(0);
             event.subject.fx = null;
             event.subject.fy = null;
-            
+
             if(stemmaId) saveCoordinates(stemmaId)
         }
 
