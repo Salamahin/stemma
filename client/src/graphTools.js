@@ -86,6 +86,16 @@ export function initChart(svgSelector) {
 
 
 let coordinatesCache = new Map()
+
+export function loadCoordinates(stemmaId) {
+    const coordsObj = JSON.parse(localStorage.getItem(`coords-${stemmaId}`));
+    coordinatesCache = new Map(Object.entries(coordsObj));
+}
+
+export function saveCoordinates(stemmaId) {
+    localStorage.setItem(`coords-${stemmaId}`, JSON.stringify(Object.fromEntries(coordinatesCache)));
+}
+
 export function configureSimulation(svg, nodes, relations, width, height) {
     return d3
         .forceSimulation(nodes)
@@ -122,7 +132,7 @@ export function updateSimulation(simulation, nodes, relations) {
     simulation.alphaTarget(0.3).restart()
 }
 
-export function makeDrag(svg, simulation) {
+export function makeDrag(svg, simulation, stemmaId) {
     function drag() {
         function dragstarted(event) {
             if (!event.active) simulation.alphaTarget(0.3).restart();
@@ -139,6 +149,8 @@ export function makeDrag(svg, simulation) {
             if (!event.active) simulation.alphaTarget(0);
             event.subject.fx = null;
             event.subject.fy = null;
+            
+            if(stemmaId) saveCoordinates(stemmaId)
         }
 
         return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);

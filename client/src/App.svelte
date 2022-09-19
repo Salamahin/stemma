@@ -262,6 +262,7 @@
         <FullStemma
             bind:this={stemmaChart}
             stemma={selectedStemma}
+            stemmaId={selectedStemmaDescription.id}
             {stemmaIndex}
             {highlight}
             {pinnedPeople}
