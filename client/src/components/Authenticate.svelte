@@ -25,6 +25,8 @@
             image_url: decoded.picture,
             id_token: response.credential,
         });
+
+        console.log("sign in!")
     }
 
     $: if (gsiLoaded && mounted) {
