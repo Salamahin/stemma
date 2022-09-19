@@ -89,7 +89,7 @@ let coordinatesCache = new Map()
 
 export function loadCoordinates(stemmaId) {
     const coordsObj = JSON.parse(localStorage.getItem(`coords-${stemmaId}`));
-    coordinatesCache = new Map(Object.entries(coordsObj));
+    if (coordsObj) coordinatesCache = new Map(Object.entries(coordsObj));
 }
 
 export function saveCoordinates(stemmaId) {
@@ -112,11 +112,11 @@ export function configureSimulation(svg, nodes, relations, width, height) {
         .force("repelForce", d3.forceManyBody().strength(-1500).distanceMin(85))
         .on("tick", () => {
             svg.select("g.main")
-            .selectAll("g")
-            .attr("transform", (d) => {
-                coordinatesCache.set(d.id, [d.x, d.y])
-                return "translate(" + d.x + "," + d.y + ")"
-            });
+                .selectAll("g")
+                .attr("transform", (d) => {
+                    coordinatesCache.set(d.id, [d.x, d.y])
+                    return "translate(" + d.x + "," + d.y + ")"
+                });
 
             svg.selectAll("line")
                 .attr("x1", (d) => d.source.x)
@@ -150,7 +150,7 @@ export function makeDrag(svg, simulation, stemmaId) {
             event.subject.fx = null;
             event.subject.fy = null;
 
-            if(stemmaId) saveCoordinates(stemmaId)
+            if (stemmaId) saveCoordinates(stemmaId)
         }
 
         return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
