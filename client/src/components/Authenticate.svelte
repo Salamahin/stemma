@@ -11,10 +11,12 @@
 
     onMount(() => {
         mounted = true;
+        console.log("auth mounted")
     });
 
     window.gsiLoad = function () {
         gsiLoaded = true;
+        console.log("gsi loaded")
     };
 
     function handleCredentialResponse(response) {
