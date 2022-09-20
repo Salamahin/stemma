@@ -5,7 +5,6 @@
 
     const dispatch = createEventDispatcher();
 
-    let forceAdd = false;
     let modalEl;
     let input;
 
@@ -20,8 +19,7 @@
         dispatch("stemmaAdded", name);
     }
 
-    export function promptNewStemma(force: boolean) {
-        forceAdd = force;
+    export function promptNewStemma() {
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 </script>
@@ -40,18 +38,14 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="addStemmaLabel">Добавить новую родословную</h5>
-                {#if !forceAdd}
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
-                {/if}
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
             </div>
             <div class="modal-body">
                 <label for="stemmaNameInput" class="form-label">Название родословной</label>
                 <input class="form-control" id="stemmaNameInput" bind:this={input} />
             </div>
             <div class="modal-footer">
-                {#if !forceAdd}
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                {/if}
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
                 <button type="button" class="btn btn-primary" on:click={handleAddStemmaClick}>Добавить</button>
             </div>
         </div>

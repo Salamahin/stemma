@@ -14,6 +14,7 @@
     import InviteModal, { CreateInviteLink } from "./components/invite_modal/InviteModal.svelte";
     import { Circle2 } from "svelte-loading-spinners";
     import AboutModal from "./components/about/About.svelte";
+    import { Stores as AppController } from "./appStores";
 
     export let google_client_id;
     export let stemma_backend_url;
@@ -26,7 +27,6 @@
     let inviteModal;
     let aboutModal;
 
-    let model: Model;
     let signedIn = false;
 
     let ownedStemmasDescriptions: StemmaDescription[];
@@ -34,58 +34,37 @@
     let selectedStemma: Stemma;
     let stemmaIndex: StemmaIndex;
     let lookupPersonName;
-
     let highlight: HiglightLineages;
     let pinnedPeople: PinnedPeopleStorage;
 
-    let waiting: Promise<any> = new Promise((resolve, reject) => {
-        resolve("ready!");
-    });
-
-    let isWaiting: boolean = false;
+    let contoller = new AppController(stemma_backend_url);
 
     function handleSignIn(user: User) {
         console.log("handle sign in");
-        signedIn = true;
-        model = new Model(stemma_backend_url, user);
 
         const urlParams = new URLSearchParams(window.location.search);
-
         if (urlParams.has("inviteToken")) {
-            isWaiting = true;
-            waiting = model.proposeInvitationToken(urlParams.get("inviteToken")).then(() => {
-                urlParams.delete("inviteToken");
-                window.history.pushState({}, document.title, window.location.pathname);
-                waiting = model.listStemmas().then((stemmas) => updateStemmaDescriptions(stemmas.stemmas));
-            });
-        } else {
-            isWaiting = true;
-            waiting = model.listStemmas().then((stemmas) => updateStemmaDescriptions(stemmas.stemmas));
-        }
-    }
+            let token = urlParams.get("inviteToken");
+            urlParams.delete("inviteToken");
+            window.history.pushState({}, document.title, window.location.pathname);
 
-    function updateStemmaDescriptions(stemmas) {
-        ownedStemmasDescriptions = stemmas;
-        if (!selectedStemmaDescription) selectedStemmaDescription = stemmas[0];
+            contoller.authenticateAndBearToken(user, token);
+        } else {
+            contoller.authenticateAndListStemmas(user);
+        }
+
+        signedIn = true;
     }
 
     function handleNewStemma(name: string) {
-        isWaiting = true;
-        waiting = model
-            .addStemma(name)
-            .then((newStemmaDescription) => {
-                ownedStemmasDescriptions = [...ownedStemmasDescriptions, newStemmaDescription];
-                selectedStemmaDescription = newStemmaDescription;
-            })
-            .finally(() => (isWaiting = false));
+        waiting = model.addStemma(name).then((newStemmaDescription) => {
+            ownedStemmasDescriptions = [...ownedStemmasDescriptions, newStemmaDescription];
+            selectedStemmaDescription = newStemmaDescription;
+        });
     }
 
     function handleNewFamilyCreation(request: GetOrCreateFamily) {
-        isWaiting = true;
-        waiting = model
-            .createFamily(selectedStemmaDescription.id, request.parents, request.children, stemmaIndex)
-            .then((s) => (selectedStemma = s))
-            .finally(() => (isWaiting = false));
+        waiting = model.createFamily(selectedStemmaDescription.id, request.parents, request.children, stemmaIndex).then((s) => (selectedStemma = s));
     }
 
     function hadlePersonUpdated(request: UpdatePerson) {
@@ -99,36 +78,22 @@
             originalPerson.name != request.description.name ||
             originalPerson.bio != request.description.bio
         ) {
-            isWaiting = true;
-            waiting = model
-                .updatePerson(selectedStemmaDescription.id, request.id, request.description, stemmaIndex)
-                .then((s) => (selectedStemma = s))
-                .finally(() => (isWaiting = false));
+            waiting = model.updatePerson(selectedStemmaDescription.id, request.id, request.description, stemmaIndex).then((s) => (selectedStemma = s));
         }
     }
 
     function handleFamilyUpdated(request: GetOrCreateFamily) {
-        isWaiting = true;
         waiting = model
             .updateFamily(selectedStemmaDescription.id, request.familyId, request.parents, request.children, stemmaIndex)
-            .then((s) => (selectedStemma = s))
-            .finally(() => (isWaiting = false));
+            .then((s) => (selectedStemma = s));
     }
 
     function handleFamilyRemoved(familyId: string) {
-        isWaiting = true;
-        waiting = model
-            .removeFamily(selectedStemmaDescription.id, familyId)
-            .then((s) => (selectedStemma = s))
-            .finally(() => (isWaiting = false));
+        waiting = model.removeFamily(selectedStemmaDescription.id, familyId).then((s) => (selectedStemma = s));
     }
 
     function handlePersonRemoved(personId: string) {
-        isWaiting = true;
-        waiting = model
-            .removePerson(selectedStemmaDescription.id, personId, stemmaIndex)
-            .then((s) => (selectedStemma = s))
-            .finally(() => (isWaiting = false));
+        waiting = model.removePerson(selectedStemmaDescription.id, personId, stemmaIndex).then((s) => (selectedStemma = s));
         pinnedPeople = pinnedPeople.remove(personId);
     }
 
@@ -141,19 +106,11 @@
     }
 
     function handleStemmaRemoval(stemmaId) {
-        isWaiting = true;
-        waiting = model
-            .removeStemma(stemmaId)
-            .then((st) => (ownedStemmasDescriptions = st.stemmas))
-            .finally(() => (isWaiting = false));
+        waiting = model.removeStemma(stemmaId).then((st) => (ownedStemmasDescriptions = st.stemmas));
     }
 
     function handleInvitationCreation(e: CreateInviteLink) {
-        isWaiting = true;
-        waiting = model
-            .createInvintation(selectedStemmaDescription.id, e.personId, e.email, stemmaIndex)
-            .then((link) => inviteModal.setInviteLink(link))
-            .finally(() => (isWaiting = false));
+        waiting = model.createInvintation(selectedStemmaDescription.id, e.personId, e.email, stemmaIndex).then((link) => inviteModal.setInviteLink(link));
     }
 
     function updateEverythingOnStemmaChange(stemmaId: string, stemma: Stemma) {
@@ -178,22 +135,14 @@
         return { si, hg };
     }
 
-    $: if (selectedStemmaDescription) {
-        isWaiting = true;
-        waiting = model
-            .getStemma(selectedStemmaDescription.id)
-            .then((s) => {
-                let { si, pp, hg } = updateEverythingOnStemmaChange(selectedStemmaDescription.id, s);
-                selectedStemma = s;
-                stemmaIndex = si;
-                pinnedPeople = pp;
-                highlight = hg;
-            })
-            .finally(() => (isWaiting = false));
-    }
-
-    $: if (ownedStemmasDescriptions && ownedStemmasDescriptions.length == 0) {
-        addStemmaModal.promptNewStemma(true);
+    $: if (selectedStemmaDescription && signedIn) {
+        waiting = model.getStemma(selectedStemmaDescription.id).then((s) => {
+            let { si, pp, hg } = updateEverythingOnStemmaChange(selectedStemmaDescription.id, s);
+            selectedStemma = s;
+            stemmaIndex = si;
+            pinnedPeople = pp;
+            highlight = hg;
+        });
     }
 
     $: if (selectedStemma) {

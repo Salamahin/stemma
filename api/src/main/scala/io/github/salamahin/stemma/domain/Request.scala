@@ -22,7 +22,7 @@ case class BearInvitationRequest(encodedToken: String)                          
 case class CreateNewStemmaRequest(stemmaName: String)               extends Request
 case class GetStemmaRequest(stemmaId: String)                       extends Request
 case class DeleteStemmaRequest(stemmaId: String)                    extends Request
-case class ListStemmasRequest()                                     extends Request
+case class ListDescribeStemmasRequest(defaultStemmaName: String)    extends Request
 case class CloneStemmaRequest(stemmaId: String, stemmaName: String) extends Request
 
 case class DeletePersonRequest(stemmaId: String, personId: String)                               extends Request

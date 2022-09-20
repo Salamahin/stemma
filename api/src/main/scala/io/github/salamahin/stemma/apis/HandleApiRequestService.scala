@@ -12,7 +12,7 @@ object HandleApiRequestService {
     api <- ZIO.service[ApiService]
   } yield new HandleApiRequestService {
     override def handle(email: String, req: Request): IO[StemmaError, Response] = req match {
-      case ListStemmasRequest()                        => api.listStemmas(email)
+      case req @ ListDescribeStemmasRequest(_)         => api.listDescribeStemmas(email, req)
       case req @ CreateFamilyRequest(_, _)             => api.createFamily(email, req)
       case req @ CreateInvitationTokenRequest(_, _, _) => api.createInvitationToken(email, req)
       case req @ CreateNewStemmaRequest(_)             => api.createNewStemma(email, req)
