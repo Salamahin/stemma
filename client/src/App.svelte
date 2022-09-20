@@ -5,7 +5,7 @@
     import FamilySelectionModal, { GetOrCreateFamily } from "./components/family_modal/FamilyDetailsModal.svelte";
     import PersonSelectionModal, { UpdatePerson } from "./components/person_details_modal/PersonDetailsModal.svelte";
     import FullStemma from "./components/FullStemma.svelte";
-    import { Model, StemmaDescription, User, Stemma, PersonDescription, FamilyDescription } from "./model";
+    import { StemmaDescription, User, Stemma, PersonDescription, FamilyDescription } from "./model";
     import { StemmaIndex } from "./stemmaIndex";
     import { HiglightLineages } from "./highlight";
     import { PinnedPeopleStorage } from "./pinnedPeopleStorage";
@@ -14,7 +14,7 @@
     import InviteModal, { CreateInviteLink } from "./components/invite_modal/InviteModal.svelte";
     import { Circle2 } from "svelte-loading-spinners";
     import AboutModal from "./components/about/About.svelte";
-    import { Stores as AppController } from "./appStores";
+    import { AppController } from "./appController";
 
     export let google_client_id;
     export let stemma_backend_url;
@@ -29,15 +29,26 @@
 
     let signedIn = false;
 
-    let ownedStemmasDescriptions: StemmaDescription[];
-    let selectedStemmaDescription: StemmaDescription;
-    let selectedStemma: Stemma;
+    let ownedStemmas: StemmaDescription[];
+    let currentStemma: StemmaDescription;
+    let stemma: Stemma;
     let stemmaIndex: StemmaIndex;
-    let lookupPersonName;
     let highlight: HiglightLineages;
     let pinnedPeople: PinnedPeopleStorage;
+    let lookupPersonName: string;
+    let isWorking: boolean;
+    let error: Error;
 
-    let contoller = new AppController(stemma_backend_url);
+    let controller = new AppController(stemma_backend_url);
+    controller.currentStemma.subscribe((s) => (currentStemma = s));
+    controller.stemma.subscribe((s) => (stemma = s));
+    controller.ownedStemmas.subscribe((os) => (ownedStemmas = os));
+    controller.stemmaIndex.subscribe((si) => (stemmaIndex = si));
+    controller.highlight.subscribe((hg) => (highlight = hg));
+    controller.pinnedStorage.subscribe((pp) => (pinnedPeople = pp));
+    controller.isWorking.subscribe((iw) => (isWorking = iw));
+    controller.err.subscribe((e) => (error = e));
+    controller.invitationToken.subscribe((it) => inviteModal.setInviteLink(it));
 
     function handleSignIn(user: User) {
         console.log("handle sign in");
@@ -48,53 +59,12 @@
             urlParams.delete("inviteToken");
             window.history.pushState({}, document.title, window.location.pathname);
 
-            contoller.authenticateAndBearToken(user, token);
+            controller.authenticateAndBearToken(user, token);
         } else {
-            contoller.authenticateAndListStemmas(user);
+            controller.authenticateAndListStemmas(user);
         }
 
         signedIn = true;
-    }
-
-    function handleNewStemma(name: string) {
-        waiting = model.addStemma(name).then((newStemmaDescription) => {
-            ownedStemmasDescriptions = [...ownedStemmasDescriptions, newStemmaDescription];
-            selectedStemmaDescription = newStemmaDescription;
-        });
-    }
-
-    function handleNewFamilyCreation(request: GetOrCreateFamily) {
-        waiting = model.createFamily(selectedStemmaDescription.id, request.parents, request.children, stemmaIndex).then((s) => (selectedStemma = s));
-    }
-
-    function hadlePersonUpdated(request: UpdatePerson) {
-        pinnedPeople = request.pin ? pinnedPeople.add(request.id) : pinnedPeople.remove(request.id);
-
-        let originalPerson = stemmaIndex.person(request.id);
-
-        if (
-            originalPerson.birthDate != request.description.birthDate ||
-            originalPerson.deathDate != request.description.deathDate ||
-            originalPerson.name != request.description.name ||
-            originalPerson.bio != request.description.bio
-        ) {
-            waiting = model.updatePerson(selectedStemmaDescription.id, request.id, request.description, stemmaIndex).then((s) => (selectedStemma = s));
-        }
-    }
-
-    function handleFamilyUpdated(request: GetOrCreateFamily) {
-        waiting = model
-            .updateFamily(selectedStemmaDescription.id, request.familyId, request.parents, request.children, stemmaIndex)
-            .then((s) => (selectedStemma = s));
-    }
-
-    function handleFamilyRemoved(familyId: string) {
-        waiting = model.removeFamily(selectedStemmaDescription.id, familyId).then((s) => (selectedStemma = s));
-    }
-
-    function handlePersonRemoved(personId: string) {
-        waiting = model.removePerson(selectedStemmaDescription.id, personId, stemmaIndex).then((s) => (selectedStemma = s));
-        pinnedPeople = pinnedPeople.remove(personId);
     }
 
     function handlePersonSelection(personDetails: PersonDescription) {
@@ -105,56 +75,8 @@
         familySelectionModal.showExistingFamily(familyDetails);
     }
 
-    function handleStemmaRemoval(stemmaId) {
-        waiting = model.removeStemma(stemmaId).then((st) => (ownedStemmasDescriptions = st.stemmas));
-    }
-
-    function handleInvitationCreation(e: CreateInviteLink) {
-        waiting = model.createInvintation(selectedStemmaDescription.id, e.personId, e.email, stemmaIndex).then((link) => inviteModal.setInviteLink(link));
-    }
-
-    function updateEverythingOnStemmaChange(stemmaId: string, stemma: Stemma) {
-        let pp = new PinnedPeopleStorage(stemmaId);
-        pp.load();
-
-        let si = new StemmaIndex(stemma);
-        let hg = new HiglightLineages(si, pp.allPinned());
-
-        return { si, pp, hg };
-    }
-
-    function updateHighlightOnPinnedPeopleChange(pp: PinnedPeopleStorage) {
-        let hg = new HiglightLineages(stemmaIndex, pp.allPinned());
-        return hg;
-    }
-
-    function updateIndexAndHighlightOnStemmaChange(stemma: Stemma) {
-        let si = new StemmaIndex(stemma);
-        let hg = new HiglightLineages(si, pinnedPeople.allPinned());
-
-        return { si, hg };
-    }
-
-    $: if (selectedStemmaDescription && signedIn) {
-        waiting = model.getStemma(selectedStemmaDescription.id).then((s) => {
-            let { si, pp, hg } = updateEverythingOnStemmaChange(selectedStemmaDescription.id, s);
-            selectedStemma = s;
-            stemmaIndex = si;
-            pinnedPeople = pp;
-            highlight = hg;
-        });
-    }
-
-    $: if (selectedStemma) {
-        let { si, hg } = updateIndexAndHighlightOnStemmaChange(selectedStemma);
-        stemmaIndex = si;
-        highlight = hg;
-    }
-
-    $: if (pinnedPeople) highlight = updateHighlightOnPinnedPeopleChange(pinnedPeople);
-
     $: if (lookupPersonName && stemmaChart) {
-        let results = fuzzysort.go(lookupPersonName, selectedStemma.people, { key: "name" });
+        let results = fuzzysort.go(lookupPersonName, stemma.people, { key: "name" });
         if (results.length) stemmaChart.zoomToNode(results[0].obj.id);
     }
 
@@ -162,33 +84,33 @@
 </script>
 
 {#if signedIn}
-    <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={(e) => handleNewStemma(e.detail)} />
+    <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={(e) => controller.addStemma(e.detail)} />
 
-    <RemoveStemmaModal bind:this={removeStemmaModal} on:stemmaRemoved={(e) => handleStemmaRemoval(e.detail)} />
+    <RemoveStemmaModal bind:this={removeStemmaModal} on:stemmaRemoved={(e) => controller.removeStemma(e.detail)} />
 
     <FamilySelectionModal
         bind:this={familySelectionModal}
-        stemma={selectedStemma}
+        {stemma}
         {stemmaIndex}
-        on:familyAdded={(e) => handleNewFamilyCreation(e.detail)}
-        on:familyUpdated={(e) => handleFamilyUpdated(e.detail)}
-        on:familyRemoved={(e) => handleFamilyRemoved(e.detail)}
+        on:familyAdded={(e) => controller.createFamily(e.detail.parents, e.detail.children)}
+        on:familyUpdated={(e) => controller.updateFamily(e.detail.familyId, e.detail.parents, e.detail.children)}
+        on:familyRemoved={(e) => controller.removeFamily(e.detail)}
     />
 
     <PersonSelectionModal
         bind:this={personSelectionModal}
-        on:personRemoved={(e) => handlePersonRemoved(e.detail)}
-        on:personUpdated={(e) => hadlePersonUpdated(e.detail)}
+        on:personRemoved={(e) => controller.removePerson(e.detail)}
+        on:personUpdated={(e) => controller.updatePerson(e.detail.id, e.detail.description, e.detail.pin)}
     />
 
-    <InviteModal bind:this={inviteModal} stemma={selectedStemma} {stemmaIndex} on:invite={(e) => handleInvitationCreation(e.detail)} />
+    <InviteModal bind:this={inviteModal} {stemma} {stemmaIndex} on:invite={(e) => controller.createInvitationToken(e.detail.personId, e.detail.email)} />
     <AboutModal bind:this={aboutModal} />
 
     <Navbar
-        bind:ownedStemmasDescriptions
-        bind:selectedStemmaDescription
+        bind:ownedStemmasDescriptions={ownedStemmas}
+        bind:selectedStemmaDescription={currentStemma}
         bind:lookupPersonName
-        bind:disabled={isWaiting}
+        bind:disabled={isWorking}
         on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
         on:createNewFamily={() => familySelectionModal.promptNewFamily()}
         on:removeStemma={(e) => removeStemmaModal.askForConfirmation(e.detail)}
@@ -196,25 +118,25 @@
         on:about={() => aboutModal.show()}
     />
 
-    {#await waiting}
-        <div class="position-absolute top-50 start-50 translate-middle">
-            <Circle2 />
-            <p class="mt-2">Минуту...</p>
-        </div>
-    {:catch error}
+    {#if error}
         <div>
             <div class="alert alert-danger alert-dismissible fade mt-2 mx-2 show">
                 <button type="button" class="btn-close" data-bs-dismiss="alert" />
                 <div><strong>Упс! </strong>{error.message}</div>
             </div>
         </div>
-    {/await}
+    {/if}
 
-    {#if !isWaiting}
+    {#if isWorking}
+        <div class="position-absolute top-50 start-50 translate-middle">
+            <Circle2 />
+            <p class="mt-2">Минуту...</p>
+        </div>
+    {:else}
         <FullStemma
             bind:this={stemmaChart}
-            stemma={selectedStemma}
-            stemmaId={selectedStemmaDescription.id}
+            {stemma}
+            stemmaId={currentStemma.id}
             {stemmaIndex}
             {highlight}
             {pinnedPeople}

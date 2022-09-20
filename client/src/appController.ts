@@ -2,18 +2,19 @@ import { Highlight, HiglightLineages } from './highlight';
 import { CreateNewPerson, Model, OwnedStemmas, PersonDefinition, Stemma, StemmaDescription, User } from './model';
 import { PinnedPeopleStorage } from './pinnedPeopleStorage';
 import { StemmaIndex } from './stemmaIndex';
-import { writable, get } from 'svelte/store'
+import { writable, get } from 'svelte/store';
+import isEqual from 'lodash.isequal';
 
-export class Stores {
-    stemma = writable(null)
-    stemmaIndex = writable(null)
-    pinnedStorage = writable(null)
-    highlight = writable(null)
-    ownedStemmas = writable([])
-    currentStemma = writable(null)
-    isWorking = writable(false)
-    invitationToken = writable(null)
-    err = writable(null)
+export class AppController {
+    stemma = writable<Stemma>(null)
+    stemmaIndex = writable<StemmaIndex>(null)
+    pinnedStorage = writable<PinnedPeopleStorage>(null)
+    highlight = writable<HiglightLineages>(null)
+    ownedStemmas = writable<Array<StemmaDescription>>([])
+    currentStemma = writable<StemmaDescription>(null)
+    isWorking = writable<boolean>(false)
+    invitationToken = writable<string>(null)
+    err = writable<Error>(null)
 
     private model: Model
     private stemmaBackendUrl: string
@@ -117,17 +118,33 @@ export class Stores {
         this.manipulateStemma((model, stemmaId) => model.removeFamily(stemmaId, familyId))
     }
 
-    updatePerson(personId: string, descr: CreateNewPerson) {
-        this.manipulateStemma((model, stemmaId) => model.updatePerson(stemmaId, personId, descr, get(this.stemmaIndex)))
+    updatePerson(personId: string, descr: CreateNewPerson, pin: boolean) {
+        let pp = get(this.pinnedStorage)
+        let si = get(this.stemmaIndex)
+
+        if (pin) pp.add(personId)
+        else pp.remove(personId)
+
+        let originalPerson = si.person(personId);
+        if (
+            originalPerson.birthDate != descr.birthDate ||
+            originalPerson.deathDate != descr.deathDate ||
+            originalPerson.name != descr.name ||
+            originalPerson.bio != descr.bio
+        ) {
+            this.manipulateStemma((model, stemmaId) => model.updatePerson(stemmaId, personId, descr, si))
+        }
     }
 
     removePerson(personId: string) {
         this.manipulateStemma((model, stemmaId) => model.removePerson(stemmaId, personId, get(this.stemmaIndex)))
     }
 
-    createInvitationToken(personId: string, email: string): Promise<string> {
-        return this.model
+    createInvitationToken(personId: string, email: string) {
+        this.invitationToken.set(null)
+        this.model
             .createInvintation(get(this.currentStemma).id, personId, email, get(this.stemmaIndex))
+            .then(tkn => this.invitationToken.set(tkn))
     }
 
     private manipulateStemma(action: (m: Model, currentStemmaId: string) => Promise<Stemma>) {
