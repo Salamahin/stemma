@@ -17,6 +17,7 @@ export type DeleteStemmaRequest = { stemmaId: string }
 export type UpdatePersonRequest = { stemmaId: string, personId: string, personDescr: CreateNewPerson }
 export type UpdateFamilyRequest = { stemmaId: string, familyId: string, familyDescr: CreateFamily }
 export type BearInvitationRequest = { encodedToken: string }
+export type CloneStemmarequest = { stemmaId: string, stemmaName: string }
 export type ListStemmasRequest = {}
 
 type CompositeRequest = {
@@ -127,7 +128,7 @@ export class Model {
         return (await this.parseResponse(response, stemmaIndex)).Stemma;
     }
 
-    async updateFamily(stemmaId: string, familyId: string, parents: PersonDefinition[], children: PersonDefinition[],  stemmaIndex: StemmaIndex): Promise<Stemma> {
+    async updateFamily(stemmaId: string, familyId: string, parents: PersonDefinition[], children: PersonDefinition[], stemmaIndex: StemmaIndex): Promise<Stemma> {
         const response = await this.sendRequest({ UpdateFamilyRequest: { stemmaId: stemmaId, familyId: familyId, familyDescr: this.makeFamily(parents, children) } })
         return (await this.parseResponse(response, stemmaIndex)).Stemma;
     }
@@ -163,7 +164,7 @@ export class Model {
         return (await this.parseResponse(response, stemmaIndex)).Stemma
     }
 
-    private async parseResponse(response: Response, stemmaIndex? : StemmaIndex) {
+    private async parseResponse(response: Response, stemmaIndex?: StemmaIndex) {
         const json = await response.json();
         if (!response.ok) {
             console.error(json)

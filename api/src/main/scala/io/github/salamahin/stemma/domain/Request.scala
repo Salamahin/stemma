@@ -19,10 +19,11 @@ case class DeleteFamilyRequest(stemmaId: String, familyId: String)              
 case class CreateInvitationTokenRequest(stemmaId: String, targetPersonId: String, targetPersonEmail: String) extends Request
 case class BearInvitationRequest(encodedToken: String)                                                       extends Request
 
-case class CreateNewStemmaRequest(stemmaName: String) extends Request
-case class GetStemmaRequest(stemmaId: String)         extends Request
-case class DeleteStemmaRequest(stemmaId: String)      extends Request
-case class ListStemmasRequest()                       extends Request
+case class CreateNewStemmaRequest(stemmaName: String)               extends Request
+case class GetStemmaRequest(stemmaId: String)                       extends Request
+case class DeleteStemmaRequest(stemmaId: String)                    extends Request
+case class ListStemmasRequest()                                     extends Request
+case class CloneStemmaRequest(stemmaId: String, stemmaName: String) extends Request
 
 case class DeletePersonRequest(stemmaId: String, personId: String)                               extends Request
 case class UpdatePersonRequest(stemmaId: String, personId: String, personDescr: CreateNewPerson) extends Request

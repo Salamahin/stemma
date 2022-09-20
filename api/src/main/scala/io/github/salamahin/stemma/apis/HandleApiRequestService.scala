@@ -23,6 +23,7 @@ object HandleApiRequestService {
       case req @ UpdatePersonRequest(_, _, _)          => api.updatePerson(email, req)
       case req @ UpdateFamilyRequest(_, _, _)          => api.updateFamily(email, req)
       case req @ BearInvitationRequest(_)              => api.bearInvitation(email, req)
+      case req @ CloneStemmaRequest(_, _)              => api.cloneStemma(email, req)
     }
   })
 }
