@@ -45,6 +45,7 @@
     let isWaiting: boolean = false;
 
     function handleSignIn(user: User) {
+        console.log("handle sign in");
         signedIn = true;
         model = new Model(stemma_backend_url, user);
 
@@ -207,6 +208,8 @@
         let results = fuzzysort.go(lookupPersonName, selectedStemma.people, { key: "name" });
         if (results.length) stemmaChart.zoomToNode(results[0].obj.id);
     }
+
+    $: console.log(`signedIn ${signedIn}`);
 </script>
 
 {#if signedIn}
@@ -273,7 +276,13 @@
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
-            <Authenticate {google_client_id} on:signIn={(e) => handleSignIn(e.detail)} />
+            <Authenticate
+                {google_client_id}
+                on:signIn={(e) => {
+                    console.log("new sign in signal");
+                    handleSignIn(e.detail);
+                }}
+            />
         </div>
     </div>
 {/if}
