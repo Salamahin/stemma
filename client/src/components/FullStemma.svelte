@@ -16,6 +16,7 @@
         normalizeId,
         renderChart,
         updateSimulation,
+        denormalizeId,
     } from "../graphTools";
     import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
 
@@ -27,19 +28,19 @@
         "M4.146.146A.5.5 0 0 1 4.5 0h7a.5.5 0 0 1 .5.5c0 .68-.342 1.174-.646 1.479-.126.125-.25.224-.354.298v4.431l.078.048c.203.127.476.314.751.555C12.36 7.775 13 8.527 13 9.5a.5.5 0 0 1-.5.5h-4v4.5c0 .276-.224 1.5-.5 1.5s-.5-1.224-.5-1.5V10h-4a.5.5 0 0 1-.5-.5c0-.973.64-1.725 1.17-2.189A5.921 5.921 0 0 1 5 6.708V2.277a2.77 2.77 0 0 1-.354-.298C4.342 1.674 4 1.179 4 .5a.5.5 0 0 1 .146-.354z";
 
     export let stemma: Stemma;
-    export let stemmaId: string;
+    export let currentStemmaId: string;
     export let stemmaIndex: StemmaIndex;
     export let highlight: HiglightLineages;
     export let pinnedPeople: PinnedPeopleStorage;
 
     window.addEventListener("beforeunload", (e) => {
-        saveCoordinates(stemmaId);
+        saveCoordinates(currentStemmaId);
     });
 
     let svg;
 
     $: if (svg && stemma) {
-        loadCoordinates(stemmaId);
+        loadCoordinates(currentStemmaId);
         let [nodes, relations] = makeNodesAndRelations(stemma.people, stemma.families);
         reconfigureGraph(nodes, relations);
     }
@@ -57,19 +58,24 @@
             .each((d) => {
                 d.fixed = false;
             });
-        pinnedPeople.allPinned().forEach((personId) => {
-            d3.select("#" + normalizeId("person", personId))
-                .append("path")
-                .attr("d", pin)
-                .attr("class", "pin")
-                .attr("transform", "translate(-8.25, -6)")
-                .attr("fill", "white")
-                .each((d) => {
-                    d.fixed = true;
-                    d.fx = d.x;
-                    d.fy = d.y;
-                });
-        });
+
+        pinnedPeople
+            .allPinned()
+            .map((id) => normalizeId("person", id))
+            .forEach((personId) => {
+                d3.select(`#${personId}`)
+                    .append("path")
+                    .attr("d", pin)
+                    .attr("class", "pin")
+                    .attr("transform", "translate(-8.25, -6)")
+                    .attr("fill", "white")
+                    .each((d) => {
+                        d.fixed = true;
+                        d.fx = d.x;
+                        d.fy = d.y;
+                    });
+            });
+
         d3.select("g.main")
             .selectAll("g")
             .each((d) => {
@@ -78,6 +84,7 @@
                     d.fy = null;
                 }
             });
+
         simulation.alphaTarget(0.1).restart();
     }
 
@@ -113,13 +120,13 @@
             .selectAll("g")
             .on("mouseenter", function (event, node) {
                 if (node.type == "person") {
-                    highlight.pushPerson(node.id);
+                    highlight.pushPerson(denormalizeId(node.id));
                     renderFullStemma();
                     d3.select(this).select("circle").attr("r", hoveredPersonR);
                     d3.select(this).select("text").attr("font-weight", "bold");
                 }
                 if (node.type == "family") {
-                    highlight.pushFamily(node.id);
+                    highlight.pushFamily(denormalizeId(node.id));
                     renderFullStemma();
                     d3.select(this).select("circle").attr("r", hoveredFamilyR);
                 }
@@ -130,18 +137,18 @@
             })
             .on("click", (event, node) => {
                 if (node.type == "person") {
-                    let selectedPerson = stemmaIndex.person(node.id);
+                    let selectedPerson = stemmaIndex.person(denormalizeId(node.id));
                     dispatch("personSelected", selectedPerson);
                 }
 
                 if (node.type == "family") {
-                    let selectedFamily = stemmaIndex.family(node.id);
+                    let selectedFamily = stemmaIndex.family(denormalizeId(node.id));
                     dispatch("familySelected", selectedFamily);
                 }
             });
 
         renderChart(svg, highlight, stemmaIndex);
-        makeDrag(svg, simulation, stemmaId);
+        makeDrag(svg, simulation, currentStemmaId);
     }
 
     onMount(() => {

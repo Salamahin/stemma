@@ -17,7 +17,8 @@ export type DeleteStemmaRequest = { stemmaId: string }
 export type UpdatePersonRequest = { stemmaId: string, personId: string, personDescr: CreateNewPerson }
 export type UpdateFamilyRequest = { stemmaId: string, familyId: string, familyDescr: CreateFamily }
 export type BearInvitationRequest = { encodedToken: string }
-export type ListStemmasRequest = {}
+export type CloneStemmaRequest = { stemmaId: string, stemmaName: string }
+export type ListDescribeStemmasRequest = { defaultStemmaName: string }
 
 type CompositeRequest = {
     CreateFamilyRequest?: CreateFamilyRequest,
@@ -28,9 +29,10 @@ type CompositeRequest = {
     CreateNewStemmaRequest?: CreateNewStemmaRequest,
     GetStemmaRequest?: GetStemmaRequest,
     DeleteStemmaRequest?: DeleteStemmaRequest,
-    ListStemmasRequest?: ListStemmasRequest,
+    ListDescribeStemmasRequest?: ListDescribeStemmasRequest,
     DeletePersonRequest?: DeletePersonRequest,
     UpdatePersonRequest?: UpdatePersonRequest,
+    CloneStemmaRequest?: CloneStemmaRequest
 }
 
 
@@ -38,11 +40,12 @@ type CompositeRequest = {
 export type ChownEffect = { affectedFamilies: Array<string>, affectedPeople: Array<string> }
 export type FamilyDescription = { id: string, parents: Array<string>, children: Array<string>, readOnly: boolean }
 export type InviteToken = { token: string }
-export type OwnedStemmasDescription = { stemmas: Array<StemmaDescription> }
+export type OwnedStemmas = { stemmas: Array<StemmaDescription>, firstStemma: Stemma }
 export type Stemma = { people: Array<PersonDescription>, families: Array<FamilyDescription> }
 export type StemmaDescription = { id: string, name: string, removable: Boolean }
 export type PersonDescription = { id: string, name: string, birthDate?: string, deathDate?: string, bio?: string, readOnly: boolean }
-export type TokenAccepted = {}
+export type TokenAccepted = { stemmas: Array<StemmaDescription>, lastStema: Stemma }
+export type CloneResult = { createdStemma: Stemma, stemmas: Array<StemmaDescription> }
 
 //errors
 export type UnknownError = { cause: string }
@@ -62,11 +65,12 @@ type CompositeResponse = {
     ChownEffect?: ChownEffect,
     FamilyDescription?: FamilyDescription,
     InviteToken?: InviteToken,
-    OwnedStemmasDescription?: OwnedStemmasDescription,
+    OwnedStemmas?: OwnedStemmas,
     Stemma?: Stemma,
     StemmaDescription?: StemmaDescription,
     PersonDescription?: PersonDescription,
     TokenAccepted?: TokenAccepted,
+    CloneResult?: CloneResult,
     UnknownError?: UnknownError,
     RequestDeserializationProblem?: RequestDeserializationProblem,
     NoSuchPersonId?: NoSuchPersonId,
@@ -96,15 +100,15 @@ export class Model {
         }
     }
 
-    async listStemmas(): Promise<OwnedStemmasDescription> {
-        const response = await this.sendRequest({ ListStemmasRequest: {} })
+    async listDescribeStemmas(): Promise<OwnedStemmas> {
+        const response = await this.sendRequest({ ListDescribeStemmasRequest: { defaultStemmaName: "Моя родословная" } })
         const x = await this.parseResponse(response, null)
-        return x.OwnedStemmasDescription
+        return x.OwnedStemmas
     }
 
-    async removeStemma(stemmaId: string): Promise<OwnedStemmasDescription> {
+    async removeStemma(stemmaId: string): Promise<OwnedStemmas> {
         const response = await this.sendRequest({ DeleteStemmaRequest: { stemmaId: stemmaId } })
-        return (await this.parseResponse(response)).OwnedStemmasDescription;
+        return (await this.parseResponse(response)).OwnedStemmas;
     }
 
     async getStemma(stemmaId: string): Promise<Stemma> {
@@ -127,7 +131,7 @@ export class Model {
         return (await this.parseResponse(response, stemmaIndex)).Stemma;
     }
 
-    async updateFamily(stemmaId: string, familyId: string, parents: PersonDefinition[], children: PersonDefinition[],  stemmaIndex: StemmaIndex): Promise<Stemma> {
+    async updateFamily(stemmaId: string, familyId: string, parents: PersonDefinition[], children: PersonDefinition[], stemmaIndex: StemmaIndex): Promise<Stemma> {
         const response = await this.sendRequest({ UpdateFamilyRequest: { stemmaId: stemmaId, familyId: familyId, familyDescr: this.makeFamily(parents, children) } })
         return (await this.parseResponse(response, stemmaIndex)).Stemma;
     }
@@ -148,7 +152,7 @@ export class Model {
         return `${location.origin}/?inviteToken=${encodeURIComponent(token.token)}`
     }
 
-    async proposeInvitationToken(token: string): Promise<TokenAccepted> {
+    async bearInvitationToken(token: string): Promise<TokenAccepted> {
         const response = await this.sendRequest({ BearInvitationRequest: { encodedToken: token } })
         return (await this.parseResponse(response, null)).TokenAccepted
     }
@@ -163,7 +167,12 @@ export class Model {
         return (await this.parseResponse(response, stemmaIndex)).Stemma
     }
 
-    private async parseResponse(response: Response, stemmaIndex? : StemmaIndex) {
+    async cloneStemma(stemmaId: string, name: string): Promise<CloneResult> {
+        const response = await this.sendRequest({ CloneStemmaRequest: { stemmaId: stemmaId, stemmaName: name } })
+        return (await this.parseResponse(response)).CloneResult
+    }
+
+    private async parseResponse(response: Response, stemmaIndex?: StemmaIndex) {
         const json = await response.json();
         if (!response.ok) {
             console.error(json)

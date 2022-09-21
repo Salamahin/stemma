@@ -6,9 +6,9 @@ import io.github.salamahin.stemma.service.{StorageService, UserService}
 import zio.{IO, UIO, URLayer, ZIO, ZLayer}
 
 trait ApiService {
-  def listStemmas(email: String): UIO[OwnedStemmasDescription]
+  def listDescribeStemmas(email: String, request: ListDescribeStemmasRequest): UIO[OwnedStemmas]
   def bearInvitation(email: String, request: BearInvitationRequest): IO[StemmaError, TokenAccepted]
-  def deleteStemma(email: String, request: DeleteStemmaRequest): IO[StemmaError, OwnedStemmasDescription]
+  def deleteStemma(email: String, request: DeleteStemmaRequest): IO[StemmaError, OwnedStemmas]
   def createNewStemma(email: String, request: CreateNewStemmaRequest): UIO[StemmaDescription]
   def stemma(email: String, requst: GetStemmaRequest): IO[StemmaError, Stemma]
   def deletePerson(email: String, request: DeletePersonRequest): IO[StemmaError, Stemma]
@@ -17,6 +17,7 @@ trait ApiService {
   def createFamily(email: String, request: CreateFamilyRequest): IO[StemmaError, Stemma]
   def deleteFamily(email: String, request: DeleteFamilyRequest): IO[StemmaError, Stemma]
   def updateFamily(email: String, request: UpdateFamilyRequest): IO[StemmaError, Stemma]
+  def cloneStemma(email: String, request: CloneStemmaRequest): IO[StemmaError, CloneResult]
 }
 
 object ApiService extends LazyLogging {
@@ -30,14 +31,27 @@ object ApiService extends LazyLogging {
         _ = logger.info(s"User was associated with $u")
       } yield u
 
-    def listStemmas(email: String) =
+    override def listDescribeStemmas(email: String, request: ListDescribeStemmasRequest): UIO[OwnedStemmas] = {
       for {
         user <- user(email)
 
-        _       = logger.info(s"[$user] Requested list of owned stemmas")
-        stemmas <- s.listOwnedStemmas(user.userId)
-        _       = logger.info(s"[$user] Onwed stemmas: ${stemmas.stemmas}")
-      } yield stemmas
+        _               = logger.info(s"[$user] Requested list of owned stemmas with first stemma description")
+        existingStemmas <- s.listOwnedStemmas(user.userId)
+
+        createdStemma <- if (existingStemmas.isEmpty) {
+                          logger.info(s"User has no stemmas yet, would create a new one with name ${request.defaultStemmaName}")
+                          s.createStemma(user.userId, request.defaultStemmaName).map(Some.apply)
+                        } else {
+                          ZIO.succeed(None)
+                        }
+
+        describedStemma <- if (existingStemmas.isEmpty) ZIO.succeed(None) else s.stemma(user.userId, existingStemmas.head.id).map(Some.apply).orDie
+        _               = logger.info(s"[$user] Onwed stemmas: $existingStemmas")
+      } yield OwnedStemmas(
+        existingStemmas ++ createdStemma.map(id => StemmaDescription(id, request.defaultStemmaName, true)),
+        Some(describedStemma.getOrElse(Stemma(Nil, Nil)))
+      )
+    }
 
     def bearInvitation(email: String, request: BearInvitationRequest) =
       for {
@@ -50,10 +64,12 @@ object ApiService extends LazyLogging {
         _ <- if (token.inviteesEmail == user.email) ZIO.succeed((): Unit)
             else ZIO.fail(ForeignInviteToken()) <* ZIO.succeed(logger.error("User beared a foreign token"))
 
-        result <- s.chown(user.userId, token.stemmaId, token.targetPersonId)
+        chownResult  <- s.chown(user.userId, token.stemmaId, token.targetPersonId)
+        ownedStemmas <- s.listOwnedStemmas(user.userId)
+        stemmaDescr  <- s.stemma(user.userId, token.stemmaId)
 
-        _ = logger.info(s"[$user] Chown is complete, effected nodes $result")
-      } yield TokenAccepted()
+        _ = logger.info(s"[$user] Chown is complete, updated ownship on ${chownResult.affectedPeople.size} people and ${chownResult.affectedFamilies.size} families")
+      } yield TokenAccepted(ownedStemmas, stemmaDescr)
 
     def deleteStemma(email: String, request: DeleteStemmaRequest) =
       for {
@@ -63,7 +79,7 @@ object ApiService extends LazyLogging {
         _       <- s.removeStemma(user.userId, request.stemmaId)
         stemmas <- s.listOwnedStemmas(user.userId)
         _       = logger.info(s"[$user] Stemma removal succeed, onwed stemmas are $stemmas")
-      } yield stemmas
+      } yield OwnedStemmas(stemmas, None)
 
     def createNewStemma(email: String, request: CreateNewStemmaRequest) =
       for {
@@ -72,7 +88,7 @@ object ApiService extends LazyLogging {
         _        = logger.info(s"[$user] Creates a new stemma with name ${request.stemmaName}")
         stemmaId <- s.createStemma(user.userId, request.stemmaName)
         _        = logger.info(s"[$user] New stemma with id $stemmaId created")
-      } yield StemmaDescription(stemmaId.toString, request.stemmaName, removable = true)
+      } yield StemmaDescription(stemmaId, request.stemmaName, removable = true)
 
     def stemma(email: String, requst: GetStemmaRequest) =
       for {
@@ -144,5 +160,14 @@ object ApiService extends LazyLogging {
         stemma <- s.stemma(user.userId, request.stemmaId)
         _      = logger.info(s"[$user] Family updated, now stemma has ${stemma.people.size} people and ${stemma.families.size} families total")
       } yield stemma
+
+    override def cloneStemma(email: String, request: CloneStemmaRequest): IO[StemmaError, CloneResult] =
+      for {
+        user         <- user(email)
+        _            = logger.info(s"[$user] Asks to clone stemma with id ${request.stemmaId} into new stemma called ${request.stemmaName}")
+        clonedStemma <- s.cloneStemma(user.userId, request.stemmaId, request.stemmaName)
+        ownedStemmas <- s.listOwnedStemmas(user.userId)
+        _            = logger.info(s"[$user] Stemma cloned, it has ${clonedStemma.people.size} people and ${clonedStemma.families.size} families total, the user owns ${ownedStemmas.size} stemmas total")
+      } yield CloneResult(clonedStemma, ownedStemmas)
   })
 }

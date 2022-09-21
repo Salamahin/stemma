@@ -6,14 +6,14 @@ import java.time.LocalDate
 
 sealed trait Response
 
-case class ChownEffect(affectedFamilies: Seq[String], affectedPeople: Seq[String])                                                                         extends Response
 case class FamilyDescription(id: String, parents: List[String], children: List[String], readOnly: Boolean)                                                 extends Response
 case class InviteToken(token: String)                                                                                                                      extends Response
-case class OwnedStemmasDescription(stemmas: Seq[StemmaDescription])                                                                                        extends Response
+case class OwnedStemmas(stemmas: Seq[StemmaDescription], firstStemma: Option[Stemma])                                                                              extends Response
 case class Stemma(people: List[PersonDescription], families: List[FamilyDescription])                                                                      extends Response
 case class StemmaDescription(id: String, name: String, removable: Boolean)                                                                                 extends Response
 case class PersonDescription(id: String, name: String, birthDate: Option[LocalDate], deathDate: Option[LocalDate], bio: Option[String], readOnly: Boolean) extends Response
-case class TokenAccepted()                                                                                                                                 extends Response
+case class CloneResult(createdStemma: Stemma, stemmas: Seq[StemmaDescription])                                                                             extends Response
+case class TokenAccepted(stemmas: Seq[StemmaDescription], lastStemma: Stemma)                                                                              extends Response
 
 object FamilyDescription {
   implicit val encoder: JsonEncoder[FamilyDescription] = DeriveJsonEncoder.gen[FamilyDescription]
@@ -27,8 +27,12 @@ object StemmaDescription {
   implicit val encoder: JsonEncoder[StemmaDescription] = DeriveJsonEncoder.gen[StemmaDescription]
 }
 
-object OwnedStemmasDescription {
-  implicit val encoder: JsonEncoder[OwnedStemmasDescription] = DeriveJsonEncoder.gen[OwnedStemmasDescription]
+object OwnedStemmas {
+  implicit val encoder: JsonEncoder[OwnedStemmas] = DeriveJsonEncoder.gen[OwnedStemmas]
+}
+
+object Stemma {
+  implicit val encoder: JsonEncoder[Stemma] = DeriveJsonEncoder.gen[Stemma]
 }
 
 object Response {

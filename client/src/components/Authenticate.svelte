@@ -19,6 +19,7 @@
 
     function handleCredentialResponse(response) {
         let decoded = jwt_decode(response.credential);
+        console.log(decoded)
 
         dispatch("signIn", {
             name: decoded.given_name,

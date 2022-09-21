@@ -2,7 +2,7 @@ package io.github.salamahin.stemma.apis.restful
 
 import com.typesafe.scalalogging.LazyLogging
 import io.github.salamahin.stemma.apis.{ApiService, HandleApiRequestService}
-import io.github.salamahin.stemma.domain.{StemmaError, UnknownError, Request => DomainRequest}
+import io.github.salamahin.stemma.domain.{RequestDeserializationProblem, StemmaError, UnknownError, Request => DomainRequest}
 import io.github.salamahin.stemma.service.{InviteSecrets, StorageService, UserService}
 import zhttp.http.Middleware.cors
 import zhttp.http._
@@ -34,7 +34,7 @@ object Main extends LazyLogging with ZIOAppDefault {
                 import cats.syntax.either._
                 body
                   .fromJson[DomainRequest]
-                  .leftMap(err => UnknownError(new IllegalArgumentException(err))): Either[StemmaError, DomainRequest]
+                  .leftMap(err => RequestDeserializationProblem(err)): Either[StemmaError, DomainRequest]
               }
             )
             .flatMap(req => ZIO.service[HandleApiRequestService].flatMap(_.handle(email, req).delay(Duration.fromSeconds(2))))

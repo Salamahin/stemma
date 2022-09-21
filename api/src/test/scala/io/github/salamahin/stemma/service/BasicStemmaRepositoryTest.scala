@@ -203,7 +203,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       userStemmaId2 <- s.createStemma(userId, "second stemma")
       _             <- s.createFamily(userId, userStemmaId2, family(createJake)(createJuly, createJames))
 
-      OwnedStemmasDescription(stemmas) <- s.listOwnedStemmas(userId)
+      stemmas <- s.listOwnedStemmas(userId)
 
       render(stemma1) <- s.stemma(userId, userStemmaId1)
       render(stemma2) <- s.stemma(userId, userStemmaId2)
@@ -351,8 +351,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       creatorStemmas  <- s.listOwnedStemmas(creatorId)
       accessorStemmas <- s.listOwnedStemmas(accessorId)
     } yield assertTrue(
-      creatorStemmas.stemmas.forall(s => !s.removable),
-      accessorStemmas.stemmas.forall(s => !s.removable)
+      creatorStemmas.forall(s => !s.removable),
+      accessorStemmas.forall(s => !s.removable)
     )).provideSome(testcontainersStorage, Scope.default)
   }
 
@@ -365,7 +365,22 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       _        <- s.removeStemma(creatorId, stemmaId)
 
       stemmas <- s.listOwnedStemmas(creatorId)
-    } yield assertTrue(stemmas.stemmas.isEmpty)).provideSome(testcontainersStorage, Scope.default)
+    } yield assertTrue(stemmas.isEmpty)).provideSome(testcontainersStorage, Scope.default)
+  }
+
+  val canCloneStemma = test("can clone the stemma into a new one") {
+    (for {
+      s               <- ZIO.service[StorageService]
+      User(userId, _) <- s.getOrCreateUser("user1@test.com")
+
+      originalStemmaId <- s.createStemma(userId, "original stemma")
+
+      FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(userId, originalStemmaId, family(createJane)(createJill))
+      _                                         <- s.createFamily(userId, originalStemmaId, family(existing(jillId))(createJuly))
+
+      render(copiedStemma)   <- s.cloneStemma(userId, originalStemmaId, "cloned")
+      render(originalStemma) <- s.stemma(userId, originalStemmaId)
+    } yield assertTrue(originalStemma.toSet == copiedStemma.toSet)).provideSome(testcontainersStorage, Scope.default)
   }
 
   override def spec =
@@ -390,6 +405,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       appendChildrenToFullExistingFamily,
       appendChildrenToIncompleteExistingFamily,
       whenThereAreSeveralOwnersThenStemmaIsNotRemovable,
-      canRemoveStemmaIfOnlyOwner
+      canRemoveStemmaIfOnlyOwner,
+      canCloneStemma
     )
 }

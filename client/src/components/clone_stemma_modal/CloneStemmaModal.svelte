@@ -7,19 +7,21 @@
 
     let modalEl;
     let input;
+    let clonedStemmaId;
 
     onMount(() => {
         modalEl.addEventListener("shown.bs.modal", () => input.focus());
     });
 
-    function handleAddStemmaClick() {
+    function handleCloneStemmaClick() {
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
         let name = input.value;
         input.value = "";
-        dispatch("stemmaAdded", name);
+        dispatch("stemmaCloned", { name: name, stemmaId: clonedStemmaId });
     }
 
-    export function promptNewStemma() {
+    export function promptStemmaClone(stemmaId: string) {
+        clonedStemmaId = stemmaId;
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 </script>
@@ -37,7 +39,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addStemmaLabel">Добавить новую родословную</h5>
+                <h5 class="modal-title" id="addStemmaLabel">Клонировать родословную</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
             </div>
             <div class="modal-body">
@@ -46,7 +48,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary" on:click={handleAddStemmaClick}>Добавить</button>
+                <button type="button" class="btn btn-primary" on:click={handleCloneStemmaClick}>Клонировать</button>
             </div>
         </div>
     </div>
