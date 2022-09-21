@@ -14,9 +14,6 @@ const familyRelationWidth = "2.5px";
 const shadedRelationWidth = "0.1px";
 
 export function makeNodesAndRelations(people, families) {
-    console.log(people)
-    console.log(families)
-
     let nodes = [
         ...people.map((p) => ({
             id: normalizeId("person", p.id),
@@ -37,6 +34,7 @@ export function makeNodesAndRelations(people, families) {
             type: "familyToChild",
         }))
     );
+
     let spouseToFamily = families.flatMap((f) =>
         f.parents.map((p) => ({
             id: `${p}_${f.id}`,
@@ -44,8 +42,6 @@ export function makeNodesAndRelations(people, families) {
             target: normalizeId("family", f.id),
             type: "spouseToFamily",
         })))
-
-    console.log(famlyToChildren, spouseToFamily)
 
     let relations = [...famlyToChildren, ...spouseToFamily];
 

@@ -163,6 +163,8 @@ export class AppController {
         if (pin) pp.add(personId)
         else pp.remove(personId)
 
+        this.refreshVisual(si);
+
         let originalPerson = si.person(personId);
         if (
             originalPerson.birthDate != descr.birthDate ||
@@ -203,6 +205,12 @@ export class AppController {
             .finally(() => this.isWorking.set(false))
     }
 
+
+    private refreshVisual(index: StemmaIndex, personId: string, pinned: boolean) {
+        
+        this.pinnedStorage.update(u => u)
+        this.highlight.set(new HiglightLineages(index, get(this.pinnedStorage).allPinned()))
+    }
 
     private refreshIndexes(stemma: Stemma, stemmaId: string) {
         let pp = new PinnedPeopleStorage(stemmaId)

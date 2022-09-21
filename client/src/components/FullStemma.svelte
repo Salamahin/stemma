@@ -58,19 +58,24 @@
             .each((d) => {
                 d.fixed = false;
             });
-        pinnedPeople.allPinned().forEach((personId) => {
-            d3.select(`#${personId}`)
-                .append("path")
-                .attr("d", pin)
-                .attr("class", "pin")
-                .attr("transform", "translate(-8.25, -6)")
-                .attr("fill", "white")
-                .each((d) => {
-                    d.fixed = true;
-                    d.fx = d.x;
-                    d.fy = d.y;
-                });
-        });
+
+        pinnedPeople
+            .allPinned()
+            .map((id) => normalizeId("person", id))
+            .forEach((personId) => {
+                d3.select(`#${personId}`)
+                    .append("path")
+                    .attr("d", pin)
+                    .attr("class", "pin")
+                    .attr("transform", "translate(-8.25, -6)")
+                    .attr("fill", "white")
+                    .each((d) => {
+                        d.fixed = true;
+                        d.fx = d.x;
+                        d.fy = d.y;
+                    });
+            });
+
         d3.select("g.main")
             .selectAll("g")
             .each((d) => {
@@ -79,6 +84,7 @@
                     d.fy = null;
                 }
             });
+
         simulation.alphaTarget(0.1).restart();
     }
 
