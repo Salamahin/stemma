@@ -28,9 +28,9 @@
                         <button type="button" data-bs-target="#carouselExampleDark" data-bs-slide-to="2" aria-label="Slide 3" />
                     </div>
                     <div class="carousel-inner">
-                        <div class="carousel-item active" data-bs-interval="-1">
+                        <div class="carousel-item active" data-bs-interval="3000">
                             <div>
-                                <h6>Вы можете добавлять иформацию о семьях</h6>
+                                <h6>Вы можете добавлять информацию о семьях</h6>
                                 <p>
                                     Семья состоит из детей и родителей, и состоит как минимум из двух человек. Семья обозначается небольшим кругом. Отношения в
                                     семье показаны направленными стрелками разной толщины.
@@ -38,7 +38,7 @@
                                 <img src="/assets/create_family.webp" class="d-block w-100" alt="..." />
                             </div>
                         </div>
-                        <div class="carousel-item" data-bs-interval="2000">
+                        <div class="carousel-item" data-bs-interval="3000">
                             <div>
                                 <h6>Могут быть тезки!</h6>
                                 <p>
@@ -49,12 +49,12 @@
                             </div>
                             <img src="/assets/select_person.webp" class="d-block w-100" alt="..." />
                         </div>
-                        <div class="carousel-item">
+                        <div class="carousel-item" data-bs-interval="3000">
                             <div>
                                 <h6>Делитесь родословной</h6>
                                 <p>
-                                    Вы создавать неограниченное количество родословных доступных только вам, а можете пригласить новых пользователей 
-                                    в проект, тем самым дав им права на добавление новых и редактивроание их прямых родственников.
+                                    Вы можете создавать неограниченное количество родословных доступных только вам, а можете пригласить новых пользователей 
+                                    в проект, тем самым давая им права на добавление новых и редактирование их прямых родственников.
                                 </p>
                                 <img src="/assets/invite.webp" class="d-block w-100" alt="..." />
                             </div>
