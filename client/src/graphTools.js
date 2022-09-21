@@ -14,36 +14,40 @@ const familyRelationWidth = "2.5px";
 const shadedRelationWidth = "0.1px";
 
 export function makeNodesAndRelations(people, families) {
+    console.log(people)
+    console.log(families)
+
     let nodes = [
         ...people.map((p) => ({
-            id: p.id,
+            id: normalizeId("person", p.id),
             name: p.name,
             type: "person",
         })),
         ...families.map((f) => ({
-            id: f.id,
+            id: normalizeId("family", f.id),
             type: "family",
         })),
     ];
 
-    let relations = [
-        ...families.flatMap((f) =>
-            f.children.map((c) => ({
-                id: `${f.id}_${c}`,
-                source: f.id,
-                target: c,
-                type: "familyToChild",
-            }))
-        ),
-        ...families.flatMap((f) =>
-            f.parents.map((p) => ({
-                id: `${p}_${f.id}`,
-                source: p,
-                target: f.id,
-                type: "spouseToFamily",
-            }))
-        ),
-    ];
+    let famlyToChildren = families.flatMap((f) =>
+        f.children.map((c) => ({
+            id: `${f.id}_${c}`,
+            source: normalizeId("family", f.id),
+            target: normalizeId("person", c),
+            type: "familyToChild",
+        }))
+    );
+    let spouseToFamily = families.flatMap((f) =>
+        f.parents.map((p) => ({
+            id: `${p}_${f.id}`,
+            source: normalizeId("person", p),
+            target: normalizeId("family", f.id),
+            type: "spouseToFamily",
+        })))
+
+    console.log(famlyToChildren, spouseToFamily)
+
+    let relations = [...famlyToChildren, ...spouseToFamily];
 
     return [nodes, relations]
 }
@@ -165,6 +169,10 @@ export function normalizeId(suffix, id) {
     return `${suffix}_${id}`
 }
 
+export function denormalizeId(id) {
+    return id.split("_")[1]
+}
+
 export function mergeData(svg, nodes, relations, widht, height) {
     svg.select("g.main")
         .selectAll("line")
@@ -193,9 +201,18 @@ export function mergeData(svg, nodes, relations, widht, height) {
         .data(nodes, (n) => n.id)
         .join(
             (enter) => {
-                let g = enter.append("g").attr("id", n => normalizeId("person", n.id));
-                g.append("circle");
-                g.append("text");
+                let people = enter
+                    .filter(n => n.type == "person")
+                    .append("g")
+                    .attr("id", n => n.id);
+                people.append("circle");
+                people.append("text");
+
+                enter
+                    .filter(n => n.type == "family")
+                    .append("g")
+                    .attr("id", n => n.id)
+                    .append("circle")
             },
             (update) => {
                 update.select("text").text((node) => node.name);
@@ -207,7 +224,7 @@ export function mergeData(svg, nodes, relations, widht, height) {
 export function renderChart(svg, highlight, stemmaIndex) {
     function getNodeColor(node) {
         if (node.type == "person") {
-            let d = stemmaIndex.lineage(node.id).generation / stemmaIndex.maxGeneration();
+            let d = stemmaIndex.lineage(denormalizeId(node.id)).generation / stemmaIndex.maxGeneration();
             return d3.interpolatePlasma(d);
         } else {
             return defaultFamilyColor;
@@ -215,8 +232,8 @@ export function renderChart(svg, highlight, stemmaIndex) {
     }
 
     function lineHighlighted(line) {
-        let relatesToSelectedFamilies = highlight.familyIsHighlighted(line.source.id) || highlight.familyIsHighlighted(line.target.id);
-        let relatesToSelectedPeople = highlight.personIsHighlighted(line.source.id) || highlight.personIsHighlighted(line.target.id);
+        let relatesToSelectedFamilies = highlight.familyIsHighlighted(denormalizeId(line.source.id)) || highlight.familyIsHighlighted(denormalizeId(line.target.id));
+        let relatesToSelectedPeople = highlight.personIsHighlighted(denormalizeId(line.source.id)) || highlight.personIsHighlighted(denormalizeId(line.target.id));
 
         return relatesToSelectedFamilies && relatesToSelectedPeople;
     }
@@ -247,25 +264,25 @@ export function renderChart(svg, highlight, stemmaIndex) {
 
     circles
         .filter((t) => t.type == "person")
-        .attr("fill", (node) => (highlight.personIsHighlighted(node.id) ? getNodeColor(node) : shadedNodeColor))
+        .attr("fill", (node) => (highlight.personIsHighlighted(denormalizeId(node.id)) ? getNodeColor(node) : shadedNodeColor))
         .attr("r", personR)
 
     circles
         .filter((t) => t.type == "family")
-        .attr("fill", (node) => (highlight.familyIsHighlighted(node.id) ? defaultFamilyColor : shadedNodeColor))
+        .attr("fill", (node) => (highlight.familyIsHighlighted(denormalizeId(node.id)) ? defaultFamilyColor : shadedNodeColor))
         .attr("r", familyR)
 
     svg.select("g.main")
         .selectAll("g")
         .select("text")
-        .style("fill", (node) => (highlight.personIsHighlighted(node.id) ? null : shadedNodeColor))
+        .style("fill", (node) => (highlight.personIsHighlighted(denormalizeId(node.id)) ? null : shadedNodeColor))
         .attr("cursor", "pointer")
         .attr("font-weight", null);
 
     svg.select("g.main")
         .selectAll("g")
         .attr("cursor", "pointer")
-        .filter(p => highlight.personIsHighlighted(p.id))
+        .filter(p => highlight.personIsHighlighted(denormalizeId(p.id)))
         .raise()
 
     svg.selectAll("text")

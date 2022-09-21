@@ -16,6 +16,7 @@
         normalizeId,
         renderChart,
         updateSimulation,
+        denormalizeId,
     } from "../graphTools";
     import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
 
@@ -58,7 +59,7 @@
                 d.fixed = false;
             });
         pinnedPeople.allPinned().forEach((personId) => {
-            d3.select("#" + normalizeId("person", personId))
+            d3.select(`#${personId}`)
                 .append("path")
                 .attr("d", pin)
                 .attr("class", "pin")
@@ -113,13 +114,13 @@
             .selectAll("g")
             .on("mouseenter", function (event, node) {
                 if (node.type == "person") {
-                    highlight.pushPerson(node.id);
+                    highlight.pushPerson(denormalizeId(node.id));
                     renderFullStemma();
                     d3.select(this).select("circle").attr("r", hoveredPersonR);
                     d3.select(this).select("text").attr("font-weight", "bold");
                 }
                 if (node.type == "family") {
-                    highlight.pushFamily(node.id);
+                    highlight.pushFamily(denormalizeId(node.id));
                     renderFullStemma();
                     d3.select(this).select("circle").attr("r", hoveredFamilyR);
                 }
@@ -130,12 +131,12 @@
             })
             .on("click", (event, node) => {
                 if (node.type == "person") {
-                    let selectedPerson = stemmaIndex.person(node.id);
+                    let selectedPerson = stemmaIndex.person(denormalizeId(node.id));
                     dispatch("personSelected", selectedPerson);
                 }
 
                 if (node.type == "family") {
-                    let selectedFamily = stemmaIndex.family(node.id);
+                    let selectedFamily = stemmaIndex.family(denormalizeId(node.id));
                     dispatch("familySelected", selectedFamily);
                 }
             });

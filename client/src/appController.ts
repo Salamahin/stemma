@@ -131,9 +131,11 @@ export class AppController {
         this.model
             .addStemma(stemmaName)
             .then((result) => {
+                let stemma = { people: [], families: [] }
+                this.refreshIndexes(stemma, result.id)
                 this.ownedStemmas.update(ownedStemmas => [...ownedStemmas, result])
                 this.currentStemmaId.set(result.id)
-                this.refreshIndexes({ people: [], families: [] }, result.id)
+                this.stemma.set(stemma)
             })
             .catch(err => {
                 this.err.set(err)
