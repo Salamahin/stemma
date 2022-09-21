@@ -45,7 +45,7 @@ object ApiService extends LazyLogging {
                           ZIO.succeed(None)
                         }
 
-        describedStemma <- if (existingStemmas.nonEmpty) ZIO.succeed(None) else s.stemma(user.userId, existingStemmas.head.id).map(Some.apply).orDie
+        describedStemma <- if (existingStemmas.isEmpty) ZIO.succeed(None) else s.stemma(user.userId, existingStemmas.head.id).map(Some.apply).orDie
         _               = logger.info(s"[$user] Onwed stemmas: $existingStemmas")
       } yield OwnedStemmas(
         existingStemmas ++ createdStemma.map(id => StemmaDescription(id, request.defaultStemmaName, true)),

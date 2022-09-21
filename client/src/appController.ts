@@ -11,7 +11,7 @@ export class AppController {
     pinnedStorage = writable<PinnedPeopleStorage>(null)
     highlight = writable<HiglightLineages>(null)
     ownedStemmas = writable<Array<StemmaDescription>>([])
-    currentStemma = writable<StemmaDescription>(null)
+    currentStemmaId = writable<string>(null)
     isWorking = writable<boolean>(false)
     invitationToken = writable<string>(null)
     err = writable<Error>(null)
@@ -36,10 +36,13 @@ export class AppController {
 
                 this.refreshIndexes(stemma, selectedStemma.id)
                 this.ownedStemmas.set(result.stemmas)
-                this.currentStemma.set(selectedStemma.id)
+                this.currentStemmaId.set(selectedStemma.id)
                 this.stemma.set(stemma)
             })
-            .catch(err => this.err.set(err))
+            .catch(err => {
+                this.err.set(err)
+                console.error('Err when listing stemmas after authenticate: ', err.stack);
+            })
             .finally(() => this.isWorking.set(false))
     }
 
@@ -56,27 +59,33 @@ export class AppController {
 
                 this.refreshIndexes(stemma, selectedStemma.id)
                 this.ownedStemmas.set(result.stemmas)
-                this.currentStemma.set(selectedStemma.id)
+                this.currentStemmaId.set(selectedStemma.id)
                 this.stemma.set(stemma)
 
                 this.isWorking.set(false)
             })
-            .catch(err => this.err.set(err))
+            .catch(err => {
+                this.err.set(err)
+                console.error('Err when bearing the token: ', err.stack);
+            })
             .finally(() => this.isWorking.set(false))
     }
 
-    selectStemma(ownedStemma: StemmaDescription) {
+    selectStemma(stemmaId: string) {
         this.isWorking.set(true)
         this.err.set(null)
 
-        this.currentStemma.set(ownedStemma)
+        this.currentStemmaId.set(stemmaId)
         this.model
-            .getStemma(ownedStemma.id)
+            .getStemma(stemmaId)
             .then((result) => {
-                this.refreshIndexes(result, ownedStemma.id)
+                this.refreshIndexes(result, stemmaId)
                 this.stemma.set(result)
             })
-            .catch(err => this.err.set(err))
+            .catch(err => {
+                this.err.set(err)
+                console.error('Err when fetching stemma data: ', err.stack);
+            })
             .finally(() => this.isWorking.set(false))
     }
 
@@ -88,7 +97,31 @@ export class AppController {
             .then((result) => {
                 this.ownedStemmas.set(result.stemmas)
             })
-            .catch(err => this.err.set(err))
+            .catch(err => {
+                this.err.set(err)
+                console.error('Err when removing stemma: ', err.stack);
+            })
+            .finally(() => this.isWorking.set(false))
+    }
+
+    cloneStemma(name: string, stemmaId: string) {
+        this.isWorking.set(true)
+        this.err.set(null)
+        this.model
+            .cloneStemma(stemmaId, name)
+            .then((result) => {
+                let clonedStemmaId = result.stemmas.slice(-1)[0].id
+                let clonedStemma = result.createdStemma;
+                this.refreshIndexes(clonedStemma, clonedStemmaId)
+
+                this.ownedStemmas.set(result.stemmas)
+                this.stemma.set(clonedStemma)
+                this.currentStemmaId.set(clonedStemmaId)
+            })
+            .catch(err => {
+                this.err.set(err)
+                console.error('Err when cloning stemma: ', err.stack);
+            })
             .finally(() => this.isWorking.set(false))
     }
 
@@ -99,10 +132,13 @@ export class AppController {
             .addStemma(stemmaName)
             .then((result) => {
                 this.ownedStemmas.update(ownedStemmas => [...ownedStemmas, result])
-                this.currentStemma.set(result)
+                this.currentStemmaId.set(result.id)
                 this.refreshIndexes({ people: [], families: [] }, result.id)
             })
-            .catch(err => this.err.set(err))
+            .catch(err => {
+                this.err.set(err)
+                console.error('Err when adding a new stemma: ', err.stack);
+            })
             .finally(() => this.isWorking.set(false))
     }
 
@@ -143,12 +179,12 @@ export class AppController {
     createInvitationToken(personId: string, email: string) {
         this.invitationToken.set(null)
         this.model
-            .createInvintation(get(this.currentStemma).id, personId, email, get(this.stemmaIndex))
+            .createInvintation(get(this.currentStemmaId), personId, email, get(this.stemmaIndex))
             .then(tkn => this.invitationToken.set(tkn))
     }
 
     private manipulateStemma(action: (m: Model, currentStemmaId: string) => Promise<Stemma>) {
-        let currentStemmaId = get(this.currentStemma).id
+        let currentStemmaId = get(this.currentStemmaId)
 
         this.isWorking.set(true)
         this.err.set(null)
@@ -158,7 +194,10 @@ export class AppController {
                 this.refreshIndexes(result, currentStemmaId)
                 this.stemma.set(result)
             })
-            .catch(err => this.err.set(err))
+            .catch(err => {
+                this.err.set(err)
+                console.error('Err when manipulating stemma data: ', err.stack);
+            })
             .finally(() => this.isWorking.set(false))
     }
 

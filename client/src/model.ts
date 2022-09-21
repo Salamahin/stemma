@@ -17,7 +17,7 @@ export type DeleteStemmaRequest = { stemmaId: string }
 export type UpdatePersonRequest = { stemmaId: string, personId: string, personDescr: CreateNewPerson }
 export type UpdateFamilyRequest = { stemmaId: string, familyId: string, familyDescr: CreateFamily }
 export type BearInvitationRequest = { encodedToken: string }
-export type CloneStemmarequest = { stemmaId: string, stemmaName: string }
+export type CloneStemmaRequest = { stemmaId: string, stemmaName: string }
 export type ListDescribeStemmasRequest = { defaultStemmaName: string }
 
 type CompositeRequest = {
@@ -32,6 +32,7 @@ type CompositeRequest = {
     ListDescribeStemmasRequest?: ListDescribeStemmasRequest,
     DeletePersonRequest?: DeletePersonRequest,
     UpdatePersonRequest?: UpdatePersonRequest,
+    CloneStemmaRequest?: CloneStemmaRequest
 }
 
 
@@ -69,6 +70,7 @@ type CompositeResponse = {
     StemmaDescription?: StemmaDescription,
     PersonDescription?: PersonDescription,
     TokenAccepted?: TokenAccepted,
+    CloneResult?: CloneResult,
     UnknownError?: UnknownError,
     RequestDeserializationProblem?: RequestDeserializationProblem,
     NoSuchPersonId?: NoSuchPersonId,
@@ -163,6 +165,11 @@ export class Model {
     async updatePerson(stemmaId: string, personId: string, descr: CreateNewPerson, stemmaIndex: StemmaIndex): Promise<Stemma> {
         const response = await this.sendRequest({ UpdatePersonRequest: { stemmaId: stemmaId, personId: personId, personDescr: this.sanitize(descr) as CreateNewPerson } })
         return (await this.parseResponse(response, stemmaIndex)).Stemma
+    }
+
+    async cloneStemma(stemmaId: string, name: string): Promise<CloneResult> {
+        const response = await this.sendRequest({ CloneStemmaRequest: { stemmaId: stemmaId, stemmaName: name } })
+        return (await this.parseResponse(response)).CloneResult
     }
 
     private async parseResponse(response: Response, stemmaIndex?: StemmaIndex) {

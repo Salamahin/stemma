@@ -2,10 +2,10 @@
     import { createEventDispatcher } from "svelte";
     import { StemmaDescription } from "../model";
 
-    export let ownedStemmasDescriptions: StemmaDescription[];
-    export let selectedStemmaDescription: StemmaDescription;
+    export let ownedStemmas: StemmaDescription[];
+    export let currentStemmaId: string;
     export let lookupPersonName;
-    export let disabled: boolean
+    export let disabled: boolean;
 
     const dispatch = createEventDispatcher();
 </script>
@@ -27,23 +27,31 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarTogglerDemo02">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item dropdown {disabled? 'd-none' : ''}">
+                    <li class="nav-item dropdown {disabled ? 'd-none' : ''}">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             Родословные
                         </a>
-                        {#if ownedStemmasDescriptions}
+                        {#if ownedStemmas}
                             <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
-                                {#each ownedStemmasDescriptions as s}
+                                {#each ownedStemmas as s}
                                     <li>
                                         <div class="d-flex flex-row mt-1 me-1">
                                             <a
-                                                class="dropdown-item {s.id == selectedStemmaDescription.id ? 'active' : ''}  {disabled? 'd-none' : ''}"
+                                                class="dropdown-item {s.id == currentStemmaId ? 'active' : ''}  {disabled ? 'd-none' : ''}"
                                                 href="#"
-                                                on:click={() => (selectedStemmaDescription = s)}>{s.name}</a
+                                                on:click={() => dispatch("selectStemma", s.id)}>{s.name}</a
                                             >
-                                            {#if s.id != selectedStemmaDescription.id && s.removable}
-                                                <button type="button" class="btn btn-danger btn-sm  {disabled? 'd-none' : ''}" on:click={(e) => dispatch("removeStemma", s)}
-                                                    ><i class="bi bi-trash" /></button
+                                            {#if s.id != currentStemmaId && s.removable}
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-danger btn-sm ms-1 {disabled ? 'd-none' : ''}"
+                                                    on:click={(e) => dispatch("removeStemma", s)}><i class="bi bi-trash" /></button
+                                                >
+                                            {:else if s.id == currentStemmaId}
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-primary btn-sm ms-1 {disabled ? 'd-none' : ''}"
+                                                    on:click={(e) => dispatch("cloneStemma", s.id)}><i class="bi bi-subtract" /></button
                                                 >
                                             {/if}
                                         </div>
@@ -54,16 +62,20 @@
                                 </li>
 
                                 <li>
-                                    <a class="dropdown-item  {disabled? 'd-none' : ''}" href="#" on:click={() => dispatch("createNewStemma")}>Создать новую</a>
+                                    <a class="dropdown-item  {disabled ? 'd-none' : ''}" href="#" on:click={() => dispatch("createNewStemma")}>Создать новую</a>
                                 </li>
                             </ul>
                         {/if}
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {disabled? 'd-none' : ''}" href="#" on:click={() => dispatch("createNewFamily")}><i class="bi bi-people-fill" /> Добавить семью</a>
+                        <a class="nav-link {disabled ? 'd-none' : ''}" href="#" on:click={() => dispatch("createNewFamily")}
+                            ><i class="bi bi-people-fill" /> Добавить семью</a
+                        >
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {disabled? 'd-none' : ''}" href="#" on:click={() => dispatch("invite")}><i class="bi bi-share-fill" /> Пригласить участника</a>
+                        <a class="nav-link {disabled ? 'd-none' : ''}" href="#" on:click={() => dispatch("invite")}
+                            ><i class="bi bi-share-fill" /> Пригласить участника</a
+                        >
                     </li>
                 </ul>
                 <hr class="border border-white" />

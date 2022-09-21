@@ -15,22 +15,24 @@
     import { Circle2 } from "svelte-loading-spinners";
     import AboutModal from "./components/about/About.svelte";
     import { AppController } from "./appController";
+    import CloneStemmaModal from "./components/clone_stemma_modal/CloneStemmaModal.svelte";
 
     export let google_client_id;
     export let stemma_backend_url;
 
     let addStemmaModal;
+    let cloneStemmaModal;
+    let removeStemmaModal;
     let familySelectionModal;
     let personSelectionModal;
     let stemmaChart;
-    let removeStemmaModal;
     let inviteModal;
     let aboutModal;
 
     let signedIn = false;
 
     let ownedStemmas: StemmaDescription[];
-    let currentStemma: StemmaDescription;
+    let currentStemmaId: string;
     let stemma: Stemma;
     let stemmaIndex: StemmaIndex;
     let highlight: HiglightLineages;
@@ -40,7 +42,8 @@
     let error: Error;
 
     let controller = new AppController(stemma_backend_url);
-    controller.currentStemma.subscribe((s) => (currentStemma = s));
+
+    controller.currentStemmaId.subscribe((s) => (currentStemmaId = s));
     controller.stemma.subscribe((s) => (stemma = s));
     controller.ownedStemmas.subscribe((os) => (ownedStemmas = os));
     controller.stemmaIndex.subscribe((si) => (stemmaIndex = si));
@@ -48,12 +51,14 @@
     controller.pinnedStorage.subscribe((pp) => (pinnedPeople = pp));
     controller.isWorking.subscribe((iw) => (isWorking = iw));
     controller.err.subscribe((e) => (error = e));
-    controller.invitationToken.subscribe((it) => inviteModal.setInviteLink(it));
+    controller.invitationToken.subscribe((it) => {
+        if (inviteModal) inviteModal.setInviteLink(it);
+    });
 
     function handleSignIn(user: User) {
         console.log("handle sign in");
 
-        const urlParams = new URLSearchParams(window.location.search);
+        let urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has("inviteToken")) {
             let token = urlParams.get("inviteToken");
             urlParams.delete("inviteToken");
@@ -67,26 +72,19 @@
         signedIn = true;
     }
 
-    function handlePersonSelection(personDetails: PersonDescription) {
-        personSelectionModal.showPersonDetails({ description: personDetails, pin: pinnedPeople.isPinned(personDetails.id) });
-    }
-
-    function handleFamilySelection(familyDetails: FamilyDescription) {
-        familySelectionModal.showExistingFamily(familyDetails);
-    }
-
     $: if (lookupPersonName && stemmaChart) {
         let results = fuzzysort.go(lookupPersonName, stemma.people, { key: "name" });
         if (results.length) stemmaChart.zoomToNode(results[0].obj.id);
     }
 
     $: console.log(`signedIn ${signedIn}`);
+    $: console.log("current state - owned stemmas, current stemma id, stemma description", ownedStemmas, currentStemmaId, stemma);
 </script>
 
 {#if signedIn}
     <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={(e) => controller.addStemma(e.detail)} />
-
     <RemoveStemmaModal bind:this={removeStemmaModal} on:stemmaRemoved={(e) => controller.removeStemma(e.detail)} />
+    <CloneStemmaModal bind:this={cloneStemmaModal} on:stemmaCloned={(e) => controller.cloneStemma(e.detail.name, e.detail.stemmaId)} />
 
     <FamilySelectionModal
         bind:this={familySelectionModal}
@@ -107,11 +105,13 @@
     <AboutModal bind:this={aboutModal} />
 
     <Navbar
-        bind:ownedStemmasDescriptions={ownedStemmas}
-        bind:selectedStemmaDescription={currentStemma}
+        {ownedStemmas}
+        {currentStemmaId}
+        disabled={isWorking}
         bind:lookupPersonName
-        bind:disabled={isWorking}
-        on:createNewStemma={() => addStemmaModal.promptNewStemma(false)}
+        on:selectStemma={(e) => controller.selectStemma(e.detail)}
+        on:createNewStemma={() => addStemmaModal.promptNewStemma()}
+        on:cloneStemma={(e) => cloneStemmaModal.promptStemmaClone(e.detail)}
         on:createNewFamily={() => familySelectionModal.promptNewFamily()}
         on:removeStemma={(e) => removeStemmaModal.askForConfirmation(e.detail)}
         on:invite={() => inviteModal.showInvintation()}
@@ -136,12 +136,12 @@
         <FullStemma
             bind:this={stemmaChart}
             {stemma}
-            stemmaId={currentStemma.id}
+            {currentStemmaId}
             {stemmaIndex}
             {highlight}
             {pinnedPeople}
-            on:personSelected={(e) => handlePersonSelection(e.detail)}
-            on:familySelected={(e) => handleFamilySelection(e.detail)}
+            on:personSelected={(e) => personSelectionModal.showPersonDetails({ description: e.detail, pin: pinnedPeople.isPinned(e.detail.id) })}
+            on:familySelected={(e) => familySelectionModal.showExistingFamily(e.detail)}
         />
     {/if}
 {:else}
