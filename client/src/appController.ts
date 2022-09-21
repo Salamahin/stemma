@@ -157,13 +157,8 @@ export class AppController {
     }
 
     updatePerson(personId: string, descr: CreateNewPerson, pin: boolean) {
-        let pp = get(this.pinnedStorage)
         let si = get(this.stemmaIndex)
-
-        if (pin) pp.add(personId)
-        else pp.remove(personId)
-
-        this.refreshVisual(si);
+        this.refreshVisual(si, personId, pin);
 
         let originalPerson = si.person(personId);
         if (
@@ -207,9 +202,14 @@ export class AppController {
 
 
     private refreshVisual(index: StemmaIndex, personId: string, pinned: boolean) {
-        
-        this.pinnedStorage.update(u => u)
-        this.highlight.set(new HiglightLineages(index, get(this.pinnedStorage).allPinned()))
+        this.pinnedStorage.update(u => {
+            if (pinned) u.add(personId)
+            else u.remove(personId)
+
+            this.highlight.set(new HiglightLineages(index, u.allPinned()))
+
+            return u
+        })
     }
 
     private refreshIndexes(stemma: Stemma, stemmaId: string) {
