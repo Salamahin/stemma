@@ -58,9 +58,9 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, jamesId :: _, _, _)       <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
-      FamilyDescription(_, _ :: jillId :: Nil, _, _) <- s.createFamily(userId, stemmaId, family(existing(jamesId), createJill)(createJohn))
-      _                                              <- s.createFamily(userId, stemmaId, family(existing(jamesId), existing(jillId))(createJosh))
+      (_, FamilyDescription(_, jamesId :: _, _, _))       <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
+      (_, FamilyDescription(_, _ :: jillId :: Nil, _, _)) <- s.createFamily(userId, stemmaId, family(existing(jamesId), createJill)(createJohn))
+      _                                                   <- s.createFamily(userId, stemmaId, family(existing(jamesId), existing(jillId))(createJosh))
 
       render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families)(hasSameElements("(James, Jill) parentsOf (John, Josh)" :: "(James) parentsOf (Jane)" :: Nil)))
@@ -73,8 +73,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, jamesId :: _, _, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
-      _                                        <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJohn))
+      (_, FamilyDescription(_, jamesId :: _, _, _)) <- s.createFamily(userId, stemmaId, family(createJames)(createJane))
+      _                                             <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJohn))
 
       render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families)(hasSameElements("(James) parentsOf (Jane, John)" :: Nil))).provideSome(testcontainersStorage, Scope.default)
@@ -87,8 +87,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(familyId, jamesId :: Nil, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
-      err                                                           <- s.updateFamily(userId, familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
+      (_, FamilyDescription(familyId, jamesId :: Nil, jillId :: Nil, _)) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
+      err                                                                <- s.updateFamily(userId, familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
     } yield assertTrue(err == DuplicatedIds(jamesId))).provideSome(testcontainersStorage, Scope.default)
   }
 
@@ -99,8 +99,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(firstFamilyId, _, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
-      err                                                   <- s.createFamily(userId, stemmaId, family(createJane)(existing(jillId))).flip
+      (_, FamilyDescription(firstFamilyId, _, jillId :: Nil, _)) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
+      err                                                        <- s.createFamily(userId, stemmaId, family(createJane)(existing(jillId))).flip
     } yield assertTrue(err == ChildAlreadyBelongsToFamily(firstFamilyId, jillId))).provideSome(testcontainersStorage, Scope.default)
   }
 
@@ -111,9 +111,9 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, _, jillId :: _ :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill, createJames))
-      _                                              <- s.createFamily(userId, stemmaId, family(existing(jillId), createJosh)(createJake))
-      _                                              <- s.removePerson(userId, jillId)
+      (_, FamilyDescription(_, _, jillId :: _ :: Nil, _)) <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill, createJames))
+      _                                                   <- s.createFamily(userId, stemmaId, family(existing(jillId), createJosh)(createJake))
+      _                                                   <- s.removePerson(userId, jillId)
 
       render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families)(hasSameElements("(Jane, John) parentsOf (James)" :: "(Josh) parentsOf (Jake)" :: Nil)))
@@ -127,8 +127,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, jamesId :: _, _, _) <- s.createFamily(userId, stemmaId, family(createJames, createJane)(createJill))
-      _                                        <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJuly))
+      (_, FamilyDescription(_, jamesId :: _, _, _)) <- s.createFamily(userId, stemmaId, family(createJames, createJane)(createJill))
+      _                                             <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJuly))
 
       render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families)(hasSameElements("(James, Jane) parentsOf (Jill)" :: "(James) parentsOf (July)" :: Nil)))
@@ -142,8 +142,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
-      _                                         <- s.createFamily(userId, stemmaId, family(existing(jillId))(createJuly))
+      (_, FamilyDescription(_, _, jillId :: Nil, _)) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
+      _                                              <- s.createFamily(userId, stemmaId, family(existing(jillId))(createJuly))
 
       _ <- s.removePerson(userId, jillId)
 
@@ -159,7 +159,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(_, janeId :: Nil, _, _) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
+      (_, FamilyDescription(_, janeId :: Nil, _, _)) <- s.createFamily(userId, stemmaId, family(createJane)(createJill))
 
       _ <- s.updatePerson(userId, janeId, createJohn)
 
@@ -182,8 +182,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(userId, _) <- s.getOrCreateUser("user@test.com")
       stemmaId        <- s.createStemma(userId, "test stemma")
 
-      FamilyDescription(familyId, _ :: johnId :: Nil, jillId :: Nil, _) <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill))
-      _                                                                 <- s.updateFamily(userId, familyId, family(createJuly, existing(johnId))(existing(jillId), createJames))
+      (_, FamilyDescription(familyId, _ :: johnId :: Nil, jillId :: Nil, _)) <- s.createFamily(userId, stemmaId, family(createJane, createJohn)(createJill))
+      _                                                                      <- s.updateFamily(userId, familyId, family(createJuly, existing(johnId))(existing(jillId), createJames))
 
       st @ Stemma(people, _) <- s.stemma(userId, stemmaId)
       render(families)       = st
@@ -219,8 +219,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
       User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
 
-      stemmaId                                <- s.createStemma(creatorId, "my first stemma")
-      FamilyDescription(_, janeId :: _, _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
+      stemmaId                                     <- s.createStemma(creatorId, "my first stemma")
+      (_, FamilyDescription(_, janeId :: _, _, _)) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
 
       personRemoveErr <- s.removePerson(accessorId, janeId).flip
       personUpdateErr <- s.updatePerson(accessorId, janeId, createJuly).flip
@@ -235,8 +235,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
       User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
 
-      stemmaId                             <- s.createStemma(creatorId, "my first stemma")
-      FamilyDescription(familyId, _, _, _) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
+      stemmaId                                  <- s.createStemma(creatorId, "my first stemma")
+      (_, FamilyDescription(familyId, _, _, _)) <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
 
       familyRemoveErr <- s.removeFamily(accessorId, familyId).flip
       familyUpdateErr <- s.updateFamily(accessorId, familyId, family(createJames)(createJuly)).flip
@@ -253,8 +253,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       stemma1Id <- s.createStemma(userId, "my first stemma")
       stemma2Id <- s.createStemma(userId, "my second stemma")
 
-      FamilyDescription(_, janeId :: johnId :: Nil, joshId :: jillId :: Nil, _) <- s.createFamily(userId, stemma1Id, family(createJane, createJohn)(createJosh, createJill))
-      familyCreationErr                                                         <- s.createFamily(userId, stemma2Id, family(existing(janeId), existing(johnId))(existing(joshId), existing(jillId))).flip
+      (_, FamilyDescription(_, janeId :: johnId :: Nil, joshId :: jillId :: Nil, _)) <- s.createFamily(userId, stemma1Id, family(createJane, createJohn)(createJosh, createJill))
+      familyCreationErr                                                              <- s.createFamily(userId, stemma2Id, family(existing(janeId), existing(johnId))(existing(joshId), existing(jillId))).flip
     } yield assertTrue(familyCreationErr == NoSuchPersonId(janeId))).provideSome(testcontainersStorage, Scope.default)
   }
 
@@ -289,10 +289,10 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
       stemmaId <- s.createStemma(creatorId, "my first stemma")
 
-      FamilyDescription(f1, jabe :: jane :: Nil, jeff :: july :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJabe, createJane)(createJeff, createJuly))
-      FamilyDescription(f2, jared :: _, jill :: Nil, _)                  <- s.createFamily(creatorId, stemmaId, family(createJared, existing(jeff))(createJill))
-      FamilyDescription(f3, _ :: josh :: Nil, jess :: Nil, _)            <- s.createFamily(creatorId, stemmaId, family(existing(july), createJosh)(createJess))
-      FamilyDescription(f4, john :: Nil, _, _)                           <- s.createFamily(creatorId, stemmaId, family(createJohn)(existing(josh)))
+      (_, FamilyDescription(f1, jabe :: jane :: Nil, jeff :: july :: Nil, _)) <- s.createFamily(creatorId, stemmaId, family(createJabe, createJane)(createJeff, createJuly))
+      (_, FamilyDescription(f2, jared :: _, jill :: Nil, _))                  <- s.createFamily(creatorId, stemmaId, family(createJared, existing(jeff))(createJill))
+      (_, FamilyDescription(f3, _ :: josh :: Nil, jess :: Nil, _))            <- s.createFamily(creatorId, stemmaId, family(existing(july), createJosh)(createJess))
+      (_, FamilyDescription(f4, john :: Nil, _, _))                           <- s.createFamily(creatorId, stemmaId, family(createJohn)(existing(josh)))
 
       ChownEffect(affectedFamilies, affectedPeople) <- s.chown(accessorId, stemmaId, july)
       accessorStemma                                <- s.stemma(accessorId, stemmaId)
@@ -316,7 +316,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
       stemmaId <- s.createStemma(creatorId, "my first stemma")
 
-      FamilyDescription(_, jabe :: jane :: Nil, jeff :: july :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJabe, createJane)(createJeff, createJuly))
+      (_, FamilyDescription(_, jabe :: jane :: Nil, jeff :: july :: Nil, _)) <- s.createFamily(creatorId, stemmaId, family(createJabe, createJane)(createJeff, createJuly))
 
       _ <- s.chown(accessorId, stemmaId, july)
       _ <- s.chown(accessorId, stemmaId, july)
@@ -343,8 +343,8 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
       User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
 
-      stemmaId                                  <- s.createStemma(creatorId, "my first stemma")
-      FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(creatorId, stemmaId, family(createJane)(createJill))
+      stemmaId                                       <- s.createStemma(creatorId, "my first stemma")
+      (_, FamilyDescription(_, _, jillId :: Nil, _)) <- s.createFamily(creatorId, stemmaId, family(createJane)(createJill))
 
       _ <- s.chown(accessorId, stemmaId, jillId)
 
@@ -375,12 +375,25 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
       originalStemmaId <- s.createStemma(userId, "original stemma")
 
-      FamilyDescription(_, _, jillId :: Nil, _) <- s.createFamily(userId, originalStemmaId, family(createJane)(createJill))
-      _                                         <- s.createFamily(userId, originalStemmaId, family(existing(jillId))(createJuly))
+      (_, FamilyDescription(_, _, jillId :: Nil, _)) <- s.createFamily(userId, originalStemmaId, family(createJane)(createJill))
+      _                                              <- s.createFamily(userId, originalStemmaId, family(existing(jillId))(createJuly))
 
       render(copiedStemma)   <- s.cloneStemma(userId, originalStemmaId, "cloned")
       render(originalStemma) <- s.stemma(userId, originalStemmaId)
     } yield assertTrue(originalStemma.toSet == copiedStemma.toSet)).provideSome(testcontainersStorage, Scope.default)
+  }
+
+  val loopsProhibited = test("its impossible to create a chart with loops") {
+    (for {
+      s            <- ZIO.service[StorageService]
+      User(uid, _) <- s.getOrCreateUser("user1@test.com")
+
+      stemmaId <- s.createStemma(uid, "my first stemma")
+
+      (_, FamilyDescription(_, janeId :: Nil, jillId :: Nil, _)) <- s.createFamily(uid, stemmaId, family(createJane)(createJill))
+      (_, FamilyDescription(_, _, joshId :: Nil, _))             <- s.createFamily(uid, stemmaId, family(existing(janeId))(createJosh))
+      err                                                        <- s.createFamily(uid, stemmaId, family(existing(joshId))(existing(janeId))).flip
+    } yield assertTrue(err == StemmaHasCycles())).provideSome(testcontainersStorage, Scope.default)
   }
 
   override def spec =
@@ -406,6 +419,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       appendChildrenToIncompleteExistingFamily,
       whenThereAreSeveralOwnersThenStemmaIsNotRemovable,
       canRemoveStemmaIfOnlyOwner,
-      canCloneStemma
+      canCloneStemma,
+      loopsProhibited
     )
 }
