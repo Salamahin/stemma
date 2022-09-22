@@ -392,7 +392,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
       (_, FamilyDescription(_, janeId :: Nil, jillId :: Nil, _)) <- s.createFamily(uid, stemmaId, family(createJane)(createJill))
       (_, FamilyDescription(_, _, joshId :: Nil, _))             <- s.createFamily(uid, stemmaId, family(existing(janeId))(createJosh))
-      err                                                        <- s.createFamily(uid, stemmaId, family(existing(joshId))(existing(janeId))).flip
+      err                                                        <- s.createFamily(uid, stemmaId, family(existing(joshId))(existing(jillId))).flip
     } yield assertTrue(err == StemmaHasCycles())).provideSome(testcontainersStorage, Scope.default)
   }
 
