@@ -2,12 +2,12 @@ version = 0.1
 [default]
 [default.deploy]
 [default.deploy.parameters]
-stack_name = "stemma-app"
-s3_bucket = "aws-sam-cli-managed-default-stemma-04-08-2022"
+stack_name = "eg-stemma-app"
+s3_bucket = "eg-sam-client-bucket"
 s3_prefix = "stemma-app"
 region = "eu-central-1"
 confirm_changeset = false
 capabilities = ["CAPABILITY_NAMED_IAM", "CAPABILITY_AUTO_EXPAND"]
-parameter_overrides = "AppName=\"stemma-app\" Stage=\"dev_local\""
+parameter_overrides = "AppName=\"stemma-app\" Stage=\"eg_local\""
 image_repositories = []
 disable_rollback = true
