@@ -247,7 +247,7 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
           familyDescr <- linkFamilyMembers(userId.toLong, stemmaId.toLong, familyId, family)
 
           stemma <- describeStemma(userId.toLong, stemmaId.toLong)
-          _      <- if (new StemmaAnalytics(stemma).hasCycles()) DBIO.failed(StemmaHasCycles()) else DBIO.successful()
+          _      <- if (new StemmaDFS(stemma).hasCycles()) DBIO.failed(StemmaHasCycles()) else DBIO.successful()
         } yield (stemma, familyDescr)).transactionally
 
         db run query
@@ -268,7 +268,7 @@ abstract class SlickStemmaService() extends Tables with PostgresProfile with Sto
           familyDescr <- linkFamilyMembers(userId.toLong, stemmaId, familyId.toLong, family)
 
           stemma <- describeStemma(userId.toLong, stemmaId)
-          _      <- if (new StemmaAnalytics(stemma).hasCycles()) DBIO.failed(StemmaHasCycles()) else DBIO.successful()
+          _      <- if (new StemmaDFS(stemma).hasCycles()) DBIO.failed(StemmaHasCycles()) else DBIO.successful()
         } yield (stemma, familyDescr)).transactionally
 
         db run query
