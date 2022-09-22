@@ -22,14 +22,19 @@
 
     let pinned: boolean;
     let name: string;
-    let birthDate: string;
-    let deathDate: string;
+    let birthDateStr: string;
+    let deathDateStr: string;
     let bio: string;
     let id: string;
     let readOnly: boolean;
 
+    let minDeathDate: Date = null;
+    let minBirthDate: Date = null;
+    let maxDeathDate = new Date();
+    let maxBirthDate = new Date();
+
     function personUpdated() {
-        dispatch("personUpdated", { id: id, description: { name: name, birthDate: birthDate, deathDate: deathDate, bio: bio }, pin: pinned });
+        dispatch("personUpdated", { id: id, description: { name: name, birthDate: birthDateStr, deathDate: deathDateStr, bio: bio }, pin: pinned });
 
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     }
@@ -41,15 +46,33 @@
     }
 
     export function showPersonDetails(p: ShowPerson) {
+        minBirthDate = null;
+        minDeathDate = null;
+        maxBirthDate = new Date()
+        maxDeathDate = new Date()
+
         id = p.description.id;
         name = p.description.name;
-        birthDate = p.description.birthDate;
-        deathDate = p.description.deathDate;
+        birthDateStr = p.description.birthDate;
+        deathDateStr = p.description.deathDate;
         bio = p.description.bio;
         pinned = p.pin;
         readOnly = p.description.readOnly;
 
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    function formatDate(d: Date) {
+        return d ? d.toISOString().split("T")[0] : null;
+    }
+
+    $: if (birthDateStr) {
+        minDeathDate = birthDateStr? new Date(birthDateStr) : null;
+        maxDeathDate = new Date();
+    }
+    $: if (deathDateStr) {
+        maxBirthDate = deathDateStr? new Date(deathDateStr) : new Date();
+        minBirthDate = null;
     }
 </script>
 
@@ -67,11 +90,27 @@
                 </div>
                 <div class="mb-3">
                     <label for="personBirthDate" class="form-label">Дата рождения</label>
-                    <input type="date" class="form-control" id="personBirthDateInput" bind:value={birthDate} readonly={readOnly} />
+                    <input
+                        type="date"
+                        class="form-control"
+                        id="personBirthDateInput"
+                        bind:value={birthDateStr}
+                        readonly={readOnly}
+                        min={formatDate(minBirthDate)}
+                        max={formatDate(maxBirthDate)}
+                    />
                 </div>
                 <div class="mb-3">
                     <label for="personDeathDate" class="form-label">Дата смерти</label>
-                    <input type="date" class="form-control" id="personDeathDateInput" bind:value={deathDate} readonly={readOnly} />
+                    <input
+                        type="date"
+                        class="form-control"
+                        id="personDeathDateInput"
+                        bind:value={deathDateStr}
+                        readonly={readOnly}
+                        min={formatDate(minDeathDate)}
+                        max={formatDate(maxDeathDate)}
+                    />
                 </div>
                 <div class="mb-3">
                     <label for="personDeathDate" class="form-label">Био</label>

@@ -52,7 +52,7 @@
 <div class="main-container">
     <div class="d-flex justify-content-center align-items-center flex-column">
         <h1>project stemma</h1>
-        <img src="assets/icon.webp" alt="" width="100" height="100" />
+        <img src="assets/logo_bw_large.webp" alt="" width="100" height="100" />
         <div class="mt-5" style="max-width:250px">
             <div id="signin" />
         </div>
