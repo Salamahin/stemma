@@ -19,7 +19,7 @@ object InviteToken {
 trait UserService {
   def createInviteToken(inviteeEmail: String, stemmaId: String, associatedPersonId: String): UIO[String]
   def decodeInviteToken(token: String): IO[StemmaError, InviteToken]
-  def getOrCreateUser(email: String): UIO[User]
+  def getOrCreateUser(email: String): IO[StemmaError, User]
 }
 
 object UserService {

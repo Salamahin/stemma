@@ -26,7 +26,7 @@ object UserServiceTest extends ZIOSpecDefault with Requests with RenderStemma {
       user1    <- us.getOrCreateUser("user@test.com")
       stemmaId <- ss.createStemma(user1.userId, "my first stemma")
 
-      FamilyDescription(_, _, joshId :: _, _) <- ss.createFamily(user1.userId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
+      (_, FamilyDescription(_, _, joshId :: _, _)) <- ss.createFamily(user1.userId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
 
       token        <- us.createInviteToken("invitee@test.com", stemmaId, joshId)
       decodedToken <- us.decodeInviteToken(token)

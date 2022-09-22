@@ -60,6 +60,7 @@ export type AccessToStemmaDenied = { stemmaId: string }
 export type IsNotTheOnlyStemmaOwner = { stemmaId: string }
 export type InvalidInviteToken = {}
 export type ForeignInviteToken = {}
+export type StemmaHasCycles = {}
 
 type CompositeResponse = {
     ChownEffect?: ChownEffect,
@@ -82,7 +83,8 @@ type CompositeResponse = {
     AccessToStemmaDenied?: AccessToStemmaDenied,
     IsNotTheOnlyStemmaOwner?: IsNotTheOnlyStemmaOwner,
     InvalidInviteToken?: InvalidInviteToken,
-    ForeignInviteToken?: ForeignInviteToken
+    ForeignInviteToken?: ForeignInviteToken,
+    StemmaHasCycles?: StemmaHasCycles
 }
 
 //aux
@@ -211,6 +213,7 @@ export class Model {
         if (response.AccessToStemmaDenied) throw new Error("Действие с родословной запрещено")
         if (response.InvalidInviteToken) throw new Error("Проверьте правильность ссылки-приглашения")
         if (response.ForeignInviteToken) throw new Error("Похоже, вы используете чужую ссылку-приглашение")
+        if (response.StemmaHasCycles) throw new Error("Неверная композиция семьи - обнаружена циклическая зависимость")
 
         return response
     }
