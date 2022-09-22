@@ -13,7 +13,7 @@
 <header>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#"><img src="assets/icon.webp" alt="" width="40" height="40" /> Stemma</a>
+            <a class="navbar-brand" href="#"><img src="assets/logo_bw_avg.webp" alt="" width="40" height="40" /> Stemma</a>
             <button
                 class="navbar-toggler"
                 type="button"
