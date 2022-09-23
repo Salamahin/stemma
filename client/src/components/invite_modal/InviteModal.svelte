@@ -67,66 +67,75 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
             </div>
             <div class="modal-body">
-                <label for="personName" class="form-label">Пользователь</label>
-                <Select
-                    id="personName"
-                    placeholder="Иванов Иван Иванович"
-                    items={peopleNames}
-                    isSearchable={true}
-                    isCreatable={false}
-                    on:select={(e) => nameChanged(e.detail.value)}
-                    on:clear={() => reset()}
-                    ClearIcon={clearIcon}
-                    hideEmptyState={true}
-                    value={selectedName}
-                />
-                {#key namesakes}
-                    {#if namesakes.length}
-                        <Carousel
-                            on:pageChange={(e) => (selectedPersonId = namesakes[e.detail].id)}
-                            bind:this={carousel}
-                            arrows={namesakes.length > 1}
-                            duration={0}
-                        >
-                            {#each namesakes as ns, i}
-                                <div class="d-flex flex-column">
-                                    <VisualPersonDescription selectedPerson={ns} {stemmaIndex} chartId={`ns_chart_${i}`} />
-                                </div>
-                            {/each}
-                        </Carousel>
-                    {:else}
-                        <div style="height:320px" />
-                    {/if}
-                {/key}
+                <div class="container h-100">
+                    <div class="d-flex flex-column h-100">
+                        <div class="flex-shrink-1">
+                            <label for="personName" class="form-label">Пользователь</label>
+                            <Select
+                                id="personName"
+                                placeholder="Иванов Иван Иванович"
+                                items={peopleNames}
+                                isSearchable={true}
+                                isCreatable={false}
+                                on:select={(e) => nameChanged(e.detail.value)}
+                                on:clear={() => reset()}
+                                ClearIcon={clearIcon}
+                                hideEmptyState={true}
+                                value={selectedName}
+                            />
+                        </div>
+                        <div class="flex-grow-1" style="min-height:300px">
+                            {#key namesakes}
+                                {#if namesakes.length}
+                                    <Carousel
+                                        on:pageChange={(e) => (selectedPersonId = namesakes[e.detail].id)}
+                                        bind:this={carousel}
+                                        arrows={namesakes.length > 1}
+                                        duration={0}
+                                    >
+                                        {#each namesakes as ns, i}
+                                            <div class="d-flex flex-column">
+                                                <VisualPersonDescription selectedPerson={ns} {stemmaIndex} chartId={`ns_chart_${i}`} />
+                                            </div>
+                                        {/each}
+                                    </Carousel>
+                                <!-- {:else}
+                                    <div class="mw-500" /> -->
+                                {/if}
+                            {/key}
+                        </div>
+                        <div class="flex-shrink-1">
+                            <div class="mt-2">
+                                <label for="emainInput" class="form-label">Email-адрес</label>
+                                <input type="email" class="form-control" id="emainInput" placeholder="name@example.com" bind:value={email} />
+                            </div>
 
-                <div class="mt-2">
-                    <label for="emainInput" class="form-label">Email-адрес</label>
-                    <input type="email" class="form-control" id="emainInput" placeholder="name@example.com" bind:value={email} />
-                </div>
-
-                <label for="outline" class="form-label mt-2">Ссылка для приглашения</label>
-                <div class="input-group">
-                    <button
-                        class="btn btn-outline-primary"
-                        type="button"
-                        disabled={!email || !selectedName}
-                        on:click={(e) => dispatch("invite", { personId: selectedPersonId, email: email })}>Создать</button
-                    >
-                    <input
-                        type="text"
-                        id="inviteLink"
-                        class="form-control"
-                        aria-label="inviteLink"
-                        aria-describedby="button-addon2"
-                        readonly
-                        value={inviteLink}
-                    />
-                    <button
-                        class="btn btn-outline-secondary"
-                        type="button"
-                        disabled={inviteLink == undefined || !inviteLink.length}
-                        on:click={() => navigator.clipboard.writeText(inviteLink)}><i class="bi bi-clipboard" /></button
-                    >
+                            <label for="outline" class="form-label mt-2">Ссылка для приглашения</label>
+                            <div class="input-group">
+                                <button
+                                    class="btn btn-outline-primary"
+                                    type="button"
+                                    disabled={!email || !selectedName}
+                                    on:click={(e) => dispatch("invite", { personId: selectedPersonId, email: email })}>Создать</button
+                                >
+                                <input
+                                    type="text"
+                                    id="inviteLink"
+                                    class="form-control"
+                                    aria-label="inviteLink"
+                                    aria-describedby="button-addon2"
+                                    readonly
+                                    value={inviteLink}
+                                />
+                                <button
+                                    class="btn btn-outline-secondary"
+                                    type="button"
+                                    disabled={inviteLink == undefined || !inviteLink.length}
+                                    on:click={() => navigator.clipboard.writeText(inviteLink)}><i class="bi bi-clipboard" /></button
+                                >
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
