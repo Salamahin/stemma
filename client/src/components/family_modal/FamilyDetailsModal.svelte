@@ -50,7 +50,7 @@
         parents = [];
         children = [];
         readOnly = false;
-        showFamilyComposition()
+        showFamilyComposition();
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
@@ -115,7 +115,7 @@
                 <h5 class="modal-title" id="addFamlilyLabel">{mode == "familyComposition" ? "Состав семьи" : "Выбрать члена семьи"}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="min-height:550px">
                 {#if mode == "familyComposition"}
                     <p class="fs-5">Родители</p>
                     <FamilyGeneration bind:selectedPeople={parents} {readOnly} />
