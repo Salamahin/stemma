@@ -35,7 +35,7 @@
     }
 
     $: {
-        if(width && height && svg && nodes && relations) {
+        if (width && height && svg && nodes && relations) {
             sim = configureSimulation(svg, nodes, relations, width, height);
             mergeData(svg, nodes, relations, width, height);
             makeDrag(svg, sim);
@@ -44,6 +44,6 @@
     }
 </script>
 
-<div bind:clientWidth={width} bind:clientHeight={height}>
-    <svg id={chartId} style="min-width: 250px; max-height: calc(100vh - 320px); min-height: 500px; width:100%" />
+<div bind:clientWidth={width} bind:clientHeight={height} class="h-100 w-100">
+    <svg id={chartId} style="min-width: 300px; min-height: 350px; width: 100%; height: 100%" />
 </div>
