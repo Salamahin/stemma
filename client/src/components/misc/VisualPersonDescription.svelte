@@ -45,5 +45,5 @@
 </script>
 
 <div bind:clientWidth={width} bind:clientHeight={height}>
-    <svg id={chartId} style="min-width: 250px;min-height:300px; width:100%" />
+    <svg id={chartId} style="min-width: 250px; max-height: calc(100vh - 320px); min-height: 500px; width:100%" />
 </div>
