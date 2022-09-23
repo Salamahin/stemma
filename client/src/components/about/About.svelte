@@ -51,7 +51,7 @@
                     <h6>Возникли проблемы?</h6>
                     <p>
                         Такое бывает, не расстраивайтесь. Можете задать вопрос, пожаловаться, или наоборот, похвалить нас, написав на <a
-                            href="mailto:danilasergeevich@gmail.com">почту</a
+                            href="mailto:danilasergeevich@gmail.com?subject=stemma">почту</a
                         >
                     </p>
                 </div>
