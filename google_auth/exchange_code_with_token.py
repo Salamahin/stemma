@@ -3,20 +3,21 @@ from datetime import date
 
 import google_auth_oauthlib
 import pkg_resources
+from google.oauth2.credentials import Credentials
 
 
 def lambda_handler(event, context):
     query_str: str = event["rawQueryString"]
     domain_name: str = event["requestContext"]["domainName"]
-    https_domain_name = f"https://{domain_name}"
-    credentials = exchange_code_to_token(https_domain_name, query_str)
+    url = f"https://{domain_name}/oauth2/idpresponse?{query_str}"
+    credentials = exchange_code_to_token(url)
     expires: date = credentials.expiry
     response = {
         "statusCode": 302,
         "body": json.dumps({}),
         "headers": {'Location': f"https://stemma.link"},
         "cookies": [
-            cookie("token", credentials.token, expires),
+            cookie("token", credentials.id_token, expires),
             cookie("refresh_token", credentials.refresh_token, expires)
         ],
     }
@@ -28,10 +29,10 @@ def cookie(key: str, value: str, expiration: date) -> str:
     return f"{key}={value}; expires={exp}; Path=/; Secure=true; Domain=.stemma.link"
 
 
-def exchange_code_to_token(https_domain_name: str, query_params: str) -> str:
+def exchange_code_to_token(url: str) -> Credentials:
     flow = create_flow()
-    flow.redirect_uri = f"{https_domain_name}/oauth2/idpresponse"
-    flow.fetch_token(authorization_response=f"{https_domain_name}?{query_params}")
+    flow.redirect_uri = url.split('?state=')[0]
+    flow.fetch_token(authorization_response=f"{url}")
     return flow.credentials
 
 
@@ -46,5 +47,8 @@ def create_flow():
 
 
 if __name__ == '__main__':
-    exchange_code_to_token(
-        "state=vZUKlFKMyhRaxVupgtV4pRlhwOtGbd&code=4%2F0ARtbsJqSeDqM2huOPE9yFYZ9D12YghGZdf3cin5wd4U66a2jJInDmUMxpkICTP9j-7DS_A&scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile+openid&authuser=0&prompt=consent")
+    token = exchange_code_to_token(
+        url="https://localhost:8072/oauth2/idpresponse?state=Ds7gXTe3PlfkMovacqFfSFyQ2BcKnb&code=4%2F0ARtbsJpvVBvdpqnj46zAa6JeZJaAUrNGZxdCYjG-G2xWTPavtUV765Fne4zj4UW7cQteVg&scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile+openid&authuser=0&prompt=consent")
+    print(token.id_token)
+    print(token.expiry)
+    print(token.refresh_token)

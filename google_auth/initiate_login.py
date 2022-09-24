@@ -5,7 +5,7 @@ import pkg_resources
 
 
 def lambda_handler(event, context):
-    authorization_url, state = generate_login_url()
+    authorization_url, state = generate_login_url('https://api.stemma.link/oauth2/idpresponse')
     response = {"statusCode": 302,
                 "headers": {'Location': authorization_url},
                 "body": json.dumps({})
@@ -13,9 +13,9 @@ def lambda_handler(event, context):
     return response
 
 
-def generate_login_url():
+def generate_login_url(redirect_url: str):
     flow = create_flow()
-    flow.redirect_uri = 'https://api.stemma.link/oauth2/idpresponse'
+    flow.redirect_uri = redirect_url
     authorization_url, state = flow.authorization_url(
         access_type='offline',
         include_granted_scopes='true',
@@ -34,5 +34,5 @@ def create_flow():
 
 
 if __name__ == '__main__':
-    url = generate_login_url()
+    url = generate_login_url("https://localhost:8072/oauth2/idpresponse")
     print(url)
