@@ -100,14 +100,6 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
-  assetsbucket:
-    Type: 'AWS::S3::Bucket'
-    Properties:
-      BucketEncryption:
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
-
   AppBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -188,7 +180,7 @@ Resources:
     Properties:
       Handler: io.github.salamahin.stemma.apis.serverless.aws.StemmaLambda::apply
       Events:
-        ApiEvent:
+        HttpApiEvent:
           Type: HttpApi
           Properties:
             ApiId: !Ref MyApi
@@ -197,8 +189,48 @@ Resources:
       Policies:
         - S3FullAccessPolicy:
             BucketName: stemma-app-backend-assets
+  LoginInitFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: google_auth/
+      Handler: initiate_login.lambda_handler
+      Runtime: python3.8
+      Architectures:
+        - x86_64
+      Events:
+        HttpApiEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyApi
+            Auth:
+              Authorizer: NONE
+            Path: /oauth2/login
+            Method: get
+  ExchangeCodeWithToken:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: google_auth/
+      Handler: exchange_code_with_token.lambda_handler
+      Runtime: python3.8
+      Architectures:
+        - x86_64
+      Events:
+        HttpApiEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyApi
+            Auth:
+              Authorizer: NONE
+            Path: /oauth2/idpresponse
+            Method: GET
 
 Outputs:
-  ApiEndpoint:
+  LoginUrl:
     Description: "HTTP API endpoint URL"
-    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/dev"
+    Value: !Sub "https://${apiAlias}/oauth2/login"
+  HtmlAssetsBucketRegionalName:
+    Description: "Name of the bucket where html assets are stored"
+    Value: !Ref appbucket
+  CloudFormationId:
+    Description: "Cloudformation id"
+    Value: !GetAtt WebAppCDN.Id
