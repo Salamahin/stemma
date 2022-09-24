@@ -54,8 +54,8 @@ export class AppController {
         this.model
             .bearInvitationToken(token)
             .then((result) => {
-                let selectedStemma = result.stemmas[-1]
-                let stemma = result.lastStema
+                let selectedStemma = result.stemmas.slice(-1)[0]
+                let stemma = result.lastStemma
 
                 this.refreshIndexes(stemma, selectedStemma.id)
                 this.ownedStemmas.set(result.stemmas)

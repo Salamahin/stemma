@@ -44,7 +44,7 @@ export type OwnedStemmas = { stemmas: Array<StemmaDescription>, firstStemma: Ste
 export type Stemma = { people: Array<PersonDescription>, families: Array<FamilyDescription> }
 export type StemmaDescription = { id: string, name: string, removable: Boolean }
 export type PersonDescription = { id: string, name: string, birthDate?: string, deathDate?: string, bio?: string, readOnly: boolean }
-export type TokenAccepted = { stemmas: Array<StemmaDescription>, lastStema: Stemma }
+export type TokenAccepted = { stemmas: Array<StemmaDescription>, lastStemma: Stemma }
 export type CloneResult = { createdStemma: Stemma, stemmas: Array<StemmaDescription> }
 
 //errors
