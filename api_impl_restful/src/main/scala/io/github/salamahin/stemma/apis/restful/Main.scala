@@ -72,7 +72,12 @@ object Main extends LazyLogging with ZIOAppDefault {
   private val corsConfig = CorsConfig(anyOrigin = true)
 
   override def run: ZIO[ZIOAppArgs with Scope, Any, Any] = {
-    (ZIO.service[StorageService].flatMap(_.createSchema).flip *> Server
+    val createSchema = ZIO
+      .service[StorageService]
+      .flatMap(_.createSchema)
+      .catchAll(th => ZIO.succeed(logger.info("Failed to create schema", th)))
+
+    (createSchema *> Server
       .start(8090, authenticated(stemmaApi) @@ cors(corsConfig))
       .tapError(err => ZIO.succeed(logger.error("Unexpected error", err))))
       .provideSome(
