@@ -2,8 +2,9 @@ package io.github.salamahin.stemma.apis.restful
 
 import com.typesafe.scalalogging.LazyLogging
 import io.github.salamahin.stemma.apis.{ApiService, HandleApiRequestService}
-import io.github.salamahin.stemma.domain.{RequestDeserializationProblem, StemmaError, UnknownError, Request => DomainRequest}
+import io.github.salamahin.stemma.domain.{RequestDeserializationProblem, StemmaError, UnknownError, User, Request => DomainRequest}
 import io.github.salamahin.stemma.service.{InviteSecrets, StorageService, UserService}
+import org.apache.http.HttpResponse
 import zhttp.http.Middleware.cors
 import zhttp.http._
 import zhttp.http.middleware.Cors.CorsConfig
@@ -41,33 +42,24 @@ object Main extends LazyLogging with ZIOAppDefault {
         }
     }
 
-  private def authenticated[R, E](onSuccess: String => HttpApp[R, E]): Http[R with UserService with OAuthService, E, Request, Response] =
+  private def authenticated[R](onSuccess: String => HttpApp[R, StemmaError]) =
     Http
       .fromFunctionZIO[Request] { request =>
-        val parseToken = ZIO
-          .fromOption {
-            request.headerValue(HeaderNames.authorization)
-          }
-          .mapBoth(
-            _ => HttpError.Forbidden(),
-            _.replace("Bearer ", "")
-          )
+        val getToken = ZIO
+          .fromOption { request.headerValue(HeaderNames.authorization) }
+          .map(_.replace("Bearer ", ""))
 
-        val user = for {
+        for {
           userService <- ZIO.service[UserService]
           authService <- ZIO.service[OAuthService]
 
-          token <- parseToken
-          email <- authService.decode(token).mapError(err => HttpError.InternalServerError(cause = Some(err)))
-          user  <- userService.getOrCreateUser(email)
+          token <- getToken.mapError(_ => HttpError.Unauthorized())
+          email <- authService.decode(token).mapError(_ => HttpError.Unauthorized())
+          user  <- userService.getOrCreateUser(email).mapError(err => HttpError.InternalServerError(cause = Some(err)))
         } yield user
-
-        user.fold(
-          err => Http.error((UnknownError(err): StemmaError).toJson),
-          user => onSuccess(user.email)
-        )
       }
-      .flatten
+      .flatMap(u => onSuccess(u.userId).mapError(e => HttpError.InternalServerError(cause = Some(e))))
+      .catchAll(err => Http.error(err))
 
   private val corsConfig = CorsConfig(anyOrigin = true)
 

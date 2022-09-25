@@ -175,17 +175,10 @@ export class Model {
     }
 
     private async parseResponse(response: Response, stemmaIndex?: StemmaIndex) {
+        if (response.status === 401) throw new Error("Сессия успела протухнуть. Авторизуйтесь заново (перезагрузите страницу)")
+        if (!response.ok) throw new Error(`Получен неожиданный ответ от сервера. Попробуйте перезагрузить страницу`)
+        
         const json = await response.json();
-        
-        if(response.status === 401) {
-            throw new Error("Сессия успела протухнуть. Авторизуйтесь заново (перезагрузите страницу)")
-        }
-
-        if (!response.ok) {
-            console.error(json)
-            throw new Error(`Получен неожиданный ответ от сервера. Попробуйте перезагрузить страницу`)
-        }
-        
         return this.translateError(json as CompositeResponse, stemmaIndex);
     }
 
