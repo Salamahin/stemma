@@ -13,6 +13,8 @@ abstract class LambdaRunner[In, Out](implicit jsonDecoder: JsonDecoder[In], json
   def run(email: String, request: In): IO[StemmaError, Out]
 
   final def apply(input: APIGatewayV2HTTPEvent, context: Context) = {
+    logger.debug("Hello world!")
+
     val email = ZIO.succeed(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"))
 
     val request = ZIO
@@ -33,6 +35,7 @@ abstract class LambdaRunner[In, Out](implicit jsonDecoder: JsonDecoder[In], json
       .tap(resp => ZIO.succeed(logger.debug(s"Generated response (truncated): ${resp.take(100)}")))
 
     Unsafe.unsafe { implicit u =>
+      logger.debug("Unsafe run...")
       Runtime.default.unsafe.run(zio) match {
         case Exit.Success(successJson) => successJson
       }
