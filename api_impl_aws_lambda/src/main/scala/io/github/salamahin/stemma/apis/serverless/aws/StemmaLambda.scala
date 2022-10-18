@@ -40,8 +40,7 @@ object StemmaLambda extends LazyLogging {
   private val dbBackendLayer = ZLayer.succeed(PostgresProfile)
 
   val layers: ZLayer[Any, Nothing, HandleApiRequestService] = ZLayer.fromZIO(
-    createCerts *> ZIO
-      .service[HandleApiRequestService]
+    (createCerts *> ZIO.service[HandleApiRequestService])
       .provideSome(
         (dbConfigLayer ++ dbBackendLayer) >>> DatabaseProvider.live,
         StorageService.live,
