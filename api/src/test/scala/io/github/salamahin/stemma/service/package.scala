@@ -1,26 +1,40 @@
 package io.github.salamahin.stemma
 
+import com.typesafe.config.ConfigFactory
 import io.github.scottweaver.models.JdbcInfo
 import io.github.scottweaver.zio.testcontainers.postgres.ZPostgreSQLContainer
+import slick.interop.zio.DatabaseProvider
+import slick.jdbc.PostgresProfile
 import zio.{Scope, ULayer, ZIO, ZLayer}
 
+import java.util.{Map => JMap}
+
 package object service {
-  val hardcodedSecret: ULayer[InviteSecrets] = ZLayer.succeed(new InviteSecrets {
+  private val dbBackendLayer = ZLayer.succeed(PostgresProfile)
+  private val dbConfigLayer = ZPostgreSQLContainer.Settings.default >+> ZPostgreSQLContainer.live >>> ZLayer.fromZIO(
+    for {
+      info <- ZIO.service[JdbcInfo]
+    } yield ConfigFactory.parseMap(
+      JMap.of(
+        "jdbcUrl",
+        info.jdbcUrl,
+        "username",
+        info.username,
+        "password",
+        info.password
+      )
+    )
+  )
+
+  val hardcodedSecret = ZLayer.succeed(new InviteSecrets {
     override val secretString: String = "secret_string"
   })
 
-  private val jdbcInfo: ULayer[JdbcInfo] = ZPostgreSQLContainer.Settings.default >+> ZPostgreSQLContainer.live
-  val testcontainersStorage: ZLayer[Scope, Throwable, StorageService] = jdbcInfo >>> ZLayer.fromZIO(
-    for {
-      pg <- ZIO.service[JdbcInfo]
-      service <- ZIO.acquireRelease(
-                  ZIO.attempt(new HardcodedStemmaService(pg.jdbcUrl, pg.username, pg.password)).tap(_.createSchema)
-                )(x => ZIO.succeed(x.close()))
-    } yield service
-  )
-
-  class HardcodedStemmaService(url: String, user: String, password: String) extends SlickStemmaService {
-    import api._
-    override val db: backend.DatabaseDef = Database.forURL(url, user, password)
-  }
+  val databaseProvider = ((dbConfigLayer ++ dbBackendLayer) >>> DatabaseProvider.live) >>> StorageService.live >>> ZLayer
+    .fromZIO {
+      for {
+        ss <- ZIO.service[StorageService]
+        _  <- ss.createSchema
+      } yield ss
+    }
 }

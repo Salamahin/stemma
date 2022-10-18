@@ -1,14 +1,11 @@
 package io.github.salamahin.stemma.service
 import io.github.salamahin.stemma.domain.{Stemma => DomainStemma, _}
 import io.github.salamahin.stemma.storage.Tables
-import slick.jdbc.{JdbcProfile, PostgresProfile}
-import zio.{IO, Scope, Task, UIO, ZIO, ZLayer}
-import zio._
 import slick.interop.zio.DatabaseProvider
+import zio._
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
-import slick.interop.zio.syntax._
 
 case class ChownEffect(affectedFamilies: Seq[String], affectedPeople: Seq[String])
 
@@ -30,22 +27,17 @@ trait StorageService {
 }
 
 object StorageService {
-  val slick: URLayer[DatabaseProvider, StorageService] = ZLayer.fromZIO {
+  val live: URLayer[DatabaseProvider, StorageService] = ZLayer.fromZIO {
     for {
       db <- ZIO.service[DatabaseProvider]
       repo <- db.profile.map { profile =>
                import profile.api._
+               import slick.interop.zio.syntax._
+               import Tables._
 
                val dbLayer = ZLayer.succeed(db)
 
-               new StorageService with Tables with JdbcProfile {
-                 override def createSchema: Task[Unit] =
-                   ZIO
-                     .fromDBIO { implicit ec =>
-                       (qStemmaUsers.schema ++ qStemmas.schema ++ qPeople.schema ++ qFamilies.schema ++ qFamiliesOwners.schema ++ qPeopleOwners.schema ++ qStemmaOwners.schema ++ qSpouses.schema ++ qChildren.schema).createIfNotExists
-                     }
-                     .provideSome(dbLayer)
-
+               new StorageService {
                  override def getOrCreateUser(email: String): IO[StemmaError, User] =
                    ZIO
                      .fromDBIO { implicit ec =>
@@ -524,6 +516,21 @@ object StorageService {
                    ZIO
                      .fromDBIO { implicit ec => qPeopleOwners.filter(po => po.ownerId === userId.toLong && po.personId === personId.toLong).exists.result }
                      .mapError(t => UnknownError(t))
+                     .provideSome(dbLayer)
+
+                 override def createSchema: Task[Unit] =
+                   ZIO
+                     .fromDBIO(
+                       (qStemmaUsers.schema ++
+                         qStemmas.schema ++
+                         qPeople.schema ++
+                         qFamilies.schema ++
+                         qFamiliesOwners.schema ++
+                         qPeopleOwners.schema ++
+                         qStemmaOwners.schema ++
+                         qSpouses.schema ++
+                         qChildren.schema).createIfNotExists
+                     )
                      .provideSome(dbLayer)
                }
              }

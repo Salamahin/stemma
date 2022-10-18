@@ -1,10 +1,13 @@
 package io.github.salamahin.stemma.apis.restful
 
+import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
 import io.github.salamahin.stemma.apis.{ApiService, HandleApiRequestService}
 import io.github.salamahin.stemma.domain.{RequestDeserializationProblem, StemmaError, UnknownError, User, Request => DomainRequest}
 import io.github.salamahin.stemma.service.{InviteSecrets, StorageService, UserService}
 import org.apache.http.HttpResponse
+import slick.interop.zio.DatabaseProvider
+import slick.jdbc.PostgresProfile
 import zhttp.http.Middleware.cors
 import zhttp.http._
 import zhttp.http.middleware.Cors.CorsConfig
@@ -64,6 +67,10 @@ object Main extends LazyLogging with ZIOAppDefault {
   private val corsConfig = CorsConfig(anyOrigin = true)
 
   override def run: ZIO[ZIOAppArgs with Scope, Any, Any] = {
+    val rootConfig     = ConfigFactory.load()
+    val dbConfigLayer  = ZLayer(ZIO.attempt(rootConfig.getConfig("dbConfig")))
+    val dbBackendLayer = ZLayer.succeed(PostgresProfile)
+
     val createSchema = ZIO
       .service[StorageService]
       .flatMap(_.createSchema)
@@ -74,11 +81,12 @@ object Main extends LazyLogging with ZIOAppDefault {
       .tapError(err => ZIO.succeed(logger.error("Unexpected error", err))))
       .provideSome(
         ZLayer.succeed(Random.RandomLive),
+        (dbConfigLayer ++ dbBackendLayer) >>> DatabaseProvider.live,
         InviteSecrets.fromEnv,
         GoogleSecrets.fromEnv,
         OAuthService.googleSignIn,
         UserService.live,
-        StorageService.slick,
+        StorageService.live,
         HandleApiRequestService.live,
         ApiService.live
       )

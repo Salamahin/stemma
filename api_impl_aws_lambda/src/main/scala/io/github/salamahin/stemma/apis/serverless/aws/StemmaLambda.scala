@@ -1,10 +1,13 @@
 package io.github.salamahin.stemma.apis.serverless.aws
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.LazyLogging
 import io.github.salamahin.stemma.apis.serverless.aws.StemmaLambda.handler
 import io.github.salamahin.stemma.apis.{ApiService, HandleApiRequestService}
 import io.github.salamahin.stemma.domain._
-import io.github.salamahin.stemma.service.{ConfiguredStemmaService, InviteSecrets, StorageService, UserService}
+import io.github.salamahin.stemma.service.{InviteSecrets, StorageService, UserService}
+import slick.interop.zio.DatabaseProvider
+import slick.jdbc._
 import zio.Random.RandomLive
 import zio.{IO, UIO, ZIO, ZLayer}
 
@@ -16,31 +19,30 @@ class StemmaLambda extends LambdaRunner[Request, Response] {
 }
 
 object StemmaLambda extends LazyLogging {
-  private val ss =
-    try {
-      val rootCert = Paths.get("/tmp/cockroach-proud-gnoll.crt")
+  //try create a cert on load
+  try {
+    val rootCert = Paths.get("/tmp/cockroach-proud-gnoll.crt")
 
-      if (!Files.exists(rootCert)) {
-        val decodedCert = new String(Base64.getDecoder.decode(sys.env("JDBC_CERT")))
-        Files.writeString(rootCert, decodedCert)
-        logger.info("root cert created")
-      }
-
-      new ConfiguredStemmaService()
-    } catch {
-      case exc: Throwable =>
-        logger.error("Fatal error while initializing StemmaService", exc)
-        throw exc
+    if (!Files.exists(rootCert)) {
+      val decodedCert = new String(Base64.getDecoder.decode(sys.env("JDBC_CERT")))
+      Files.writeString(rootCert, decodedCert)
+      logger.info("root cert created")
     }
+  } catch {
+    case exc: Throwable =>
+      logger.error("Fatal error while initializing StemmaService", exc)
+      throw exc
+  }
 
-  sys.addShutdownHook(() => {
-    if (ss != null) ss.close()
-  })
+  val rootConfig: Config = ConfigFactory.load()
+  val dbConfigLayer      = ZLayer(ZIO.attempt(rootConfig.getConfig("dbConfig")))
+  val dbBackendLayer     = ZLayer.succeed(PostgresProfile)
 
   val handler: UIO[HandleApiRequestService] = ZIO
     .service[HandleApiRequestService]
     .provideSome(
-      ZLayer.succeed(ss: StorageService),
+      (dbConfigLayer ++ dbBackendLayer) >>> DatabaseProvider.live,
+      StorageService.live,
       InviteSecrets.fromEnv,
       ZLayer.succeed(RandomLive),
       UserService.live,
