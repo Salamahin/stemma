@@ -19,8 +19,8 @@ class StemmaLambda extends LambdaRunner[Request, Response] {
   override def run(email: String, request: Request): IO[StemmaError, Response] =
     ZIO
       .service[HandleApiRequestService]
-      .flatMap(_.handle(email, request))
       .provideSome(layers)
+      .flatMap(_.handle(email, request))
 }
 
 object StemmaLambda extends LazyLogging {
@@ -42,7 +42,9 @@ object StemmaLambda extends LazyLogging {
   val layers: ZLayer[Any, Nothing, HandleApiRequestService] = ZLayer.fromZIO(
     (createCerts *> ZIO.service[HandleApiRequestService])
       .provideSome(
-        (dbConfigLayer ++ dbBackendLayer) >>> DatabaseProvider.live,
+        dbConfigLayer,
+        dbBackendLayer,
+        DatabaseProvider.live,
         StorageService.live,
         InviteSecrets.fromEnv,
         ZLayer.succeed(RandomLive),
