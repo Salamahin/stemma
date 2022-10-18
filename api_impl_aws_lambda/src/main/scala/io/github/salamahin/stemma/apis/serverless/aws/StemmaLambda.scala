@@ -51,7 +51,3 @@ object StemmaLambda extends LazyLogging {
     .tapError(err => ZIO.succeed(logger.error("Failed to create deps", err)))
     .orDie
 }
-
-object Aaaa extends App {
-  new StemmaLambda().run("test", CreateNewStemmaRequest("asdasdada"))
-}
