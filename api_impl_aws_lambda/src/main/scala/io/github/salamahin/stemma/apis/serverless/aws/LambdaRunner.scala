@@ -52,7 +52,7 @@ abstract class LambdaRunner[In, Out](implicit jsonDecoder: JsonDecoder[In], json
 
     Unsafe.unsafe { implicit u =>
       val logAndHandle = ZIO.succeed(logger.debug("Unsafe started")) *> handle <* ZIO.succeed(logger.debug("Done"))
-      lambdaRuntime.run(logAndHandle) match {
+      lambdaRuntime.unsafe.run(logAndHandle) match {
         case Exit.Success(successJson) => successJson
       }
     }
