@@ -36,7 +36,7 @@ abstract class LambdaRunner[In, Out](implicit jsonDecoder: JsonDecoder[In], json
 
     Unsafe.unsafe { implicit u =>
       logger.debug("Unsafe run...")
-      Runtime.default.unsafe.run(zio) match {
+      Runtime.default.unsafe.run(ZIO.succeed(logger.debug("Unsafe started")) *> zio <* ZIO.succeed(logger.debug("Done"))) match {
         case Exit.Success(successJson) => successJson
       }
     }
