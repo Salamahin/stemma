@@ -4,62 +4,20 @@ import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
-import io.github.salamahin.stemma.apis.serverless.aws.LambdaRunner.lambdaRuntime
 import io.github.salamahin.stemma.apis.{ApiService, HandleApiRequestService}
-import io.github.salamahin.stemma.domain.{Request, RequestDeserializationProblem, Response, StemmaError}
+import io.github.salamahin.stemma.domain.{Request, RequestDeserializationProblem}
 import io.github.salamahin.stemma.service.{InviteSecrets, StorageService, UserService}
 import slick.interop.zio.DatabaseProvider
 import slick.jdbc.PostgresProfile
 import zio.Random.RandomLive
-import zio.json.{DecoderOps, EncoderOps, JsonDecoder, JsonEncoder}
-import zio.{Exit, IO, Runtime, Unsafe, ZIO, ZLayer}
+import zio.json.{DecoderOps, EncoderOps}
+import zio.{Exit, Runtime, Unsafe, ZIO, ZLayer}
 
 import java.nio.file.{Files, Paths}
 import java.util.Base64
 import scala.util.Try
 
-class StemmaLambda extends LambdaRunner[Request, Response] {
-  override def run(email: String, request: Request): ZIO[HandleApiRequestService, StemmaError, Response] =
-    ZIO
-      .service[HandleApiRequestService]
-      .flatMap(_.handle(email, request))
-}
-
-abstract class LambdaRunner[In, Out](implicit jsonDecoder: JsonDecoder[In], jsonEncoder: JsonEncoder[Out]) extends LazyLogging {
-  def run(email: String, request: In): ZIO[HandleApiRequestService, StemmaError, Out]
-
-  final def apply(input: APIGatewayV2HTTPEvent, context: Context) = {
-    logger.debug("Hello world!")
-
-    val email = ZIO.succeed(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"))
-
-    val request = ZIO
-      .attempt(new String(Base64.getDecoder.decode(input.getBody)))
-      .tap(body => ZIO.succeed(logger.debug(s"Received request body: $body")))
-      .flatMap(str => ZIO.fromEither(str.fromJson[In]))
-      .mapError(err => RequestDeserializationProblem(s"Failed to deser the request, details: $err"))
-
-    val handle = (for {
-      (email, body) <- email <&> request
-      res           <- run(email, body)
-    } yield res)
-      .tapError(err => ZIO.succeed(logger.error("Error occurred", err)))
-      .fold(
-        err => err.toJson,
-        res => res.toJson
-      )
-      .tap(resp => ZIO.succeed(logger.debug(s"Generated response (truncated): ${resp.take(100)}")))
-
-    Unsafe.unsafe { implicit u =>
-      logger.debug("Unsafe run")
-      lambdaRuntime.unsafe.run(handle) match {
-        case Exit.Success(successJson) => successJson
-      }
-    }
-  }
-}
-
-object LambdaRunner extends LazyLogging {
+class StemmaLambda extends LazyLogging {
   private val createCerts = ZIO.fromTry {
     Try {
       val rootCert = Paths.get("/tmp/cockroach-proud-gnoll.crt")
@@ -96,6 +54,36 @@ object LambdaRunner extends LazyLogging {
       .orDie
   )
 
-  val lambdaRuntime = Unsafe.unsafe { implicit unsafe => Runtime.unsafe.fromLayer(layers) }
-  logger.debug("Runtime created")
+  private val runtime = Unsafe.unsafe { implicit u => Runtime.unsafe.fromLayer(layers) }
+
+  def apply(input: APIGatewayV2HTTPEvent, context: Context) = {
+    logger.debug("Hello world!")
+
+    val email = ZIO.succeed(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"))
+
+    val request = ZIO
+      .attempt(new String(Base64.getDecoder.decode(input.getBody)))
+      .tap(body => ZIO.succeed(logger.debug(s"Received request body: $body")))
+      .flatMap(str => ZIO.fromEither(str.fromJson[Request]))
+      .mapError(err => RequestDeserializationProblem(s"Failed to deser the request, details: $err"))
+
+    val handler = (for {
+      service       <- ZIO.service[HandleApiRequestService]
+      (email, body) <- email <&> request
+      res           <- service.handle(email, body)
+    } yield res)
+      .tapError(err => ZIO.succeed(logger.error("Error occurred", err)))
+      .fold(
+        err => err.toJson,
+        res => res.toJson
+      )
+      .tap(resp => ZIO.succeed(logger.debug(s"Generated response (truncated): ${resp.take(100)}")))
+
+    Unsafe.unsafe { implicit u =>
+      logger.debug("Unsafe run")
+      runtime.unsafe.run(handler) match {
+        case Exit.Success(successJson) => successJson
+      }
+    }
+  }
 }
