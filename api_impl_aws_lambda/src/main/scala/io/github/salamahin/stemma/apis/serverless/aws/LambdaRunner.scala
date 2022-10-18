@@ -6,7 +6,6 @@ import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
 import io.github.salamahin.stemma.apis.serverless.aws.LambdaRunner.lambdaRuntime
 import io.github.salamahin.stemma.apis.{ApiService, HandleApiRequestService}
-import io.github.salamahin.stemma.apis.serverless.aws.StemmaLambda.logger
 import io.github.salamahin.stemma.domain.{Request, RequestDeserializationProblem, Response, StemmaError}
 import io.github.salamahin.stemma.service.{InviteSecrets, StorageService, UserService}
 import slick.interop.zio.DatabaseProvider
