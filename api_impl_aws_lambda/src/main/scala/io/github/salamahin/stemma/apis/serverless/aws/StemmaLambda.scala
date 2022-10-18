@@ -32,6 +32,8 @@ object StemmaLambda extends LazyLogging {
         val decodedCert = new String(Base64.getDecoder.decode(sys.env("JDBC_CERT")))
         Files.writeString(rootCert, decodedCert)
         logger.info("Root cert created")
+      } else {
+        logger.info("Root cert already exist")
       }
     }
   }
@@ -40,18 +42,20 @@ object StemmaLambda extends LazyLogging {
   private val dbBackendLayer = ZLayer.succeed(PostgresProfile)
 
   val layers: ZLayer[Any, Nothing, HandleApiRequestService] = ZLayer.fromZIO(
-    (createCerts *> ZIO.service[HandleApiRequestService])
-      .provideSome(
-        dbConfigLayer,
-        dbBackendLayer,
-        DatabaseProvider.live,
-        StorageService.live,
-        InviteSecrets.fromEnv,
-        ZLayer.succeed(RandomLive),
-        UserService.live,
-        ApiService.live,
-        HandleApiRequestService.live
-      )
+    (createCerts *>
+      ZIO
+        .service[HandleApiRequestService]
+        .provideSome(
+          dbConfigLayer,
+          dbBackendLayer,
+          DatabaseProvider.live,
+          StorageService.live,
+          InviteSecrets.fromEnv,
+          ZLayer.succeed(RandomLive),
+          UserService.live,
+          ApiService.live,
+          HandleApiRequestService.live
+        ))
       .tapError(err => ZIO.succeed(logger.error("Failed to create deps", err)))
       .orDie
   )
