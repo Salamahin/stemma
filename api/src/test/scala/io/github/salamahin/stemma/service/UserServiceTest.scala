@@ -16,7 +16,7 @@ object UserServiceTest extends ZIOSpecDefault with Requests with RenderStemma {
       createdUser <- us.getOrCreateUser("user@test.com")
       foundUser   <- us.getOrCreateUser("user@test.com")
     } yield assertTrue(createdUser == foundUser))
-      .provideSome(Scope.default, testcontainersStorage)
+      .provideSome(Scope.default, databaseProvider)
   }
 
   private val canCreateAnInvitationLink = test("can create invite token") {
@@ -31,7 +31,7 @@ object UserServiceTest extends ZIOSpecDefault with Requests with RenderStemma {
       token        <- us.createInviteToken("invitee@test.com", stemmaId, joshId)
       decodedToken <- us.decodeInviteToken(token)
     } yield assertTrue(decodedToken.inviteesEmail == "invitee@test.com") && assertTrue(decodedToken.targetPersonId == joshId))
-      .provideSome(Scope.default, testcontainersStorage)
+      .provideSome(Scope.default, databaseProvider)
   }
 
   override def spec = suite("UserServiceTest")(

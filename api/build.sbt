@@ -9,6 +9,7 @@ libraryDependencies ++= Seq(
   "org.postgresql"             % "postgresql"                         % "42.5.0",
   "dev.zio"                    %% "zio"                               % Versions.zioV,
   "dev.zio"                    %% "zio-json"                          % "0.3.0-RC10",
+  "io.scalac"                  %% "zio-slick-interop"                 % "0.5.0",
   "org.typelevel"              %% "cats-core"                         % "2.8.0",
   "com.typesafe.slick"         %% "slick"                             % Versions.slickV,
   "com.typesafe.slick"         %% "slick-hikaricp"                    % Versions.slickV,

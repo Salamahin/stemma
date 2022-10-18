@@ -1,12 +1,9 @@
 package io.github.salamahin.stemma.storage
 
-import slick.jdbc.JdbcProfile
-
 import java.time.LocalDate
 
-trait Tables {
-  this: JdbcProfile =>
-  import api._
+object Tables {
+  import slick.jdbc.PostgresProfile.api._
 
   case class StemmaUser(id: Long = 0, email: String)
   case class Stemma(id: Long = 0, name: String)
@@ -31,6 +28,8 @@ trait Tables {
   class TStemmaUsers(tag: Tag) extends Table[StemmaUser](tag, "StemmaUsers") {
     def id    = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def email = column[String]("email", O.Unique)
+
+    def idx = index("idx_email", email, unique = true)
 
     override def * = (id, email).mapTo[StemmaUser]
   }

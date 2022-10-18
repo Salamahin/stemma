@@ -27,7 +27,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
           "() parentsOf (Jane, John)" ::
           Nil
       )
-    }).provideSome(testcontainersStorage, Scope.default)
+    }).provideSome(databaseProvider, Scope.default)
   }
 
   private val cantCreateFamilyOfSingleParent = test("there cant be a family with a single parent and no children") {
@@ -38,7 +38,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       stemmaId        <- s.createStemma(userId, "test stemma")
 
       err <- s.createFamily(userId, stemmaId, family(createJohn)()).flip
-    } yield assertTrue(err == IncompleteFamily())).provideSome(testcontainersStorage, Scope.default)
+    } yield assertTrue(err == IncompleteFamily())).provideSome(databaseProvider, Scope.default)
   }
 
   private val cantCreateFamilyOfSingleChild = test("there cant be a family with no parents and a single child") {
@@ -49,7 +49,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       stemmaId        <- s.createStemma(userId, "test stemma")
 
       err <- s.createFamily(userId, stemmaId, family()(createJill)).flip
-    } yield assertTrue(err == IncompleteFamily())).provideSome(testcontainersStorage, Scope.default)
+    } yield assertTrue(err == IncompleteFamily())).provideSome(databaseProvider, Scope.default)
   }
 
   private val appendChildrenToFullExistingFamily = test("when family description contains existing parents that already have a full family then children appended to that family") {
@@ -64,7 +64,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
       render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families)(hasSameElements("(James, Jill) parentsOf (John, Josh)" :: "(James) parentsOf (Jane)" :: Nil)))
-      .provideSome(testcontainersStorage, Scope.default)
+      .provideSome(databaseProvider, Scope.default)
   }
 
   private val appendChildrenToIncompleteExistingFamily = test("when family description contains a single parent then newely added with same single parent appended to that family") {
@@ -77,7 +77,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       _                                             <- s.createFamily(userId, stemmaId, family(existing(jamesId))(createJohn))
 
       render(families) <- s.stemma(userId, stemmaId)
-    } yield assert(families)(hasSameElements("(James) parentsOf (Jane, John)" :: Nil))).provideSome(testcontainersStorage, Scope.default)
+    } yield assert(families)(hasSameElements("(James) parentsOf (Jane, John)" :: Nil))).provideSome(databaseProvider, Scope.default)
   }
 
   private val duplicatedIdsForbidden = test("cant update a family when there are duplicated ids in members") {
@@ -89,7 +89,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
       (_, FamilyDescription(familyId, jamesId :: Nil, jillId :: Nil, _)) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
       err                                                                <- s.updateFamily(userId, familyId, family(existing(jamesId), existing(jamesId))(existing(jillId))).flip
-    } yield assertTrue(err == DuplicatedIds(jamesId))).provideSome(testcontainersStorage, Scope.default)
+    } yield assertTrue(err == DuplicatedIds(jamesId))).provideSome(databaseProvider, Scope.default)
   }
 
   private val aChildCanBelongToASingleFamilyOnly = test("a child must belong to a single family") {
@@ -101,7 +101,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
       (_, FamilyDescription(firstFamilyId, _, jillId :: Nil, _)) <- s.createFamily(userId, stemmaId, family(createJames)(createJill))
       err                                                        <- s.createFamily(userId, stemmaId, family(createJane)(existing(jillId))).flip
-    } yield assertTrue(err == ChildAlreadyBelongsToFamily(firstFamilyId, jillId))).provideSome(testcontainersStorage, Scope.default)
+    } yield assertTrue(err == ChildAlreadyBelongsToFamily(firstFamilyId, jillId))).provideSome(databaseProvider, Scope.default)
   }
 
   private val canRemovePerson = test("when removing a person his child & spouse relations are removed as well") {
@@ -117,7 +117,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
       render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families)(hasSameElements("(Jane, John) parentsOf (James)" :: "(Josh) parentsOf (Jake)" :: Nil)))
-      .provideSome(testcontainersStorage, Scope.default)
+      .provideSome(databaseProvider, Scope.default)
   }
 
   private val aPersonCanBeSpouseInDifferentFamilies = test("one can have several families as a spouse") {
@@ -132,7 +132,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
       render(families) <- s.stemma(userId, stemmaId)
     } yield assert(families)(hasSameElements("(James, Jane) parentsOf (Jill)" :: "(James) parentsOf (July)" :: Nil)))
-      .provideSome(testcontainersStorage, Scope.default)
+      .provideSome(databaseProvider, Scope.default)
   }
 
   private val leavingSingleMemberOfFamilyDropsEmptyFamilies = test("when the only member of family left the family is removed") {
@@ -149,7 +149,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
       Stemma(people, families) <- s.stemma(userId, stemmaId)
     } yield assertTrue(families.isEmpty) && assert(people.map(_.name))(hasSameElements("Jane" :: "July" :: Nil)))
-      .provideSome(testcontainersStorage, Scope.default)
+      .provideSome(databaseProvider, Scope.default)
   }
 
   private val canUpdateExistingPerson = test("can update existing person") {
@@ -172,7 +172,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
           p.birthDate.contains(johnsBirthDay) &&
           p.deathDate.contains(johnsDeathDay)
       )
-    )).provideSome(testcontainersStorage, Scope.default)
+    )).provideSome(databaseProvider, Scope.default)
   }
 
   private val canUpdateExistingFamily = test("when updating a family members are not removed") {
@@ -189,7 +189,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       render(families)       = st
     } yield assertTrue(families == List("(John, July) parentsOf (James, Jill)")) &&
       assert(people.map(_.name))(hasSameElements("Jane" :: "John" :: "Jill" :: "July" :: "James" :: Nil)))
-      .provideSome(testcontainersStorage, Scope.default)
+      .provideSome(databaseProvider, Scope.default)
   }
 
   private val usersHaveSeparateGraphs = test("users might have separated stemmas") {
@@ -210,7 +210,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
     } yield assert(stemmas)(hasSameElements(StemmaDescription(userStemmaId1, "first stemma", true) :: StemmaDescription(userStemmaId2, "second stemma", true) :: Nil)) &&
       assert(stemma1)(hasSameElements("(Jane, John) parentsOf (Jill, Josh)" :: Nil)) &&
       assert(stemma2)(hasSameElements("(Jake) parentsOf (James, July)" :: Nil)))
-      .provideSome(testcontainersStorage, Scope.default)
+      .provideSome(databaseProvider, Scope.default)
   }
 
   private val cantUpdatePersonIfNotAnOwner = test("cant update or remove a person that dont own") {
@@ -226,7 +226,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       personUpdateErr <- s.updatePerson(accessorId, janeId, createJuly).flip
     } yield assertTrue(personRemoveErr == AccessToPersonDenied(janeId)) &&
       assertTrue(personUpdateErr == AccessToPersonDenied(janeId)))
-      .provideSome(testcontainersStorage, Scope.default)
+      .provideSome(databaseProvider, Scope.default)
   }
 
   private val cantUpdateFamilyIfNotAnOwner = test("cant update or remove a family that dont own") {
@@ -242,7 +242,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       familyUpdateErr <- s.updateFamily(accessorId, familyId, family(createJames)(createJuly)).flip
     } yield assertTrue(familyRemoveErr == AccessToFamilyDenied(familyId)) &&
       assertTrue(familyUpdateErr == AccessToFamilyDenied(familyId)))
-      .provideSome(testcontainersStorage, Scope.default)
+      .provideSome(databaseProvider, Scope.default)
   }
 
   private val whenUpdatingFamilyAllMembersShouldBelongToGraph = test("when updating a family with existing person there should be no members of different stemmas") {
@@ -255,7 +255,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
       (_, FamilyDescription(_, janeId :: johnId :: Nil, joshId :: jillId :: Nil, _)) <- s.createFamily(userId, stemma1Id, family(createJane, createJohn)(createJosh, createJill))
       familyCreationErr                                                              <- s.createFamily(userId, stemma2Id, family(existing(janeId), existing(johnId))(existing(joshId), existing(jillId))).flip
-    } yield assertTrue(familyCreationErr == NoSuchPersonId(janeId))).provideSome(testcontainersStorage, Scope.default)
+    } yield assertTrue(familyCreationErr == NoSuchPersonId(janeId))).provideSome(databaseProvider, Scope.default)
   }
 
   private val cantRequestStemmaIfNotGraphOwner = test("cant request stemma if not a stemma owner") {
@@ -268,7 +268,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       _        <- s.createFamily(creatorId, stemmaId, family(createJane, createJohn)(createJosh, createJill))
 
       stemmaRequestErr <- s.stemma(accessorId, stemmaId).flip
-    } yield assertTrue(stemmaRequestErr == AccessToStemmaDenied(stemmaId))).provideSome(testcontainersStorage, Scope.default)
+    } yield assertTrue(stemmaRequestErr == AccessToStemmaDenied(stemmaId))).provideSome(databaseProvider, Scope.default)
   }
 
   private val canChangeOwnershipInRecursiveManner = test("ownership change affects spouses, their ancestors and children") {
@@ -305,7 +305,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       assertTrue(affectedPeople.toSet == expectedAffectedPeople.toSet) &&
       assert(accessorStemma)(canEditOnlyP(expectedAffectedPeople: _*)) &&
       assert(accessorStemma)(canEditOnlyF(expectedAffectedFamilies: _*))
-    }).provideSome(testcontainersStorage, Scope.default)
+    }).provideSome(databaseProvider, Scope.default)
   }
 
   private val canChownSeveralTimes = test("can chown several times and wont fail") {
@@ -320,7 +320,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
       _ <- s.chown(accessorId, stemmaId, july)
       _ <- s.chown(accessorId, stemmaId, july)
-    } yield assertCompletes).provideSome(testcontainersStorage, Scope.default)
+    } yield assertCompletes).provideSome(databaseProvider, Scope.default)
   }
 
   private def canEditOnlyP(peopleIds: String*) = Assertion.assertion[Stemma](s"Can edit only following people: ${peopleIds.mkString(",")}") { st =>
@@ -353,7 +353,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
     } yield assertTrue(
       creatorStemmas.forall(s => !s.removable),
       accessorStemmas.forall(s => !s.removable)
-    )).provideSome(testcontainersStorage, Scope.default)
+    )).provideSome(databaseProvider, Scope.default)
   }
 
   val canRemoveStemmaIfOnlyOwner = test("if only owner then can remove owned stemma") {
@@ -365,7 +365,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       _        <- s.removeStemma(creatorId, stemmaId)
 
       stemmas <- s.listOwnedStemmas(creatorId)
-    } yield assertTrue(stemmas.isEmpty)).provideSome(testcontainersStorage, Scope.default)
+    } yield assertTrue(stemmas.isEmpty)).provideSome(databaseProvider, Scope.default)
   }
 
   val canCloneStemma = test("can clone the stemma into a new one") {
@@ -380,7 +380,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
 
       render(copiedStemma)   <- s.cloneStemma(userId, originalStemmaId, "cloned")
       render(originalStemma) <- s.stemma(userId, originalStemmaId)
-    } yield assertTrue(originalStemma.toSet == copiedStemma.toSet)).provideSome(testcontainersStorage, Scope.default)
+    } yield assertTrue(originalStemma.toSet == copiedStemma.toSet)).provideSome(databaseProvider, Scope.default)
   }
 
   val loopsProhibited = test("its impossible to create a chart with loops") {
@@ -394,7 +394,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       (_, FamilyDescription(_, _, joshId :: Nil, _))             <- s.createFamily(uid, stemmaId, family(existing(janeId))(createJosh))
       (_, FamilyDescription(_, _, jabeId :: Nil, _))             <- s.createFamily(uid, stemmaId, family(existing(joshId))(createJabe))
       err                                                        <- s.createFamily(uid, stemmaId, family(existing(jabeId), existing(jillId))()).flip
-    } yield assertTrue(err == StemmaHasCycles())).provideSome(testcontainersStorage, Scope.default)
+    } yield assertTrue(err == StemmaHasCycles())).provideSome(databaseProvider, Scope.default)
   }
 
   override def spec =
