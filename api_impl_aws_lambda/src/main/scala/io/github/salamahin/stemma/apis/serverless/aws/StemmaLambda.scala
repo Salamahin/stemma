@@ -20,19 +20,19 @@ class StemmaLambda extends LambdaRunner[Request, Response] {
 
 object StemmaLambda extends LazyLogging {
   //try create a cert on load
-  try {
-    val rootCert = Paths.get("/tmp/cockroach-proud-gnoll.crt")
-
-    if (!Files.exists(rootCert)) {
-      val decodedCert = new String(Base64.getDecoder.decode(sys.env("JDBC_CERT")))
-      Files.writeString(rootCert, decodedCert)
-      logger.info("root cert created")
-    }
-  } catch {
-    case exc: Throwable =>
-      logger.error("Fatal error while initializing StemmaService", exc)
-      throw exc
-  }
+//  try {
+//    val rootCert = Paths.get("/tmp/cockroach-proud-gnoll.crt")
+//
+//    if (!Files.exists(rootCert)) {
+//      val decodedCert = new String(Base64.getDecoder.decode(sys.env("JDBC_CERT")))
+//      Files.writeString(rootCert, decodedCert)
+//      logger.info("Root cert created")
+//    }
+//  } catch {
+//    case exc: Throwable =>
+//      logger.error("Fatal error while initializing StemmaService", exc)
+//      throw exc
+//  }
 
   private val dbConfigLayer  = ZLayer(ZIO.attempt(ConfigFactory.load().getConfig("dbConfig")))
   private val dbBackendLayer = ZLayer.succeed(PostgresProfile)
@@ -50,4 +50,8 @@ object StemmaLambda extends LazyLogging {
     )
     .tapError(err => ZIO.succeed(logger.error("Failed to create deps", err)))
     .orDie
+}
+
+object Aaaa extends App {
+  new StemmaLambda().run("test", CreateNewStemmaRequest("asdasdada"))
 }
