@@ -34,9 +34,8 @@ object StemmaLambda extends LazyLogging {
       throw exc
   }
 
-  val rootConfig: Config = ConfigFactory.load()
-  val dbConfigLayer      = ZLayer(ZIO.attempt(rootConfig.getConfig("dbConfig")))
-  val dbBackendLayer     = ZLayer.succeed(PostgresProfile)
+  private val dbConfigLayer  = ZLayer(ZIO.attempt(ConfigFactory.load().getConfig("dbConfig")))
+  private val dbBackendLayer = ZLayer.succeed(PostgresProfile)
 
   val handler: UIO[HandleApiRequestService] = ZIO
     .service[HandleApiRequestService]
