@@ -51,8 +51,8 @@ abstract class LambdaRunner[In, Out](implicit jsonDecoder: JsonDecoder[In], json
       .tap(resp => ZIO.succeed(logger.debug(s"Generated response (truncated): ${resp.take(100)}")))
 
     Unsafe.unsafe { implicit u =>
-      val logAndHandle = ZIO.succeed(logger.debug("Unsafe started")) *> handle <* ZIO.succeed(logger.debug("Done"))
-      lambdaRuntime.unsafe.run(logAndHandle) match {
+      logger.debug("Unsafe run")
+      lambdaRuntime.unsafe.run(handle) match {
         case Exit.Success(successJson) => successJson
       }
     }
@@ -77,7 +77,7 @@ object LambdaRunner extends LazyLogging {
   private val dbConfigLayer  = ZLayer(ZIO.attempt(ConfigFactory.load().getConfig("dbConfig")))
   private val dbBackendLayer = ZLayer.succeed(PostgresProfile)
 
-  private val layers: ZLayer[Any, Nothing, HandleApiRequestService] = ZLayer.fromZIO(
+  private val layers = ZLayer.fromZIO(
     (createCerts *>
       ZIO
         .service[HandleApiRequestService]
@@ -97,4 +97,5 @@ object LambdaRunner extends LazyLogging {
   )
 
   val lambdaRuntime = Unsafe.unsafe { implicit unsafe => Runtime.unsafe.fromLayer(layers) }
+  logger.debug("Runtime created")
 }
