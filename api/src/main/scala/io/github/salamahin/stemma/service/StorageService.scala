@@ -44,7 +44,7 @@ object StorageService {
                        val userId = qStemmaUsers returning qStemmaUsers.map(_.id)
 
                        val query = (for {
-                         maybeUserId <- qStemmaUsers.filter(_.email === email).map(_.id).take(1).result.headOption
+                         maybeUserId <- qStemmaUsers.filter(_.email === email).map(_.id).result.headOption
                          userId      <- maybeUserId.map(id => DBIO.successful(id)).getOrElse(userId += StemmaUser(email = email))
                        } yield User(userId.toString, email)).transactionally
 
