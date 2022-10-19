@@ -16,4 +16,16 @@
     <logger name="slick.jdbc.JdbcBackend.benchmark" level="debug" additivity="false">
         <appender-ref ref="console"/>
     </logger>
+
+    <logger name="slick.jdbc.JdbcBackend.statement" level="debug" additivity="false">
+        <appender-ref ref="console"/>
+    </logger>
+
+    <logger name="slick.jdbc.StatementInvoker.result" level="debug" additivity="false">
+        <appender-ref ref="console"/>
+    </logger>
+
+    <logger name="slick.compiler.QueryCompilerBenchmark" level="debug" additivity="false">
+        <appender-ref ref="console"/>
+    </logger>
 </configuration>
