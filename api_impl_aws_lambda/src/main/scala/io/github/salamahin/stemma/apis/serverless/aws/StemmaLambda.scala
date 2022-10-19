@@ -92,4 +92,5 @@ object StemmaLambda extends LazyLogging {
   )
 
   val runtime = Unsafe.unsafe { implicit u => Runtime.unsafe.fromLayer(StemmaLambda.layers) }
+  logger.debug("Runtime prepared")
 }
