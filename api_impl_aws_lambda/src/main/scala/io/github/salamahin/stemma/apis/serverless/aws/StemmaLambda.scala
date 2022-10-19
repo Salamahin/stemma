@@ -19,6 +19,7 @@ import scala.util.Try
 
 class StemmaLambda extends LazyLogging {
   logger.debug("Hello world!")
+  StemmaLambda.runtime //init runtime
 
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = {
     val email = ZIO.succeed(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"))
