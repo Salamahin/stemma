@@ -83,7 +83,7 @@ object StemmaLambda extends LazyLogging {
     (createCerts *>
       ZIO
         .service[HandleApiRequestService]
-        .provideSome[Scope](
+        .provideSome(
           ZLayer.succeed(databaseProvider),
           StorageService.live,
           InviteSecrets.fromEnv,
