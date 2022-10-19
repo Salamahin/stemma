@@ -19,7 +19,8 @@ import scala.util.Try
 
 class StemmaLambda extends LazyLogging {
   logger.debug("Hello world!")
-  StemmaLambda.runtime //init runtime
+  private val runtime = Unsafe.unsafe { implicit u => Runtime.unsafe.fromLayer(StemmaLambda.layers) }
+  logger.debug("Runtime prepared")
 
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = {
     val email = ZIO.succeed(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"))
@@ -44,7 +45,7 @@ class StemmaLambda extends LazyLogging {
 
     Unsafe.unsafe { implicit u =>
       logger.debug("Unsafe run")
-      StemmaLambda.runtime.unsafe.run(handler) match {
+      runtime.unsafe.run(handler) match {
         case Exit.Success(successJson) => successJson
       }
     }
@@ -76,7 +77,7 @@ object StemmaLambda extends LazyLogging {
     database.close()
   }
 
-  private val layers: ZLayer[Any, Nothing, HandleApiRequestService] = ZLayer.fromZIO(
+  val layers: ZLayer[Any, Nothing, HandleApiRequestService] = ZLayer.fromZIO(
     ZIO
       .service[HandleApiRequestService]
       .provideSome(
@@ -91,7 +92,4 @@ object StemmaLambda extends LazyLogging {
       .tapError(err => ZIO.succeed(logger.error("Failed to create deps", err)))
       .orDie
   )
-
-  val runtime = Unsafe.unsafe { implicit u => Runtime.unsafe.fromLayer(StemmaLambda.layers) }
-  logger.debug("Runtime prepared")
 }
