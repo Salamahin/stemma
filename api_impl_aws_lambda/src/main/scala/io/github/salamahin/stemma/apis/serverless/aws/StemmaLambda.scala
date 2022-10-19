@@ -2,26 +2,26 @@ package io.github.salamahin.stemma.apis.serverless.aws
 
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.LazyLogging
 import io.github.salamahin.stemma.apis.{ApiService, HandleApiRequestService}
 import io.github.salamahin.stemma.domain.{Request, RequestDeserializationProblem}
 import io.github.salamahin.stemma.service.{InviteSecrets, StorageService, UserService}
 import slick.interop.zio.DatabaseProvider
-import slick.jdbc.PostgresProfile
+import slick.jdbc.{JdbcBackend, JdbcProfile, PostgresProfile}
 import zio.Random.RandomLive
 import zio.json.{DecoderOps, EncoderOps}
-import zio.{Exit, Runtime, Unsafe, ZIO, ZLayer}
+import zio.{Exit, Runtime, Scope, UIO, Unsafe, ZEnvironment, ZIO, ZLayer}
 
 import java.nio.file.{Files, Paths}
 import java.util.Base64
 import scala.util.Try
 
 class StemmaLambda extends LazyLogging {
-  def apply(input: APIGatewayV2HTTPEvent, context: Context) = {
-    val runtime = Unsafe.unsafe { implicit u => Runtime.unsafe.fromLayer(StemmaLambda.layers) }
-    logger.debug("Hello world!")
+  val runtime = Unsafe.unsafe { implicit u => Runtime.unsafe.fromLayer(StemmaLambda.layers) }
+  logger.debug("Hello world!")
 
+  def apply(input: APIGatewayV2HTTPEvent, context: Context) = {
     val email = ZIO.succeed(input.getRequestContext.getAuthorizer.getJwt.getClaims.get("email"))
 
     val request = ZIO
@@ -69,21 +69,22 @@ object StemmaLambda extends LazyLogging {
   private val dbConfigLayer  = ZLayer(ZIO.attempt(ConfigFactory.load().getConfig("dbConfig")))
   private val dbBackendLayer = ZLayer.succeed(PostgresProfile)
 
-  val layers = ZLayer.fromZIO(
+  val layers: ZLayer[Any, Nothing, HandleApiRequestService] = ZLayer.fromZIO(
     (createCerts *>
+      ZIO.scoped(
       ZIO
         .service[HandleApiRequestService]
-        .provideSome(
+        .provideSome[Scope](
           dbConfigLayer,
           dbBackendLayer,
-          DatabaseProvider.live,
+          DatabaseProvider.live.extendScope,
           StorageService.live,
           InviteSecrets.fromEnv,
           ZLayer.succeed(RandomLive),
           UserService.live,
           ApiService.live,
           HandleApiRequestService.live
-        ))
+        )))
       .tapError(err => ZIO.succeed(logger.error("Failed to create deps", err)))
       .orDie
   )
