@@ -12,4 +12,8 @@
     <logger name="io.github.salamahin.stemma" level="debug" additivity="false">
         <appender-ref ref="console"/>
     </logger>
+
+    <logger name="slick.jdbc.JdbcBackend.benchmark" level="debug" additivity="false">
+        <appender-ref ref="console"/>
+    </logger>
 </configuration>
