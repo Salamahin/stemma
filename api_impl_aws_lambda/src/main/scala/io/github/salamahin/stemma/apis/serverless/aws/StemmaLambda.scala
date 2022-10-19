@@ -34,7 +34,9 @@ class StemmaLambda extends LazyLogging {
     val handler = (for {
       service       <- ZIO.service[HandleApiRequestService]
       (email, body) <- email <&> request
+      _             = logger.debug("Handling request...")
       res           <- service.handle(email, body)
+      _             = logger.debug("Response created")
     } yield res)
       .tapError(err => ZIO.succeed(logger.error("Error occurred", err)))
       .fold(
