@@ -18,7 +18,6 @@ import java.util.Base64
 import scala.util.Try
 
 class StemmaLambda extends LazyLogging {
-  val runtime = Unsafe.unsafe { implicit u => Runtime.unsafe.fromLayer(StemmaLambda.layers) }
   logger.debug("Hello world!")
 
   def apply(input: APIGatewayV2HTTPEvent, context: Context) = {
@@ -44,7 +43,7 @@ class StemmaLambda extends LazyLogging {
 
     Unsafe.unsafe { implicit u =>
       logger.debug("Unsafe run")
-      runtime.unsafe.run(handler) match {
+      StemmaLambda.runtime.unsafe.run(handler) match {
         case Exit.Success(successJson) => successJson
       }
     }
@@ -52,6 +51,20 @@ class StemmaLambda extends LazyLogging {
 }
 
 object StemmaLambda extends LazyLogging {
+  self =>
+  private val conf     = ConfigFactory.load().getConfig("dbConfig")
+  private val profile  = PostgresProfile
+  private val database = profile.backend.Database.forConfig("", conf)
+
+  private val databaseProvider = new DatabaseProvider {
+    override def db: UIO[JdbcBackend#DatabaseDef] = ZIO.succeed(database)
+    override def profile: UIO[JdbcProfile]        = ZIO.succeed(self.profile)
+  }
+
+  sys.addShutdownHook {
+    database.close()
+  }
+
   private val createCerts = ZIO.fromTry {
     Try {
       val rootCert = Paths.get("/tmp/cockroach-proud-gnoll.crt")
@@ -66,26 +79,22 @@ object StemmaLambda extends LazyLogging {
     }
   }
 
-  private val dbConfigLayer  = ZLayer(ZIO.attempt(ConfigFactory.load().getConfig("dbConfig")))
-  private val dbBackendLayer = ZLayer.succeed(PostgresProfile)
-
-  val layers: ZLayer[Any, Nothing, HandleApiRequestService] = ZLayer.fromZIO(
+  private val layers: ZLayer[Any, Nothing, HandleApiRequestService] = ZLayer.fromZIO(
     (createCerts *>
-      ZIO.scoped(
       ZIO
         .service[HandleApiRequestService]
         .provideSome[Scope](
-          dbConfigLayer,
-          dbBackendLayer,
-          DatabaseProvider.live.extendScope,
+          ZLayer.succeed(databaseProvider),
           StorageService.live,
           InviteSecrets.fromEnv,
           ZLayer.succeed(RandomLive),
           UserService.live,
           ApiService.live,
           HandleApiRequestService.live
-        )))
+        ))
       .tapError(err => ZIO.succeed(logger.error("Failed to create deps", err)))
       .orDie
   )
+
+  val runtime = Unsafe.unsafe { implicit u => Runtime.unsafe.fromLayer(StemmaLambda.layers) }
 }
