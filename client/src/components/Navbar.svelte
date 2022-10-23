@@ -78,9 +78,7 @@
                         >
                     </li>
                 </ul>
-                <hr class="border border-white" />
                 <div class="d-flex ms-auto">
-                    <hr class="border border-light" />
                     <ul class="navbar-nav w-100">
                         <li class="nav-item">
                             <input
