@@ -48,8 +48,8 @@
     export function showPersonDetails(p: ShowPerson) {
         minBirthDate = null;
         minDeathDate = null;
-        maxBirthDate = new Date()
-        maxDeathDate = new Date()
+        maxBirthDate = new Date();
+        maxDeathDate = new Date();
 
         id = p.description.id;
         name = p.description.name;
@@ -67,11 +67,11 @@
     }
 
     $: if (birthDateStr) {
-        minDeathDate = birthDateStr? new Date(birthDateStr) : null;
+        minDeathDate = birthDateStr ? new Date(birthDateStr) : null;
         maxDeathDate = new Date();
     }
     $: if (deathDateStr) {
-        maxBirthDate = deathDateStr? new Date(deathDateStr) : new Date();
+        maxBirthDate = deathDateStr ? new Date(deathDateStr) : new Date();
         minBirthDate = null;
     }
 </script>
@@ -89,18 +89,30 @@
                     <input class="form-control" id="personNameInput" aria-describedby="personNameHelp" bind:value={name} readonly={readOnly} />
                 </div>
                 <div class="mb-3">
-                    <label for="personBirthDate" class="form-label">Дата рождения</label>
-                    <input
-                        type="date"
-                        class="form-control"
-                        id="personBirthDateInput"
-                        bind:value={birthDateStr}
-                        readonly={readOnly}
-                        min={formatDate(minBirthDate)}
-                        max={formatDate(maxBirthDate)}
-                    />
+                    <label for="personBirthDate" class="form-label">Годы жизни</label>
+                    <div class="d-flex flex-row align-items-center">
+                        <input
+                            type="date"
+                            class="form-control me-2"
+                            id="personBirthDateInput"
+                            bind:value={birthDateStr}
+                            readonly={readOnly}
+                            min={formatDate(minBirthDate)}
+                            max={formatDate(maxBirthDate)}
+                        />
+                        —
+                        <input
+                            type="date"
+                            class="form-control ms-2"
+                            id="personDeathDateInput"
+                            bind:value={deathDateStr}
+                            readonly={readOnly}
+                            min={formatDate(minDeathDate)}
+                            max={formatDate(maxDeathDate)}
+                        />
+                    </div>
                 </div>
-                <div class="mb-3">
+                <!-- <div class="mb-3">
                     <label for="personDeathDate" class="form-label">Дата смерти</label>
                     <input
                         type="date"
@@ -111,7 +123,7 @@
                         min={formatDate(minDeathDate)}
                         max={formatDate(maxDeathDate)}
                     />
-                </div>
+                </div> -->
                 <div class="mb-3">
                     <label for="personDeathDate" class="form-label">Био</label>
                     <textarea class="form-control" rows="6" id="personBioInput" bind:value={bio} readonly={readOnly} />

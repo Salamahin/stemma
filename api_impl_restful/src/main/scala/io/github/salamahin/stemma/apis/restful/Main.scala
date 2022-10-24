@@ -41,7 +41,7 @@ object Main extends LazyLogging with ZIOAppDefault {
                   .leftMap(err => RequestDeserializationProblem(err)): Either[StemmaError, DomainRequest]
               }
             )
-            .flatMap(req => ZIO.service[HandleApiRequestService].flatMap(_.handle(email, req).delay(Duration.fromSeconds(2))))
+            .flatMap(req => ZIO.serviceWithZIO[HandleApiRequestService](_.handle(email, req)).delay(Duration.fromSeconds(2)))
         }
     }
 
@@ -58,10 +58,10 @@ object Main extends LazyLogging with ZIOAppDefault {
 
           token <- getToken.mapError(_ => HttpError.Unauthorized())
           email <- authService.decode(token).mapError(_ => HttpError.Unauthorized())
-          user  <- userService.getOrCreateUser(email).mapError(err => HttpError.InternalServerError(cause = Some(err)))
-        } yield user
+          _  <- userService.getOrCreateUser(email).mapError(err => HttpError.InternalServerError(cause = Some(err)))
+        } yield email
       }
-      .flatMap(u => onSuccess(u.userId).mapError(e => HttpError.InternalServerError(cause = Some(e))))
+      .flatMap(email => onSuccess(email).mapError(e => HttpError.InternalServerError(cause = Some(e))))
       .catchAll(err => Http.error(err))
 
   private val corsConfig = CorsConfig(anyOrigin = true)

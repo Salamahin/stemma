@@ -43,12 +43,10 @@ object StorageService {
                      .fromDBIO { implicit ec =>
                        val userId = qStemmaUsers returning qStemmaUsers.map(_.id)
 
-                       val query = (for {
+                       (for {
                          maybeUserId <- qStemmaUsers.filter(_.email === email).map(_.id).result.headOption
-                         userId      <- maybeUserId.map(id => DBIO.successful(id)).getOrElse(userId += StemmaUser(email = email))
+                         userId <- maybeUserId.map(id => DBIO.successful(id)).getOrElse(userId += StemmaUser(email = email))
                        } yield User(userId.toString, email)).transactionally
-
-                       query
                      }
                      .mapError(t => UnknownError(t))
                      .provideSome(dbLayer)
@@ -108,7 +106,7 @@ object StorageService {
                            case (stemmaId, owners) => (stemmaId, owners.map(_._2.ownerId).size)
                          }
 
-                       val stemmasWithRemovableFlag = (qStemmas join ownersCounted on ((l, r) => l.id === r._1))
+                       (qStemmas join ownersCounted on ((l, r) => l.id === r._1))
                          .map {
                            case (stemma, (_, numberOwners)) => (stemma.id, stemma.name, numberOwners === 1)
                          }
@@ -116,8 +114,6 @@ object StorageService {
                          .map(_.map {
                            case (id, name, removable) => StemmaDescription(id.toString, name, removable)
                          })
-
-                       stemmasWithRemovableFlag
                      }
                      .mapError(t => UnknownError(t))
                      .provideSome(dbLayer)
