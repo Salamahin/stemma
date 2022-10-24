@@ -271,6 +271,20 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
     } yield assertTrue(stemmaRequestErr == AccessToStemmaDenied(stemmaId))).provideSome(databaseProvider, Scope.default)
   }
 
+  private val canAddParentsIfChildHasSpouseAndChild = test("can add a person's parent if he already has a spouse and child") {
+    (for {
+      s            <- ZIO.service[StorageService]
+      User(uid, _) <- s.getOrCreateUser("user@test.com")
+      stemmaId     <- s.createStemma(uid, "stemma")
+
+      (_, FamilyDescription(_, jane :: _, _, _)) <- s.createFamily(uid, stemmaId, family(createJane, createJohn)(createJill))
+      _                                          <- s.createFamily(uid, stemmaId, family(createJames, createJuly)(existing(jane)))
+
+      render(families) <- s.stemma(uid, stemmaId)
+    } yield assert(families)(hasSameElements("(Jane, John) parentsOf (Jill)" :: "(James, July) parentsOf (Jane)" :: Nil)))
+      .provideSome(databaseProvider, Scope.default)
+  }
+
   private val canChangeOwnershipInRecursiveManner = test("ownership change affects spouses, their ancestors and children") {
     (for {
       s                   <- ZIO.service[StorageService]
@@ -421,6 +435,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       whenThereAreSeveralOwnersThenStemmaIsNotRemovable,
       canRemoveStemmaIfOnlyOwner,
       canCloneStemma,
+      canAddParentsIfChildHasSpouseAndChild,
       loopsProhibited
     )
 }

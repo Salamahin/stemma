@@ -45,7 +45,7 @@ object StorageService {
 
                        (for {
                          maybeUserId <- qStemmaUsers.filter(_.email === email).map(_.id).result.headOption
-                         userId <- maybeUserId.map(id => DBIO.successful(id)).getOrElse(userId += StemmaUser(email = email))
+                         userId      <- maybeUserId.map(id => DBIO.successful(id)).getOrElse(userId += StemmaUser(email = email))
                        } yield User(userId.toString, email)).transactionally
                      }
                      .mapError(t => UnknownError(t))
@@ -78,8 +78,11 @@ object StorageService {
                    } yield ()
                  }
 
-                 private def checkStemmaCorrectness(personId: Long, stemmaId: Long)(implicit ec: ExecutionContext) = {
-                   qPeople.filter(_.id === personId).map(_.stemmaId).result.head.flatMap(sId => if (sId != stemmaId) DBIO.failed(NoSuchPersonId(personId.toString)) else DBIO.successful((): Unit))
+                 private def checkPersonBelongsToStemma(personId: Long, stemmaId: Long)(implicit ec: ExecutionContext) = {
+                   for {
+                     personExists <- qPeople.filter(p => p.id === personId && p.stemmaId === stemmaId).exists.result
+                     _            <- if (personExists) DBIO.successful((): Unit) else DBIO.failed(NoSuchPersonId(personId.toString))
+                   } yield ()
                  }
 
                  override def createStemma(userId: String, name: String): UIO[String] =
@@ -147,7 +150,7 @@ object StorageService {
                    case ExistingPerson(id) =>
                      for {
                        _ <- checkPersonAccess(id.toLong, userId)
-                       _ <- checkStemmaCorrectness(id.toLong, stemmaId)
+                       _ <- checkPersonBelongsToStemma(id.toLong, stemmaId)
                      } yield id.toLong
 
                    case CreateNewPerson(name, birthDate, deathDate, bio) =>
