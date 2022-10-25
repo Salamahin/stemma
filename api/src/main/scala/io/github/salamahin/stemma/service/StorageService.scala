@@ -449,22 +449,35 @@ object StorageService {
                  }
 
                  private def selectKinsmenFamilies(initPersonId: Long) = sql"""
-                   WITH RECURSIVE 
-                   "FamilyDescr" AS (
-                       SELECT coalesce(s."personId", c."personId") AS "personId", s."familyId" AS "childFamily", c."familyId" AS "parentFamily"
-                       FROM "Spouse" s FULL JOIN "Child" c on s."personId" = c."personId"
-                   ), 
-                   "Ancestors" AS (
-                     SELECT "personId", "childFamily", "parentFamily" FROM "FamilyDescr" WHERE "personId" = $initPersonId
-                     UNION
-                     SELECT fd."personId", fd."childFamily", fd."parentFamily" FROM "FamilyDescr" fd INNER JOIN "Ancestors" anc ON anc."parentFamily" = fd."childFamily"
-                   ),
-                   "Dependees" AS (
-                       SELECT "personId", "childFamily", "parentFamily" FROM "FamilyDescr" WHERE "childFamily" IN (SELECT DISTINCT "parentFamily" FROM "Ancestors" WHERE "parentFamily" IS NOT NULL)
-                       UNION
-                       SELECT fd."personId", fd."childFamily", fd."parentFamily" FROM "FamilyDescr" fd INNER JOIN "Dependees" dep ON dep."childFamily" = fd."parentFamily"
-                   ) SELECT DISTINCT "childFamily" AS familyId FROM "Dependees" WHERE "childFamily" IS NOT NULL
-                   """.as[Long]
+                  with recursive 
+                    "PersonFamilies" as (
+                    select coalesce(s."personId", c."personId") as "personId", s."familyId" as "spouseOf", c."familyId" as "childOf"
+                    from "Spouse" s full join "Child" c on s."personId" = c."personId"
+                  ), 
+                  "Ancestors" as (
+                    select "personId", "spouseOf", "childOf" FROM "PersonFamilies" WHERE "personId" = $initPersonId
+                    union
+                    select pf."personId", pf."spouseOf", pf."childOf" from "Ancestors" anc inner join "PersonFamilies" pf on anc."childOf" = pf."spouseOf"
+                  ),
+                  "Siblings" as (
+                    select pf."personId", pf."spouseOf", pf."childOf" from "Ancestors" a
+                    inner join "PersonFamilies" pf 
+                    on pf."childOf" = a."childOf" 
+                  ),
+                  "BloodRelativies" as (
+                    select * from "Ancestors" union select * from "Siblings"
+                  ),
+                  "Dependees" AS (
+                    select * from "BloodRelativies"
+                    union
+                    select pf."personId", pf."spouseOf", pf."childOf" from "Dependees" dep inner join "PersonFamilies" pf on dep."spouseOf" = pf."childOf" 
+                  ),
+                  "KinsmenFamilies" as (
+                    select "spouseOf" as "familyId" FROM "Dependees"
+                    union
+                    select "childOf" as "familyId" from "Dependees"
+                 ) select * from "KinsmenFamilies" where "familyId" is not null
+                  """.as[Long]
 
                  // ==================================================================================================================
                  //for some reason slick compiles an incorrect query when insertOrUpdate on the table where all the columns are

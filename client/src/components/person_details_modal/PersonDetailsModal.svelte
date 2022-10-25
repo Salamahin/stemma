@@ -112,18 +112,6 @@
                         />
                     </div>
                 </div>
-                <!-- <div class="mb-3">
-                    <label for="personDeathDate" class="form-label">Дата смерти</label>
-                    <input
-                        type="date"
-                        class="form-control"
-                        id="personDeathDateInput"
-                        bind:value={deathDateStr}
-                        readonly={readOnly}
-                        min={formatDate(minDeathDate)}
-                        max={formatDate(maxDeathDate)}
-                    />
-                </div> -->
                 <div class="mb-3">
                     <label for="personDeathDate" class="form-label">Био</label>
                     <textarea class="form-control" rows="6" id="personBioInput" bind:value={bio} readonly={readOnly} />

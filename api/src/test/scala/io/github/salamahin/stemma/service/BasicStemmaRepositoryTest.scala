@@ -322,6 +322,41 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
     }).provideSome(databaseProvider, Scope.default)
   }
 
+  private val whenChangingAnOwnershipSiblingsRelationsAreTakenIntoAccount = test("changing the ownership grants permissions to siblings as well") {
+    (for {
+      s                   <- ZIO.service[StorageService]
+      User(creatorId, _)  <- s.getOrCreateUser("user1@test.com")
+      User(accessorId, _) <- s.getOrCreateUser("user2@test.com")
+
+      /*
+
+                            f1
+       *
+                 f2        / \        f3
+       ..........* <- jill1  josh2 -> * <- july4
+                /                      \
+          james3                         jared5
+       */
+
+      stemmaId <- s.createStemma(creatorId, "my first stemma")
+
+      (_, FamilyDescription(f1, _, jill :: josh :: Nil, _))         <- s.createFamily(creatorId, stemmaId, family()(createJill, createJosh))
+      (_, FamilyDescription(f2, _, james :: Nil, _))                <- s.createFamily(creatorId, stemmaId, family(existing(jill))(createJames))
+      (_, FamilyDescription(f3, _ :: july :: Nil, jared :: Nil, _)) <- s.createFamily(creatorId, stemmaId, family(existing(josh), createJuly)(createJared))
+
+      ChownEffect(affectedFamilies, affectedPeople) <- s.chown(accessorId, stemmaId, james)
+      accessorStemma                                <- s.stemma(accessorId, stemmaId)
+    } yield {
+      val expectedAffectedFamilies = Seq(f1, f2, f3)
+      val expectedAffectedPeople   = Seq(jill, josh, july, james, jared)
+
+      assertTrue(affectedFamilies.toSet == expectedAffectedFamilies.toSet) &&
+      assertTrue(affectedPeople.toSet == expectedAffectedPeople.toSet) &&
+      assert(accessorStemma)(canEditOnlyP(expectedAffectedPeople: _*)) &&
+      assert(accessorStemma)(canEditOnlyF(expectedAffectedFamilies: _*))
+    }).provideSome(databaseProvider, Scope.default)
+  }
+
   private val canChownSeveralTimes = test("can chown several times and wont fail") {
     (for {
       s                   <- ZIO.service[StorageService]
@@ -429,6 +464,7 @@ object BasicStemmaRepositoryTest extends ZIOSpecDefault with Requests with Rende
       cantRequestStemmaIfNotGraphOwner,
       whenUpdatingFamilyAllMembersShouldBelongToGraph,
       canChangeOwnershipInRecursiveManner,
+      whenChangingAnOwnershipSiblingsRelationsAreTakenIntoAccount,
       canChownSeveralTimes,
       appendChildrenToFullExistingFamily,
       appendChildrenToIncompleteExistingFamily,
