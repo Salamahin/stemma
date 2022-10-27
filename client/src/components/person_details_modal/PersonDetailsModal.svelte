@@ -38,8 +38,8 @@
             id: id,
             description: {
                 name: name,
-                birthDate: birthDate.toString(),
-                deathDate: deathDate.toString(),
+                birthDate: dateToIsoLocalTime(birthDate),
+                deathDate: dateToIsoLocalTime(deathDate),
                 bio: bio,
             },
             pin: pinned,
@@ -52,6 +52,19 @@
         dispatch("personRemoved", id);
 
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+    }
+
+    function dateToIsoLocalTime(d: Date) {
+        if (!d) return null;
+
+        let date = d.getDate();
+        let month = d.getMonth() + 1;
+        let year = d.getFullYear();
+
+        let dateStr = date < 10 ? "0" + date : date.toString();
+        let monthStr = month < 10 ? "0" + month : month.toString();
+
+        return `${year}-${monthStr}-${dateStr}`;
     }
 
     export function showPersonDetails(p: ShowPerson) {
