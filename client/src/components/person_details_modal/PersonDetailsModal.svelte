@@ -76,6 +76,9 @@
         pinned = p.pin;
         readOnly = p.description.readOnly;
 
+        birthDateErrString = null;
+        deathDateErrString = null;
+
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
