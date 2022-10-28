@@ -180,19 +180,18 @@ export function mergeData(svg, nodes, relations, widht, height, ignoreLocations)
             (exit) => exit.remove()
         );
 
-    if (!ignoreLocations)
-        nodes.forEach(n => {
-            let x, y;
-            if (coordinatesCache.has(n.id)) {
-                [x, y] = coordinatesCache.get(n.id)
-            } else {
-                x = widht / 2;
-                y = height / 2
-            }
+    nodes.forEach(n => {
+        let x, y;
+        if (!ignoreLocations && icoordinatesCache.has(n.id)) {
+            [x, y] = coordinatesCache.get(n.id)
+        } else {
+            x = widht / 2;
+            y = height / 2
+        }
 
-            n.x = x
-            n.y = y
-        })
+        n.x = x
+        n.y = y
+    })
 
     svg.select("g.main")
         .selectAll("g")
