@@ -110,6 +110,7 @@ export function configureSimulation(svg, nodes, relations, width, height) {
             d3.forceCollide().radius((d) => d.r * 20)
         )
         .force("repelForce", d3.forceManyBody().strength(-1500).distanceMin(85))
+        .velocityDecay(0.8)
         .on("tick", () => {
             svg.select("g.main")
                 .selectAll("g")
@@ -169,7 +170,7 @@ export function denormalizeId(id) {
     return id.split("_")[1]
 }
 
-export function mergeData(svg, nodes, relations, widht, height) {
+export function mergeData(svg, nodes, relations, widht, height, ignoreLocations) {
     svg.select("g.main")
         .selectAll("line")
         .data(relations, (r) => r.id)
@@ -179,18 +180,19 @@ export function mergeData(svg, nodes, relations, widht, height) {
             (exit) => exit.remove()
         );
 
-    nodes.forEach(n => {
-        let x, y;
-        if (coordinatesCache.has(n.id)) {
-            [x, y] = coordinatesCache.get(n.id)
-        } else {
-            x = widht / 2;
-            y = height / 2
-        }
+    if (!ignoreLocations)
+        nodes.forEach(n => {
+            let x, y;
+            if (coordinatesCache.has(n.id)) {
+                [x, y] = coordinatesCache.get(n.id)
+            } else {
+                x = widht / 2;
+                y = height / 2
+            }
 
-        n.x = x
-        n.y = y
-    })
+            n.x = x
+            n.y = y
+        })
 
     svg.select("g.main")
         .selectAll("g")

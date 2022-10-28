@@ -32,6 +32,7 @@
     export let stemmaIndex: StemmaIndex;
     export let highlight: HiglightLineages;
     export let pinnedPeople: PinnedPeopleStorage;
+    export let hidden: boolean;
 
     window.addEventListener("beforeunload", (e) => {
         saveCoordinates(currentStemmaId);
@@ -114,7 +115,7 @@
         if (!simulation) simulation = configureSimulation(svg, nodes, relations, window.innerWidth, window.innerHeight);
         else updateSimulation(simulation, nodes, relations);
 
-        mergeData(svg, nodes, relations, window.innerWidth, window.innerHeight);
+        mergeData(svg, nodes, relations, window.innerWidth, window.innerHeight, false);
 
         svg.select("g.main")
             .selectAll("g")
@@ -157,7 +158,9 @@
     });
 </script>
 
-<svg id="chart" class="w-100 p-3 fullHeight" />
+<div {hidden}>
+    <svg id="chart" class="w-100 p-3 fullHeight" />
+</div>
 
 <style lang="less">
     .fullHeight {
