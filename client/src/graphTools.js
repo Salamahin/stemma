@@ -130,6 +130,7 @@ export function configureSimulation(svg, nodes, relations, width, height) {
 export function updateSimulation(simulation, nodes, relations) {
     simulation.nodes(nodes)
     simulation.force("link").links(relations)
+    simulation.velocityDecay(0.8)
     simulation.alphaTarget(0.3).restart()
 }
 
