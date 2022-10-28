@@ -132,18 +132,18 @@
             <Circle2 />
             <p class="mt-2">Минуту...</p>
         </div>
-    {:else}
-        <FullStemma
-            bind:this={stemmaChart}
-            {stemma}
-            {currentStemmaId}
-            {stemmaIndex}
-            {highlight}
-            {pinnedPeople}
-            on:personSelected={(e) => personSelectionModal.showPersonDetails({ description: e.detail, pin: pinnedPeople.isPinned(e.detail.id) })}
-            on:familySelected={(e) => familySelectionModal.showExistingFamily(e.detail)}
-        />
     {/if}
+    <FullStemma
+        bind:this={stemmaChart}
+        hidden={isWorking}
+        {stemma}
+        {currentStemmaId}
+        {stemmaIndex}
+        {highlight}
+        {pinnedPeople}
+        on:personSelected={(e) => personSelectionModal.showPersonDetails({ description: e.detail, pin: pinnedPeople.isPinned(e.detail.id) })}
+        on:familySelected={(e) => familySelectionModal.showExistingFamily(e.detail)}
+    />
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
