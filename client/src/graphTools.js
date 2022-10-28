@@ -182,7 +182,7 @@ export function mergeData(svg, nodes, relations, widht, height, ignoreLocations)
 
     nodes.forEach(n => {
         let x, y;
-        if (!ignoreLocations && icoordinatesCache.has(n.id)) {
+        if (!ignoreLocations && coordinatesCache.has(n.id)) {
             [x, y] = coordinatesCache.get(n.id)
         } else {
             x = widht / 2;
