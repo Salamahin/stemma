@@ -71,6 +71,8 @@
         name = p.description.name;
         birthDate = p.description.birthDate ? new Date(p.description.birthDate) : null;
         deathDate = p.description.deathDate ? new Date(p.description.deathDate) : null;
+        document.getElementById("birthDateInput").value = birthDate;
+        document.getElementById("deathDateInput").value = deathDate;
         bio = p.description.bio;
         pinned = p.pin;
         readOnly = p.description.readOnly;
@@ -150,14 +152,15 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
             </div>
             <div class="modal-body">
-                <form class="row g-3">
+                <form class="row">
                     <div class="col-12">
                         <label for="personNameInput" class="form-label">Имя</label>
                         <input class="form-control" id="personNameInput" aria-describedby="personNameHelp" bind:value={name} readonly={readOnly} />
                     </div>
-                    <div class="col-12 mb-2">Годы жизни</div>
-                    <div class="col-md-6 mt-0">
+                    <div class="mt-3 mb-2">Годы жизни</div>
+                    <div class="col-md-6 mb-2">
                         <input
+                            id="birthDateInput"
                             value={dateToMaskedDateStr(birthDate)}
                             use:imask={dateMaskingOpts}
                             on:accept={acceptBirthDate}
@@ -168,8 +171,9 @@
                         />
                         <div class="invalid-feedback">{birthDateErrString}</div>
                     </div>
-                    <div class="col-md-6 mt-0">
+                    <div class="col-md-6 mb-2">
                         <input
+                            id="deathDateInput"
                             value={dateToMaskedDateStr(deathDate)}
                             use:imask={dateMaskingOpts}
                             on:accept={acceptDeathDate}
@@ -180,7 +184,8 @@
                         />
                         <div class="invalid-feedback">{deathDateErrString}</div>
                     </div>
-                    <div class="col-12">
+
+                    <div class="col-12 mt-2">
                         <label for="personBioInput" class="form-label">Био</label>
                         <textarea class="form-control" rows="6" id="personBioInput" bind:value={bio} readonly={readOnly} />
                     </div>
