@@ -189,7 +189,7 @@
                         <label for="personBioInput" class="form-label">Био</label>
                         <textarea class="form-control" rows="6" id="personBioInput" bind:value={bio} readonly={readOnly} />
                     </div>
-                    <div class="col-12">
+                    <div class="col-12 mt-3">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault" bind:checked={pinned} />
                             <label class="form-check-label" for="flexSwitchCheckDefault">Закрепить</label>
