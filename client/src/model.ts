@@ -1,5 +1,19 @@
 import { StemmaIndex } from "./stemmaIndex"
 
+export enum ViewMode {
+    ALL,
+    EDITABLE_ONLY,
+}
+
+export type Settings = {
+    viewMode: ViewMode;
+};
+
+export const DEFAULT_SETTINGS: Settings = {
+    viewMode: ViewMode.ALL,
+};
+
+
 //requests
 export type PersonDefinition = { ExistingPerson?: ExistingPerson, CreateNewPerson?: CreateNewPerson }
 export type ExistingPerson = { id: string }
@@ -177,7 +191,7 @@ export class Model {
     private async parseResponse(response: Response, stemmaIndex?: StemmaIndex) {
         if (response.status === 401) throw new Error("Сессия успела протухнуть. Авторизуйтесь заново (перезагрузите страницу)")
         if (!response.ok) throw new Error(`Получен неожиданный ответ от сервера. Попробуйте перезагрузить страницу`)
-        
+
         const json = await response.json();
         return this.translateError(json as CompositeResponse, stemmaIndex);
     }
