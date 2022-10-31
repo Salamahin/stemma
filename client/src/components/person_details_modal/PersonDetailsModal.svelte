@@ -1,7 +1,6 @@
 <script context="module" lang="ts">
     import { PersonDescription, CreateNewPerson } from "../../model";
     import { imask } from "@imask/svelte";
-    import { onMount } from "svelte";
 
     export type UpdatePerson = {
         id: string;

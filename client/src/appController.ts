@@ -1,9 +1,9 @@
-import { Highlight, HiglightLineages } from './highlight';
-import { CreateNewPerson, Model, OwnedStemmas, PersonDefinition, Stemma, StemmaDescription, User } from './model';
+import { HiglightLineages } from './highlight';
+import { CreateNewPerson, Model, PersonDefinition, Stemma, StemmaDescription, User } from './model';
 import { PinnedPeopleStorage } from './pinnedPeopleStorage';
 import { StemmaIndex } from './stemmaIndex';
 import { writable, get } from 'svelte/store';
-import isEqual from 'lodash.isequal';
+import { SettingsStorage } from './settingsStroage';
 
 export class AppController {
     stemma = writable<Stemma>(null)
@@ -15,6 +15,7 @@ export class AppController {
     isWorking = writable<boolean>(false)
     invitationToken = writable<string>(null)
     err = writable<Error>(null)
+    settingsStorage = writable<SettingsStorage>(null);
 
     private model: Model
     private stemmaBackendUrl: string
@@ -215,11 +216,16 @@ export class AppController {
     private refreshIndexes(stemma: Stemma, stemmaId: string) {
         let pp = new PinnedPeopleStorage(stemmaId)
         pp.load()
+
+        let ss = new SettingsStorage(stemmaId)
+        ss.load()
+
         let si = new StemmaIndex(stemma)
         let hg = new HiglightLineages(si, pp.allPinned());
 
         this.pinnedStorage.set(pp)
         this.highlight.set(hg)
         this.stemmaIndex.set(si)
+        this.settingsStorage.set(ss)
     }
 }

@@ -77,6 +77,11 @@
                             ><i class="bi bi-share-fill" /> Пригласить участника</a
                         >
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {disabled ? 'd-none' : ''}" href="#" on:click={() => dispatch("settings")}
+                            ><i class="bi bi-gear-fill" /> Настройки</a
+                        >
+                    </li>
                 </ul>
                 <div class="d-flex ms-auto">
                     <ul class="navbar-nav w-100">

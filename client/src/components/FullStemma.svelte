@@ -1,6 +1,6 @@
 <script lang="ts">
     import * as d3 from "d3";
-    import { Stemma } from "../model";
+    import { Stemma, ViewMode } from "../model";
     import { StemmaIndex } from "../stemmaIndex";
     import { onMount } from "svelte";
     import { createEventDispatcher } from "svelte";
@@ -33,6 +33,7 @@
     export let highlight: HiglightLineages;
     export let pinnedPeople: PinnedPeopleStorage;
     export let hidden: boolean;
+    export let viewMode: ViewMode;
 
     window.addEventListener("beforeunload", (e) => {
         saveCoordinates(currentStemmaId);
@@ -42,7 +43,17 @@
 
     $: if (svg && stemma) {
         loadCoordinates(currentStemmaId);
-        let [nodes, relations] = makeNodesAndRelations(stemma.people, stemma.families);
+        let nodes, relations;
+        
+        if (viewMode == ViewMode.ALL) {
+            [nodes, relations] = makeNodesAndRelations(stemma.people, stemma.families);
+        } else if (viewMode == ViewMode.EDITABLE_ONLY) {
+            [nodes, relations] = makeNodesAndRelations(
+                stemma.people.filter((p) => !p.readOnly),
+                stemma.families.filter((f) => !f.readOnly)
+            );
+        }
+
         reconfigureGraph(nodes, relations);
     }
 
