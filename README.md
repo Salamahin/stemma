@@ -3,10 +3,6 @@
 [![Deploy to AWS](https://github.com/Salamahin/stemma/actions/workflows/cd.yml/badge.svg)](https://github.com/Salamahin/stemma/actions/workflows/cd.yml)
 
 
-# Trello board
-https://trello.com/invite/b/ZGWqjKmo/eee45cabf66aa7d377a475169588779d/project-stemma
-
-
 # Create Google API PROJECT
  
 Move to the Google Credentials page https://console.developers.google.com/apis/credentials    
