@@ -3,10 +3,6 @@
 [![Deploy to AWS](https://github.com/Salamahin/stemma/actions/workflows/cd.yml/badge.svg)](https://github.com/Salamahin/stemma/actions/workflows/cd.yml)
 
 
-# Trello board
-https://trello.com/invite/b/ZGWqjKmo/eee45cabf66aa7d377a475169588779d/project-stemma
-
-
 # Create Google API PROJECT
  
 Move to the Google Credentials page https://console.developers.google.com/apis/credentials    
@@ -51,11 +47,3 @@ You will be presented with two pieces of information
 Note down the `Client ID` you will need it later.  
 You wont need the `Client Secret` again.  
 Once noted down safely, click `OK`   
-
-
-# Managing database
-
-Could be found here:
-```console
-https://data.heroku.com/datastores/9902c2a4-3639-491a-ac90-1098e8998579#administration
-```
