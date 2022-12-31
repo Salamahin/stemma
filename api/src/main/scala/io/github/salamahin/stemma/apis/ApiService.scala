@@ -59,7 +59,7 @@ object ApiService extends LazyLogging {
 
         _     = logger.info(s"[$user] Bears invitation token ${request.encodedToken}")
         token <- us.decodeInviteToken(request.encodedToken)
-        _     = logger.info(s"[$user] Token was successfully decoded, target person is ${token.targetPersonId}")
+        _     = logger.info(s"[$user] Token was successfully decoded, target person is ${token.targetPersonId}, bearer email should be ${token.inviteesEmail}")
 
         _ <- if (token.inviteesEmail.toLowerCase == user.email.toLowerCase) ZIO.succeed((): Unit)
             else ZIO.fail(ForeignInviteToken()) <* ZIO.succeed(logger.error(s"[$user] beared a foreign token, invitees email should be ${token.inviteesEmail}"))
