@@ -10,4 +10,4 @@ confirm_changeset = false
 capabilities = ["CAPABILITY_NAMED_IAM", "CAPABILITY_AUTO_EXPAND"]
 parameter_overrides = "AppName=\"stemma-app\" Stage=\"dev_local\""
 image_repositories = []
-disable_rollback = true
+disable_rollback = false
