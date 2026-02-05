@@ -18,6 +18,9 @@ jobs:
           distribution: 'temurin'
           cache: 'sbt'
 
+      - name: Set up sbt
+        uses: sbt/setup-sbt@v1
+
       - name: Build backend
         run: sbt 'clean;package;pack'
 
