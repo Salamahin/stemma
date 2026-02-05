@@ -66,9 +66,15 @@ object StemmaLambda extends LazyLogging {
     logger.info("Root cert already exist")
   }
 
-  private val conf     = ConfigFactory.load().getConfig("dbConfig")
-  private val profile  = PostgresProfile
-  private val database = profile.backend.Database.forConfig("", conf)
+  private val conf    = ConfigFactory.load().getConfig("dbConfig")
+  private val profile = PostgresProfile
+
+  @volatile private var dbInitialized           = false
+  private lazy val database: JdbcBackend#DatabaseDef = {
+    val db = profile.backend.Database.forConfig("", conf)
+    dbInitialized = true
+    db
+  }
 
   private val databaseProvider = new DatabaseProvider {
     override def db: UIO[JdbcBackend#DatabaseDef] = ZIO.succeed(database)
@@ -76,7 +82,7 @@ object StemmaLambda extends LazyLogging {
   }
 
   sys.addShutdownHook {
-    database.close()
+    if (dbInitialized) database.close()
   }
 
   val layers: ZLayer[Any, Nothing, HandleApiRequestService] = ZLayer.fromZIO(
