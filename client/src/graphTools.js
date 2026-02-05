@@ -280,8 +280,6 @@ export function renderChart(svg, highlight, stemmaIndex) {
     svg.select("g.main")
         .selectAll("g")
         .attr("cursor", "pointer")
-        .filter(p => highlight.personIsHighlighted(denormalizeId(p.id)))
-        .raise()
 
     svg.selectAll("text")
         .raise()
