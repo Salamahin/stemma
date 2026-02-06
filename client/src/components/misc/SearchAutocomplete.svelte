@@ -2,6 +2,7 @@
     import { createEventDispatcher } from "svelte";
     import fuzzysort from "fuzzysort";
     import type { PersonDescription } from "../../model";
+    import { t } from "../../i18n";
 
     export let people: PersonDescription[] = [];
     export let disabled: boolean = false;
@@ -72,7 +73,7 @@
     <input
         type="search"
         class="form-control"
-        placeholder="Быстрый поиск"
+        placeholder={$t("search.placeholder")}
         bind:value={query}
         {disabled}
         on:keydown={handleKeydown}

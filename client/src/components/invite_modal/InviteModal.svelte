@@ -13,6 +13,7 @@
     import { createEventDispatcher } from "svelte";
     import { StemmaIndex } from "../../stemmaIndex";
     import PersonSelector from "../misc/PersonSelector.svelte";
+    import { t } from "../../i18n";
 
     let modalEl;
 
@@ -55,17 +56,17 @@
     <div class="modal-dialog modal-lg modal-dialog-centered modal-fullscreen-lg-down">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title ms-2">Пригласить</h5>
+                <h5 class="modal-title ms-2">{$t("invite.title")}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
             </div>
             <div class="modal-body">
                 <div class="container h-100">
                     <div class="d-flex flex-column h-100">
                         <div class="flex-shrink-1">
-                            <label for="personName" class="form-label">Пользователь</label>
+                            <label for="personName" class="form-label">{$t("invite.user")}</label>
                             <Select
                                 id="personName"
-                                placeholder="Иванов Иван Иванович"
+                                placeholder={$t("family.namePlaceholder")}
                                 items={peopleNames}
                                 isSearchable={true}
                                 isCreatable={false}
@@ -81,17 +82,17 @@
                         </div>
                         <div class="flex-shrink-1 mb-2">
                             <div class="mt-2">
-                                <label for="emainInput" class="form-label">Email-адрес</label>
+                                <label for="emainInput" class="form-label">{$t("invite.email")}</label>
                                 <input type="email" class="form-control" id="emainInput" placeholder="name@example.com" bind:value={email} />
                             </div>
 
-                            <label for="outline" class="form-label mt-2">Ссылка для приглашения</label>
+                            <label for="outline" class="form-label mt-2">{$t("invite.linkLabel")}</label>
                             <div class="input-group">
                                 <button
                                     class="btn btn-outline-primary"
                                     type="button"
                                     disabled={!email || !selectedPerson}
-                                    on:click={(e) => dispatch("invite", { personId: selectedPerson.id, email: email })}>Создать</button
+                                    on:click={(e) => dispatch("invite", { personId: selectedPerson.id, email: email })}>{$t("invite.create")}</button
                                 >
                                 <input
                                     type="text"
@@ -114,7 +115,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{$t("common.close")}</button>
             </div>
         </div>
     </div>

@@ -2,6 +2,7 @@
     import { createEventDispatcher } from "svelte";
     import { onMount } from "svelte";
     import * as bootstrap from "bootstrap";
+    import { t } from "../../i18n";
 
     const dispatch = createEventDispatcher();
 
@@ -39,16 +40,16 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addStemmaLabel">Клонировать родословную</h5>
+                <h5 class="modal-title" id="addStemmaLabel">{$t("stemma.cloneTitle")}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
             </div>
             <div class="modal-body">
-                <label for="stemmaNameInput" class="form-label">Название родословной</label>
+                <label for="stemmaNameInput" class="form-label">{$t("stemma.nameLabel")}</label>
                 <input class="form-control" id="stemmaNameInput" bind:this={input} />
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary" on:click={handleCloneStemmaClick}>Клонировать</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{$t("common.cancel")}</button>
+                <button type="button" class="btn btn-primary" on:click={handleCloneStemmaClick}>{$t("stemma.clone")}</button>
             </div>
         </div>
     </div>

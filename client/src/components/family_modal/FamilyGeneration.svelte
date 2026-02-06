@@ -1,5 +1,6 @@
 <script lang="ts">
   import { CreateNewPerson, PersonDescription } from "../../model";
+  import { t } from "../../i18n";
 
   export let selectedPeople: (PersonDescription | CreateNewPerson)[] = [];
   export let readOnly: boolean;
@@ -10,7 +11,7 @@
 </script>
 
 {#if !selectedPeople.length}
-  <p class="text-center text-secondary fs-6">Нет информации</p>
+  <p class="text-center text-secondary fs-6">{$t('family.noInfo')}</p>
 {:else}
   <table class="table">
     <tbody>
