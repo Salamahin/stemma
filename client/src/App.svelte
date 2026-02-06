@@ -17,9 +17,13 @@
     import CloneStemmaModal from "./components/clone_stemma_modal/CloneStemmaModal.svelte";
     import SettingsModal from "./components/settings_modal/SettingsModal.svelte";
     import { SettingsStorage } from "./settingsStroage";
+    import jwt_decode from "jwt-decode";
+    import { onMount } from "svelte";
 
     export let google_client_id;
     export let stemma_backend_url;
+
+    const CREDENTIAL_KEY = "stemma_credential";
 
     let addStemmaModal;
     let cloneStemmaModal;
@@ -63,6 +67,8 @@
     });
 
     function handleSignIn(user: User) {
+        sessionStorage.setItem(CREDENTIAL_KEY, user.id_token);
+
         let urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has("inviteToken")) {
             let token = urlParams.get("inviteToken");
@@ -77,6 +83,19 @@
         signedIn = true;
     }
 
+    onMount(() => {
+        try {
+            const credential = sessionStorage.getItem(CREDENTIAL_KEY);
+            if (credential) {
+                const decoded: any = jwt_decode(credential);
+                if (decoded.exp * 1000 > Date.now()) {
+                    handleSignIn({ id_token: credential });
+                }
+            }
+        } catch (e) {
+            sessionStorage.removeItem(CREDENTIAL_KEY);
+        }
+    });
 
 </script>
 

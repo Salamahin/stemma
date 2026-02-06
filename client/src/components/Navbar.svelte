@@ -1,5 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
+    import * as bootstrap from "bootstrap";
     import { StemmaDescription, PersonDescription } from "../model";
     import SearchAutocomplete from "./misc/SearchAutocomplete.svelte";
 
@@ -8,7 +9,15 @@
     export let people: PersonDescription[] = [];
     export let disabled: boolean;
 
+    let navbarCollapseEl: HTMLElement;
+
     const dispatch = createEventDispatcher();
+
+    function handlePersonSelect(e: CustomEvent) {
+        const instance = bootstrap.Collapse.getInstance(navbarCollapseEl);
+        if (instance) instance.hide();
+        dispatch("zoomToPerson", e.detail);
+    }
 </script>
 
 <header>
@@ -26,7 +35,7 @@
             >
                 <span class="navbar-toggler-icon" />
             </button>
-            <div class="collapse navbar-collapse" id="navbarTogglerDemo02">
+            <div class="collapse navbar-collapse" id="navbarTogglerDemo02" bind:this={navbarCollapseEl}>
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <li class="nav-item dropdown {disabled ? 'd-none' : ''}">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -90,7 +99,7 @@
                             <SearchAutocomplete
                                 {people}
                                 {disabled}
-                                on:select={(e) => dispatch("zoomToPerson", e.detail)}
+                                on:select={handlePersonSelect}
                             />
                         </li>
                         <li class="nav-item">
