@@ -1,10 +1,11 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    import { StemmaDescription } from "../model";
+    import { StemmaDescription, PersonDescription } from "../model";
+    import SearchAutocomplete from "./misc/SearchAutocomplete.svelte";
 
     export let ownedStemmas: StemmaDescription[];
     export let currentStemmaId: string;
-    export let lookupPersonName;
+    export let people: PersonDescription[] = [];
     export let disabled: boolean;
 
     const dispatch = createEventDispatcher();
@@ -86,12 +87,10 @@
                 <div class="d-flex ms-auto">
                     <ul class="navbar-nav w-100">
                         <li class="nav-item">
-                            <input
-                                type="search"
-                                class="form-control mw-100"
-                                style="min-width: 350px"
-                                placeholder="Быстрый поиск"
-                                bind:value={lookupPersonName}
+                            <SearchAutocomplete
+                                {people}
+                                {disabled}
+                                on:select={(e) => dispatch("zoomToPerson", e.detail)}
                             />
                         </li>
                         <li class="nav-item">

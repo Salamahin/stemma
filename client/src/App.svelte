@@ -9,7 +9,6 @@
     import { StemmaIndex } from "./stemmaIndex";
     import { HiglightLineages } from "./highlight";
     import { PinnedPeopleStorage } from "./pinnedPeopleStorage";
-    import fuzzysort from "fuzzysort";
     import RemoveStemmaModal from "./components/delete_stemma_modal/RemoveStemmaModal.svelte";
     import InviteModal, { CreateInviteLink } from "./components/invite_modal/InviteModal.svelte";
     import { Circle2 } from "svelte-loading-spinners";
@@ -40,7 +39,6 @@
     let stemmaIndex: StemmaIndex;
     let highlight: HiglightLineages;
     let pinnedPeople: PinnedPeopleStorage;
-    let lookupPersonName: string;
     let isWorking: boolean;
     let error: Error;
     let settingsStorage: SettingsStorage;
@@ -79,10 +77,7 @@
         signedIn = true;
     }
 
-    $: if (lookupPersonName && stemmaChart) {
-        let results = fuzzysort.go(lookupPersonName, stemma.people, { key: "name" });
-        if (results.length) stemmaChart.zoomToNode(results[0].obj.id);
-    }
+
 </script>
 
 {#if signedIn}
@@ -119,7 +114,7 @@
         {ownedStemmas}
         {currentStemmaId}
         disabled={isWorking}
-        bind:lookupPersonName
+        people={stemma ? stemma.people : []}
         on:selectStemma={(e) => controller.selectStemma(e.detail)}
         on:createNewStemma={() => addStemmaModal.promptNewStemma()}
         on:cloneStemma={(e) => cloneStemmaModal.promptStemmaClone(e.detail)}
@@ -128,6 +123,7 @@
         on:invite={() => inviteModal.showInvintation()}
         on:about={() => aboutModal.show()}
         on:settings={() => settingsModal.show()}
+        on:zoomToPerson={(e) => stemmaChart.zoomToNode(e.detail)}
     />
 
     {#if error}
