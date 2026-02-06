@@ -24,7 +24,17 @@
 <header>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#"><img src="assets/logo_bw_avg.webp" alt="" width="40" height="40" /> Stemma</a>
+            <div class="brand-group">
+                <a class="navbar-brand" href="#"><img src="assets/logo_bw_avg.webp" alt="" width="40" height="40" /> Stemma</a>
+                <button
+                    type="button"
+                    class="lang-switch"
+                    aria-label={$t('nav.language')}
+                    on:click={() => locale.set($locale === 'en' ? 'ru' : 'en')}
+                >
+                    {$locale === 'en' ? 'RU' : 'EN'}
+                </button>
+            </div>
             <button
                 class="navbar-toggler"
                 type="button"
@@ -104,16 +114,6 @@
                             />
                         </li>
                         <li class="nav-item">
-                            <button
-                                type="button"
-                                class="lang-switch"
-                                aria-label={$t('nav.language')}
-                                on:click={() => locale.set($locale === 'en' ? 'ru' : 'en')}
-                            >
-                                {$locale === 'en' ? 'RU' : 'EN'}
-                            </button>
-                        </li>
-                        <li class="nav-item">
                             <a class="nav-item nav-link active" href="#" on:click={() => dispatch("about")}>{$t('nav.about')}</a>
                         </li>
                     </ul>
@@ -124,16 +124,22 @@
 </header>
 
 <style>
+    .brand-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
     .lang-switch {
         display: inline-flex;
         align-items: center;
-        margin-right: 10px;
+        margin-left: 8px;
         font-size: 0.7rem;
         letter-spacing: 0.12em;
         text-transform: uppercase;
         background: transparent;
         border: 0;
-        padding: 2px 4px;
+        padding: 4px 6px;
         color: rgba(255, 255, 255, 0.65);
     }
 

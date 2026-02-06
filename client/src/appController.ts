@@ -6,6 +6,7 @@ import { writable, get } from 'svelte/store';
 import { SettingsStorage } from './settingsStroage';
 
 export class AppController {
+    private static readonly LAST_STEMMA_KEY = "stemma_last_stemma_id";
     stemma = writable<Stemma>(null)
     stemmaIndex = writable<StemmaIndex>(null)
     pinnedStorage = writable<PinnedPeopleStorage>(null)
@@ -33,12 +34,21 @@ export class AppController {
             .listDescribeStemmas()
             .then((result) => {
                 let selectedStemma = result.stemmas[0]
-                let stemma = result.firstStemma
+                const lastStemmaId = this.loadLastStemmaId();
+                if (lastStemmaId) {
+                    const match = result.stemmas.find((s) => s.id === lastStemmaId);
+                    if (match) selectedStemma = match;
+                }
+                const stemmaPromise = selectedStemma.id === result.stemmas[0].id
+                    ? Promise.resolve(result.firstStemma)
+                    : this.model.getStemma(selectedStemma.id);
 
-                this.refreshIndexes(stemma, selectedStemma.id)
-                this.ownedStemmas.set(result.stemmas)
-                this.currentStemmaId.set(selectedStemma.id)
-                this.stemma.set(stemma)
+                return stemmaPromise.then((stemma) => {
+                    this.refreshIndexes(stemma, selectedStemma.id)
+                    this.ownedStemmas.set(result.stemmas)
+                    this.setCurrentStemmaId(selectedStemma.id)
+                    this.stemma.set(stemma)
+                })
             })
             .catch(err => {
                 this.err.set(err)
@@ -60,7 +70,7 @@ export class AppController {
 
                 this.refreshIndexes(stemma, selectedStemma.id)
                 this.ownedStemmas.set(result.stemmas)
-                this.currentStemmaId.set(selectedStemma.id)
+                this.setCurrentStemmaId(selectedStemma.id)
                 this.stemma.set(stemma)
 
                 this.isWorking.set(false)
@@ -76,7 +86,7 @@ export class AppController {
         this.isWorking.set(true)
         this.err.set(null)
 
-        this.currentStemmaId.set(stemmaId)
+        this.setCurrentStemmaId(stemmaId)
         this.model
             .getStemma(stemmaId)
             .then((result) => {
@@ -117,7 +127,7 @@ export class AppController {
 
                 this.ownedStemmas.set(result.stemmas)
                 this.stemma.set(clonedStemma)
-                this.currentStemmaId.set(clonedStemmaId)
+                this.setCurrentStemmaId(clonedStemmaId)
             })
             .catch(err => {
                 this.err.set(err)
@@ -135,7 +145,7 @@ export class AppController {
                 let stemma = { people: [], families: [] }
                 this.refreshIndexes(stemma, result.id)
                 this.ownedStemmas.update(ownedStemmas => [...ownedStemmas, result])
-                this.currentStemmaId.set(result.id)
+                this.setCurrentStemmaId(result.id)
                 this.stemma.set(stemma)
             })
             .catch(err => {
@@ -227,5 +237,26 @@ export class AppController {
         this.highlight.set(hg)
         this.stemmaIndex.set(si)
         this.settingsStorage.set(ss)
+    }
+
+    private setCurrentStemmaId(stemmaId: string) {
+        this.currentStemmaId.set(stemmaId)
+        this.persistLastStemmaId(stemmaId)
+    }
+
+    private loadLastStemmaId() {
+        try {
+            return localStorage.getItem(AppController.LAST_STEMMA_KEY)
+        } catch {
+            return null
+        }
+    }
+
+    private persistLastStemmaId(stemmaId: string) {
+        try {
+            if (stemmaId) localStorage.setItem(AppController.LAST_STEMMA_KEY, stemmaId)
+        } catch {
+            // ignore storage errors
+        }
     }
 }
