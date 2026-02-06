@@ -28,7 +28,7 @@
                 <a class="navbar-brand" href="#"><img src="assets/logo_bw_avg.webp" alt="" width="40" height="40" /> Stemma</a>
                 <button
                     type="button"
-                    class="lang-switch"
+                    class="nav-link lang-switch"
                     aria-label={$t('nav.language')}
                     on:click={() => locale.set($locale === 'en' ? 'ru' : 'en')}
                 >
@@ -134,19 +134,13 @@
         display: inline-flex;
         align-items: center;
         margin-left: 8px;
-        font-size: 0.7rem;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
         background: transparent;
         border: 0;
-        padding: 4px 6px;
-        color: rgba(255, 255, 255, 0.65);
+        padding: 0.5rem 0.5rem;
     }
 
     .lang-switch:hover,
     .lang-switch:focus-visible {
-        color: #fff;
-        text-decoration: underline;
-        text-underline-offset: 4px;
+        text-decoration: none;
     }
 </style>
