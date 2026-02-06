@@ -137,10 +137,12 @@
         background: transparent;
         border: 0;
         padding: 0.5rem 0.5rem;
+        color: rgba(255, 255, 255, 0.55);
     }
 
     .lang-switch:hover,
     .lang-switch:focus-visible {
+        color: rgba(255, 255, 255, 0.75);
         text-decoration: none;
     }
 </style>
