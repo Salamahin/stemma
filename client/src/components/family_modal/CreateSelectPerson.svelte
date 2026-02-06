@@ -27,7 +27,7 @@
     selectedPerson = null;
   }
 
-  $: if (stemma) peopleNames = [...new Set(stemma.people.map((p) => p.name))];
+  $: if (stemma) peopleNames = [...new Set(stemma.people.filter((p) => !p.readOnly).map((p) => p.name))];
   $: if (selectedPerson) dispatch("selected", selectedPerson);
 </script>
 

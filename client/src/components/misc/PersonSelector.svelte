@@ -20,16 +20,17 @@
     export let people: (CreateNewPerson | PersonDescription)[] = [];
     export let stemmaIndex: StemmaIndex;
 
-    $: if (people) selectedPerson = people[0];
+    $: filteredPeople = people.filter((p) => !("readOnly" in p) || !p.readOnly);
+    $: if (filteredPeople) selectedPerson = filteredPeople[0];
     $: if (selectedPerson) dispatch("select", selectedPerson);
 </script>
 
-{#if people && people.length}
+{#if filteredPeople && filteredPeople.length}
     <div class="container h-100 w-100 p-0">
         <div class="d-flex flex-column h-100">
             <div class="flex-shrink-1">
                 <ul class="nav nav-tabs">
-                    {#each people as p, i}
+                    {#each filteredPeople as p, i}
                         <li class="nav-item">
                             <a
                                 class="nav-link {p == selectedPerson ? 'active' : ''}"

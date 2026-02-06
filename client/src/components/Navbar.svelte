@@ -104,14 +104,17 @@
                             />
                         </li>
                         <li class="nav-item">
-                            <a class="nav-item nav-link active" href="#" on:click={() => dispatch("about")}>{$t('nav.about')}</a>
+                            <button
+                                type="button"
+                                class="lang-switch"
+                                aria-label={$t('nav.language')}
+                                on:click={() => locale.set($locale === 'en' ? 'ru' : 'en')}
+                            >
+                                {$locale === 'en' ? 'RU' : 'EN'}
+                            </button>
                         </li>
                         <li class="nav-item">
-                            <div class="lang-switch" role="group" aria-label={$t('nav.language')}>
-                                <button type="button" class:active={$locale === 'en'} on:click={() => locale.set('en')}>EN</button>
-                                <span class="divider">/</span>
-                                <button type="button" class:active={$locale === 'ru'} on:click={() => locale.set('ru')}>RU</button>
-                            </div>
+                            <a class="nav-item nav-link active" href="#" on:click={() => dispatch("about")}>{$t('nav.about')}</a>
                         </li>
                     </ul>
                 </div>
@@ -124,28 +127,20 @@
     .lang-switch {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        margin-left: 12px;
+        margin-right: 10px;
         font-size: 0.7rem;
         letter-spacing: 0.12em;
         text-transform: uppercase;
-    }
-
-    .lang-switch button {
         background: transparent;
         border: 0;
         padding: 2px 4px;
         color: rgba(255, 255, 255, 0.65);
     }
 
-    .lang-switch button.active {
+    .lang-switch:hover,
+    .lang-switch:focus-visible {
         color: #fff;
         text-decoration: underline;
         text-underline-offset: 4px;
-    }
-
-    .lang-switch .divider {
-        color: rgba(255, 255, 255, 0.35);
-        user-select: none;
     }
 </style>
