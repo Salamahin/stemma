@@ -1,6 +1,9 @@
 import { StemmaIndex } from "./stemmaIndex"
 import { get } from "svelte/store";
 import { LocalizedError, t } from "./i18n";
+import { sanitizeRequestPayload } from "./requestSanitizer";
+import { mapStemmaError } from "./stemmaErrorMapping";
+import { buildInviteLink } from "./inviteLinkBuilder";
 
 export enum ViewMode {
     ALL,
@@ -136,9 +139,9 @@ export class Model {
 
     private makeFamily(parents: PersonDefinition[], children: PersonDefinition[]) {
         let cf = {
-            parent1: parents.length > 0 ? this.sanitize(parents[0]) as PersonDefinition : null,
-            parent2: parents.length > 1 ? this.sanitize(parents[1]) as PersonDefinition : null,
-            children: children.map(c => this.sanitize(c) as PersonDefinition),
+            parent1: parents.length > 0 ? sanitizeRequestPayload(parents[0]) as PersonDefinition : null,
+            parent2: parents.length > 1 ? sanitizeRequestPayload(parents[1]) as PersonDefinition : null,
+            children: children.map(c => sanitizeRequestPayload(c) as PersonDefinition),
         };
 
         return cf as CreateFamily
@@ -167,7 +170,7 @@ export class Model {
     async createInvintation(stemmaId: string, personId: string, email: string, stemmaIndex: StemmaIndex): Promise<string> {
         const response = await this.sendRequest({ CreateInvitationTokenRequest: { stemmaId: stemmaId, targetPersonId: personId, targetPersonEmail: email } })
         const token = (await this.parseResponse(response, stemmaIndex)).InviteToken
-        return `${location.origin}/?inviteToken=${encodeURIComponent(token.token)}`
+        return buildInviteLink(location.origin, token.token)
     }
 
     async bearInvitationToken(token: string): Promise<TokenAccepted> {
@@ -181,7 +184,7 @@ export class Model {
     }
 
     async updatePerson(stemmaId: string, personId: string, descr: CreateNewPerson, stemmaIndex: StemmaIndex): Promise<Stemma> {
-        const response = await this.sendRequest({ UpdatePersonRequest: { stemmaId: stemmaId, personId: personId, personDescr: this.sanitize(descr) as CreateNewPerson } })
+        const response = await this.sendRequest({ UpdatePersonRequest: { stemmaId: stemmaId, personId: personId, personDescr: sanitizeRequestPayload(descr) as CreateNewPerson } })
         return (await this.parseResponse(response, stemmaIndex)).Stemma
     }
 
@@ -217,30 +220,7 @@ export class Model {
     }
 
     private translateError(response: CompositeResponse, stemmaIndex?: StemmaIndex) {
-        if (response.UnknownError) throw new LocalizedError("error.unknown")
-        if (response.RequestDeserializationProblem) throw new LocalizedError("error.invalidRequest")
-        if (response.NoSuchPersonId) throw new LocalizedError("error.noSuchPerson", { name: this.describePerson(response.NoSuchPersonId.id, stemmaIndex) })
-        if (response.ChildAlreadyBelongsToFamily) {
-            throw new LocalizedError("error.childAlreadyHasParents", { name: this.describePerson(response.ChildAlreadyBelongsToFamily.personId, stemmaIndex) })
-        }
-        if (response.IncompleteFamily) throw new LocalizedError("error.incompleteFamily")
-        if (response.DuplicatedIds) {
-            throw new LocalizedError("error.duplicatedIds", { name: this.describePerson(response.DuplicatedIds.duplicatedIds, stemmaIndex) })
-        }
-        if (response.AccessToFamilyDenied) throw new LocalizedError("error.accessToFamilyDenied")
-        if (response.AccessToPersonDenied) {
-            throw new LocalizedError("error.accessToPersonDenied", { name: this.describePerson(response.AccessToPersonDenied.personId, stemmaIndex) })
-        }
-        if (response.AccessToStemmaDenied) throw new LocalizedError("error.accessToStemmaDenied")
-        if (response.InvalidInviteToken) throw new LocalizedError("error.invalidInviteToken")
-        if (response.ForeignInviteToken) throw new LocalizedError("error.foreignInviteToken")
-        if (response.StemmaHasCycles) throw new LocalizedError("error.stemmaHasCycles")
-
-        return response
-    }
-
-    private sanitize(obj) {
-        return Object.fromEntries(Object.entries(obj).filter(([_, v]) => v != null && v != ""))
+        return mapStemmaError(response, (id) => this.describePerson(id, stemmaIndex))
     }
 
     private translate(key: string, params?: Record<string, string>) {

@@ -6,6 +6,7 @@
   import { createEventDispatcher } from "svelte";
   import PersonSelector from "../misc/PersonSelector.svelte";
   import { t } from "../../i18n";
+  import { filterEditablePeople } from "../../personSelectionRules";
 
   export let stemmaIndex: StemmaIndex;
   export let stemma: Stemma;
@@ -27,7 +28,7 @@
     selectedPerson = null;
   }
 
-  $: if (stemma) peopleNames = [...new Set(stemma.people.filter((p) => !p.readOnly).map((p) => p.name))];
+  $: if (stemma) peopleNames = [...new Set(filterEditablePeople(stemma.people).map((p) => p.name))];
   $: if (selectedPerson) dispatch("selected", selectedPerson);
 </script>
 

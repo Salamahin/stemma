@@ -4,9 +4,11 @@ import { PinnedPeopleStorage } from './pinnedPeopleStorage';
 import { StemmaIndex } from './stemmaIndex';
 import { writable, get } from 'svelte/store';
 import { SettingsStorage } from './settingsStroage';
+import { selectStemmaId } from './appControllerSelection';
 
 export class AppController {
     private static readonly LAST_STEMMA_KEY = "stemma_last_stemma_id";
+    private modelFactory: (endpoint: string, user: User) => Model;
     stemma = writable<Stemma>(null)
     stemmaIndex = writable<StemmaIndex>(null)
     pinnedStorage = writable<PinnedPeopleStorage>(null)
@@ -21,24 +23,21 @@ export class AppController {
     private model: Model
     private stemmaBackendUrl: string
 
-    constructor(stemmaBackendUrl: string) {
+    constructor(stemmaBackendUrl: string, modelFactory?: (endpoint: string, user: User) => Model) {
         this.stemmaBackendUrl = stemmaBackendUrl;
+        this.modelFactory = modelFactory ?? ((endpoint, user) => new Model(endpoint, user));
     }
 
     authenticateAndListStemmas(user: User) {
         this.isWorking.set(true)
         this.err.set(null)
 
-        this.model = new Model(this.stemmaBackendUrl, user)
+        this.model = this.modelFactory(this.stemmaBackendUrl, user)
         this.model
             .listDescribeStemmas()
             .then((result) => {
-                let selectedStemma = result.stemmas[0]
-                const lastStemmaId = this.loadLastStemmaId();
-                if (lastStemmaId) {
-                    const match = result.stemmas.find((s) => s.id === lastStemmaId);
-                    if (match) selectedStemma = match;
-                }
+                const selectedId = selectStemmaId(result.stemmas, this.loadLastStemmaId());
+                const selectedStemma = result.stemmas.find((s) => s.id === selectedId);
                 const stemmaPromise = selectedStemma.id === result.stemmas[0].id
                     ? Promise.resolve(result.firstStemma)
                     : this.model.getStemma(selectedStemma.id);
@@ -61,7 +60,7 @@ export class AppController {
         this.isWorking.set(true)
         this.err.set(null)
 
-        this.model = new Model(this.stemmaBackendUrl, user)
+        this.model = this.modelFactory(this.stemmaBackendUrl, user)
         this.model
             .bearInvitationToken(token)
             .then((result) => {

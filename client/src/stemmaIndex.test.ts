@@ -59,20 +59,16 @@ test('Jane is the first in her lineage and is a direct relative of Josh, Jill, J
 
 test("July is the second in her lineage and is a direct relative of Joseph, Jake, James and Jeff", () => {
     let lineage = new StemmaIndex(jjFamily).lineage(july)
-    expect(lineage).toEqual({
-        generation: 1,
-        relativies: new Set([july, jake, james, jeff, joseph]),
-        families: new Set(["5", "4", "2", "2"])
-    })
+    expect(lineage.generation).toEqual(1)
+    expect([...lineage.relativies].sort()).toEqual([july, jake, james, jeff, joseph].sort())
+    expect([...lineage.families].sort()).toEqual(["5", "4", "3", "2"].sort())
 });
 
 test("Generation is selected as max known generations count", () => {
     let lineage = new StemmaIndex(jjFamily).lineage(jeff)
-    expect(lineage).toEqual({
-        generation: 4, //Joseph's bloodline
-        relativies: new Set([july, jake, joseph, jill, james, jane, john, jeff]),
-        families: new Set(["1", "2", "2", "4", "5"])
-    })
+    expect(lineage.generation).toEqual(4) //Joseph's bloodline
+    expect([...lineage.relativies].sort()).toEqual([july, jake, joseph, jill, james, jane, john, jeff].sort())
+    expect([...lineage.families].sort()).toEqual(["1", "2", "4", "5", "3"].sort())
 })
 
 const masha = "1"

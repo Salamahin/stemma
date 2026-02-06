@@ -4,6 +4,7 @@
     import VisualPersonDescription from "./VisualPersonDescription.svelte";
     import { StemmaIndex } from "../../stemmaIndex";
     import { t } from "../../i18n";
+    import { filterEditablePeople } from "../../personSelectionRules";
 
     let dispatch = createEventDispatcher();
     let selectedPerson: CreateNewPerson | PersonDescription;
@@ -20,7 +21,7 @@
     export let people: (CreateNewPerson | PersonDescription)[] = [];
     export let stemmaIndex: StemmaIndex;
 
-    $: filteredPeople = people.filter((p) => !("readOnly" in p) || !p.readOnly);
+    $: filteredPeople = filterEditablePeople(people);
     $: if (filteredPeople) selectedPerson = filteredPeople[0];
     $: if (selectedPerson) dispatch("select", selectedPerson);
 </script>

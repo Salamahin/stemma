@@ -16,7 +16,7 @@ export class LocalizedError extends Error {
 
 const STORAGE_KEY = 'stemma_locale';
 
-function getInitialLocale(): Locale {
+export function getInitialLocale(): Locale {
     try {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored === 'en' || stored === 'ru') return stored;
@@ -32,7 +32,7 @@ locale.subscribe((val) => {
     } catch {}
 });
 
-const en: Record<string, string> = {
+export const en: Record<string, string> = {
     // Navbar
     'nav.familyTrees': 'Family trees',
     'nav.createNew': 'Create new',
@@ -155,7 +155,7 @@ const en: Record<string, string> = {
     'removeStemma.title': 'Delete {name}?',
 };
 
-const ru: Record<string, string> = {
+export const ru: Record<string, string> = {
     // Navbar
     'nav.familyTrees': 'Родословные',
     'nav.createNew': 'Создать новую',
@@ -280,7 +280,7 @@ const ru: Record<string, string> = {
 
 const dictionaries: Record<Locale, Record<string, string>> = { en, ru };
 
-function interpolate(template: string, params?: Record<string, string>): string {
+export function interpolate(template: string, params?: Record<string, string>): string {
     if (!params) return template;
     return template.replace(/\{(\w+)\}/g, (_, key) => params[key] ?? `{${key}}`);
 }
