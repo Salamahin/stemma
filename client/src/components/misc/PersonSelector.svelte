@@ -3,13 +3,14 @@
     import { createEventDispatcher } from "svelte";
     import VisualPersonDescription from "./VisualPersonDescription.svelte";
     import { StemmaIndex } from "../../stemmaIndex";
+    import { t } from "../../i18n";
 
     let dispatch = createEventDispatcher();
     let selectedPerson: CreateNewPerson | PersonDescription;
 
     function tabName(p: PersonDescription | CreateNewPerson, i: number) {
-        if ("id" in p) return `Тезка ${i + 1}`;
-        else return `Создать нового`;
+        if ("id" in p) return $t("personSelector.namesake", { index: String(i + 1) });
+        else return $t("personSelector.createNew");
     }
 
     function selectPerson(p: PersonDescription | CreateNewPerson) {

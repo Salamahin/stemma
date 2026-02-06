@@ -5,6 +5,7 @@
   import ClearIcon from "../misc/ClearIconTranslated.svelte";
   import { createEventDispatcher } from "svelte";
   import PersonSelector from "../misc/PersonSelector.svelte";
+  import { t } from "../../i18n";
 
   export let stemmaIndex: StemmaIndex;
   export let stemma: Stemma;
@@ -33,10 +34,10 @@
 <div class="container h-100">
   <div class="d-flex flex-column h-100">
     <div class="flex-shrink-1">
-      <label for="personName" class="form-label">Полное имя</label>
+      <label for="personName" class="form-label">{$t('family.fullName')}</label>
       <Select
         id="personName"
-        placeholder="Иванов Иван Иванович"
+        placeholder={$t('family.namePlaceholder')}
         items={peopleNames}
         isSearchable={true}
         isCreatable={true}
@@ -44,7 +45,7 @@
         on:clear={() => reset()}
         ClearIcon={clearIcon}
         getOptionLabel={(option, filterText) => {
-          return option.isCreator ? `Создать "${filterText}"` : option["label"];
+          return option.isCreator ? $t("family.createOption", { name: filterText }) : option["label"];
         }}
         hideEmptyState={true}
         value={selectedPerson ? selectedPerson.name : null}

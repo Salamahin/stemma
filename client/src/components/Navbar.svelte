@@ -3,6 +3,7 @@
     import * as bootstrap from "bootstrap";
     import { StemmaDescription, PersonDescription } from "../model";
     import SearchAutocomplete from "./misc/SearchAutocomplete.svelte";
+    import { locale, t } from "../i18n";
 
     export let ownedStemmas: StemmaDescription[];
     export let currentStemmaId: string;
@@ -39,7 +40,7 @@
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <li class="nav-item dropdown {disabled ? 'd-none' : ''}">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            Родословные
+                            {$t('nav.familyTrees')}
                         </a>
                         {#if ownedStemmas}
                             <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
@@ -72,29 +73,29 @@
                                 </li>
 
                                 <li>
-                                    <a class="dropdown-item  {disabled ? 'd-none' : ''}" href="#" on:click={() => dispatch("createNewStemma")}>Создать новую</a>
+                                    <a class="dropdown-item  {disabled ? 'd-none' : ''}" href="#" on:click={() => dispatch("createNewStemma")}>{$t('nav.createNew')}</a>
                                 </li>
                             </ul>
                         {/if}
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {disabled ? 'd-none' : ''}" href="#" on:click={() => dispatch("createNewFamily")}
-                            ><i class="bi bi-people-fill" /> Добавить семью</a
+                            ><i class="bi bi-people-fill" /> {$t('nav.addFamily')}</a
                         >
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {disabled ? 'd-none' : ''}" href="#" on:click={() => dispatch("invite")}
-                            ><i class="bi bi-share-fill" /> Пригласить участника</a
+                            ><i class="bi bi-share-fill" /> {$t('nav.inviteMember')}</a
                         >
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {disabled ? 'd-none' : ''}" href="#" on:click={() => dispatch("settings")}
-                            ><i class="bi bi-gear-fill" /> Настройки</a
+                            ><i class="bi bi-gear-fill" /> {$t('nav.settings')}</a
                         >
                     </li>
                 </ul>
-                <div class="d-flex ms-auto">
-                    <ul class="navbar-nav w-100">
+                <div class="d-flex ms-auto align-items-center">
+                    <ul class="navbar-nav w-100 align-items-center">
                         <li class="nav-item">
                             <SearchAutocomplete
                                 {people}
@@ -103,7 +104,14 @@
                             />
                         </li>
                         <li class="nav-item">
-                            <a class="nav-item nav-link active" href="#" on:click={() => dispatch("about")}>О проекте</a>
+                            <a class="nav-item nav-link active" href="#" on:click={() => dispatch("about")}>{$t('nav.about')}</a>
+                        </li>
+                        <li class="nav-item">
+                            <div class="lang-switch" role="group" aria-label={$t('nav.language')}>
+                                <button type="button" class:active={$locale === 'en'} on:click={() => locale.set('en')}>EN</button>
+                                <span class="divider">/</span>
+                                <button type="button" class:active={$locale === 'ru'} on:click={() => locale.set('ru')}>RU</button>
+                            </div>
                         </li>
                     </ul>
                 </div>
@@ -111,3 +119,33 @@
         </div>
     </nav>
 </header>
+
+<style>
+    .lang-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-left: 12px;
+        font-size: 0.7rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    .lang-switch button {
+        background: transparent;
+        border: 0;
+        padding: 2px 4px;
+        color: rgba(255, 255, 255, 0.65);
+    }
+
+    .lang-switch button.active {
+        color: #fff;
+        text-decoration: underline;
+        text-underline-offset: 4px;
+    }
+
+    .lang-switch .divider {
+        color: rgba(255, 255, 255, 0.35);
+        user-select: none;
+    }
+</style>

@@ -16,6 +16,7 @@
     import FamilyGeneration from "./FamilyGeneration.svelte";
 
     import { createEventDispatcher } from "svelte";
+    import { t } from "../../i18n";
 
     let modalEl;
     let mode = "familyComposition";
@@ -112,26 +113,26 @@
     <div class="modal-dialog modal-lg modal-dialog-centered modal-fullscreen-lg-down">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addFamlilyLabel">{mode == "familyComposition" ? "Состав семьи" : "Выбрать члена семьи"}</h5>
+                <h5 class="modal-title" id="addFamlilyLabel">{mode == "familyComposition" ? $t("family.compositionTitle") : $t("family.selectMemberTitle")}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
             </div>
             <div class="modal-body" style="min-height:550px">
                 {#if mode == "familyComposition"}
-                    <p class="fs-5">Родители</p>
+                    <p class="fs-5">{$t("family.parents")}</p>
                     <FamilyGeneration bind:selectedPeople={parents} {readOnly} />
                     {#if selectedParentsCount < 2 && !readOnly}
                         <button type="button" class="btn btn-primary btn-sm" on:click={(e) => showPersonSelection(true)}
-                            ><i class="bi bi-person-plus-fill" /> добавить</button
+                            ><i class="bi bi-person-plus-fill" /> {$t("common.add")}</button
                         >
                     {/if}
 
                     <hr class="my-5" />
 
-                    <p class="fs-5">Дети</p>
+                    <p class="fs-5">{$t("family.children")}</p>
                     <FamilyGeneration bind:selectedPeople={children} {readOnly} />
                     {#if !readOnly}
                         <button type="button" class="btn btn-primary btn-sm" on:click={(e) => showPersonSelection(false)}
-                            ><i class="bi bi-person-plus-fill" /> добавить</button
+                            ><i class="bi bi-person-plus-fill" /> {$t("common.add")}</button
                         >
                     {/if}
                 {:else}
@@ -142,15 +143,15 @@
                 <div class="modal-footer">
                     {#if mode == "familyComposition"}
                         {#if familyId != null}
-                            <button type="button" class="btn btn-danger me-auto" on:click={() => removeFamily()}>Удалить</button>
+                            <button type="button" class="btn btn-danger me-auto" on:click={() => removeFamily()}>{$t("common.delete")}</button>
                         {/if}
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{$t("common.cancel")}</button>
                         <button type="button" class="btn btn-primary" disabled={selectedParentsCount + selectedChildrenCount < 2} on:click={(e) => saveFamily()}
-                            >Сохранить</button
+                            >{$t("common.save")}</button
                         >
                     {:else}
-                        <button type="button" class="btn btn-secondary" on:click={(e) => showFamilyComposition()}>Назад</button>
-                        <button type="button" class="btn btn-primary" disabled={selected == null} on:click={(e) => confirmPersonSelection()}>Выбрать</button>
+                        <button type="button" class="btn btn-secondary" on:click={(e) => showFamilyComposition()}>{$t("common.back")}</button>
+                        <button type="button" class="btn btn-primary" disabled={selected == null} on:click={(e) => confirmPersonSelection()}>{$t("common.select")}</button>
                     {/if}
                 </div>
             {/if}

@@ -17,6 +17,7 @@
     import CloneStemmaModal from "./components/clone_stemma_modal/CloneStemmaModal.svelte";
     import SettingsModal from "./components/settings_modal/SettingsModal.svelte";
     import { SettingsStorage } from "./settingsStroage";
+    import { LocalizedError, t } from "./i18n";
     import jwt_decode from "jwt-decode";
     import { onMount } from "svelte";
 
@@ -65,6 +66,11 @@
     controller.invitationToken.subscribe((it) => {
         if (inviteModal) inviteModal.setInviteLink(it);
     });
+
+    function errorMessage(err: Error) {
+        if (err instanceof LocalizedError) return $t(err.key, err.params);
+        return err.message;
+    }
 
     function handleSignIn(user: User) {
         sessionStorage.setItem(CREDENTIAL_KEY, user.id_token);
@@ -149,7 +155,7 @@
         <div>
             <div class="alert alert-danger alert-dismissible fade mt-2 mx-2 show">
                 <button type="button" class="btn-close" data-bs-dismiss="alert" />
-                <div><strong>Упс! </strong>{error.message}</div>
+                <div><strong>{$t('app.oops')} </strong>{errorMessage(error)}</div>
             </div>
         </div>
     {/if}
@@ -157,7 +163,7 @@
     {#if isWorking}
         <div class="position-absolute top-50 start-50 translate-middle">
             <Circle2 />
-            <p class="mt-2">Минуту...</p>
+            <p class="mt-2">{$t('app.loading')}</p>
         </div>
     {/if}
     <FullStemma

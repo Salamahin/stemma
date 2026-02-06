@@ -1,4 +1,6 @@
 import { StemmaIndex } from "./stemmaIndex"
+import { get } from "svelte/store";
+import { LocalizedError, t } from "./i18n";
 
 export enum ViewMode {
     ALL,
@@ -117,7 +119,7 @@ export class Model {
     }
 
     async listDescribeStemmas(): Promise<OwnedStemmas> {
-        const response = await this.sendRequest({ ListDescribeStemmasRequest: { defaultStemmaName: "Моя родословная" } })
+        const response = await this.sendRequest({ ListDescribeStemmasRequest: { defaultStemmaName: this.translate("stemma.defaultName") } })
         const x = await this.parseResponse(response, null)
         return x.OwnedStemmas
     }
@@ -189,8 +191,8 @@ export class Model {
     }
 
     private async parseResponse(response: Response, stemmaIndex?: StemmaIndex) {
-        if (response.status === 401) throw new Error("Сессия успела протухнуть. Авторизуйтесь заново (перезагрузите страницу)")
-        if (!response.ok) throw new Error(`Получен неожиданный ответ от сервера. Попробуйте перезагрузить страницу`)
+        if (response.status === 401) throw new LocalizedError("error.sessionExpired")
+        if (!response.ok) throw new LocalizedError("error.unexpectedResponse")
 
         const json = await response.json();
         return this.translateError(json as CompositeResponse, stemmaIndex);
@@ -205,33 +207,43 @@ export class Model {
     }
 
     private describePerson(id: string, stemmaIndex?: StemmaIndex) {
-        if (!stemmaIndex) return "[НЕТ ОПИСАНИЯ]"
+        if (!stemmaIndex) return this.translate("error.noDescription")
         try {
             let pd = stemmaIndex.person(id)
-            return `[${pd.name}]`
+            return pd.name
         } catch (err) {
-            return "[НЕТ ОПИСАНИЯ]"
+            return this.translate("error.noDescription")
         }
     }
 
     private translateError(response: CompositeResponse, stemmaIndex?: StemmaIndex) {
-        if (response.UnknownError) throw new Error("Что-то пошло не так. Попробуйте перезагрузить страницу")
-        if (response.RequestDeserializationProblem) throw new Error("Невалидный запрос, как у тебя удалось-то такой послать вообще?!")
-        if (response.NoSuchPersonId) throw new Error(`Вы указали неизвестного человека ${this.describePerson(response.NoSuchPersonId.id), stemmaIndex}, возможно, его уже удалили?`)
-        if (response.ChildAlreadyBelongsToFamily) throw new Error(`У ${this.describePerson(response.ChildAlreadyBelongsToFamily.personId, stemmaIndex)}, уже есть родители, вы не можете добавить его в семью`)
-        if (response.IncompleteFamily) throw new Error("Нельзя создать семью, в которой меньше 2 людей")
-        if (response.DuplicatedIds) throw new Error(`Нельзя указать одного и того же человека ${this.describePerson(response.DuplicatedIds.duplicatedIds, stemmaIndex)} в семье дважды`)
-        if (response.AccessToFamilyDenied) throw new Error("Действие с семьей запрещено")
-        if (response.AccessToPersonDenied) throw new Error(`Действие с человеком ${this.describePerson(response.AccessToPersonDenied.personId, stemmaIndex)} запрещено`)
-        if (response.AccessToStemmaDenied) throw new Error("Действие с родословной запрещено")
-        if (response.InvalidInviteToken) throw new Error("Проверьте правильность ссылки-приглашения")
-        if (response.ForeignInviteToken) throw new Error("Похоже, вы используете чужую ссылку-приглашение")
-        if (response.StemmaHasCycles) throw new Error("Неверная композиция семьи - обнаружена циклическая зависимость")
+        if (response.UnknownError) throw new LocalizedError("error.unknown")
+        if (response.RequestDeserializationProblem) throw new LocalizedError("error.invalidRequest")
+        if (response.NoSuchPersonId) throw new LocalizedError("error.noSuchPerson", { name: this.describePerson(response.NoSuchPersonId.id, stemmaIndex) })
+        if (response.ChildAlreadyBelongsToFamily) {
+            throw new LocalizedError("error.childAlreadyHasParents", { name: this.describePerson(response.ChildAlreadyBelongsToFamily.personId, stemmaIndex) })
+        }
+        if (response.IncompleteFamily) throw new LocalizedError("error.incompleteFamily")
+        if (response.DuplicatedIds) {
+            throw new LocalizedError("error.duplicatedIds", { name: this.describePerson(response.DuplicatedIds.duplicatedIds, stemmaIndex) })
+        }
+        if (response.AccessToFamilyDenied) throw new LocalizedError("error.accessToFamilyDenied")
+        if (response.AccessToPersonDenied) {
+            throw new LocalizedError("error.accessToPersonDenied", { name: this.describePerson(response.AccessToPersonDenied.personId, stemmaIndex) })
+        }
+        if (response.AccessToStemmaDenied) throw new LocalizedError("error.accessToStemmaDenied")
+        if (response.InvalidInviteToken) throw new LocalizedError("error.invalidInviteToken")
+        if (response.ForeignInviteToken) throw new LocalizedError("error.foreignInviteToken")
+        if (response.StemmaHasCycles) throw new LocalizedError("error.stemmaHasCycles")
 
         return response
     }
 
     private sanitize(obj) {
         return Object.fromEntries(Object.entries(obj).filter(([_, v]) => v != null && v != ""))
+    }
+
+    private translate(key: string, params?: Record<string, string>) {
+        return get(t)(key, params);
     }
 }
