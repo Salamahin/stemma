@@ -22,8 +22,8 @@ Stemma is a collaborative family tree editor. Multiple users build shared geneal
 
 ### Backend (run from `backend/`)
 ```sh
-sbt test              # Run all backend tests
-sbt compile           # Compile all modules
+sbt test                                  # Run all backend tests
+sbt compile                               # Compile all modules
 sbt "project api" test                    # Test only the core API module
 sbt "project api_impl_restful" run        # Start local REST server on :8090
 ```
