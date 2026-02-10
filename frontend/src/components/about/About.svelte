@@ -3,6 +3,11 @@
     import * as d3 from "d3";
     import { onMount } from "svelte";
     import { t } from "../../i18n";
+    import {
+        personR, familyR, defaultFamilyColor, relationsColor,
+        childRelationWidth, familyRelationWidth, labelFontSize,
+        personColor, addArrowMarkers
+    } from "../../graphStyles";
 
     let modalEl;
     let diagramEl: HTMLDivElement;
@@ -21,6 +26,8 @@
             .attr("width", "100%")
             .attr("height", "100%");
 
+        addArrowMarkers(svg);
+
         const parentsY = 40;
         const familyY = 110;
         const childY = 185;
@@ -30,79 +37,57 @@
         const familyX = 180;
         const childX = 180;
 
-        const line = d3
-            .line()
-            .x((d: { x: number; y: number }) => d.x)
-            .y((d: { x: number; y: number }) => d.y);
+        // Parent-left → family link
+        svg.append("line")
+            .attr("x1", parentLeftX).attr("y1", parentsY)
+            .attr("x2", familyX).attr("y2", familyY)
+            .attr("stroke", relationsColor)
+            .attr("stroke-width", familyRelationWidth)
+            .attr("marker-end", "url(#arrow-to-family)");
 
-        svg.append("path")
-            .attr(
-                "d",
-                line([
-                    { x: parentLeftX, y: parentsY + 18 },
-                    { x: familyX, y: familyY - 18 },
-                ])
-            )
-            .attr("stroke", "#333")
-            .attr("fill", "none");
+        // Parent-right → family link
+        svg.append("line")
+            .attr("x1", parentRightX).attr("y1", parentsY)
+            .attr("x2", familyX).attr("y2", familyY)
+            .attr("stroke", relationsColor)
+            .attr("stroke-width", familyRelationWidth)
+            .attr("marker-end", "url(#arrow-to-family)");
 
-        svg.append("path")
-            .attr(
-                "d",
-                line([
-                    { x: parentRightX, y: parentsY + 18 },
-                    { x: familyX, y: familyY - 18 },
-                ])
-            )
-            .attr("stroke", "#333")
-            .attr("fill", "none");
+        // Family → child link
+        svg.append("line")
+            .attr("x1", familyX).attr("y1", familyY)
+            .attr("x2", childX).attr("y2", childY)
+            .attr("stroke", relationsColor)
+            .attr("stroke-width", childRelationWidth)
+            .attr("marker-end", "url(#arrow-to-person)");
 
-        svg.append("path")
-            .attr(
-                "d",
-                line([
-                    { x: familyX, y: familyY + 18 },
-                    { x: childX, y: childY - 18 },
-                ])
-            )
-            .attr("stroke", "#333")
-            .attr("fill", "none");
-
-        const nodeStyle = {
-            fill: "#fff",
-            stroke: "#333",
-            strokeWidth: 2,
-        };
-
+        // Parent-left node
         svg.append("circle")
             .attr("cx", parentLeftX)
             .attr("cy", parentsY)
-            .attr("r", 16)
-            .attr("fill", nodeStyle.fill)
-            .attr("stroke", nodeStyle.stroke)
-            .attr("stroke-width", nodeStyle.strokeWidth);
+            .attr("r", personR)
+            .attr("fill", personColor(0));
 
+        // Parent-right node
         svg.append("circle")
             .attr("cx", parentRightX)
             .attr("cy", parentsY)
-            .attr("r", 16)
-            .attr("fill", nodeStyle.fill)
-            .attr("stroke", nodeStyle.stroke)
-            .attr("stroke-width", nodeStyle.strokeWidth);
+            .attr("r", personR)
+            .attr("fill", personColor(0));
 
+        // Family node
         svg.append("circle")
             .attr("cx", familyX)
             .attr("cy", familyY)
-            .attr("r", 10)
-            .attr("fill", "#333");
+            .attr("r", familyR)
+            .attr("fill", defaultFamilyColor);
 
+        // Child node
         svg.append("circle")
             .attr("cx", childX)
             .attr("cy", childY)
-            .attr("r", 16)
-            .attr("fill", nodeStyle.fill)
-            .attr("stroke", nodeStyle.stroke)
-            .attr("stroke-width", nodeStyle.strokeWidth);
+            .attr("r", personR)
+            .attr("fill", personColor(1));
 
         const label = (text: string, x: number, y: number) => {
             svg.append("text")
@@ -110,14 +95,13 @@
                 .attr("x", x)
                 .attr("y", y)
                 .attr("text-anchor", "middle")
-                .attr("font-size", 12)
-                .attr("fill", "#333");
+                .style("font-size", labelFontSize);
         };
 
-        label($t("about.diagram.parent1"), parentLeftX, parentsY - 22);
-        label($t("about.diagram.parent2"), parentRightX, parentsY - 22);
-        label($t("about.diagram.family"), familyX, familyY - 18);
-        label($t("about.diagram.child"), childX, childY + 34);
+        label($t("about.diagram.parent1"), parentLeftX, parentsY - personR - 5);
+        label($t("about.diagram.parent2"), parentRightX, parentsY - personR - 5);
+        label($t("about.diagram.family"), familyX, familyY - familyR - 5);
+        label($t("about.diagram.child"), childX, childY + personR + 18);
     }
 
     onMount(() => {

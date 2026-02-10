@@ -1,17 +1,10 @@
 import * as d3 from "d3";
-
-const personR = 15;
-const familyR = 5;
-
-const defaultFamilyColor = "#326f93";
-const shadedNodeColor = "#d3d3d3";
-
-const shadedRelationColor = "#a9a9a9";
-const relationsColor = "#808080";
-
-const childRelationWidth = "0.5px";
-const familyRelationWidth = "2.5px";
-const shadedRelationWidth = "0.1px";
+import {
+    personR, familyR, defaultFamilyColor, shadedNodeColor,
+    relationsColor, shadedRelationColor, childRelationWidth,
+    familyRelationWidth, shadedRelationWidth, labelFontSize,
+    personColor, addArrowMarkers
+} from "./graphStyles";
 
 export function makeNodesAndRelations(people, families) {
     let nodes = [
@@ -50,33 +43,7 @@ export function makeNodesAndRelations(people, families) {
 
 export function initChart(svgSelector) {
     let svg = d3.select(svgSelector);
-    let defs = svg.append("defs");
-
-    defs.append("marker")
-        .attr("id", "arrow-to-family")
-        .attr("viewBox", "0 0 10 6")
-        .attr("refX", 16)
-        .attr("refY", 3)
-        .attr("markerWidth", 10)
-        .attr("markerHeight", 6)
-        .attr("markerUnits", "userSpaceOnUse")
-        .attr("orient", "auto")
-        .style("fill", relationsColor)
-        .append("path")
-        .attr("d", "M 0 0 L 10 3 L 0 6 Z");
-
-    defs.append("marker")
-        .attr("id", "arrow-to-person")
-        .attr("viewBox", "0 0 10 6")
-        .attr("refX", 26)
-        .attr("refY", 3)
-        .attr("markerWidth", 10)
-        .attr("markerHeight", 6)
-        .attr("markerUnits", "userSpaceOnUse")
-        .attr("orient", "auto")
-        .style("fill", relationsColor)
-        .append("path")
-        .attr("d", "M 0 0 L 10 3 L 0 6 Z");
+    addArrowMarkers(svg);
 
 
     svg.append("g").attr("class", "main");
@@ -223,7 +190,7 @@ export function renderChart(svg, highlight, stemmaIndex) {
     function getNodeColor(node) {
         if (node.type == "person") {
             let d = stemmaIndex.lineage(denormalizeId(node.id)).generation / stemmaIndex.maxGeneration();
-            return d3.interpolatePlasma(d);
+            return personColor(d);
         } else {
             return defaultFamilyColor;
         }
@@ -284,7 +251,7 @@ export function renderChart(svg, highlight, stemmaIndex) {
     svg.selectAll("text")
         .raise()
         .text((node) => node.name)
-        .style("font-size", "15px")
+        .style("font-size", labelFontSize)
         .attr("dy", 40)
         .attr("dx", -personR);
 }
