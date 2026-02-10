@@ -1,7 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
     import * as bootstrap from "bootstrap";
-    import { StemmaDescription } from "../../model";
+    import type { StemmaDescription } from "../../model";
     import { t } from "../../i18n";
 
     const dispatch = createEventDispatcher();
@@ -27,7 +27,7 @@
                 {#if selectedStemma}
                     <h5 class="modal-title">{$t("removeStemma.title", { name: selectedStemma.name })}</h5>
                 {/if}
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{$t("common.cancel")}</button>

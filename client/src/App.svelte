@@ -2,15 +2,19 @@
     import Authenticate from "./components/Authenticate.svelte";
     import Navbar from "./components/Navbar.svelte";
     import AddStemmaModal from "./components/add_stemma_modal/AddStemmaModal.svelte";
-    import FamilySelectionModal, { GetOrCreateFamily } from "./components/family_modal/FamilyDetailsModal.svelte";
-    import PersonSelectionModal, { UpdatePerson } from "./components/person_details_modal/PersonDetailsModal.svelte";
+    import FamilySelectionModal from "./components/family_modal/FamilyDetailsModal.svelte";
+    import type { GetOrCreateFamily } from "./components/family_modal/FamilyDetailsModal.svelte";
+    import PersonSelectionModal from "./components/person_details_modal/PersonDetailsModal.svelte";
+    import type { UpdatePerson } from "./components/person_details_modal/PersonDetailsModal.svelte";
     import FullStemma from "./components/FullStemma.svelte";
-    import { StemmaDescription, User, Stemma, PersonDescription, FamilyDescription, Settings, DEFAULT_SETTINGS, ViewMode } from "./model";
+    import type { StemmaDescription, User, Stemma, PersonDescription, FamilyDescription, Settings } from "./model";
+    import { DEFAULT_SETTINGS, ViewMode } from "./model";
     import { StemmaIndex } from "./stemmaIndex";
     import { HiglightLineages } from "./highlight";
     import { PinnedPeopleStorage } from "./pinnedPeopleStorage";
     import RemoveStemmaModal from "./components/delete_stemma_modal/RemoveStemmaModal.svelte";
-    import InviteModal, { CreateInviteLink } from "./components/invite_modal/InviteModal.svelte";
+    import InviteModal from "./components/invite_modal/InviteModal.svelte";
+    import type { CreateInviteLink } from "./components/invite_modal/InviteModal.svelte";
     import { Circle2 } from "svelte-loading-spinners";
     import AboutModal from "./components/about/About.svelte";
     import { AppController } from "./appController";
@@ -154,7 +158,7 @@
     {#if error}
         <div>
             <div class="alert alert-danger alert-dismissible fade mt-2 mx-2 show">
-                <button type="button" class="btn-close" data-bs-dismiss="alert" />
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label={$t("common.close")}></button>
                 <div><strong>{$t('app.oops')} </strong>{errorMessage(error)}</div>
             </div>
         </div>

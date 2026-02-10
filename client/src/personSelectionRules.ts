@@ -1,4 +1,4 @@
-import { CreateNewPerson, PersonDescription } from "./model";
+import type { CreateNewPerson, PersonDescription } from "./model";
 
 export type SelectablePerson = CreateNewPerson | PersonDescription;
 

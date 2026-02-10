@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { CreateNewPerson, PersonDescription } from "../../model";
+    import type { CreateNewPerson, PersonDescription } from "../../model";
     import { createEventDispatcher } from "svelte";
     import VisualPersonDescription from "./VisualPersonDescription.svelte";
     import { StemmaIndex } from "../../stemmaIndex";
@@ -36,8 +36,8 @@
                             <a
                                 class="nav-link {p == selectedPerson ? 'active' : ''}"
                                 aria-current={p == selectedPerson ? "page" : null}
-                                href="#"
-                                on:click={() => selectPerson(p)}>{tabName(p, i)}</a
+                                href="/"
+                                on:click|preventDefault={() => selectPerson(p)}>{tabName(p, i)}</a
                             >
                         </li>
                     {/each}

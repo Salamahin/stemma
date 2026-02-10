@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { CreateNewPerson, PersonDescription } from "../../model";
+    import type { CreateNewPerson, PersonDescription } from "../../model";
     import { StemmaIndex } from "../../stemmaIndex";
     import { onMount } from "svelte";
     import { configureSimulation, initChart, makeDrag, makeNodesAndRelations, mergeData, renderChart } from "../../graphTools";
@@ -45,5 +45,5 @@
 </script>
 
 <div bind:clientWidth={width} bind:clientHeight={height} class="h-100 w-100">
-    <svg id={chartId} style="min-width: 300px; min-height: 350px; width: 100%; height: 100%" />
+    <svg id={chartId} style="min-width: 300px; min-height: 350px; width: 100%; height: 100%"></svg>
 </div>

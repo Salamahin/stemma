@@ -1,7 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
     import * as bootstrap from "bootstrap";
-    import { StemmaDescription, PersonDescription } from "../model";
+    import type { StemmaDescription, PersonDescription } from "../model";
     import SearchAutocomplete from "./misc/SearchAutocomplete.svelte";
     import { locale, t } from "../i18n";
 
@@ -25,7 +25,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
             <div class="brand-group">
-                <a class="navbar-brand" href="#"><img src="assets/logo_bw_avg.webp" alt="" width="40" height="40" /> Stemma</a>
+                <a class="navbar-brand" href="/" on:click|preventDefault><img src="assets/logo_bw_avg.webp" alt="" width="40" height="40" /> Stemma</a>
                 <button
                     type="button"
                     class="nav-link lang-switch"
@@ -44,12 +44,12 @@
                 aria-expanded="false"
                 aria-label="Toggle navigation"
             >
-                <span class="navbar-toggler-icon" />
+                <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarTogglerDemo02" bind:this={navbarCollapseEl}>
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <li class="nav-item dropdown {disabled ? 'd-none' : ''}">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <a class="nav-link dropdown-toggle" href="/" on:click|preventDefault id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             {$t('nav.familyTrees')}
                         </a>
                         {#if ownedStemmas}
@@ -59,20 +59,22 @@
                                         <div class="d-flex flex-row mt-1 me-1">
                                             <a
                                                 class="dropdown-item {s.id == currentStemmaId ? 'active' : ''}  {disabled ? 'd-none' : ''}"
-                                                href="#"
-                                                on:click={() => dispatch("selectStemma", s.id)}>{s.name}</a
+                                                href="/"
+                                                on:click|preventDefault={() => dispatch("selectStemma", s.id)}>{s.name}</a
                                             >
                                             {#if s.id != currentStemmaId && s.removable}
                                                 <button
                                                     type="button"
                                                     class="btn btn-danger btn-sm ms-1 {disabled ? 'd-none' : ''}"
-                                                    on:click={(e) => dispatch("removeStemma", s)}><i class="bi bi-trash" /></button
+                                                    aria-label={$t("common.delete")}
+                                                    on:click={(e) => dispatch("removeStemma", s)}><i class="bi bi-trash"></i></button
                                                 >
                                             {:else if s.id == currentStemmaId}
                                                 <button
                                                     type="button"
                                                     class="btn btn-primary btn-sm ms-1 {disabled ? 'd-none' : ''}"
-                                                    on:click={(e) => dispatch("cloneStemma", s.id)}><i class="bi bi-subtract" /></button
+                                                    aria-label={$t("stemma.clone")}
+                                                    on:click={(e) => dispatch("cloneStemma", s.id)}><i class="bi bi-subtract"></i></button
                                                 >
                                             {/if}
                                         </div>
@@ -83,24 +85,24 @@
                                 </li>
 
                                 <li>
-                                    <a class="dropdown-item  {disabled ? 'd-none' : ''}" href="#" on:click={() => dispatch("createNewStemma")}>{$t('nav.createNew')}</a>
+                                    <a class="dropdown-item  {disabled ? 'd-none' : ''}" href="/" on:click|preventDefault={() => dispatch("createNewStemma")}>{$t('nav.createNew')}</a>
                                 </li>
                             </ul>
                         {/if}
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {disabled ? 'd-none' : ''}" href="#" on:click={() => dispatch("createNewFamily")}
-                            ><i class="bi bi-people-fill" /> {$t('nav.addFamily')}</a
+                        <a class="nav-link {disabled ? 'd-none' : ''}" href="/" on:click|preventDefault={() => dispatch("createNewFamily")}
+                            ><i class="bi bi-people-fill"></i> {$t('nav.addFamily')}</a
                         >
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {disabled ? 'd-none' : ''}" href="#" on:click={() => dispatch("invite")}
-                            ><i class="bi bi-share-fill" /> {$t('nav.inviteMember')}</a
+                        <a class="nav-link {disabled ? 'd-none' : ''}" href="/" on:click|preventDefault={() => dispatch("invite")}
+                            ><i class="bi bi-share-fill"></i> {$t('nav.inviteMember')}</a
                         >
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {disabled ? 'd-none' : ''}" href="#" on:click={() => dispatch("settings")}
-                            ><i class="bi bi-gear-fill" /> {$t('nav.settings')}</a
+                        <a class="nav-link {disabled ? 'd-none' : ''}" href="/" on:click|preventDefault={() => dispatch("settings")}
+                            ><i class="bi bi-gear-fill"></i> {$t('nav.settings')}</a
                         >
                     </li>
                 </ul>
@@ -114,7 +116,7 @@
                             />
                         </li>
                         <li class="nav-item">
-                            <a class="nav-item nav-link active" href="#" on:click={() => dispatch("about")}>{$t('nav.about')}</a>
+                            <a class="nav-item nav-link active" href="/" on:click|preventDefault={() => dispatch("about")}>{$t('nav.about')}</a>
                         </li>
                     </ul>
                 </div>

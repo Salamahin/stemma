@@ -1,4 +1,4 @@
-import { Stemma, FamilyDescription, PersonDescription } from "./model";
+import type { Stemma, FamilyDescription, PersonDescription } from "./model";
 
 export type Generation = {
     generation: number,

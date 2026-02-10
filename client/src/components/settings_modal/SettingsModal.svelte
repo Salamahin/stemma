@@ -1,7 +1,8 @@
 <script lang="ts">
     import * as bootstrap from "bootstrap";
     import { createEventDispatcher } from "svelte";
-    import { DEFAULT_SETTINGS, Settings, ViewMode } from "../../model";
+    import type { Settings } from "../../model";
+    import { DEFAULT_SETTINGS, ViewMode } from "../../model";
     import { t } from "../../i18n";
 
     let modalEl;
@@ -10,7 +11,8 @@
     const dispatch = createEventDispatcher();
 
     function saveSettings() {
-        let viewAll = document.getElementById("showAll").checked;
+        const showAllInput = document.getElementById("showAll") as HTMLInputElement | null;
+        const viewAll = showAllInput?.checked ?? false;
 
         dispatch("settingsChanged", {
             viewMode: viewAll ? ViewMode.ALL : ViewMode.EDITABLE_ONLY,
@@ -29,7 +31,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">{$t("settings.title")}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="form-check">

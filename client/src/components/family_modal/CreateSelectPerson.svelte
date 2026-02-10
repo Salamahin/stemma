@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Stemma, CreateNewPerson, PersonDescription } from "../../model";
+  import type { Stemma, CreateNewPerson, PersonDescription } from "../../model";
   import { StemmaIndex } from "../../stemmaIndex";
   import Select from "svelte-select";
   import ClearIcon from "../misc/ClearIconTranslated.svelte";
