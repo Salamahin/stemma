@@ -12,3 +12,7 @@ client/package-lock.json
 
 target
 .aws-sam
+
+# Ignore CLAUDE.md in subdirectories (keep root CLAUDE.md)
+**/CLAUDE.md
+!CLAUDE.md
