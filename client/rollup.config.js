@@ -56,7 +56,8 @@ export default {
                 style: less(),
             }),
             compilerOptions: {
-                dev: !production
+                dev: !production,
+                runes: false
             }
         }),
         css({

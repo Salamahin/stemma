@@ -13,9 +13,9 @@
         mounted = true;
     });
 
-    window.gsiLoad = function () {
+    function gsiLoad() {
         gsiLoaded = true;
-    };
+    }
 
     function handleCredentialResponse(response) {
         let decoded = jwt_decode(response.credential);
@@ -45,7 +45,7 @@
 </script>
 
 <svelte:head>
-    <script defer async src="https://accounts.google.com/gsi/client" onload="gsiLoad()"></script>
+    <script defer async src="https://accounts.google.com/gsi/client" on:load={gsiLoad}></script>
     <meta name="google-signin-client_id" content={google_client_id} />
 </svelte:head>
 
@@ -54,7 +54,7 @@
         <h1>project stemma</h1>
         <img src="assets/logo_bw_avg.webp" alt="" width="100" height="100" />
         <div class="mt-5" style="max-width:250px">
-            <div id="signin" />
+            <div id="signin"></div>
         </div>
     </div>
 </div>

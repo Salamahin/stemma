@@ -1,5 +1,5 @@
 <script context="module" lang="ts">
-    import { PersonDescription, CreateNewPerson } from "../../model";
+    import type { PersonDescription, CreateNewPerson } from "../../model";
     import { imask } from "@imask/svelte";
 
     export type UpdatePerson = {
@@ -72,8 +72,10 @@
         name = p.description.name;
         birthDate = p.description.birthDate ? new Date(p.description.birthDate) : null;
         deathDate = p.description.deathDate ? new Date(p.description.deathDate) : null;
-        document.getElementById("birthDateInput").value = birthDate;
-        document.getElementById("deathDateInput").value = deathDate;
+        const birthInput = document.getElementById("birthDateInput") as HTMLInputElement | null;
+        if (birthInput) birthInput.value = dateToMaskedDateStr(birthDate) ?? "";
+        const deathInput = document.getElementById("deathDateInput") as HTMLInputElement | null;
+        if (deathInput) deathInput.value = dateToMaskedDateStr(deathDate) ?? "";
         bio = p.description.bio;
         pinned = p.pin;
         readOnly = p.description.readOnly;
@@ -150,7 +152,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title ms-2" id="addFamlilyLabel">{$t("person.title")}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <form class="row">
@@ -188,7 +190,7 @@
 
                     <div class="col-12 mt-2">
                         <label for="personBioInput" class="form-label">{$t("person.bio")}</label>
-                        <textarea class="form-control" rows="6" id="personBioInput" bind:value={bio} readonly={readOnly} />
+                        <textarea class="form-control" rows="6" id="personBioInput" bind:value={bio} readonly={readOnly}></textarea>
                     </div>
                     <div class="col-12 mt-3">
                         <div class="form-check form-switch">

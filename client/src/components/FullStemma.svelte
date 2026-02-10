@@ -1,6 +1,7 @@
 <script lang="ts">
     import * as d3 from "d3";
-    import { Stemma, ViewMode } from "../model";
+    import type { Stemma } from "../model";
+    import { ViewMode } from "../model";
     import { StemmaIndex } from "../stemmaIndex";
     import { onMount } from "svelte";
     import { createEventDispatcher } from "svelte";

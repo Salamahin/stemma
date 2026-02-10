@@ -1,5 +1,5 @@
 <script context="module" lang="ts">
-    import { CreateNewPerson, FamilyDescription, PersonDefinition, PersonDescription } from "../../model";
+    import type { CreateNewPerson, FamilyDescription, PersonDefinition, PersonDescription } from "../../model";
     import * as bootstrap from "bootstrap";
 
     export type GetOrCreateFamily = {
@@ -10,7 +10,7 @@
 </script>
 
 <script lang="ts">
-    import { Stemma } from "../../model";
+    import type { Stemma } from "../../model";
     import { StemmaIndex } from "../../stemmaIndex";
     import CreateSelectPerson from "./CreateSelectPerson.svelte";
     import FamilyGeneration from "./FamilyGeneration.svelte";
@@ -114,7 +114,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="addFamlilyLabel">{mode == "familyComposition" ? $t("family.compositionTitle") : $t("family.selectMemberTitle")}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" style="min-height:550px">
                 {#if mode == "familyComposition"}
@@ -122,7 +122,7 @@
                     <FamilyGeneration bind:selectedPeople={parents} {readOnly} />
                     {#if selectedParentsCount < 2 && !readOnly}
                         <button type="button" class="btn btn-primary btn-sm" on:click={(e) => showPersonSelection(true)}
-                            ><i class="bi bi-person-plus-fill" /> {$t("common.add")}</button
+                            ><i class="bi bi-person-plus-fill"></i> {$t("common.add")}</button
                         >
                     {/if}
 
@@ -132,7 +132,7 @@
                     <FamilyGeneration bind:selectedPeople={children} {readOnly} />
                     {#if !readOnly}
                         <button type="button" class="btn btn-primary btn-sm" on:click={(e) => showPersonSelection(false)}
-                            ><i class="bi bi-person-plus-fill" /> {$t("common.add")}</button
+                            ><i class="bi bi-person-plus-fill"></i> {$t("common.add")}</button
                         >
                     {/if}
                 {:else}

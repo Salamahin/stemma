@@ -1,4 +1,5 @@
-import { DEFAULT_SETTINGS, Settings } from "./model";
+import type { Settings } from "./model";
+import { DEFAULT_SETTINGS } from "./model";
 
 export class SettingsStorage {
     private stemmaId: string;

@@ -1,6 +1,6 @@
-import { Generation } from './stemmaIndex'
+import type { Generation } from './stemmaIndex'
 import { StemmaIndex } from './stemmaIndex'
-import { Stemma } from './model';
+import type { Stemma } from './model';
 
 /*
     JJ family:

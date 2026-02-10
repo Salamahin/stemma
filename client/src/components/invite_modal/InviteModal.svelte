@@ -8,7 +8,7 @@
 <script lang="ts">
     import Select from "svelte-select";
     import * as bootstrap from "bootstrap";
-    import { Stemma, PersonDescription } from "../../model";
+    import type { Stemma, PersonDescription } from "../../model";
     import ClearIcon from "../misc/ClearIconTranslated.svelte";
     import { createEventDispatcher } from "svelte";
     import { StemmaIndex } from "../../stemmaIndex";
@@ -57,7 +57,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title ms-2">{$t("invite.title")}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" />
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="container h-100">
@@ -106,8 +106,9 @@
                                 <button
                                     class="btn btn-outline-secondary"
                                     type="button"
+                                    aria-label="Copy invitation link"
                                     disabled={inviteLink == undefined || !inviteLink.length}
-                                    on:click={() => navigator.clipboard.writeText(inviteLink)}><i class="bi bi-clipboard" /></button
+                                    on:click={() => navigator.clipboard.writeText(inviteLink)}><i class="bi bi-clipboard"></i></button
                                 >
                             </div>
                         </div>
@@ -120,13 +121,3 @@
         </div>
     </div>
 </div>
-
-<style>
-    .control :global(svg) {
-        width: 100%;
-        height: 100%;
-        color: #fff;
-        border: 2px solid #fff;
-        border-radius: 32px;
-    }
-</style>

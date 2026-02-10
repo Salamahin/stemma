@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CreateNewPerson, PersonDescription } from "../../model";
+  import type { CreateNewPerson, PersonDescription } from "../../model";
   import { t } from "../../i18n";
 
   export let selectedPeople: (PersonDescription | CreateNewPerson)[] = [];
@@ -22,7 +22,7 @@
           <td class="align-middle">
             {#if !readOnly}
               <div class="float-end">
-                <button type="button" class="btn btn-sm btn-danger" on:click={(e) => remove(i)}><i class="bi bi-trash" /></button>
+                <button type="button" class="btn btn-sm btn-danger" aria-label={$t("common.delete")} on:click={(e) => remove(i)}><i class="bi bi-trash"></i></button>
               </div>
             {/if}
           </td>

@@ -7,8 +7,24 @@ module.exports = {
         "**/?(*.)+(spec|test).+(ts|tsx|js)"
     ],
     "transform": {
-        "^.+\\.(ts|tsx)$": "ts-jest"
+        "^.+\\.(t|j)sx?$": [
+            "@swc/jest",
+            {
+                "jsc": {
+                    "parser": {
+                        "syntax": "typescript",
+                        "tsx": false
+                    }
+                },
+                "module": {
+                    "type": "commonjs"
+                }
+            }
+        ]
     },
+    "transformIgnorePatterns": [
+        "/node_modules/(?!svelte)/"
+    ],
     moduleFileExtensions: ['js', 'ts', 'svelte'],
     "testEnvironment": "jsdom"
 }

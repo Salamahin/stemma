@@ -1,5 +1,6 @@
 import { HiglightLineages } from './highlight';
-import { CreateNewPerson, Model, PersonDefinition, Stemma, StemmaDescription, User } from './model';
+import { Model } from './model';
+import type { CreateNewPerson, PersonDefinition, Stemma, StemmaDescription, User } from './model';
 import { PinnedPeopleStorage } from './pinnedPeopleStorage';
 import { StemmaIndex } from './stemmaIndex';
 import { writable, get } from 'svelte/store';

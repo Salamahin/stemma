@@ -1,5 +1,5 @@
 import { HiglightLineages, HighlightAll } from "./highlight";
-import { Stemma } from "./model";
+import type { Stemma } from "./model";
 import { StemmaIndex } from "./stemmaIndex";
 
 const stemma: Stemma = {
