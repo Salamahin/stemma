@@ -43,8 +43,13 @@ jobs:
 
       - name: Run database migrations
         run: |
+          FUNCTION_NAME=$(aws cloudformation describe-stack-resource \
+            --stack-name stemma-app \
+            --logical-resource-id MigrationFunction \
+            --query 'StackResourceDetail.PhysicalResourceId' \
+            --output text)
           aws lambda invoke \
-            --function-name MigrationFunction \
+            --function-name "$FUNCTION_NAME" \
             --cli-binary-format raw-in-base64-out \
             --payload '{}' \
             /tmp/migration-output.json
