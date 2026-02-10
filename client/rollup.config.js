@@ -14,6 +14,26 @@ import terser from "@rollup/plugin-terser";
 
 const production = !process.env.ROLLUP_WATCH;
 
+function isIgnoredWarning(warning) {
+    const ids = Array.isArray(warning?.ids) ? warning.ids : [];
+    const id = warning?.id || warning?.loc?.file || "";
+    const message = warning?.message || "";
+
+    const isNodeModulesCircular =
+        warning?.code === "CIRCULAR_DEPENDENCY" &&
+        ids.length > 0 &&
+        ids.every((x) => x.includes("node_modules/"));
+
+    const isThirdPartySvelteWarning =
+        warning?.plugin === "svelte" &&
+        (id.includes("node_modules/svelte-loading-spinners") ||
+            id.includes("node_modules/svelte-select") ||
+            message.includes("node_modules/svelte-loading-spinners") ||
+            message.includes("node_modules/svelte-select"));
+
+    return isNodeModulesCircular || isThirdPartySvelteWarning;
+}
+
 function serve() {
     let server;
 
@@ -37,6 +57,10 @@ function serve() {
 
 export default {
     input: 'src/main.ts',
+    onwarn(warning, defaultHandler) {
+        if (isIgnoredWarning(warning)) return;
+        defaultHandler(warning);
+    },
     output: {
         sourcemap: !production,
         format: 'iife',
