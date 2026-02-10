@@ -22,7 +22,7 @@
     import SettingsModal from "./components/settings_modal/SettingsModal.svelte";
     import { SettingsStorage } from "./settingsStroage";
     import { LocalizedError, t } from "./i18n";
-    import jwt_decode from "jwt-decode";
+    import { jwtDecode } from "jwt-decode";
     import { onMount } from "svelte";
 
     export let google_client_id;
@@ -97,7 +97,7 @@
         try {
             const credential = sessionStorage.getItem(CREDENTIAL_KEY);
             if (credential) {
-                const decoded: any = jwt_decode(credential);
+                const decoded: any = jwtDecode(credential);
                 if (decoded.exp * 1000 > Date.now()) {
                     handleSignIn({ id_token: credential });
                 }

@@ -1,6 +1,6 @@
 <script>
     import { createEventDispatcher } from "svelte";
-    import jwt_decode from "jwt-decode";
+    import { jwtDecode } from "jwt-decode";
     import { onMount } from "svelte";
 
     const dispatch = createEventDispatcher();
@@ -18,7 +18,7 @@
     }
 
     function handleCredentialResponse(response) {
-        let decoded = jwt_decode(response.credential);
+        let decoded = jwtDecode(response.credential);
 
         dispatch("signIn", {
             name: decoded.given_name,
