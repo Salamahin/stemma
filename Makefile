@@ -7,3 +7,6 @@ build-MyLayer:
 	cp -r backend/src/api/target/pack/lib/*.jar $(ARTIFACTS_DIR)/java/lib
 
 build-StemmaFunction: build-any-lambda
+
+build-MigrationFunction:
+	cp -r backend/src/migration_lambda/target/scala-2.13/classes/* $(ARTIFACTS_DIR)

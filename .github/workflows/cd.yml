@@ -41,6 +41,15 @@ jobs:
       - name: Deploy backend
         run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
 
+      - name: Run database migrations
+        run: |
+          aws lambda invoke \
+            --function-name MigrationFunction \
+            --cli-binary-format raw-in-base64-out \
+            --payload '{}' \
+            /tmp/migration-output.json
+          cat /tmp/migration-output.json
+
       - name: Install node
         uses: actions/setup-node@v3
         with:

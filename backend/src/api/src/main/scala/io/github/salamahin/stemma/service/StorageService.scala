@@ -10,7 +10,6 @@ import scala.concurrent.ExecutionContext
 case class ChownEffect(affectedFamilies: Seq[String], affectedPeople: Seq[String])
 
 trait StorageService {
-  def createSchema: Task[Unit]
   def getOrCreateUser(email: String): IO[StemmaError, User]
   def createStemma(userId: String, name: String): IO[StemmaError, String]
   def listOwnedStemmas(userId: String): IO[StemmaError, Seq[StemmaDescription]]
@@ -49,7 +48,7 @@ object StorageService {
                        } yield User(userId.toString, email)).transactionally
                      }
                      .mapError(t => UnknownError(t))
-                     .provideSome(dbLayer)
+                     .provide(dbLayer)
 
                  private def checkStemmaAccess(stemmaId: Long, userId: Long)(implicit ec: ExecutionContext) = {
                    val ownedStemma = qStemmaOwners.filter(so => so.ownerId === userId && so.stemmaId === stemmaId)
@@ -89,7 +88,7 @@ object StorageService {
                    ZIO
                      .fromDBIO { implicit ec => makeNewStemma(userId.toLong, name).map(_.toString) }
                      .orDie
-                     .provideSome(dbLayer)
+                     .provide(dbLayer)
 
                  private def makeNewStemma(userId: Long, name: String)(implicit ec: ExecutionContext) = {
                    for {
@@ -119,7 +118,7 @@ object StorageService {
                          })
                      }
                      .mapError(t => UnknownError(t))
-                     .provideSome(dbLayer)
+                     .provide(dbLayer)
 
                  override def removeStemma(userId: String, stemmaId: String): IO[StemmaError, Unit] =
                    ZIO
@@ -144,7 +143,7 @@ object StorageService {
                      .refineOrDie {
                        case stemmaError: StemmaError => stemmaError
                      }
-                     .provideSome(dbLayer)
+                     .provide(dbLayer)
 
                  private def getOrCreatePerson(stemmaId: Long, userId: Long, pd: PersonDefinition)(implicit ec: ExecutionContext) = pd match {
                    case ExistingPerson(id) =>
@@ -247,7 +246,7 @@ object StorageService {
                          familyDescr <- linkFamilyMembers(userId.toLong, stemmaId.toLong, familyId, family)
 
                          stemma <- describeStemma(userId.toLong, stemmaId.toLong)
-                         _      <- if (new StemmaDFS(stemma).hasCycles()) DBIO.failed(StemmaHasCycles()) else DBIO.successful()
+                         _      <- if (new StemmaDFS(stemma).hasCycles()) DBIO.failed(StemmaHasCycles()) else DBIO.successful(())
                        } yield (stemma, familyDescr)).transactionally
 
                        query
@@ -256,7 +255,7 @@ object StorageService {
                        case stemmaError: StemmaError => stemmaError
                        case t                        => UnknownError(t)
                      }
-                     .provideSome(dbLayer)
+                     .provide(dbLayer)
 
                  override def updateFamily(userId: String, familyId: String, family: CreateFamily): IO[StemmaError, (DomainStemma, FamilyDescription)] =
                    ZIO
@@ -269,7 +268,7 @@ object StorageService {
                          familyDescr <- linkFamilyMembers(userId.toLong, stemmaId, familyId.toLong, family)
 
                          stemma <- describeStemma(userId.toLong, stemmaId)
-                         _      <- if (new StemmaDFS(stemma).hasCycles()) DBIO.failed(StemmaHasCycles()) else DBIO.successful()
+                         _      <- if (new StemmaDFS(stemma).hasCycles()) DBIO.failed(StemmaHasCycles()) else DBIO.successful(())
                        } yield (stemma, familyDescr)).transactionally
 
                        query
@@ -278,7 +277,7 @@ object StorageService {
                        case stemmaError: StemmaError => stemmaError
                        case t                        => UnknownError(t)
                      }
-                     .provideSome(dbLayer)
+                     .provide(dbLayer)
 
                  override def removePerson(userId: String, personId: String): IO[StemmaError, Unit] =
                    ZIO
@@ -308,7 +307,7 @@ object StorageService {
                        case stemmaError: StemmaError => stemmaError
                        case t                        => UnknownError(t)
                      }
-                     .provideSome(dbLayer)
+                     .provide(dbLayer)
 
                  override def removeFamily(userId: String, familyId: String): IO[StemmaError, Unit] =
                    ZIO
@@ -325,7 +324,7 @@ object StorageService {
                        case stemmaError: StemmaError => stemmaError
                        case t                        => UnknownError(t)
                      }
-                     .provideSome(dbLayer)
+                     .provide(dbLayer)
 
                  override def updatePerson(userId: String, personId: String, description: CreateNewPerson): IO[StemmaError, Unit] =
                    ZIO
@@ -342,7 +341,7 @@ object StorageService {
                        case stemmaError: StemmaError => stemmaError
                        case t                        => UnknownError(t)
                      }
-                     .provideSome(dbLayer)
+                     .provide(dbLayer)
 
                  override def cloneStemma(userId: String, stemmaId: String, newStemmaName: String): IO[StemmaError, DomainStemma] =
                    ZIO
@@ -384,7 +383,7 @@ object StorageService {
                        case stemmaError: StemmaError => stemmaError
                        case t                        => UnknownError(t)
                      }
-                     .provideSome(dbLayer)
+                     .provide(dbLayer)
 
                  override def stemma(userId: String, stemmaId: String): IO[StemmaError, DomainStemma] =
                    ZIO
@@ -400,7 +399,7 @@ object StorageService {
                        case stemmaError: StemmaError => stemmaError
                        case t                        => UnknownError(t)
                      }
-                     .provideSome(dbLayer)
+                     .provide(dbLayer)
 
                  private def describeStemma(userId: Long, stemmaId: Long)(implicit ec: ExecutionContext) = {
                    val fs     = qFamilies.filter(_.stemmaId === stemmaId)
@@ -522,28 +521,13 @@ object StorageService {
                        action
                      }
                      .mapError(t => UnknownError(t))
-                     .provideSome(dbLayer)
+                     .provide(dbLayer)
 
                  override def ownsPerson(userId: String, personId: String): IO[StemmaError, Boolean] =
                    ZIO
                      .fromDBIO { implicit ec => qPeopleOwners.filter(po => po.ownerId === userId.toLong && po.personId === personId.toLong).exists.result }
                      .mapError(t => UnknownError(t))
-                     .provideSome(dbLayer)
-
-                 override def createSchema: Task[Unit] =
-                   ZIO
-                     .fromDBIO(
-                       (qStemmaUsers.schema ++
-                         qStemmas.schema ++
-                         qPeople.schema ++
-                         qFamilies.schema ++
-                         qFamiliesOwners.schema ++
-                         qPeopleOwners.schema ++
-                         qStemmaOwners.schema ++
-                         qSpouses.schema ++
-                         qChildren.schema).createIfNotExists
-                     )
-                     .provideSome(dbLayer)
+                     .provide(dbLayer)
                }
              }
     } yield repo

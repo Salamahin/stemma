@@ -49,6 +49,7 @@ class StemmaLambda extends LazyLogging {
       logger.debug("Unsafe run")
       runtime.unsafe.run(handler) match {
         case Exit.Success(successJson) => successJson
+        case Exit.Failure(cause)       => throw cause.squash
       }
     }
   }

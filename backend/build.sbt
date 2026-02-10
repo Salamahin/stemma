@@ -20,3 +20,7 @@ lazy val api_impl_aws_lambda = project.in(file("src/api_impl_aws_lambda"))
 lazy val api_impl_restful = project.in(file("src/api_impl_restful"))
   .dependsOn(api)
   .settings(options: _*)
+
+lazy val migration_lambda = project.in(file("src/migration_lambda"))
+  .dependsOn(api)
+  .settings(options: _*)

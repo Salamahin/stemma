@@ -202,6 +202,14 @@ Resources:
       Policies:
         - S3FullAccessPolicy:
             BucketName: stemma-app-backend-assets
+  MigrationFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Handler: io.github.salamahin.stemma.migration.MigrationLambda::apply
+      Timeout: 120
+      MemorySize: 1024
 
 Outputs:
   ApiEndpoint:
