@@ -1,7 +1,6 @@
 <script lang="ts">
     import * as bootstrap from "bootstrap";
     import * as d3 from "d3";
-    import { onMount } from "svelte";
     import { t } from "../../i18n";
     import {
         personR, familyR, defaultFamilyColor, relationsColor,
@@ -15,7 +14,7 @@
     const width = 360;
     const height = 220;
 
-    function renderDiagram() {
+    function renderDiagram(translate: (key: string) => string) {
         if (!diagramEl) return;
         diagramEl.innerHTML = "";
 
@@ -98,19 +97,14 @@
                 .style("font-size", labelFontSize);
         };
 
-        label($t("about.diagram.parent1"), parentLeftX, parentsY - personR - 5);
-        label($t("about.diagram.parent2"), parentRightX, parentsY - personR - 5);
-        label($t("about.diagram.family"), familyX, familyY - familyR - 5);
-        label($t("about.diagram.child"), childX, childY + personR + 18);
+        label(translate("about.diagram.parent1"), parentLeftX, parentsY - personR - 5);
+        label(translate("about.diagram.parent2"), parentRightX, parentsY - personR - 5);
+        label(translate("about.diagram.family"), familyX, familyY - familyR - 5);
+        label(translate("about.diagram.child"), childX, childY + personR + 18);
     }
 
-    onMount(() => {
-        renderDiagram();
-    });
-
-    $: if (diagramEl) {
-        // re-render on locale change
-        renderDiagram();
+    $: if (diagramEl && $t) {
+        renderDiagram($t);
     }
 
     export function show() {
