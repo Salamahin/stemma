@@ -13,6 +13,7 @@ import {
 import terser from "@rollup/plugin-terser";
 
 const production = !process.env.ROLLUP_WATCH;
+const livereloadEnabled = process.env.NO_LIVERELOAD !== '1';
 
 function isIgnoredWarning(warning) {
     const ids = Array.isArray(warning?.ids) ? warning.ids : [];
@@ -71,6 +72,7 @@ export default {
         replace({
             GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
             STEMMA_BACKEND_URL: process.env.STEMMA_BACKEND_URL,
+            E2E_AUTO_LOGIN: JSON.stringify(process.env.E2E_AUTO_LOGIN || "0"),
             preventAssignment: true,
         }),
         svelte({
@@ -124,7 +126,7 @@ export default {
 
         // Watch the `public` directory and refresh the
         // browser on changes when not in production
-        !production && livereload('public'),
+        !production && livereloadEnabled && livereload('public'),
 
         // If we're building for production (npm run build
         // instead of npm run dev), minify

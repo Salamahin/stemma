@@ -10,13 +10,13 @@ val options = Seq(
   javacOptions ++= Seq("-source", "11")
 )
 
-lazy val api = project
+lazy val api = project.in(file("src/api"))
   .settings(options: _*)
 
-lazy val api_impl_aws_lambda = project
+lazy val api_impl_aws_lambda = project.in(file("src/api_impl_aws_lambda"))
   .dependsOn(api)
   .settings(options: _*)
 
-lazy val api_impl_restful = project
+lazy val api_impl_restful = project.in(file("src/api_impl_restful"))
   .dependsOn(api)
   .settings(options: _*)

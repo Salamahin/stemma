@@ -16,6 +16,7 @@ import zio.{Duration, Random, Scope, ZIO, ZIOAppArgs, ZIOAppDefault, ZLayer}
 
 object Main extends LazyLogging with ZIOAppDefault {
   import zio.json._
+  private val e2eAuthBypassEnabled = sys.env.get("E2E_AUTH_BYPASS").contains("1")
 
   private def httpResponse[R, T: JsonEncoder](effect: ZIO[R, StemmaError, T]) =
     effect
@@ -70,6 +71,7 @@ object Main extends LazyLogging with ZIOAppDefault {
     val rootConfig     = ConfigFactory.load()
     val dbConfigLayer  = ZLayer(ZIO.attempt(rootConfig.getConfig("dbConfig")))
     val dbBackendLayer = ZLayer.succeed(PostgresProfile)
+    val authLayer      = if (e2eAuthBypassEnabled) OAuthService.allowAnyToken else (GoogleSecrets.fromEnv >>> OAuthService.googleSignIn)
 
     val createSchema = ZIO
       .service[StorageService]
@@ -83,8 +85,7 @@ object Main extends LazyLogging with ZIOAppDefault {
         ZLayer.succeed(Random.RandomLive),
         (dbConfigLayer ++ dbBackendLayer) >>> DatabaseProvider.live,
         InviteSecrets.fromEnv,
-        GoogleSecrets.fromEnv,
-        OAuthService.googleSignIn,
+        authLayer,
         UserService.live,
         StorageService.live,
         HandleApiRequestService.live,

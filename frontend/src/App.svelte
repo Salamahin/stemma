@@ -94,6 +94,12 @@
     }
 
     onMount(() => {
+        const e2eAutoLoginEnabled = typeof E2E_AUTO_LOGIN !== "undefined" && E2E_AUTO_LOGIN === "1";
+        if (e2eAutoLoginEnabled) {
+            handleSignIn({ id_token: "e2e-user@stemma.local" } as User);
+            return;
+        }
+
         try {
             const credential = sessionStorage.getItem(CREDENTIAL_KEY);
             if (credential) {
