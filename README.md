@@ -16,10 +16,13 @@ Stemma is a collaborative family tree editor. It lets multiple people build and 
 - Storage: PostgreSQL
 
 ## Repository layout
-- `api/`: domain model and core services
-- `api_impl_restful/`: REST API implementation (local server)
-- `api_impl_aws_lambda/`: AWS Lambda implementation
-- `client/`: Svelte frontend
+- `backend/`: Scala backend root
+- `backend/build.sbt`, `backend/project/`: SBT root and build config
+- `backend/src/api/`: domain model and core services
+- `backend/src/api_impl_restful/`: REST API implementation (local server)
+- `backend/src/api_impl_aws_lambda/`: AWS Lambda implementation
+- `frontend/`: Svelte frontend
+- `e2e/`: Playwright end-to-end tests and local dev stack launcher
 
 ## Quick start (local)
 
@@ -44,7 +47,7 @@ export INVITE_SECRET=your_invite_secret
 export JDBC_URL=jdbc:postgresql://localhost:5432/stemma
 export JDBC_USER=postgres
 export JDBC_PASSWORD=mysecretpassword
-
+cd backend
 sbt "project api_impl_restful" run
 ```
 
@@ -52,7 +55,7 @@ The REST API listens on `http://localhost:8090`.
 
 ### 3) Run the frontend
 ```bash
-cd client
+cd frontend
 npm install
 
 GOOGLE_CLIENT_ID=your_google_client_id \
@@ -64,11 +67,17 @@ Open the dev server URL printed by Rollup.
 
 ## Tests
 ```bash
+cd backend
 sbt test
 ```
 
 ```bash
-cd client
+cd frontend
+npm test
+```
+
+```bash
+cd e2e
 npm test
 ```
 
@@ -79,6 +88,7 @@ Backend:
 - `JDBC_URL`: PostgreSQL JDBC URL
 - `JDBC_USER`: database user
 - `JDBC_PASSWORD`: database password
+- `E2E_AUTH_BYPASS` (optional): when set to `1` in `api_impl_restful`, any bearer token is accepted (for E2E only)
 
 Frontend:
 - `GOOGLE_CLIENT_ID`: same client ID as backend

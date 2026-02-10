@@ -19,15 +19,46 @@ jobs:
       uses: sbt/setup-sbt@v1
     - name: Run tests
       run: sbt test
+      working-directory: backend
     - name: Set up Node
       uses: actions/setup-node@v4
       with:
         node-version: '18'
         cache: 'npm'
-        cache-dependency-path: client/package-lock.json
-    - name: Install client deps
+        cache-dependency-path: frontend/package-lock.json
+    - name: Install frontend deps
       run: npm ci
-      working-directory: client
-    - name: Run client tests
+      working-directory: frontend
+    - name: Run frontend tests
       run: npm test
-      working-directory: client
+      working-directory: frontend
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up JDK 11
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+        cache: 'sbt'
+    - name: Set up sbt
+      uses: sbt/setup-sbt@v1
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    - name: Install frontend deps
+      run: npm ci
+      working-directory: frontend
+    - name: Install e2e deps
+      run: npm install
+      working-directory: e2e
+    - name: Install Playwright browser
+      run: npx playwright install --with-deps chromium
+      working-directory: e2e
+    - name: Run e2e tests
+      run: npm test
+      working-directory: e2e

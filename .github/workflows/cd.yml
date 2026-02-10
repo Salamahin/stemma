@@ -23,6 +23,7 @@ jobs:
 
       - name: Build backend
         run: sbt 'clean;package;pack'
+        working-directory: backend
 
       - name: Setup SAM
         uses: aws-actions/setup-sam@v2
@@ -45,12 +46,12 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install client deps
-        working-directory: client
+      - name: Install frontend deps
+        working-directory: frontend
         run: npm i
 
-      - name: Build client
-        working-directory: client
+      - name: Build frontend
+        working-directory: frontend
         run: npm run build
         env:
           STEMMA_BACKEND_URL: ${{ secrets.STEMMA_BACKEND_URL }}
@@ -65,7 +66,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: 'eu-central-1'
-          SOURCE_DIR: 'client/public'
+          SOURCE_DIR: 'frontend/public'
 
       - name: Invalidate CloudFront
         uses: chetan/invalidate-cloudfront-action@v2
