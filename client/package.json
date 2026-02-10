@@ -44,7 +44,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@imask/svelte": "7.6.1",
+    "@imask/svelte": "^6.6.3",
     "fuzzysort": "^3.1.0",
     "jwt-decode": "^4.0.0",
     "lodash.clone": "^4.5.0",
