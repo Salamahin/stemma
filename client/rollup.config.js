@@ -10,9 +10,7 @@ import replace from '@rollup/plugin-replace';
 import {
     less
 } from 'svelte-preprocess-less';
-import {
-    terser
-} from "rollup-plugin-terser";
+import terser from "@rollup/plugin-terser";
 
 const production = !process.env.ROLLUP_WATCH;
 
@@ -49,6 +47,7 @@ export default {
         replace({
             GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
             STEMMA_BACKEND_URL: process.env.STEMMA_BACKEND_URL,
+            preventAssignment: true,
         }),
         svelte({
             preprocess: sveltePreprocess({
@@ -86,7 +85,8 @@ export default {
 
         resolve({
             browser: true,
-            dedupe: ['svelte']
+            dedupe: ['svelte'],
+            exportConditions: ['svelte']
         }),
         commonjs(),
         typescript({
@@ -104,7 +104,7 @@ export default {
 
         // If we're building for production (npm run build
         // instead of npm run dev), minify
-        production && terser()
+        production && terser({ maxWorkers: 1 })
     ],
     watch: {
         clearScreen: false
