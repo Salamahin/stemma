@@ -11,11 +11,13 @@
   export let stemmaIndex: StemmaIndex;
   export let stemma: Stemma;
 
-  let clearIcon = ClearIcon;
-
   let namesakes: (CreateNewPerson | PersonDescription)[] = [];
   let selectedPerson: CreateNewPerson | PersonDescription;
   let peopleNames: string[];
+  let filterText = "";
+  type SelectItem = { label: string; value: string; isCreator?: boolean };
+  let peopleItems: SelectItem[] = [];
+  let selectedItem: SelectItem = null;
 
   let dispatch = createEventDispatcher();
 
@@ -26,10 +28,33 @@
   export function reset() {
     namesakes = [];
     selectedPerson = null;
+    filterText = "";
   }
 
   $: if (stemma) peopleNames = [...new Set(filterEditablePeople(stemma.people).map((p) => p.name))];
+  $: {
+    if (!peopleNames) {
+      peopleItems = [];
+    } else {
+      peopleItems = peopleNames.map((name) => ({ label: name, value: name }));
+      if (filterText && !peopleNames.includes(filterText)) {
+        peopleItems = [
+          ...peopleItems,
+          { label: $t("family.createOption", { name: filterText }), value: filterText, isCreator: true },
+        ];
+      }
+    }
+  }
+  $: selectedItem = selectedPerson
+    ? { label: selectedPerson.name, value: selectedPerson.name }
+    : null;
   $: if (selectedPerson) dispatch("selected", selectedPerson);
+
+  function handleSelect(e) {
+    const detail = e?.detail as SelectItem | undefined;
+    const value = detail?.value ?? detail?.label ?? "";
+    if (value) nameChanged(value);
+  }
 </script>
 
 <div class="container h-100">
@@ -39,18 +64,18 @@
       <Select
         id="personName"
         placeholder={$t('family.namePlaceholder')}
-        items={peopleNames}
-        isSearchable={true}
-        isCreatable={true}
-        on:select={(e) => nameChanged(e.detail.value)}
+        items={peopleItems}
+        searchable={true}
+        bind:filterText={filterText}
+        on:select={handleSelect}
         on:clear={() => reset()}
-        ClearIcon={clearIcon}
-        getOptionLabel={(option, filterText) => {
-          return option.isCreator ? $t("family.createOption", { name: filterText }) : option["label"];
-        }}
         hideEmptyState={true}
-        value={selectedPerson ? selectedPerson.name : null}
-      />
+        value={selectedItem}
+      >
+        <svelte:fragment slot="clear-icon">
+          <ClearIcon />
+        </svelte:fragment>
+      </Select>
     </div>
     <div class="flex-grow-1 mt-2 mb-2" style="min-height:400px">
       <PersonSelector people={namesakes} {stemmaIndex} on:select={(e) => (selectedPerson = e.detail)} />

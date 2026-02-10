@@ -22,11 +22,13 @@
 
     let namesakes: PersonDescription[] = [];
     let selectedPerson: PersonDescription;
+    type SelectItem = { label: string; value: string };
     let peopleNames: string[];
+    let peopleItems: SelectItem[] = [];
+    let selectedItem: SelectItem = null;
     let email;
     let inviteLink = "";
 
-    let clearIcon = ClearIcon;
     let dispatch = createEventDispatcher();
 
     function nameChanged(newName: string) {
@@ -50,6 +52,14 @@
     }
 
     $: if (stemma) peopleNames = [...new Set(stemma.people.map((p) => p.name))];
+    $: peopleItems = peopleNames ? peopleNames.map((name) => ({ label: name, value: name })) : [];
+    $: selectedItem = selectedPerson ? { label: selectedPerson.name, value: selectedPerson.name } : null;
+
+    function handleSelect(e) {
+        const detail = e?.detail as SelectItem | undefined;
+        const value = detail?.value ?? detail?.label ?? "";
+        if (value) nameChanged(value);
+    }
 </script>
 
 <div class="modal fade" id="personDetailsModal" tabindex="-1" aria-hidden="true" bind:this={modalEl}>
@@ -67,15 +77,17 @@
                             <Select
                                 id="personName"
                                 placeholder={$t("family.namePlaceholder")}
-                                items={peopleNames}
-                                isSearchable={true}
-                                isCreatable={false}
-                                on:select={(e) => nameChanged(e.detail.value)}
+                                items={peopleItems}
+                                searchable={true}
+                                on:select={handleSelect}
                                 on:clear={() => reset()}
-                                ClearIcon={clearIcon}
                                 hideEmptyState={true}
-                                value={selectedPerson ? selectedPerson.name : null}
-                            />
+                                value={selectedItem}
+                            >
+                                <svelte:fragment slot="clear-icon">
+                                    <ClearIcon />
+                                </svelte:fragment>
+                            </Select>
                         </div>
                         <div class="flex-grow-1 mt-2" style="min-height:400px">
                             <PersonSelector people={namesakes} {stemmaIndex} on:select={(e) => (selectedPerson = e.detail)} />

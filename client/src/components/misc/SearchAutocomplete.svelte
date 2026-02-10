@@ -89,7 +89,7 @@
                         type="button"
                         on:mousedown|preventDefault={() => selectPerson(result.obj.id)}
                     >
-                        <span>{@html fuzzysort.highlight(result, '<b>', '</b>')}</span>
+                        <span>{@html result.highlight('<b>', '</b>')}</span>
                         {#if lifespan(result.obj)}
                             <small class="text-muted ms-2">{lifespan(result.obj)}</small>
                         {/if}
