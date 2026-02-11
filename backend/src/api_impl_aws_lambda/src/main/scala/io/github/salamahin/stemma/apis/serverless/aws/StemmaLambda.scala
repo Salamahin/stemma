@@ -13,6 +13,8 @@ import zio.Random.RandomLive
 import zio.json.{DecoderOps, EncoderOps}
 import zio.{Exit, Runtime, Scope, UIO, Unsafe, ZEnvironment, ZIO, ZLayer}
 
+import org.crac.{Context => CracContext, Core, Resource}
+
 import java.nio.file.{Files, Paths}
 import java.util.Base64
 import scala.util.Try
@@ -70,12 +72,26 @@ object StemmaLambda extends LazyLogging {
   private val conf    = ConfigFactory.load().getConfig("dbConfig")
   private val profile = PostgresProfile
 
-  @volatile private var dbInitialized           = false
-  private lazy val database: JdbcBackend#DatabaseDef = {
-    val db = profile.backend.Database.forConfig("", conf)
-    dbInitialized = true
-    db
+  @volatile private var _database: JdbcBackend#DatabaseDef = _
+
+  private def database: JdbcBackend#DatabaseDef = synchronized {
+    if (_database == null) {
+      _database = profile.backend.Database.forConfig("", conf)
+    }
+    _database
   }
+
+  Core.getGlobalContext.register(new Resource {
+    override def beforeCheckpoint(context: CracContext[_ <: Resource]): Unit = synchronized {
+      if (_database != null) {
+        _database.close()
+        _database = null
+      }
+    }
+    override def afterRestore(context: CracContext[_ <: Resource]): Unit = {
+      database // eagerly reconnect
+    }
+  })
 
   private val databaseProvider = new DatabaseProvider {
     override def db: UIO[JdbcBackend#DatabaseDef] = ZIO.succeed(database)
@@ -83,7 +99,7 @@ object StemmaLambda extends LazyLogging {
   }
 
   sys.addShutdownHook {
-    if (dbInitialized) database.close()
+    if (_database != null) _database.close()
   }
 
   val layers: ZLayer[Any, Nothing, HandleApiRequestService] = ZLayer.fromZIO(

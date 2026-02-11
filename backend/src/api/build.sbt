@@ -6,6 +6,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.scala-logging" %% "scala-logging"                     % "3.9.5",
   "com.amazonaws"              % "aws-lambda-java-core"               % "1.2.1",
   "com.amazonaws"              % "aws-lambda-java-events"             % "3.11.0",
+  "org.crac"                   % "crac"                               % "1.4.0",
   "org.postgresql"             % "postgresql"                         % "42.5.0",
   "org.flywaydb"               % "flyway-core"                        % "9.22.3",
   "dev.zio"                    %% "zio"                               % Versions.zioV,
