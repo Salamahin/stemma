@@ -10,6 +10,7 @@ import scala.concurrent.ExecutionContext
 case class ChownEffect(affectedFamilies: Seq[String], affectedPeople: Seq[String])
 
 trait StorageService {
+  def createSchema: Task[Unit]
   def getOrCreateUser(email: String): IO[StemmaError, User]
   def createStemma(userId: String, name: String): IO[StemmaError, String]
   def listOwnedStemmas(userId: String): IO[StemmaError, Seq[StemmaDescription]]
@@ -37,6 +38,21 @@ object StorageService {
                val dbLayer = ZLayer.succeed(db)
 
                new StorageService {
+                 override def createSchema: Task[Unit] =
+                   ZIO
+                     .fromDBIO(
+                       (qStemmaUsers.schema ++
+                         qStemmas.schema ++
+                         qPeople.schema ++
+                         qFamilies.schema ++
+                         qFamiliesOwners.schema ++
+                         qPeopleOwners.schema ++
+                         qStemmaOwners.schema ++
+                         qSpouses.schema ++
+                         qChildren.schema).createIfNotExists
+                     )
+                     .provide(dbLayer)
+
                  override def getOrCreateUser(email: String): IO[StemmaError, User] =
                    ZIO
                      .fromDBIO { implicit ec =>
