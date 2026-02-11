@@ -4,7 +4,7 @@ import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
 import io.github.salamahin.stemma.apis.{ApiService, HandleApiRequestService}
 import io.github.salamahin.stemma.domain.{RequestDeserializationProblem, StemmaError, UnknownError, User, Request => DomainRequest}
-import io.github.salamahin.stemma.service.{InviteSecrets, StorageService, UserService}
+import io.github.salamahin.stemma.service.{InviteSecrets, MigrationRunner, StorageService, UserService}
 import org.apache.http.HttpResponse
 import slick.interop.zio.DatabaseProvider
 import slick.jdbc.PostgresProfile
@@ -73,12 +73,14 @@ object Main extends LazyLogging with ZIOAppDefault {
     val dbBackendLayer = ZLayer.succeed(PostgresProfile)
     val authLayer      = if (e2eAuthBypassEnabled) OAuthService.allowAnyToken else (GoogleSecrets.fromEnv >>> OAuthService.googleSignIn)
 
-    val createSchema = ZIO
-      .service[StorageService]
-      .flatMap(_.createSchema)
-      .catchAll(th => ZIO.succeed(logger.info("Failed to create schema", th)))
+    val runMigrations = ZIO.attempt {
+      val jdbcUrl  = sys.env("JDBC_URL")
+      val jdbcUser = sys.env("JDBC_USER")
+      val jdbcPass = sys.env("JDBC_PASSWORD")
+      MigrationRunner.migrate(jdbcUrl, jdbcUser, jdbcPass)
+    }.catchAll(th => ZIO.succeed(logger.info("Failed to run migrations", th)))
 
-    (createSchema *> Server
+    (runMigrations *> Server
       .start(8090, authenticated(stemmaApi) @@ cors(corsConfig))
       .tapError(err => ZIO.succeed(logger.error("Unexpected error", err))))
       .provide(

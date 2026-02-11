@@ -11,9 +11,12 @@ import java.util.{Map => JMap}
 
 package object service {
   private val dbBackendLayer = ZLayer.succeed(PostgresProfile)
-  private val dbConfigLayer = ZPostgreSQLContainer.Settings.default >+> ZPostgreSQLContainer.live >>> ZLayer.fromZIO(
+  private val containerLayer = ZPostgreSQLContainer.Settings.default >+> ZPostgreSQLContainer.live
+
+  private val migratedDbConfigLayer = containerLayer >>> ZLayer.fromZIO(
     for {
       info <- ZIO.service[JdbcInfo]
+      _    <- ZIO.attempt(MigrationRunner.migrate(info.jdbcUrl, info.username, info.password))
     } yield ConfigFactory.parseMap(
       JMap.of(
         "jdbcUrl",
@@ -30,11 +33,5 @@ package object service {
     override val secretString: String = "secret_string"
   })
 
-  val databaseProvider = ((dbConfigLayer ++ dbBackendLayer) >>> DatabaseProvider.live) >>> StorageService.live >>> ZLayer
-    .fromZIO {
-      for {
-        ss <- ZIO.service[StorageService]
-        _  <- ss.createSchema
-      } yield ss
-    }
+  val databaseProvider = (migratedDbConfigLayer ++ dbBackendLayer) >>> DatabaseProvider.live >>> StorageService.live
 }
