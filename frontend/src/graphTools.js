@@ -101,12 +101,13 @@ export function updateSimulation(simulation, nodes, relations) {
     simulation.alphaTarget(0.3).restart()
 }
 
-export function makeDrag(svg, simulation, stemmaId) {
+export function makeDrag(svg, simulation, stemmaId, onDragStart, onDragEnd) {
     function drag() {
         function dragstarted(event) {
             if (!event.active) simulation.alphaTarget(0.3).restart();
             event.subject.fx = event.subject.x;
             event.subject.fy = event.subject.y;
+            if (onDragStart) onDragStart();
         }
 
         function dragged(event) {
@@ -122,6 +123,7 @@ export function makeDrag(svg, simulation, stemmaId) {
             }
 
             if (stemmaId) saveCoordinates(stemmaId)
+            if (onDragEnd) onDragEnd();
         }
 
         return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);

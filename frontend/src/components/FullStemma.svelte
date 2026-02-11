@@ -41,6 +41,7 @@
     });
 
     let svg;
+    let isDragging = false;
 
     $: if (svg && stemma) {
         loadCoordinates(currentStemmaId);
@@ -132,6 +133,7 @@
         svg.select("g.main")
             .selectAll("g")
             .on("mouseenter", function (event, node) {
+                if (isDragging) return;
                 if (node.type == "person") {
                     highlight.pushPerson(denormalizeId(node.id));
                     renderFullStemma();
@@ -145,6 +147,7 @@
                 }
             })
             .on("mouseleave", (_event, node) => {
+                if (isDragging) return;
                 highlight.pop();
                 renderFullStemma();
             })
@@ -161,7 +164,7 @@
             });
 
         renderChart(svg, highlight, stemmaIndex);
-        makeDrag(svg, simulation, currentStemmaId);
+        makeDrag(svg, simulation, currentStemmaId, () => isDragging = true, () => isDragging = false);
     }
 
     onMount(() => {
