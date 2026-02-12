@@ -5,14 +5,28 @@
 *.iml
 
 client/node_modules/
+node_modules/
 client/public/build/
 client/public/vendor
+frontend/public/vendor/
 client/.vscode
 client/package-lock.json
 
 target
 .aws-sam
 
+# Build artifacts
+build/
+dist/
+out/
+bin/
+.cache/
+coverage/
+
+# CSS artifacts (generated)
+.sass-cache/
+*.css.map
+
 # Ignore CLAUDE.md in subdirectories (keep root CLAUDE.md)
 **/CLAUDE.md
-!CLAUDE.md
+!/CLAUDE.md
