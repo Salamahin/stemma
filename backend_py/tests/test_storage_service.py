@@ -98,7 +98,7 @@ def test_duplicated_ids_forbidden(storage: StorageService) -> None:
     james_id, jill_id = fam.parents[0], fam.children[0]
     with pytest.raises(DuplicatedIds) as exc:
         storage.update_family(
-            user.user_id, fam.id, family(existing(james_id), existing(james_id))(existing(jill_id))
+            user.user_id, sid, fam.id, family(existing(james_id), existing(james_id))(existing(jill_id))
         )
     assert exc.value.duplicated_ids == james_id
 
@@ -120,7 +120,7 @@ def test_remove_person_drops_relations(storage: StorageService) -> None:
     _, fam = storage.create_family(user.user_id, sid, family(create_jane, create_john)(create_jill, create_james))
     jill_id = fam.children[0]
     storage.create_family(user.user_id, sid, family(existing(jill_id), create_josh)(create_jake))
-    storage.remove_person(user.user_id, jill_id)
+    storage.remove_person(user.user_id, sid, jill_id)
 
     stemma = storage.stemma(user.user_id, sid)
     assert sorted(render_families(stemma)) == sorted(
@@ -147,7 +147,7 @@ def test_leaving_single_member_drops_family(storage: StorageService) -> None:
     _, fam = storage.create_family(user.user_id, sid, family(create_jane)(create_jill))
     jill_id = fam.children[0]
     storage.create_family(user.user_id, sid, family(existing(jill_id))(create_july))
-    storage.remove_person(user.user_id, jill_id)
+    storage.remove_person(user.user_id, sid, jill_id)
 
     stemma = storage.stemma(user.user_id, sid)
     assert stemma.families == []
@@ -159,7 +159,7 @@ def test_can_update_existing_person(storage: StorageService) -> None:
     sid = storage.create_stemma(user.user_id, "test stemma")
     _, fam = storage.create_family(user.user_id, sid, family(create_jane)(create_jill))
     jane_id = fam.parents[0]
-    storage.update_person(user.user_id, jane_id, create_john)
+    storage.update_person(user.user_id, sid, jane_id, create_john)
 
     stemma = storage.stemma(user.user_id, sid)
     assert render_families(stemma) == ["(John) parentsOf (Jill)"]
@@ -178,7 +178,7 @@ def test_can_update_existing_family(storage: StorageService) -> None:
     john_id = fam.parents[1]
     jill_id = fam.children[0]
     storage.update_family(
-        user.user_id, fam.id, family(create_july, existing(john_id))(existing(jill_id), create_james)
+        user.user_id, sid, fam.id, family(create_july, existing(john_id))(existing(jill_id), create_james)
     )
 
     stemma = storage.stemma(user.user_id, sid)
@@ -209,9 +209,9 @@ def test_cant_update_person_if_not_owner(storage: StorageService) -> None:
     _, fam = storage.create_family(creator.user_id, sid, family(create_jane, create_john)(create_josh, create_jill))
     jane_id = fam.parents[0]
     with pytest.raises(AccessToPersonDenied):
-        storage.remove_person(accessor.user_id, jane_id)
+        storage.remove_person(accessor.user_id, sid, jane_id)
     with pytest.raises(AccessToPersonDenied):
-        storage.update_person(accessor.user_id, jane_id, create_july)
+        storage.update_person(accessor.user_id, sid, jane_id, create_july)
 
 
 def test_cant_update_family_if_not_owner(storage: StorageService) -> None:
@@ -220,9 +220,9 @@ def test_cant_update_family_if_not_owner(storage: StorageService) -> None:
     sid = storage.create_stemma(creator.user_id, "my first stemma")
     _, fam = storage.create_family(creator.user_id, sid, family(create_jane, create_john)(create_josh, create_jill))
     with pytest.raises(AccessToFamilyDenied):
-        storage.remove_family(accessor.user_id, fam.id)
+        storage.remove_family(accessor.user_id, sid, fam.id)
     with pytest.raises(AccessToFamilyDenied):
-        storage.update_family(accessor.user_id, fam.id, family(create_james)(create_july))
+        storage.update_family(accessor.user_id, sid, fam.id, family(create_james)(create_july))
 
 
 def test_cant_request_stemma_if_not_owner(storage: StorageService) -> None:

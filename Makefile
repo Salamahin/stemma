@@ -12,7 +12,3 @@ build-MyLayer:
 
 build-StemmaFunction:
 	cp -r backend_py/src/stemma $(ARTIFACTS_DIR)/
-
-build-MigrationFunction:
-	cp -r backend_py/src/stemma $(ARTIFACTS_DIR)/
-	cp -r backend_py/migrations $(ARTIFACTS_DIR)/migrations

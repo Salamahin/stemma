@@ -11,10 +11,9 @@ const repoRoot = resolve(e2eDir, "..");
 const backendDir = resolve(repoRoot, "backend_py");
 const frontendDir = resolve(repoRoot, "frontend");
 
-const postgresContainer = "stemma-e2e-postgres";
-const postgresPassword = "mysecretpassword";
-const postgresDb = "stemma";
-const postgresUser = "postgres";
+const dynamoContainer = "stemma-e2e-dynamodb";
+const dynamoPort = 8000;
+const tableName = "stemma-e2e";
 
 let backendProc = null;
 let frontendProc = null;
@@ -71,7 +70,7 @@ async function waitForHttp(url, timeoutMs) {
 function cleanup() {
   killTree(frontendProc);
   killTree(backendProc);
-  spawnSync("docker", ["rm", "-f", postgresContainer], { stdio: "inherit" });
+  spawnSync("docker", ["rm", "-f", dynamoContainer], { stdio: "inherit" });
 }
 
 async function main() {
@@ -85,25 +84,21 @@ async function main() {
   });
   process.on("exit", cleanup);
 
-  // 1) Start PostgreSQL in Docker
-  spawnSync("docker", ["rm", "-f", postgresContainer], { stdio: "ignore" });
+  // 1) Start DynamoDB Local in Docker
+  spawnSync("docker", ["rm", "-f", dynamoContainer], { stdio: "ignore" });
   runOrThrow("docker", [
     "run",
     "--name",
-    postgresContainer,
-    "-e",
-    `POSTGRES_PASSWORD=${postgresPassword}`,
-    "-e",
-    `POSTGRES_DB=${postgresDb}`,
+    dynamoContainer,
     "--rm",
     "-d",
     "-p",
-    "5432:5432",
-    "postgres"
+    `${dynamoPort}:8000`,
+    "amazon/dynamodb-local"
   ]);
-  await waitForPort("127.0.0.1", 5432, 60_000);
+  await waitForPort("127.0.0.1", dynamoPort, 60_000);
 
-  // 2) Start backend with auth bypass
+  // 2) Start backend with auth bypass and table auto-creation
   backendProc = spawn(
     process.env.SHELL || "bash",
     [
@@ -117,9 +112,12 @@ async function main() {
         E2E_AUTH_BYPASS: "1",
         GOOGLE_CLIENT_ID: "e2e",
         INVITE_SECRET: "e2e-secret",
-        JDBC_URL: "jdbc:postgresql://localhost:5432/stemma",
-        JDBC_USER: postgresUser,
-        JDBC_PASSWORD: postgresPassword
+        STEMMA_TABLE_NAME: tableName,
+        STEMMA_AUTO_CREATE_TABLE: "1",
+        DYNAMODB_ENDPOINT_URL: `http://127.0.0.1:${dynamoPort}`,
+        AWS_ACCESS_KEY_ID: "local",
+        AWS_SECRET_ACCESS_KEY: "local",
+        AWS_REGION: "eu-central-1"
       },
       stdio: "inherit"
     }
