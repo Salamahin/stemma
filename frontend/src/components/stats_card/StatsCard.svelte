@@ -70,30 +70,33 @@
 <style>
     .stats-card {
         position: fixed;
-        right: 12px;
-        bottom: 12px;
-        z-index: 1000;
+        right: calc(12px + env(safe-area-inset-right, 0px));
+        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        z-index: 1100;
+        box-sizing: border-box;
+        width: 120px;
         padding: 6px 9px;
-        background: rgba(33, 37, 41, 0.7);
-        color: rgba(255, 255, 255, 0.85);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(33, 37, 41, 0.78);
+        color: rgba(255, 255, 255, 0.88);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 4px;
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-        font-size: 10px;
+        font-size: 11px;
         line-height: 1.4;
         white-space: nowrap;
         backdrop-filter: blur(4px);
         -webkit-backdrop-filter: blur(4px);
         pointer-events: none;
-        transition: border-color 120ms ease;
+        transition: background-color 140ms ease;
         user-select: none;
     }
 
     .stats-card.active {
-        border-color: rgba(255, 196, 0, 0.55);
+        background: rgba(74, 58, 22, 0.82);
     }
 
     table {
+        width: 100%;
         border-collapse: collapse;
     }
 
@@ -102,9 +105,8 @@
     }
 
     .label {
-        color: rgba(255, 255, 255, 0.5);
+        color: rgba(255, 255, 255, 0.55);
         text-align: left;
-        padding-right: 14px;
     }
 
     .value {
