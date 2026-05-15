@@ -24,7 +24,7 @@ jobs:
 
       - name: Export backend requirements
         working-directory: backend_py
-        run: uv export --no-dev --no-hashes --format requirements.txt -o requirements.txt
+        run: uv export --no-dev --no-hashes --no-emit-project --format requirements.txt -o requirements.txt
 
       - name: Setup SAM
         uses: aws-actions/setup-sam@v2
