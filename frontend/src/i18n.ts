@@ -157,6 +157,12 @@ export const en: Record<string, string> = {
 
     // Remove stemma modal
     'removeStemma.title': 'Delete {name}?',
+
+    // Stats card
+    'stats.people': 'people',
+    'stats.families': 'families',
+    'stats.depth': 'depth',
+    'stats.highlighted': 'highlighted',
 };
 
 export const ru: Record<string, string> = {
@@ -284,6 +290,12 @@ export const ru: Record<string, string> = {
 
     // Remove stemma modal
     'removeStemma.title': 'Удалить {name}?',
+
+    // Stats card
+    'stats.people': 'людей',
+    'stats.families': 'семей',
+    'stats.depth': 'глубина',
+    'stats.highlighted': 'подсвечено',
 };
 
 const dictionaries: Record<Locale, Record<string, string>> = { en, ru };

@@ -20,6 +20,7 @@
     import { AppController } from "./appController";
     import CloneStemmaModal from "./components/clone_stemma_modal/CloneStemmaModal.svelte";
     import SettingsModal from "./components/settings_modal/SettingsModal.svelte";
+    import StatsCard from "./components/stats_card/StatsCard.svelte";
     import { SettingsStorage } from "./settingsStroage";
     import { LocalizedError, t } from "./i18n";
     import { jwtDecode } from "jwt-decode";
@@ -52,6 +53,7 @@
     let error: Error;
     let settingsStorage: SettingsStorage;
     let settings: Settings = DEFAULT_SETTINGS;
+    let highlightVersion = 0;
 
     let controller = new AppController(stemma_backend_url);
 
@@ -187,7 +189,12 @@
         viewMode={settings.viewMode}
         on:personSelected={(e) => personSelectionModal.showPersonDetails({ description: e.detail, pin: pinnedPeople.isPinned(e.detail.id) })}
         on:familySelected={(e) => familySelectionModal.showExistingFamily(e.detail)}
+        on:highlightChanged={() => highlightVersion++}
     />
+
+    {#if !isWorking && stemma && stemmaIndex && highlight}
+        <StatsCard {stemma} {stemmaIndex} {highlight} {highlightVersion} />
+    {/if}
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
