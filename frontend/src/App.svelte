@@ -23,13 +23,11 @@
     import StatsCard from "./components/stats_card/StatsCard.svelte";
     import { SettingsStorage } from "./settingsStroage";
     import { LocalizedError, t } from "./i18n";
-    import { jwtDecode } from "jwt-decode";
+    import { loadCredential, saveCredential } from "./credentialStorage";
     import { onMount } from "svelte";
 
     export let google_client_id;
     export let stemma_backend_url;
-
-    const CREDENTIAL_KEY = "stemma_credential";
 
     let addStemmaModal;
     let cloneStemmaModal;
@@ -79,7 +77,7 @@
     }
 
     function handleSignIn(user: User) {
-        sessionStorage.setItem(CREDENTIAL_KEY, user.id_token);
+        saveCredential(user.id_token);
 
         let urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has("inviteToken")) {
@@ -102,16 +100,9 @@
             return;
         }
 
-        try {
-            const credential = sessionStorage.getItem(CREDENTIAL_KEY);
-            if (credential) {
-                const decoded: any = jwtDecode(credential);
-                if (decoded.exp * 1000 > Date.now()) {
-                    handleSignIn({ id_token: credential });
-                }
-            }
-        } catch (e) {
-            sessionStorage.removeItem(CREDENTIAL_KEY);
+        const cached = loadCredential();
+        if (cached) {
+            handleSignIn({ id_token: cached.token });
         }
     });
 
