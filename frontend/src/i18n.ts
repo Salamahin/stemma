@@ -161,7 +161,7 @@ export const en: Record<string, string> = {
     // Stats card
     'stats.people': 'people',
     'stats.families': 'families',
-    'stats.depth': 'depth',
+    'stats.depth': 'generations',
     'stats.highlighted': 'highlighted',
 };
 
@@ -294,7 +294,7 @@ export const ru: Record<string, string> = {
     // Stats card
     'stats.people': 'людей',
     'stats.families': 'семей',
-    'stats.depth': 'глубина',
+    'stats.depth': 'поколений',
     'stats.highlighted': 'подсвечено',
 };
 
