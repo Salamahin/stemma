@@ -30,7 +30,7 @@ def run_migrations(engine: Engine, migrations_dir: Path) -> None:
             continue
         sql = sql_path.read_text(encoding="utf-8")
         with engine.begin() as conn:
-            conn.execute(text(sql))
+            conn.exec_driver_sql(sql)
             conn.execute(
                 text("INSERT INTO applied_migrations (version, description) VALUES (:v, :d)"),
                 {"v": version, "d": description},

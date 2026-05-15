@@ -1,39 +1,33 @@
 import { LocalizedError } from "./i18n";
+import type { StemmaResponse } from "./model";
 
-type ErrorResponse = {
-    UnknownError?: { cause: string }
-    RequestDeserializationProblem?: { descr: string }
-    NoSuchPersonId?: { id: string }
-    ChildAlreadyBelongsToFamily?: { familyId: string, personId: string }
-    IncompleteFamily?: {}
-    DuplicatedIds?: { duplicatedIds: string }
-    AccessToFamilyDenied?: { familyId: string }
-    AccessToPersonDenied?: { personId: string }
-    AccessToStemmaDenied?: { stemmaId: string }
-    InvalidInviteToken?: {}
-    ForeignInviteToken?: {}
-    StemmaHasCycles?: {}
-};
-
-export function mapStemmaError<T extends ErrorResponse>(response: T, describePerson: (id: string) => string) {
-    if (response.UnknownError) throw new LocalizedError("error.unknown")
-    if (response.RequestDeserializationProblem) throw new LocalizedError("error.invalidRequest")
-    if (response.NoSuchPersonId) throw new LocalizedError("error.noSuchPerson", { name: describePerson(response.NoSuchPersonId.id) })
-    if (response.ChildAlreadyBelongsToFamily) {
-        throw new LocalizedError("error.childAlreadyHasParents", { name: describePerson(response.ChildAlreadyBelongsToFamily.personId) })
+export function mapStemmaError<T extends StemmaResponse>(response: T, describePerson: (id: string) => string): T {
+    switch (response.type) {
+        case "UnknownError":
+            throw new LocalizedError("error.unknown")
+        case "RequestDeserializationProblem":
+            throw new LocalizedError("error.invalidRequest")
+        case "NoSuchPersonId":
+            throw new LocalizedError("error.noSuchPerson", { name: describePerson(response.id) })
+        case "ChildAlreadyBelongsToFamily":
+            throw new LocalizedError("error.childAlreadyHasParents", { name: describePerson(response.personId) })
+        case "IncompleteFamily":
+            throw new LocalizedError("error.incompleteFamily")
+        case "DuplicatedIds":
+            throw new LocalizedError("error.duplicatedIds", { name: describePerson(response.duplicatedIds) })
+        case "AccessToFamilyDenied":
+            throw new LocalizedError("error.accessToFamilyDenied")
+        case "AccessToPersonDenied":
+            throw new LocalizedError("error.accessToPersonDenied", { name: describePerson(response.personId) })
+        case "AccessToStemmaDenied":
+            throw new LocalizedError("error.accessToStemmaDenied")
+        case "InvalidInviteToken":
+            throw new LocalizedError("error.invalidInviteToken")
+        case "ForeignInviteToken":
+            throw new LocalizedError("error.foreignInviteToken")
+        case "StemmaHasCycles":
+            throw new LocalizedError("error.stemmaHasCycles")
+        default:
+            return response
     }
-    if (response.IncompleteFamily) throw new LocalizedError("error.incompleteFamily")
-    if (response.DuplicatedIds) {
-        throw new LocalizedError("error.duplicatedIds", { name: describePerson(response.DuplicatedIds.duplicatedIds) })
-    }
-    if (response.AccessToFamilyDenied) throw new LocalizedError("error.accessToFamilyDenied")
-    if (response.AccessToPersonDenied) {
-        throw new LocalizedError("error.accessToPersonDenied", { name: describePerson(response.AccessToPersonDenied.personId) })
-    }
-    if (response.AccessToStemmaDenied) throw new LocalizedError("error.accessToStemmaDenied")
-    if (response.InvalidInviteToken) throw new LocalizedError("error.invalidInviteToken")
-    if (response.ForeignInviteToken) throw new LocalizedError("error.foreignInviteToken")
-    if (response.StemmaHasCycles) throw new LocalizedError("error.stemmaHasCycles")
-
-    return response
 }

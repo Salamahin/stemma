@@ -14,12 +14,11 @@ class UserService:
         return self._storage.get_or_create_user(email)
 
     def create_invite_token(self, invitee_email: str, stemma_id: str, target_person_id: str) -> str:
-        entropy = secrets.token_urlsafe(20)
         token = InviteToken(
-            inviteesEmail=invitee_email,
-            stemmaId=stemma_id,
-            targetPersonId=target_person_id,
-            entropy=entropy,
+            invitees_email=invitee_email,
+            stemma_id=stemma_id,
+            target_person_id=target_person_id,
+            entropy=secrets.token_urlsafe(20),
         )
         return encode_invite_token(self._invite_secret, token)
 

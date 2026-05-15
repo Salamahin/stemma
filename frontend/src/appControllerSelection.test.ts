@@ -1,10 +1,12 @@
 import { selectStemmaId } from "./appControllerSelection";
 
+import type { StemmaDescription } from "./model";
+
 describe("selectStemmaId", () => {
-    const stemmas = [
-        { id: "a", name: "A", removable: true },
-        { id: "b", name: "B", removable: true },
-        { id: "c", name: "C", removable: true },
+    const stemmas: StemmaDescription[] = [
+        { type: "StemmaDescription", id: "a", name: "A", removable: true },
+        { type: "StemmaDescription", id: "b", name: "B", removable: true },
+        { type: "StemmaDescription", id: "c", name: "C", removable: true },
     ];
 
     test("falls back to the first stemma when last id is missing", () => {

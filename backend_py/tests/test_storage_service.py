@@ -100,7 +100,7 @@ def test_duplicated_ids_forbidden(storage: StorageService) -> None:
         storage.update_family(
             user.user_id, fam.id, family(existing(james_id), existing(james_id))(existing(jill_id))
         )
-    assert exc.value.duplicatedIds == james_id
+    assert exc.value.duplicated_ids == james_id
 
 
 def test_child_can_belong_to_single_family_only(storage: StorageService) -> None:
@@ -110,8 +110,8 @@ def test_child_can_belong_to_single_family_only(storage: StorageService) -> None
     jill_id = fam.children[0]
     with pytest.raises(ChildAlreadyBelongsToFamily) as exc:
         storage.create_family(user.user_id, sid, family(create_jane)(existing(jill_id)))
-    assert exc.value.familyId == fam.id
-    assert exc.value.personId == jill_id
+    assert exc.value.family_id == fam.id
+    assert exc.value.person_id == jill_id
 
 
 def test_remove_person_drops_relations(storage: StorageService) -> None:
@@ -165,8 +165,8 @@ def test_can_update_existing_person(storage: StorageService) -> None:
     assert render_families(stemma) == ["(John) parentsOf (Jill)"]
     [john] = [p for p in stemma.people if p.id == jane_id]
     assert john.name == "John"
-    assert john.birthDate == JOHNS_BIRTHDAY
-    assert john.deathDate == JOHNS_DEATHDAY
+    assert john.birth_date == JOHNS_BIRTHDAY
+    assert john.death_date == JOHNS_DEATHDAY
 
 
 def test_can_update_existing_family(storage: StorageService) -> None:
@@ -272,8 +272,8 @@ def test_chown_affects_kinsmen_recursively(storage: StorageService) -> None:
     assert set(effect.affected_people) == expected_people
 
     accessor_stemma = storage.stemma(accessor.user_id, sid)
-    editable_people = {p.id for p in accessor_stemma.people if not p.readOnly}
-    editable_families = {f.id for f in accessor_stemma.families if not f.readOnly}
+    editable_people = {p.id for p in accessor_stemma.people if not p.read_only}
+    editable_families = {f.id for f in accessor_stemma.families if not f.read_only}
     assert editable_people == expected_people
     assert editable_families == expected_families
 

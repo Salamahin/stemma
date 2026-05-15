@@ -3,7 +3,7 @@ from stemma.services.stemma_dfs import has_cycles
 
 
 def _family(fid: str, parents: list[str], children: list[str]) -> FamilyDescription:
-    return FamilyDescription(id=fid, parents=parents, children=children, readOnly=False)
+    return FamilyDescription(id=fid, parents=parents, children=children, read_only=False)
 
 
 def test_minimal_stemma_has_no_cycles() -> None:

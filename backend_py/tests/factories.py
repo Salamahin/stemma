@@ -2,12 +2,13 @@ from collections.abc import Callable
 from datetime import date
 
 from stemma.domain.requests import CreateFamily, CreateNewPerson, ExistingPerson, PersonDefinition
+from stemma.domain.responses import Stemma
 
 JOHNS_BIRTHDAY = date(1900, 1, 1)
 JOHNS_DEATHDAY = date(2000, 1, 1)
 
-create_john = CreateNewPerson(name="John", birthDate=JOHNS_BIRTHDAY, deathDate=JOHNS_DEATHDAY)
-create_jane = CreateNewPerson(name="Jane", birthDate=date(1850, 1, 1), deathDate=date(1950, 1, 1))
+create_john = CreateNewPerson(name="John", birth_date=JOHNS_BIRTHDAY, death_date=JOHNS_DEATHDAY)
+create_jane = CreateNewPerson(name="Jane", birth_date=date(1850, 1, 1), death_date=date(1950, 1, 1))
 create_james = CreateNewPerson(name="James")
 create_jake = CreateNewPerson(name="Jake")
 create_july = CreateNewPerson(name="July")
@@ -35,7 +36,7 @@ def family(*parents: PersonDefinition) -> Callable[..., CreateFamily]:
     return with_children
 
 
-def render_families(stemma) -> list[str]:
+def render_families(stemma: Stemma) -> list[str]:
     person_by_id = {p.id: p for p in stemma.people}
     out = []
     for f in stemma.families:

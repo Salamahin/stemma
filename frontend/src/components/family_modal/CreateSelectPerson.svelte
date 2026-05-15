@@ -22,7 +22,7 @@
   let dispatch = createEventDispatcher();
 
   function nameChanged(newName: string) {
-    namesakes = [...stemmaIndex.namesakes(newName).filter((p) => !p.readOnly), { name: newName }];
+    namesakes = [...stemmaIndex.namesakes(newName).filter((p) => !p.readOnly), { type: "CreateNewPerson", name: newName }];
   }
 
   export function reset() {

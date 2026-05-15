@@ -1,71 +1,103 @@
-from dataclasses import dataclass
+from typing import Annotated, Literal
+
+from pydantic import Discriminator
+from pydantic.dataclasses import dataclass
+
+from stemma.domain._config import DOMAIN_CONFIG
 
 
 class StemmaError(Exception):
     pass
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class UnknownError(StemmaError):
     cause: str
+    type: Literal["UnknownError"] = "UnknownError"
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class RequestDeserializationProblem(StemmaError):
     descr: str
+    type: Literal["RequestDeserializationProblem"] = "RequestDeserializationProblem"
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class NoSuchPersonId(StemmaError):
     id: str
+    type: Literal["NoSuchPersonId"] = "NoSuchPersonId"
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class ChildAlreadyBelongsToFamily(StemmaError):
-    familyId: str
-    personId: str
+    family_id: str
+    person_id: str
+    type: Literal["ChildAlreadyBelongsToFamily"] = "ChildAlreadyBelongsToFamily"
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class IncompleteFamily(StemmaError):
-    pass
+    type: Literal["IncompleteFamily"] = "IncompleteFamily"
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class DuplicatedIds(StemmaError):
-    duplicatedIds: str
+    duplicated_ids: str
+    type: Literal["DuplicatedIds"] = "DuplicatedIds"
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class AccessToFamilyDenied(StemmaError):
-    familyId: str
+    family_id: str
+    type: Literal["AccessToFamilyDenied"] = "AccessToFamilyDenied"
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class AccessToPersonDenied(StemmaError):
-    personId: str
+    person_id: str
+    type: Literal["AccessToPersonDenied"] = "AccessToPersonDenied"
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class AccessToStemmaDenied(StemmaError):
-    stemmaId: str
+    stemma_id: str
+    type: Literal["AccessToStemmaDenied"] = "AccessToStemmaDenied"
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class IsNotTheOnlyStemmaOwner(StemmaError):
-    stemmaId: str
+    stemma_id: str
+    type: Literal["IsNotTheOnlyStemmaOwner"] = "IsNotTheOnlyStemmaOwner"
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class InvalidInviteToken(StemmaError):
-    pass
+    type: Literal["InvalidInviteToken"] = "InvalidInviteToken"
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class ForeignInviteToken(StemmaError):
-    pass
+    type: Literal["ForeignInviteToken"] = "ForeignInviteToken"
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class StemmaHasCycles(StemmaError):
-    pass
+    type: Literal["StemmaHasCycles"] = "StemmaHasCycles"
+
+
+StemmaErrorUnion = Annotated[
+    UnknownError
+    | RequestDeserializationProblem
+    | NoSuchPersonId
+    | ChildAlreadyBelongsToFamily
+    | IncompleteFamily
+    | DuplicatedIds
+    | AccessToFamilyDenied
+    | AccessToPersonDenied
+    | AccessToStemmaDenied
+    | IsNotTheOnlyStemmaOwner
+    | InvalidInviteToken
+    | ForeignInviteToken
+    | StemmaHasCycles,
+    Discriminator("type"),
+]

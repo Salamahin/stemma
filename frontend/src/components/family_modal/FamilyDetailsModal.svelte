@@ -76,8 +76,8 @@
     }
 
     function toPersonDefinition(pd: CreateNewPerson | PersonDescription): PersonDefinition {
-        if ("id" in pd) return { ExistingPerson: { id: pd.id } };
-        else return { CreateNewPerson: pd as CreateNewPerson };
+        if ("id" in pd) return { type: "ExistingPerson", id: pd.id };
+        else return pd;
     }
 
     function saveFamily() {

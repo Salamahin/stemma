@@ -20,91 +20,87 @@ export const DEFAULT_SETTINGS: Settings = {
 
 
 //requests
-export type PersonDefinition = { ExistingPerson?: ExistingPerson, CreateNewPerson?: CreateNewPerson }
-export type ExistingPerson = { id: string }
-export type CreateNewPerson = { name: string, birthDate?: string, deathDate?: string, bio?: string }
+export type ExistingPerson = { type: "ExistingPerson", id: string }
+export type CreateNewPerson = { type: "CreateNewPerson", name: string, birthDate?: string, deathDate?: string, bio?: string }
+export type PersonDefinition = ExistingPerson | CreateNewPerson
 
 export type CreateFamily = { parent1?: PersonDefinition, parent2?: PersonDefinition, children: Array<PersonDefinition> }
 
-export type CreateFamilyRequest = { stemmaId: string, familyDescr: CreateFamily }
-export type CreateInvitationTokenRequest = { stemmaId: string, targetPersonId: string, targetPersonEmail: string }
-export type CreateNewStemmaRequest = { stemmaName: string }
-export type DeleteFamilyRequest = { stemmaId: string, familyId: string }
-export type DeletePersonRequest = { stemmaId: string, personId: string }
-export type GetStemmaRequest = { stemmaId: string }
-export type DeleteStemmaRequest = { stemmaId: string }
-export type UpdatePersonRequest = { stemmaId: string, personId: string, personDescr: CreateNewPerson }
-export type UpdateFamilyRequest = { stemmaId: string, familyId: string, familyDescr: CreateFamily }
-export type BearInvitationRequest = { encodedToken: string }
-export type CloneStemmaRequest = { stemmaId: string, stemmaName: string }
-export type ListDescribeStemmasRequest = { defaultStemmaName: string }
+export type CreateFamilyRequest = { type: "CreateFamilyRequest", stemmaId: string, familyDescr: CreateFamily }
+export type CreateInvitationTokenRequest = { type: "CreateInvitationTokenRequest", stemmaId: string, targetPersonId: string, targetPersonEmail: string }
+export type CreateNewStemmaRequest = { type: "CreateNewStemmaRequest", stemmaName: string }
+export type DeleteFamilyRequest = { type: "DeleteFamilyRequest", stemmaId: string, familyId: string }
+export type DeletePersonRequest = { type: "DeletePersonRequest", stemmaId: string, personId: string }
+export type GetStemmaRequest = { type: "GetStemmaRequest", stemmaId: string }
+export type DeleteStemmaRequest = { type: "DeleteStemmaRequest", stemmaId: string }
+export type UpdatePersonRequest = { type: "UpdatePersonRequest", stemmaId: string, personId: string, personDescr: CreateNewPerson }
+export type UpdateFamilyRequest = { type: "UpdateFamilyRequest", stemmaId: string, familyId: string, familyDescr: CreateFamily }
+export type BearInvitationRequest = { type: "BearInvitationRequest", encodedToken: string }
+export type CloneStemmaRequest = { type: "CloneStemmaRequest", stemmaId: string, stemmaName: string }
+export type ListDescribeStemmasRequest = { type: "ListDescribeStemmasRequest", defaultStemmaName: string }
 
-type CompositeRequest = {
-    CreateFamilyRequest?: CreateFamilyRequest,
-    UpdateFamilyRequest?: UpdateFamilyRequest,
-    DeleteFamilyRequest?: DeleteFamilyRequest,
-    CreateInvitationTokenRequest?: CreateInvitationTokenRequest,
-    BearInvitationRequest?: BearInvitationRequest,
-    CreateNewStemmaRequest?: CreateNewStemmaRequest,
-    GetStemmaRequest?: GetStemmaRequest,
-    DeleteStemmaRequest?: DeleteStemmaRequest,
-    ListDescribeStemmasRequest?: ListDescribeStemmasRequest,
-    DeletePersonRequest?: DeletePersonRequest,
-    UpdatePersonRequest?: UpdatePersonRequest,
-    CloneStemmaRequest?: CloneStemmaRequest
-}
+type Request =
+    | CreateFamilyRequest
+    | UpdateFamilyRequest
+    | DeleteFamilyRequest
+    | CreateInvitationTokenRequest
+    | BearInvitationRequest
+    | CreateNewStemmaRequest
+    | GetStemmaRequest
+    | DeleteStemmaRequest
+    | ListDescribeStemmasRequest
+    | DeletePersonRequest
+    | UpdatePersonRequest
+    | CloneStemmaRequest
 
 
 //responses
-export type ChownEffect = { affectedFamilies: Array<string>, affectedPeople: Array<string> }
-export type FamilyDescription = { id: string, parents: Array<string>, children: Array<string>, readOnly: boolean }
-export type InviteToken = { token: string }
-export type OwnedStemmas = { stemmas: Array<StemmaDescription>, firstStemma: Stemma }
-export type Stemma = { people: Array<PersonDescription>, families: Array<FamilyDescription> }
-export type StemmaDescription = { id: string, name: string, removable: Boolean }
-export type PersonDescription = { id: string, name: string, birthDate?: string, deathDate?: string, bio?: string, readOnly: boolean }
-export type TokenAccepted = { stemmas: Array<StemmaDescription>, lastStemma: Stemma }
-export type CloneResult = { createdStemma: Stemma, stemmas: Array<StemmaDescription> }
+export type FamilyDescription = { type: "FamilyDescription", id: string, parents: Array<string>, children: Array<string>, readOnly: boolean }
+export type InviteToken = { type: "InviteToken", token: string }
+export type OwnedStemmas = { type: "OwnedStemmas", stemmas: Array<StemmaDescription>, firstStemma: Stemma }
+export type Stemma = { type: "Stemma", people: Array<PersonDescription>, families: Array<FamilyDescription> }
+export type StemmaDescription = { type: "StemmaDescription", id: string, name: string, removable: Boolean }
+export type PersonDescription = { type: "PersonDescription", id: string, name: string, birthDate?: string, deathDate?: string, bio?: string, readOnly: boolean }
+export type TokenAccepted = { type: "TokenAccepted", stemmas: Array<StemmaDescription>, lastStemma: Stemma }
+export type CloneResult = { type: "CloneResult", createdStemma: Stemma, stemmas: Array<StemmaDescription> }
 
 //errors
-export type UnknownError = { cause: string }
-export type RequestDeserializationProblem = { descr: string }
-export type NoSuchPersonId = { id: string }
-export type ChildAlreadyBelongsToFamily = { familyId: string, personId: string }
-export type IncompleteFamily = {}
-export type DuplicatedIds = { duplicatedIds: string }
-export type AccessToFamilyDenied = { familyId: string }
-export type AccessToPersonDenied = { personId: string }
-export type AccessToStemmaDenied = { stemmaId: string }
-export type IsNotTheOnlyStemmaOwner = { stemmaId: string }
-export type InvalidInviteToken = {}
-export type ForeignInviteToken = {}
-export type StemmaHasCycles = {}
+export type UnknownError = { type: "UnknownError", cause: string }
+export type RequestDeserializationProblem = { type: "RequestDeserializationProblem", descr: string }
+export type NoSuchPersonId = { type: "NoSuchPersonId", id: string }
+export type ChildAlreadyBelongsToFamily = { type: "ChildAlreadyBelongsToFamily", familyId: string, personId: string }
+export type IncompleteFamily = { type: "IncompleteFamily" }
+export type DuplicatedIds = { type: "DuplicatedIds", duplicatedIds: string }
+export type AccessToFamilyDenied = { type: "AccessToFamilyDenied", familyId: string }
+export type AccessToPersonDenied = { type: "AccessToPersonDenied", personId: string }
+export type AccessToStemmaDenied = { type: "AccessToStemmaDenied", stemmaId: string }
+export type IsNotTheOnlyStemmaOwner = { type: "IsNotTheOnlyStemmaOwner", stemmaId: string }
+export type InvalidInviteToken = { type: "InvalidInviteToken" }
+export type ForeignInviteToken = { type: "ForeignInviteToken" }
+export type StemmaHasCycles = { type: "StemmaHasCycles" }
 
-type CompositeResponse = {
-    ChownEffect?: ChownEffect,
-    FamilyDescription?: FamilyDescription,
-    InviteToken?: InviteToken,
-    OwnedStemmas?: OwnedStemmas,
-    Stemma?: Stemma,
-    StemmaDescription?: StemmaDescription,
-    PersonDescription?: PersonDescription,
-    TokenAccepted?: TokenAccepted,
-    CloneResult?: CloneResult,
-    UnknownError?: UnknownError,
-    RequestDeserializationProblem?: RequestDeserializationProblem,
-    NoSuchPersonId?: NoSuchPersonId,
-    ChildAlreadyBelongsToFamily?: ChildAlreadyBelongsToFamily,
-    IncompleteFamily?: IncompleteFamily,
-    DuplicatedIds?: DuplicatedIds,
-    AccessToFamilyDenied?: AccessToFamilyDenied,
-    AccessToPersonDenied?: AccessToPersonDenied,
-    AccessToStemmaDenied?: AccessToStemmaDenied,
-    IsNotTheOnlyStemmaOwner?: IsNotTheOnlyStemmaOwner,
-    InvalidInviteToken?: InvalidInviteToken,
-    ForeignInviteToken?: ForeignInviteToken,
-    StemmaHasCycles?: StemmaHasCycles
-}
+export type StemmaResponse =
+    | FamilyDescription
+    | InviteToken
+    | OwnedStemmas
+    | Stemma
+    | StemmaDescription
+    | PersonDescription
+    | TokenAccepted
+    | CloneResult
+    | UnknownError
+    | RequestDeserializationProblem
+    | NoSuchPersonId
+    | ChildAlreadyBelongsToFamily
+    | IncompleteFamily
+    | DuplicatedIds
+    | AccessToFamilyDenied
+    | AccessToPersonDenied
+    | AccessToStemmaDenied
+    | IsNotTheOnlyStemmaOwner
+    | InvalidInviteToken
+    | ForeignInviteToken
+    | StemmaHasCycles
 
 //aux
 export type User = { id_token: string }
@@ -122,91 +118,87 @@ export class Model {
     }
 
     async listDescribeStemmas(): Promise<OwnedStemmas> {
-        const response = await this.sendRequest({ ListDescribeStemmasRequest: { defaultStemmaName: this.translate("stemma.defaultName") } })
-        const x = await this.parseResponse(response, null)
-        return x.OwnedStemmas
+        return this.send<OwnedStemmas>(
+            { type: "ListDescribeStemmasRequest", defaultStemmaName: this.translate("stemma.defaultName") },
+            null,
+        )
     }
 
     async removeStemma(stemmaId: string): Promise<OwnedStemmas> {
-        const response = await this.sendRequest({ DeleteStemmaRequest: { stemmaId: stemmaId } })
-        return (await this.parseResponse(response)).OwnedStemmas;
+        return this.send<OwnedStemmas>({ type: "DeleteStemmaRequest", stemmaId }, null)
     }
 
     async getStemma(stemmaId: string): Promise<Stemma> {
-        const response = await this.sendRequest({ GetStemmaRequest: { stemmaId: stemmaId } })
-        return (await this.parseResponse(response, null)).Stemma;
+        return this.send<Stemma>({ type: "GetStemmaRequest", stemmaId }, null)
     }
 
-    private makeFamily(parents: PersonDefinition[], children: PersonDefinition[]) {
-        let cf = {
+    private makeFamily(parents: PersonDefinition[], children: PersonDefinition[]): CreateFamily {
+        return {
             parent1: parents.length > 0 ? sanitizeRequestPayload(parents[0]) as PersonDefinition : null,
             parent2: parents.length > 1 ? sanitizeRequestPayload(parents[1]) as PersonDefinition : null,
             children: children.map(c => sanitizeRequestPayload(c) as PersonDefinition),
-        };
-
-        return cf as CreateFamily
+        }
     }
 
     async createFamily(stemmaId: string, parents: PersonDefinition[], children: PersonDefinition[], stemmaIndex: StemmaIndex): Promise<Stemma> {
-        const response = await this.sendRequest({ CreateFamilyRequest: { stemmaId: stemmaId, familyDescr: this.makeFamily(parents, children) } })
-        return (await this.parseResponse(response, stemmaIndex)).Stemma;
+        return this.send<Stemma>(
+            { type: "CreateFamilyRequest", stemmaId, familyDescr: this.makeFamily(parents, children) },
+            stemmaIndex,
+        )
     }
 
     async updateFamily(stemmaId: string, familyId: string, parents: PersonDefinition[], children: PersonDefinition[], stemmaIndex: StemmaIndex): Promise<Stemma> {
-        const response = await this.sendRequest({ UpdateFamilyRequest: { stemmaId: stemmaId, familyId: familyId, familyDescr: this.makeFamily(parents, children) } })
-        return (await this.parseResponse(response, stemmaIndex)).Stemma;
+        return this.send<Stemma>(
+            { type: "UpdateFamilyRequest", stemmaId, familyId, familyDescr: this.makeFamily(parents, children) },
+            stemmaIndex,
+        )
     }
 
     async addStemma(name: string): Promise<StemmaDescription> {
-        const response = await this.sendRequest({ CreateNewStemmaRequest: { stemmaName: name } })
-        return (await this.parseResponse(response, null)).StemmaDescription;
+        return this.send<StemmaDescription>({ type: "CreateNewStemmaRequest", stemmaName: name }, null)
     }
 
     async removePerson(stemmaId: string, personId: string, stemmaIndex: StemmaIndex): Promise<Stemma> {
-        const response = await this.sendRequest({ DeletePersonRequest: { stemmaId: stemmaId, personId: personId } })
-        return (await this.parseResponse(response, stemmaIndex)).Stemma;
+        return this.send<Stemma>({ type: "DeletePersonRequest", stemmaId, personId }, stemmaIndex)
     }
 
     async createInvintation(stemmaId: string, personId: string, email: string, stemmaIndex: StemmaIndex): Promise<string> {
-        const response = await this.sendRequest({ CreateInvitationTokenRequest: { stemmaId: stemmaId, targetPersonId: personId, targetPersonEmail: email } })
-        const token = (await this.parseResponse(response, stemmaIndex)).InviteToken
+        const token = await this.send<InviteToken>(
+            { type: "CreateInvitationTokenRequest", stemmaId, targetPersonId: personId, targetPersonEmail: email },
+            stemmaIndex,
+        )
         return buildInviteLink(location.origin, token.token)
     }
 
     async bearInvitationToken(token: string): Promise<TokenAccepted> {
-        const response = await this.sendRequest({ BearInvitationRequest: { encodedToken: token } })
-        return (await this.parseResponse(response, null)).TokenAccepted
+        return this.send<TokenAccepted>({ type: "BearInvitationRequest", encodedToken: token }, null)
     }
 
     async removeFamily(stemmaId: string, familyId: string): Promise<Stemma> {
-        const response = await this.sendRequest({ DeleteFamilyRequest: { stemmaId: stemmaId, familyId: familyId } })
-        return (await this.parseResponse(response, null)).Stemma
+        return this.send<Stemma>({ type: "DeleteFamilyRequest", stemmaId, familyId }, null)
     }
 
     async updatePerson(stemmaId: string, personId: string, descr: CreateNewPerson, stemmaIndex: StemmaIndex): Promise<Stemma> {
-        const response = await this.sendRequest({ UpdatePersonRequest: { stemmaId: stemmaId, personId: personId, personDescr: sanitizeRequestPayload(descr) as CreateNewPerson } })
-        return (await this.parseResponse(response, stemmaIndex)).Stemma
+        return this.send<Stemma>(
+            { type: "UpdatePersonRequest", stemmaId, personId, personDescr: sanitizeRequestPayload(descr) as CreateNewPerson },
+            stemmaIndex,
+        )
     }
 
     async cloneStemma(stemmaId: string, name: string): Promise<CloneResult> {
-        const response = await this.sendRequest({ CloneStemmaRequest: { stemmaId: stemmaId, stemmaName: name } })
-        return (await this.parseResponse(response)).CloneResult
+        return this.send<CloneResult>({ type: "CloneStemmaRequest", stemmaId, stemmaName: name }, null)
     }
 
-    private async parseResponse(response: Response, stemmaIndex?: StemmaIndex) {
-        if (response.status === 401) throw new LocalizedError("error.sessionExpired")
-        if (!response.ok) throw new LocalizedError("error.unexpectedResponse")
-
-        const json = await response.json();
-        return this.translateError(json as CompositeResponse, stemmaIndex);
-    }
-
-    private async sendRequest(request: CompositeRequest) {
-        return fetch(`${this.endpoint}/stemma`, {
+    private async send<R extends StemmaResponse>(request: Request, stemmaIndex: StemmaIndex | null): Promise<R> {
+        const response = await fetch(`${this.endpoint}/stemma`, {
             method: 'POST',
             headers: this.commonHeader,
-            body: JSON.stringify(request)
+            body: JSON.stringify(request),
         })
+        if (response.status === 401) throw new LocalizedError("error.sessionExpired")
+        if (!response.ok) throw new LocalizedError("error.unexpectedResponse")
+        const body = (await response.json()) as StemmaResponse
+        return mapStemmaError(body, (id) => this.describePerson(id, stemmaIndex)) as R
     }
 
     private describePerson(id: string, stemmaIndex?: StemmaIndex) {
@@ -217,10 +209,6 @@ export class Model {
         } catch (err) {
             return this.translate("error.noDescription")
         }
-    }
-
-    private translateError(response: CompositeResponse, stemmaIndex?: StemmaIndex) {
-        return mapStemmaError(response, (id) => this.describePerson(id, stemmaIndex))
     }
 
     private translate(key: string, params?: Record<string, string>) {

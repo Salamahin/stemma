@@ -5,7 +5,12 @@ from pathlib import Path
 
 from sqlalchemy import Engine, create_engine
 
-_COCKROACH_CERT_PATH = Path("/tmp/cockroach-proud-gnoll.crt")
+_DEFAULT_CERT_PATH = Path("/tmp/cockroach-proud-gnoll.crt")
+
+
+def _cert_path() -> Path:
+    override = os.environ.get("STEMMA_JDBC_CERT_PATH")
+    return Path(override) if override else _DEFAULT_CERT_PATH
 
 
 def populate_env_from_secrets() -> None:
@@ -29,12 +34,13 @@ def populate_env_from_secrets() -> None:
 
 
 def write_root_cert() -> None:
-    if _COCKROACH_CERT_PATH.exists():
+    path = _cert_path()
+    if path.exists():
         return
     cert_b64 = os.environ.get("JDBC_CERT")
     if not cert_b64:
         return
-    _COCKROACH_CERT_PATH.write_text(base64.b64decode(cert_b64).decode("utf-8"))
+    path.write_text(base64.b64decode(cert_b64).decode("utf-8"))
 
 
 def jdbc_to_sqlalchemy_url(jdbc_url: str, user: str, password: str) -> str:

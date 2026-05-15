@@ -1,101 +1,121 @@
-from dataclasses import dataclass, field
+from dataclasses import field
 from datetime import date
+from typing import Annotated, Literal
+
+from pydantic import Discriminator
+from pydantic.dataclasses import dataclass
+
+from stemma.domain._config import DOMAIN_CONFIG
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class ExistingPerson:
     id: str
+    type: Literal["ExistingPerson"] = "ExistingPerson"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class CreateNewPerson:
     name: str
-    birthDate: date | None = None
-    deathDate: date | None = None
+    birth_date: date | None = None
+    death_date: date | None = None
     bio: str | None = None
+    type: Literal["CreateNewPerson"] = "CreateNewPerson"
 
 
-PersonDefinition = ExistingPerson | CreateNewPerson
+PersonDefinition = Annotated[ExistingPerson | CreateNewPerson, Discriminator("type")]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class CreateFamily:
     parent1: PersonDefinition | None
     parent2: PersonDefinition | None
     children: list[PersonDefinition] = field(default_factory=list)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class CreateFamilyRequest:
-    stemmaId: str
-    familyDescr: CreateFamily
+    stemma_id: str
+    family_descr: CreateFamily
+    type: Literal["CreateFamilyRequest"] = "CreateFamilyRequest"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class UpdateFamilyRequest:
-    stemmaId: str
-    familyId: str
-    familyDescr: CreateFamily
+    stemma_id: str
+    family_id: str
+    family_descr: CreateFamily
+    type: Literal["UpdateFamilyRequest"] = "UpdateFamilyRequest"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class DeleteFamilyRequest:
-    stemmaId: str
-    familyId: str
+    stemma_id: str
+    family_id: str
+    type: Literal["DeleteFamilyRequest"] = "DeleteFamilyRequest"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class CreateInvitationTokenRequest:
-    stemmaId: str
-    targetPersonId: str
-    targetPersonEmail: str
+    stemma_id: str
+    target_person_id: str
+    target_person_email: str
+    type: Literal["CreateInvitationTokenRequest"] = "CreateInvitationTokenRequest"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class BearInvitationRequest:
-    encodedToken: str
+    encoded_token: str
+    type: Literal["BearInvitationRequest"] = "BearInvitationRequest"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class CreateNewStemmaRequest:
-    stemmaName: str
+    stemma_name: str
+    type: Literal["CreateNewStemmaRequest"] = "CreateNewStemmaRequest"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class GetStemmaRequest:
-    stemmaId: str
+    stemma_id: str
+    type: Literal["GetStemmaRequest"] = "GetStemmaRequest"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class DeleteStemmaRequest:
-    stemmaId: str
+    stemma_id: str
+    type: Literal["DeleteStemmaRequest"] = "DeleteStemmaRequest"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class ListDescribeStemmasRequest:
-    defaultStemmaName: str
+    default_stemma_name: str
+    type: Literal["ListDescribeStemmasRequest"] = "ListDescribeStemmasRequest"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class CloneStemmaRequest:
-    stemmaId: str
-    stemmaName: str
+    stemma_id: str
+    stemma_name: str
+    type: Literal["CloneStemmaRequest"] = "CloneStemmaRequest"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class DeletePersonRequest:
-    stemmaId: str
-    personId: str
+    stemma_id: str
+    person_id: str
+    type: Literal["DeletePersonRequest"] = "DeletePersonRequest"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class UpdatePersonRequest:
-    stemmaId: str
-    personId: str
-    personDescr: CreateNewPerson
+    stemma_id: str
+    person_id: str
+    person_descr: CreateNewPerson
+    type: Literal["UpdatePersonRequest"] = "UpdatePersonRequest"
 
 
-Request = (
+Request = Annotated[
     CreateFamilyRequest
     | UpdateFamilyRequest
     | DeleteFamilyRequest
@@ -107,5 +127,6 @@ Request = (
     | ListDescribeStemmasRequest
     | CloneStemmaRequest
     | DeletePersonRequest
-    | UpdatePersonRequest
-)
+    | UpdatePersonRequest,
+    Discriminator("type"),
+]

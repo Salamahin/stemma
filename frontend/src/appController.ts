@@ -142,7 +142,7 @@ export class AppController {
         this.model
             .addStemma(stemmaName)
             .then((result) => {
-                let stemma = { people: [], families: [] }
+                let stemma: Stemma = { type: "Stemma", people: [], families: [] }
                 this.refreshIndexes(stemma, result.id)
                 this.ownedStemmas.update(ownedStemmas => [...ownedStemmas, result])
                 this.setCurrentStemmaId(result.id)

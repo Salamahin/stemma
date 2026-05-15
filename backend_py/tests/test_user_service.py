@@ -18,5 +18,5 @@ def test_can_create_and_decode_invite_token(users: UserService, storage: Storage
 
     token = users.create_invite_token("invitee@test.com", sid, josh_id)
     decoded = users.decode_invite_token(token)
-    assert decoded.inviteesEmail == "invitee@test.com"
-    assert decoded.targetPersonId == josh_id
+    assert decoded.invitees_email == "invitee@test.com"
+    assert decoded.target_person_id == josh_id

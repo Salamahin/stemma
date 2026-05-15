@@ -37,6 +37,7 @@
         dispatch("personUpdated", {
             id: id,
             description: {
+                type: "CreateNewPerson",
                 name: name,
                 birthDate: dateToIsoLocalTime(birthDate),
                 deathDate: dateToIsoLocalTime(deathDate),
