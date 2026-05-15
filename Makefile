@@ -1,15 +1,17 @@
-build-any-lambda:
-	cp -r backend/src/api_impl_aws_lambda/target/scala-2.13/classes/* $(ARTIFACTS_DIR)
-
-
 build-MyLayer:
-	mkdir -p $(ARTIFACTS_DIR)/java/lib
-	cp -r backend/src/api/target/pack/lib/*.jar $(ARTIFACTS_DIR)/java/lib
-	rm -f $(ARTIFACTS_DIR)/java/lib/flyway-core*.jar
+	mkdir -p $(ARTIFACTS_DIR)/python
+	pip install \
+		-r backend_py/requirements.txt \
+		--target $(ARTIFACTS_DIR)/python \
+		--platform manylinux2014_aarch64 \
+		--implementation cp \
+		--python-version 3.13 \
+		--only-binary=:all: \
+		--upgrade
 
-build-StemmaFunction: build-any-lambda
+build-StemmaFunction:
+	cp -r backend_py/src/stemma $(ARTIFACTS_DIR)/
 
 build-MigrationFunction:
-	cp -r backend/src/migration_lambda/target/scala-2.13/classes/* $(ARTIFACTS_DIR)
-	mkdir -p $(ARTIFACTS_DIR)/lib
-	cp backend/src/api/target/pack/lib/flyway-core*.jar $(ARTIFACTS_DIR)/lib/
+	cp -r backend_py/src/stemma $(ARTIFACTS_DIR)/
+	cp -r backend_py/migrations $(ARTIFACTS_DIR)/migrations

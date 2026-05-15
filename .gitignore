@@ -15,6 +15,14 @@ client/package-lock.json
 target
 .aws-sam
 
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
 # Build artifacts
 build/
 dist/
