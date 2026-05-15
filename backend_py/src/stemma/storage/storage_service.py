@@ -1,8 +1,7 @@
 from collections import defaultdict
-from dataclasses import dataclass, replace
-from typing import Any
+from dataclasses import replace
 
-from sqlalchemy import Engine, Table, and_, delete, exists, func, insert, select, text, update
+from sqlalchemy import Engine, and_, delete, exists, func, insert, select, text, update
 from sqlalchemy.engine import Connection
 
 from stemma.domain.errors import (
@@ -49,15 +48,15 @@ class StorageService:
             return User(user_id=str(user_id), email=email)
 
     def create_stemma(self, user_id: str, name: str) -> str:
+        user_pk = int(user_id)
         with self._engine.begin() as conn:
-            return self._make_new_stemma(conn, int(user_id), name)
+            return self._make_new_stemma(conn, user_pk, name)
 
     def list_owned_stemmas(self, user_id: str) -> list[StemmaDescription]:
+        user_pk = int(user_id)
         with self._engine.begin() as conn:
             owned = (
-                select(stemma_owners.c.stemmaId)
-                .where(stemma_owners.c.ownerId == int(user_id))
-                .subquery()
+                select(stemma_owners.c.stemmaId).where(stemma_owners.c.ownerId == user_pk).subquery()
             )
             owners_counted = (
                 select(owned.c.stemmaId.label("sid"), func.count(stemma_owners.c.ownerId).label("n"))
@@ -74,152 +73,115 @@ class StorageService:
             ]
 
     def remove_stemma(self, user_id: str, stemma_id: str) -> None:
+        user_pk, stemma_pk = int(user_id), int(stemma_id)
         with self._engine.begin() as conn:
-            self._check_stemma_access(conn, int(stemma_id), int(user_id))
+            self._check_stemma_access(conn, stemma_pk, user_pk)
             owners_count = conn.execute(
                 select(func.count())
                 .select_from(stemma_owners)
-                .where(stemma_owners.c.stemmaId == int(stemma_id))
+                .where(stemma_owners.c.stemmaId == stemma_pk)
             ).scalar_one()
             if owners_count != 1:
-                raise IsNotTheOnlyStemmaOwner(stemmaId=stemma_id)
-            conn.execute(delete(stemmas).where(stemmas.c.id == int(stemma_id)))
+                raise IsNotTheOnlyStemmaOwner(stemma_id=stemma_id)
+            conn.execute(delete(stemmas).where(stemmas.c.id == stemma_pk))
 
-    def create_family(self, user_id: str, stemma_id: str, family: CreateFamily) -> tuple[Stemma, FamilyDescription]:
+    def create_family(
+        self, user_id: str, stemma_id: str, family: CreateFamily
+    ) -> tuple[Stemma, FamilyDescription]:
+        user_pk, stemma_pk = int(user_id), int(stemma_id)
         with self._engine.begin() as conn:
-            self._check_stemma_access(conn, int(stemma_id), int(user_id))
+            self._check_stemma_access(conn, stemma_pk, user_pk)
             parents = [p for p in (family.parent1, family.parent2) if p is not None]
-            existing_match = self._try_find_matching_family(conn, parents, int(user_id))
+            existing_match = self._try_find_matching_family(conn, parents, user_pk)
             if existing_match is not None:
-                family_id = existing_match
+                family_pk = existing_match
             else:
-                family_id = conn.execute(
-                    insert(families).values(stemmaId=int(stemma_id)).returning(families.c.id)
+                family_pk = conn.execute(
+                    insert(families).values(stemmaId=stemma_pk).returning(families.c.id)
                 ).scalar_one()
-                conn.execute(insert(family_owners).values(ownerId=int(user_id), familyId=family_id))
+                self._grant_family_owner(conn, user_pk, family_pk)
 
-            descr = self._link_family_members(conn, int(user_id), int(stemma_id), family_id, family)
-            stemma = self._describe_stemma(conn, int(user_id), int(stemma_id))
+            descr = self._link_family_members(conn, user_pk, stemma_pk, family_pk, family)
+            stemma = self._describe_stemma(conn, user_pk, stemma_pk)
             if has_cycles(stemma):
                 raise StemmaHasCycles()
             return stemma, descr
 
-    def update_family(self, user_id: str, family_id: str, family: CreateFamily) -> tuple[Stemma, FamilyDescription]:
+    def update_family(
+        self, user_id: str, family_id: str, family: CreateFamily
+    ) -> tuple[Stemma, FamilyDescription]:
+        user_pk, family_pk = int(user_id), int(family_id)
         with self._engine.begin() as conn:
-            self._check_family_access(conn, int(family_id), int(user_id))
-            self._unlink_family_members(conn, int(family_id))
-            stemma_id = conn.execute(
-                select(families.c.stemmaId).where(families.c.id == int(family_id))
+            self._check_family_access(conn, family_pk, user_pk)
+            self._unlink_family_members(conn, family_pk)
+            stemma_pk = conn.execute(
+                select(families.c.stemmaId).where(families.c.id == family_pk)
             ).scalar_one()
-            descr = self._link_family_members(conn, int(user_id), stemma_id, int(family_id), family)
-            stemma = self._describe_stemma(conn, int(user_id), stemma_id)
+            descr = self._link_family_members(conn, user_pk, stemma_pk, family_pk, family)
+            stemma = self._describe_stemma(conn, user_pk, stemma_pk)
             if has_cycles(stemma):
                 raise StemmaHasCycles()
             return stemma, descr
 
     def remove_person(self, user_id: str, person_id: str) -> None:
+        user_pk, person_pk = int(user_id), int(person_id)
         with self._engine.begin() as conn:
-            self._check_person_access(conn, int(person_id), int(user_id))
-            conn.execute(delete(people).where(people.c.id == int(person_id)))
+            self._check_person_access(conn, person_pk, user_pk)
+            conn.execute(delete(people).where(people.c.id == person_pk))
             self._drop_empty_families(conn)
 
     def remove_family(self, user_id: str, family_id: str) -> None:
+        user_pk, family_pk = int(user_id), int(family_id)
         with self._engine.begin() as conn:
-            self._check_family_access(conn, int(family_id), int(user_id))
-            self._unlink_family_members(conn, int(family_id))
-            conn.execute(delete(families).where(families.c.id == int(family_id)))
+            self._check_family_access(conn, family_pk, user_pk)
+            self._unlink_family_members(conn, family_pk)
+            conn.execute(delete(families).where(families.c.id == family_pk))
 
     def update_person(self, user_id: str, person_id: str, description: CreateNewPerson) -> None:
+        user_pk, person_pk = int(user_id), int(person_id)
         with self._engine.begin() as conn:
-            self._check_person_access(conn, int(person_id), int(user_id))
+            self._check_person_access(conn, person_pk, user_pk)
             conn.execute(
                 update(people)
-                .where(people.c.id == int(person_id))
+                .where(people.c.id == person_pk)
                 .values(
                     name=description.name,
-                    birthDate=description.birthDate,
-                    deathDate=description.deathDate,
+                    birthDate=description.birth_date,
+                    deathDate=description.death_date,
                     bio=description.bio,
                 )
             )
 
     def clone_stemma(self, user_id: str, stemma_id: str, new_stemma_name: str) -> Stemma:
+        user_pk, stemma_pk = int(user_id), int(stemma_id)
         with self._engine.begin() as conn:
-            self._check_stemma_access(conn, int(stemma_id), int(user_id))
-            new_stemma_id = self._make_new_stemma(conn, int(user_id), new_stemma_name)
-            source = self._describe_stemma(conn, int(user_id), int(stemma_id))
-
-            old_to_new_person: dict[str, int] = {}
-            for person in source.people:
-                new_id = conn.execute(
-                    insert(people)
-                    .values(
-                        name=person.name,
-                        birthDate=person.birthDate,
-                        deathDate=person.deathDate,
-                        bio=person.bio,
-                        stemmaId=new_stemma_id,
-                    )
-                    .returning(people.c.id)
-                ).scalar_one()
-                old_to_new_person[person.id] = new_id
-                conn.execute(insert(person_owners).values(ownerId=int(user_id), personId=new_id))
-
-            old_to_new_family: dict[str, int] = {}
-            for fam in source.families:
-                new_fid = conn.execute(
-                    insert(families).values(stemmaId=new_stemma_id).returning(families.c.id)
-                ).scalar_one()
-                old_to_new_family[fam.id] = new_fid
-                conn.execute(insert(family_owners).values(ownerId=int(user_id), familyId=new_fid))
-                for parent_old in fam.parents:
-                    conn.execute(
-                        insert(spouses).values(personId=old_to_new_person[parent_old], familyId=new_fid)
-                    )
-                for child_old in fam.children:
-                    conn.execute(
-                        insert(children).values(personId=old_to_new_person[child_old], familyId=new_fid)
-                    )
-
-            return Stemma(
-                people=[replace(p, id=str(old_to_new_person[p.id]), readOnly=False) for p in source.people],
-                families=[
-                    FamilyDescription(
-                        id=str(old_to_new_family[f.id]),
-                        parents=[str(old_to_new_person[pid]) for pid in f.parents],
-                        children=[str(old_to_new_person[cid]) for cid in f.children],
-                        readOnly=False,
-                    )
-                    for f in source.families
-                ],
-            )
+            self._check_stemma_access(conn, stemma_pk, user_pk)
+            new_stemma_id = int(self._make_new_stemma(conn, user_pk, new_stemma_name))
+            source = self._describe_stemma(conn, user_pk, stemma_pk)
+            person_id_map = self._clone_people(conn, user_pk, new_stemma_id, source.people)
+            family_id_map = self._clone_families(conn, user_pk, new_stemma_id, source.families, person_id_map)
+            return _rewrite_stemma_ids(source, person_id_map, family_id_map)
 
     def stemma(self, user_id: str, stemma_id: str) -> Stemma:
+        user_pk, stemma_pk = int(user_id), int(stemma_id)
         with self._engine.begin() as conn:
-            self._check_stemma_access(conn, int(stemma_id), int(user_id))
-            return self._describe_stemma(conn, int(user_id), int(stemma_id))
+            self._check_stemma_access(conn, stemma_pk, user_pk)
+            return self._describe_stemma(conn, user_pk, stemma_pk)
 
     def chown(self, user_id: str, stemma_id: str, target_person_id: str) -> ChownEffect:
+        user_pk, stemma_pk, target_pk = int(user_id), int(stemma_id), int(target_person_id)
         with self._engine.begin() as conn:
             kinsmen_families = [
                 row[0]
-                for row in conn.execute(_KINSMEN_FAMILIES_SQL, {"init_person_id": int(target_person_id)})
+                for row in conn.execute(_KINSMEN_FAMILIES_SQL, {"init_person_id": target_pk})
             ]
-            if kinsmen_families:
-                affected_people_rows = conn.execute(
-                    select(spouses.c.personId)
-                    .where(spouses.c.familyId.in_(kinsmen_families))
-                    .union(select(children.c.personId).where(children.c.familyId.in_(kinsmen_families)))
-                ).all()
-                affected_people = [row[0] for row in affected_people_rows]
-            else:
-                affected_people = []
+            affected_people = self._members_of_families(conn, kinsmen_families) if kinsmen_families else []
 
             for fid in kinsmen_families:
-                self._add_owner_if_needed(conn, _FAMILY_OWNERSHIP, int(user_id), fid)
+                self._grant_family_owner(conn, user_pk, fid)
             for pid in affected_people:
-                self._add_owner_if_needed(conn, _PERSON_OWNERSHIP, int(user_id), pid)
-            self._add_owner_if_needed(conn, _STEMMA_OWNERSHIP, int(user_id), int(stemma_id))
+                self._grant_person_owner(conn, user_pk, pid)
+            self._grant_stemma_owner(conn, user_pk, stemma_pk)
 
             return ChownEffect(
                 affected_families=[str(f) for f in kinsmen_families],
@@ -227,47 +189,45 @@ class StorageService:
             )
 
     def owns_person(self, user_id: str, person_id: str) -> bool:
+        user_pk, person_pk = int(user_id), int(person_id)
         with self._engine.begin() as conn:
-            return conn.execute(
-                select(
-                    exists().where(
-                        and_(
-                            person_owners.c.ownerId == int(user_id),
-                            person_owners.c.personId == int(person_id),
-                        )
-                    )
-                )
-            ).scalar_one()
+            return self._owns(
+                conn, person_owners.c.ownerId, person_owners.c.personId, user_pk, person_pk
+            )
 
     def _make_new_stemma(self, conn: Connection, user_id: int, name: str) -> str:
         new_id = conn.execute(insert(stemmas).values(name=name).returning(stemmas.c.id)).scalar_one()
-        conn.execute(insert(stemma_owners).values(ownerId=user_id, stemmaId=new_id))
+        self._grant_stemma_owner(conn, user_id, new_id)
         return str(new_id)
 
-    def _check_ownership(
-        self, conn: Connection, ownership: "_Ownership", target_id: int, user_id: int
-    ) -> None:
-        is_owner = conn.execute(
-            select(
-                exists().where(
-                    and_(
-                        ownership.owner_col == user_id,
-                        ownership.target_col == target_id,
-                    )
-                )
-            )
+    def _owns(self, conn: Connection, owner_col, target_col, user_id: int, target_id: int) -> bool:
+        return conn.execute(
+            select(exists().where(and_(owner_col == user_id, target_col == target_id)))
         ).scalar_one()
-        if not is_owner:
-            raise ownership.denied_exc(**{ownership.denied_field: str(target_id)})
 
     def _check_stemma_access(self, conn: Connection, stemma_id: int, user_id: int) -> None:
-        self._check_ownership(conn, _STEMMA_OWNERSHIP, stemma_id, user_id)
+        if not self._owns(conn, stemma_owners.c.ownerId, stemma_owners.c.stemmaId, user_id, stemma_id):
+            raise AccessToStemmaDenied(stemma_id=str(stemma_id))
 
     def _check_person_access(self, conn: Connection, person_id: int, user_id: int) -> None:
-        self._check_ownership(conn, _PERSON_OWNERSHIP, person_id, user_id)
+        if not self._owns(conn, person_owners.c.ownerId, person_owners.c.personId, user_id, person_id):
+            raise AccessToPersonDenied(person_id=str(person_id))
 
     def _check_family_access(self, conn: Connection, family_id: int, user_id: int) -> None:
-        self._check_ownership(conn, _FAMILY_OWNERSHIP, family_id, user_id)
+        if not self._owns(conn, family_owners.c.ownerId, family_owners.c.familyId, user_id, family_id):
+            raise AccessToFamilyDenied(family_id=str(family_id))
+
+    def _grant_stemma_owner(self, conn: Connection, user_id: int, stemma_id: int) -> None:
+        if not self._owns(conn, stemma_owners.c.ownerId, stemma_owners.c.stemmaId, user_id, stemma_id):
+            conn.execute(insert(stemma_owners).values(ownerId=user_id, stemmaId=stemma_id))
+
+    def _grant_person_owner(self, conn: Connection, user_id: int, person_id: int) -> None:
+        if not self._owns(conn, person_owners.c.ownerId, person_owners.c.personId, user_id, person_id):
+            conn.execute(insert(person_owners).values(ownerId=user_id, personId=person_id))
+
+    def _grant_family_owner(self, conn: Connection, user_id: int, family_id: int) -> None:
+        if not self._owns(conn, family_owners.c.ownerId, family_owners.c.familyId, user_id, family_id):
+            conn.execute(insert(family_owners).values(ownerId=user_id, familyId=family_id))
 
     def _check_person_belongs_to_stemma(self, conn: Connection, person_id: int, stemma_id: int) -> None:
         present = conn.execute(
@@ -279,23 +239,25 @@ class StorageService:
     def _get_or_create_person(
         self, conn: Connection, stemma_id: int, user_id: int, pd: PersonDefinition
     ) -> int:
-        if isinstance(pd, ExistingPerson):
-            self._check_person_access(conn, int(pd.id), user_id)
-            self._check_person_belongs_to_stemma(conn, int(pd.id), stemma_id)
-            return int(pd.id)
-        new_id = conn.execute(
-            insert(people)
-            .values(
-                name=pd.name,
-                birthDate=pd.birthDate,
-                deathDate=pd.deathDate,
-                bio=pd.bio,
-                stemmaId=stemma_id,
-            )
-            .returning(people.c.id)
-        ).scalar_one()
-        conn.execute(insert(person_owners).values(ownerId=user_id, personId=new_id))
-        return new_id
+        match pd:
+            case ExistingPerson(id=pid):
+                self._check_person_access(conn, int(pid), user_id)
+                self._check_person_belongs_to_stemma(conn, int(pid), stemma_id)
+                return int(pid)
+            case CreateNewPerson():
+                new_id = conn.execute(
+                    insert(people)
+                    .values(
+                        name=pd.name,
+                        birthDate=pd.birth_date,
+                        deathDate=pd.death_date,
+                        bio=pd.bio,
+                        stemmaId=stemma_id,
+                    )
+                    .returning(people.c.id)
+                ).scalar_one()
+                self._grant_person_owner(conn, user_id, new_id)
+                return new_id
 
     def _link_family_members(
         self, conn: Connection, user_id: int, stemma_id: int, family_id: int, family: CreateFamily
@@ -318,7 +280,7 @@ class StorageService:
             id=str(family_id),
             parents=[str(p) for p in parent_ids],
             children=[str(c) for c in child_ids],
-            readOnly=True,
+            read_only=True,
         )
 
     def _unlink_family_members(self, conn: Connection, family_id: int) -> None:
@@ -352,7 +314,12 @@ class StorageService:
         return None
 
     def _describe_stemma(self, conn: Connection, user_id: int, stemma_id: int) -> Stemma:
-        person_rows = conn.execute(
+        people_descr = self._load_people(conn, user_id, stemma_id)
+        families_descr = self._load_families(conn, user_id, stemma_id)
+        return Stemma(people=people_descr, families=families_descr)
+
+    def _load_people(self, conn: Connection, user_id: int, stemma_id: int) -> list[PersonDescription]:
+        rows = conn.execute(
             select(
                 people.c.id,
                 people.c.name,
@@ -369,20 +336,22 @@ class StorageService:
                 .label("is_owner"),
             ).where(people.c.stemmaId == stemma_id)
         ).all()
-
-        people_descr = [
+        return [
             PersonDescription(
                 id=str(pid),
                 name=name,
-                birthDate=birth,
-                deathDate=death,
+                birth_date=birth,
+                death_date=death,
                 bio=bio,
-                readOnly=not is_owner,
+                read_only=not is_owner,
             )
-            for (pid, name, birth, death, bio, is_owner) in person_rows
+            for (pid, name, birth, death, bio, is_owner) in rows
         ]
 
-        fam_ids_for_stemma = select(families.c.id).where(families.c.stemmaId == stemma_id).scalar_subquery()
+    def _load_families(self, conn: Connection, user_id: int, stemma_id: int) -> list[FamilyDescription]:
+        fam_ids_for_stemma = (
+            select(families.c.id).where(families.c.stemmaId == stemma_id).scalar_subquery()
+        )
         spouse_rows = conn.execute(
             select(
                 spouses.c.familyId,
@@ -412,47 +381,90 @@ class StorageService:
             ).where(children.c.familyId.in_(fam_ids_for_stemma))
         ).all()
 
-        family_read_only: dict[str, bool] = {}
-        family_spouses: dict[str, set[str]] = defaultdict(set)
-        family_children: dict[str, set[str]] = defaultdict(set)
+        read_only: dict[str, bool] = {}
+        spouses_by_family: dict[str, set[str]] = defaultdict(set)
+        children_by_family: dict[str, set[str]] = defaultdict(set)
 
         for fid, pid, is_owner in spouse_rows:
-            family_spouses[str(fid)].add(str(pid))
-            family_read_only[str(fid)] = not is_owner
+            spouses_by_family[str(fid)].add(str(pid))
+            read_only[str(fid)] = not is_owner
         for fid, pid, is_owner in child_rows:
-            family_children[str(fid)].add(str(pid))
-            family_read_only[str(fid)] = not is_owner
+            children_by_family[str(fid)].add(str(pid))
+            read_only[str(fid)] = not is_owner
 
-        families_descr = [
+        return [
             FamilyDescription(
                 id=fid,
-                parents=list(family_spouses[fid]),
-                children=list(family_children[fid]),
-                readOnly=read_only,
+                parents=list(spouses_by_family[fid]),
+                children=list(children_by_family[fid]),
+                read_only=ro,
             )
-            for fid, read_only in family_read_only.items()
+            for fid, ro in read_only.items()
         ]
 
-        return Stemma(people=people_descr, families=families_descr)
+    def _members_of_families(self, conn: Connection, family_ids: list[int]) -> list[int]:
+        rows = conn.execute(
+            select(spouses.c.personId)
+            .where(spouses.c.familyId.in_(family_ids))
+            .union(select(children.c.personId).where(children.c.familyId.in_(family_ids)))
+        ).all()
+        return [row[0] for row in rows]
+
+    def _clone_people(
+        self, conn: Connection, user_id: int, new_stemma_id: int, source_people: list[PersonDescription]
+    ) -> dict[str, int]:
+        old_to_new: dict[str, int] = {}
+        for person in source_people:
+            new_id = conn.execute(
+                insert(people)
+                .values(
+                    name=person.name,
+                    birthDate=person.birth_date,
+                    deathDate=person.death_date,
+                    bio=person.bio,
+                    stemmaId=new_stemma_id,
+                )
+                .returning(people.c.id)
+            ).scalar_one()
+            old_to_new[person.id] = new_id
+            self._grant_person_owner(conn, user_id, new_id)
+        return old_to_new
+
+    def _clone_families(
+        self,
+        conn: Connection,
+        user_id: int,
+        new_stemma_id: int,
+        source_families: list[FamilyDescription],
+        person_id_map: dict[str, int],
+    ) -> dict[str, int]:
+        old_to_new: dict[str, int] = {}
+        for fam in source_families:
+            new_fid = conn.execute(
+                insert(families).values(stemmaId=new_stemma_id).returning(families.c.id)
+            ).scalar_one()
+            old_to_new[fam.id] = new_fid
+            self._grant_family_owner(conn, user_id, new_fid)
+            for parent_old in fam.parents:
+                conn.execute(insert(spouses).values(personId=person_id_map[parent_old], familyId=new_fid))
+            for child_old in fam.children:
+                conn.execute(insert(children).values(personId=person_id_map[child_old], familyId=new_fid))
+        return old_to_new
 
     def _drop_empty_families(self, conn: Connection) -> None:
         combined = select(spouses.c.familyId).union_all(select(children.c.familyId)).subquery()
         empty_family_ids = (
-            select(combined.c.familyId)
-            .group_by(combined.c.familyId)
-            .having(func.count() < 2)
+            select(combined.c.familyId).group_by(combined.c.familyId).having(func.count() < 2)
         )
         fids = [row[0] for row in conn.execute(empty_family_ids)]
         if fids:
             conn.execute(delete(families).where(families.c.id.in_(fids)))
 
     def _create_spouse_relation_if_not_exist(self, conn: Connection, person_id: int, family_id: int) -> None:
-        exists_row = conn.execute(
-            select(
-                exists().where(and_(spouses.c.personId == person_id, spouses.c.familyId == family_id))
-            )
+        present = conn.execute(
+            select(exists().where(and_(spouses.c.personId == person_id, spouses.c.familyId == family_id)))
         ).scalar_one()
-        if not exists_row:
+        if not present:
             conn.execute(insert(spouses).values(personId=person_id, familyId=family_id))
 
     def _create_child_relation_or_fail(self, conn: Connection, person_id: int, family_id: int) -> None:
@@ -466,25 +478,7 @@ class StorageService:
         if len(existing) == 1 and existing[0] == family_id:
             return
         other = next(f for f in existing if f != family_id)
-        raise ChildAlreadyBelongsToFamily(familyId=str(other), personId=str(person_id))
-
-    def _add_owner_if_needed(
-        self, conn: Connection, ownership: "_Ownership", user_id: int, target_id: int
-    ) -> None:
-        present = conn.execute(
-            select(
-                exists().where(
-                    and_(
-                        ownership.owner_col == user_id,
-                        ownership.target_col == target_id,
-                    )
-                )
-            )
-        ).scalar_one()
-        if not present:
-            conn.execute(
-                insert(ownership.table).values(ownerId=user_id, **{ownership.target_key: target_id})
-            )
+        raise ChildAlreadyBelongsToFamily(family_id=str(other), person_id=str(person_id))
 
 
 def _ensure_no_duplicate_ids(definitions: list[PersonDefinition]) -> None:
@@ -494,43 +488,24 @@ def _ensure_no_duplicate_ids(definitions: list[PersonDefinition]) -> None:
             seen[pd.id] += 1
     for pid, count in seen.items():
         if count > 1:
-            raise DuplicatedIds(duplicatedIds=pid)
+            raise DuplicatedIds(duplicated_ids=pid)
 
 
-@dataclass(frozen=True)
-class _Ownership:
-    table: Table
-    owner_col: Any
-    target_col: Any
-    target_key: str
-    denied_exc: type[Exception]
-    denied_field: str
-
-
-_STEMMA_OWNERSHIP = _Ownership(
-    table=stemma_owners,
-    owner_col=stemma_owners.c.ownerId,
-    target_col=stemma_owners.c.stemmaId,
-    target_key="stemmaId",
-    denied_exc=AccessToStemmaDenied,
-    denied_field="stemmaId",
-)
-_PERSON_OWNERSHIP = _Ownership(
-    table=person_owners,
-    owner_col=person_owners.c.ownerId,
-    target_col=person_owners.c.personId,
-    target_key="personId",
-    denied_exc=AccessToPersonDenied,
-    denied_field="personId",
-)
-_FAMILY_OWNERSHIP = _Ownership(
-    table=family_owners,
-    owner_col=family_owners.c.ownerId,
-    target_col=family_owners.c.familyId,
-    target_key="familyId",
-    denied_exc=AccessToFamilyDenied,
-    denied_field="familyId",
-)
+def _rewrite_stemma_ids(
+    source: Stemma, person_id_map: dict[str, int], family_id_map: dict[str, int]
+) -> Stemma:
+    return Stemma(
+        people=[replace(p, id=str(person_id_map[p.id]), read_only=False) for p in source.people],
+        families=[
+            FamilyDescription(
+                id=str(family_id_map[f.id]),
+                parents=[str(person_id_map[pid]) for pid in f.parents],
+                children=[str(person_id_map[cid]) for cid in f.children],
+                read_only=False,
+            )
+            for f in source.families
+        ],
+    )
 
 
 _KINSMEN_FAMILIES_SQL = text(

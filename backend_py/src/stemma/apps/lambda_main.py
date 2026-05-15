@@ -17,6 +17,8 @@ logger.setLevel(logging.INFO)
 
 @cache
 def _build() -> tuple[RequestHandler, UserService]:
+    # Cached so warm Lambda invocations reuse the engine + handler instead of
+    # rebuilding (and rehitting Secrets Manager) on every request.
     populate_env_from_secrets()
     write_root_cert()
     engine = engine_from_env(pool_pre_ping=True, pool_recycle=300)

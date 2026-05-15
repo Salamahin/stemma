@@ -1,7 +1,7 @@
 import base64
 import hashlib
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -13,14 +13,23 @@ AES_BLOCK_SIZE_BITS = 128
 
 @dataclass(frozen=True)
 class InviteToken:
-    inviteesEmail: str
-    stemmaId: str
-    targetPersonId: str
+    invitees_email: str
+    stemma_id: str
+    target_person_id: str
     entropy: str
 
 
+_WIRE_KEYS = {
+    "invitees_email": "inviteesEmail",
+    "stemma_id": "stemmaId",
+    "target_person_id": "targetPersonId",
+    "entropy": "entropy",
+}
+_PY_KEYS = {wire: py for py, wire in _WIRE_KEYS.items()}
+
+
 def encode_invite_token(secret: str, token: InviteToken) -> str:
-    payload = json.dumps(asdict(token)).encode("utf-8")
+    payload = json.dumps({_WIRE_KEYS[k]: v for k, v in token.__dict__.items()}).encode("utf-8")
     return _encrypt(_derive_key(secret), payload)
 
 
@@ -28,7 +37,7 @@ def decode_invite_token(secret: str, encoded: str) -> InviteToken:
     try:
         decrypted = _decrypt(_derive_key(secret), encoded)
         data = json.loads(decrypted)
-        return InviteToken(**data)
+        return InviteToken(**{_PY_KEYS[k]: v for k, v in data.items()})
     except Exception as e:
         raise InvalidInviteToken() from e
 

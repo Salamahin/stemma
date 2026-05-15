@@ -1,59 +1,63 @@
-from dataclasses import dataclass, field
+from dataclasses import field
 from datetime import date
 
+from pydantic.dataclasses import dataclass
 
-@dataclass(frozen=True)
+from stemma.domain._config import DOMAIN_CONFIG
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class FamilyDescription:
     id: str
     parents: list[str]
     children: list[str]
-    readOnly: bool
+    read_only: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class PersonDescription:
     id: str
     name: str
-    birthDate: date | None
-    deathDate: date | None
+    birth_date: date | None
+    death_date: date | None
     bio: str | None
-    readOnly: bool
+    read_only: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class StemmaDescription:
     id: str
     name: str
     removable: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class Stemma:
     people: list[PersonDescription] = field(default_factory=list)
     families: list[FamilyDescription] = field(default_factory=list)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class OwnedStemmas:
     stemmas: list[StemmaDescription]
-    firstStemma: Stemma | None
+    first_stemma: Stemma | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class InviteToken:
     token: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class CloneResult:
-    createdStemma: Stemma
+    created_stemma: Stemma
     stemmas: list[StemmaDescription]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class TokenAccepted:
     stemmas: list[StemmaDescription]
-    lastStemma: Stemma
+    last_stemma: Stemma
 
 
 Response = (

@@ -1,71 +1,73 @@
-from dataclasses import dataclass
+from pydantic.dataclasses import dataclass
+
+from stemma.domain._config import DOMAIN_CONFIG
 
 
 class StemmaError(Exception):
     pass
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class UnknownError(StemmaError):
     cause: str
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class RequestDeserializationProblem(StemmaError):
     descr: str
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class NoSuchPersonId(StemmaError):
     id: str
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class ChildAlreadyBelongsToFamily(StemmaError):
-    familyId: str
-    personId: str
+    family_id: str
+    person_id: str
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class IncompleteFamily(StemmaError):
     pass
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class DuplicatedIds(StemmaError):
-    duplicatedIds: str
+    duplicated_ids: str
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class AccessToFamilyDenied(StemmaError):
-    familyId: str
+    family_id: str
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class AccessToPersonDenied(StemmaError):
-    personId: str
+    person_id: str
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class AccessToStemmaDenied(StemmaError):
-    stemmaId: str
+    stemma_id: str
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class IsNotTheOnlyStemmaOwner(StemmaError):
-    stemmaId: str
+    stemma_id: str
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class InvalidInviteToken(StemmaError):
     pass
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class ForeignInviteToken(StemmaError):
     pass
 
 
-@dataclass
+@dataclass(config=DOMAIN_CONFIG)
 class StemmaHasCycles(StemmaError):
     pass
