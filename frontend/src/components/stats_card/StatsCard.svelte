@@ -57,71 +57,58 @@
 
 {#if stats}
     <aside class="stats-card" class:active={stats.active} aria-live="polite">
-        <div class="title">
-            {stats.active ? $t("stats.highlighted") : ""}
-        </div>
-        <div class="row">
-            <span class="label">{$t("stats.people")}</span>
-            <span class="value">{stats.people}</span>
-        </div>
-        <div class="row">
-            <span class="label">{$t("stats.families")}</span>
-            <span class="value">{stats.families}</span>
-        </div>
-        <div class="row">
-            <span class="label">{$t("stats.depth")}</span>
-            <span class="value">{stats.depth}</span>
-        </div>
+        <table>
+            <tbody>
+                <tr><td class="label">{$t("stats.people")}</td><td class="value">{stats.people}</td></tr>
+                <tr><td class="label">{$t("stats.families")}</td><td class="value">{stats.families}</td></tr>
+                <tr><td class="label">{$t("stats.depth")}</td><td class="value">{stats.depth}</td></tr>
+            </tbody>
+        </table>
     </aside>
 {/if}
 
 <style>
     .stats-card {
         position: fixed;
-        right: 16px;
-        bottom: 16px;
+        right: 12px;
+        bottom: 12px;
         z-index: 1000;
-        padding: 10px 14px;
-        min-width: 140px;
-        background: rgba(33, 37, 41, 0.72);
-        color: rgba(255, 255, 255, 0.88);
+        padding: 6px 9px;
+        background: rgba(33, 37, 41, 0.7);
+        color: rgba(255, 255, 255, 0.85);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 6px;
+        border-radius: 4px;
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-        font-size: 12px;
-        line-height: 1.55;
+        font-size: 10px;
+        line-height: 1.4;
+        white-space: nowrap;
         backdrop-filter: blur(4px);
         -webkit-backdrop-filter: blur(4px);
         pointer-events: none;
-        transition: border-color 120ms ease, background 120ms ease;
+        transition: border-color 120ms ease;
         user-select: none;
     }
 
     .stats-card.active {
         border-color: rgba(255, 196, 0, 0.55);
-        background: rgba(33, 37, 41, 0.82);
     }
 
-    .title {
-        min-height: 14px;
-        font-size: 10px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: rgba(255, 196, 0, 0.75);
-        margin-bottom: 4px;
+    table {
+        border-collapse: collapse;
     }
 
-    .row {
-        display: flex;
-        justify-content: space-between;
-        gap: 14px;
+    td {
+        padding: 0;
     }
 
     .label {
-        color: rgba(255, 255, 255, 0.55);
+        color: rgba(255, 255, 255, 0.5);
+        text-align: left;
+        padding-right: 14px;
     }
 
     .value {
+        text-align: right;
         font-variant-numeric: tabular-nums;
         font-weight: 600;
     }
