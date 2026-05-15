@@ -43,7 +43,7 @@ def jdbc_to_sqlalchemy_url(jdbc_url: str, user: str, password: str) -> str:
         if stripped.startswith(prefix):
             stripped = stripped.removeprefix(prefix)
             break
-    return f"postgresql+psycopg://{user}:{password}@{stripped}"
+    return f"cockroachdb+psycopg://{user}:{password}@{stripped}"
 
 
 def engine_from_env(*, pool_pre_ping: bool = False, pool_recycle: int = -1) -> Engine:

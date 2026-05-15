@@ -6,6 +6,7 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "sqlalchemy>=2.0",
+    "sqlalchemy-cockroachdb>=2.0",
     "psycopg[binary]>=3.2",
     "pydantic>=2.9",
     "cryptography>=43",
