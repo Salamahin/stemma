@@ -13,14 +13,13 @@ from stemma.domain.responses import FamilyDescription, OwnedStemmas, PersonDescr
 
 def test_decode_create_family_request_with_mixed_person_definitions() -> None:
     payload = {
-        "CreateFamilyRequest": {
-            "stemmaId": "7",
-            "familyDescr": {
-                "parent1": {"ExistingPerson": {"id": "1"}},
-                "parent2": {"CreateNewPerson": {"name": "Jane", "birthDate": "1900-01-01"}},
-                "children": [{"CreateNewPerson": {"name": "Josh"}}],
-            },
-        }
+        "type": "CreateFamilyRequest",
+        "stemmaId": "7",
+        "familyDescr": {
+            "parent1": {"type": "ExistingPerson", "id": "1"},
+            "parent2": {"type": "CreateNewPerson", "name": "Jane", "birthDate": "1900-01-01"},
+            "children": [{"type": "CreateNewPerson", "name": "Josh"}],
+        },
     }
     request = decode_request(payload)
     assert isinstance(request, CreateFamilyRequest)
@@ -31,13 +30,18 @@ def test_decode_create_family_request_with_mixed_person_definitions() -> None:
 
 
 def test_decode_update_person_request_omits_missing_optional_fields() -> None:
-    payload = {"UpdatePersonRequest": {"stemmaId": "1", "personId": "2", "personDescr": {"name": "Solo"}}}
+    payload = {
+        "type": "UpdatePersonRequest",
+        "stemmaId": "1",
+        "personId": "2",
+        "personDescr": {"type": "CreateNewPerson", "name": "Solo"},
+    }
     request = decode_request(payload)
     assert isinstance(request, UpdatePersonRequest)
     assert request.person_descr == CreateNewPerson(name="Solo")
 
 
-def test_encode_owned_stemmas_response_wraps_with_class_name() -> None:
+def test_encode_owned_stemmas_response_tags_with_type_field() -> None:
     response = OwnedStemmas(
         stemmas=[StemmaDescription(id="3", name="Tree", removable=True)],
         first_stemma=Stemma(
@@ -56,29 +60,35 @@ def test_encode_owned_stemmas_response_wraps_with_class_name() -> None:
     )
     encoded = encode_response(response)
     assert encoded == {
-        "OwnedStemmas": {
-            "stemmas": [{"id": "3", "name": "Tree", "removable": True}],
-            "firstStemma": {
-                "people": [
-                    {
-                        "id": "9",
-                        "name": "John",
-                        "birthDate": "1900-01-01",
-                        "deathDate": None,
-                        "bio": None,
-                        "readOnly": False,
-                    }
-                ],
-                "families": [{"id": "1", "parents": ["9"], "children": [], "readOnly": False}],
-            },
-        }
+        "type": "OwnedStemmas",
+        "stemmas": [{"type": "StemmaDescription", "id": "3", "name": "Tree", "removable": True}],
+        "firstStemma": {
+            "type": "Stemma",
+            "people": [
+                {
+                    "type": "PersonDescription",
+                    "id": "9",
+                    "name": "John",
+                    "birthDate": "1900-01-01",
+                    "deathDate": None,
+                    "bio": None,
+                    "readOnly": False,
+                }
+            ],
+            "families": [
+                {"type": "FamilyDescription", "id": "1", "parents": ["9"], "children": [], "readOnly": False}
+            ],
+        },
     }
 
 
 def test_encode_error_with_fields() -> None:
-    assert encode_error(AccessToFamilyDenied(family_id="42")) == {"AccessToFamilyDenied": {"familyId": "42"}}
+    assert encode_error(AccessToFamilyDenied(family_id="42")) == {
+        "type": "AccessToFamilyDenied",
+        "familyId": "42",
+    }
 
 
 def test_encode_error_without_fields() -> None:
-    assert encode_error(IncompleteFamily()) == {"IncompleteFamily": {}}
-    assert encode_error(InvalidInviteToken()) == {"InvalidInviteToken": {}}
+    assert encode_error(IncompleteFamily()) == {"type": "IncompleteFamily"}
+    assert encode_error(InvalidInviteToken()) == {"type": "InvalidInviteToken"}

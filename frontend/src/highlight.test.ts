@@ -3,15 +3,16 @@ import type { Stemma } from "./model";
 import { StemmaIndex } from "./stemmaIndex";
 
 const stemma: Stemma = {
+    type: "Stemma",
     people: [
-        { id: "1", name: "Ann", readOnly: false },
-        { id: "2", name: "Ben", readOnly: false },
-        { id: "3", name: "Cam", readOnly: false },
-        { id: "4", name: "Dan", readOnly: false },
+        { type: "PersonDescription", id: "1", name: "Ann", readOnly: false },
+        { type: "PersonDescription", id: "2", name: "Ben", readOnly: false },
+        { type: "PersonDescription", id: "3", name: "Cam", readOnly: false },
+        { type: "PersonDescription", id: "4", name: "Dan", readOnly: false },
     ],
     families: [
-        { id: "f1", parents: ["1"], children: ["2"], readOnly: false },
-        { id: "f2", parents: ["3"], children: ["4"], readOnly: false },
+        { type: "FamilyDescription", id: "f1", parents: ["1"], children: ["2"], readOnly: false },
+        { type: "FamilyDescription", id: "f2", parents: ["3"], children: ["4"], readOnly: false },
     ],
 };
 

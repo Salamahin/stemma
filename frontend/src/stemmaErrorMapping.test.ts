@@ -5,9 +5,9 @@ describe("mapStemmaError", () => {
     const describePerson = (id: string) => `[${id}]`;
 
     test("maps unknown error", () => {
-        expect(() => mapStemmaError({ UnknownError: { cause: "x" } }, describePerson)).toThrow(LocalizedError);
+        expect(() => mapStemmaError({ type: "UnknownError", cause: "x" }, describePerson)).toThrow(LocalizedError);
         try {
-            mapStemmaError({ UnknownError: { cause: "x" } }, describePerson);
+            mapStemmaError({ type: "UnknownError", cause: "x" }, describePerson);
         } catch (err: any) {
             expect(err.key).toBe("error.unknown");
         }
@@ -15,7 +15,7 @@ describe("mapStemmaError", () => {
 
     test("maps NoSuchPersonId with name param", () => {
         try {
-            mapStemmaError({ NoSuchPersonId: { id: "p1" } }, describePerson);
+            mapStemmaError({ type: "NoSuchPersonId", id: "p1" }, describePerson);
         } catch (err: any) {
             expect(err.key).toBe("error.noSuchPerson");
             expect(err.params).toEqual({ name: "[p1]" });
@@ -23,7 +23,7 @@ describe("mapStemmaError", () => {
     });
 
     test("returns response when no error", () => {
-        const response = { Stemma: { people: [], families: [] } } as any;
+        const response = { type: "Stemma" as const, people: [], families: [] };
         expect(mapStemmaError(response, describePerson)).toBe(response);
     });
 });

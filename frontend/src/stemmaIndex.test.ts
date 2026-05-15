@@ -1,6 +1,10 @@
 import type { Generation } from './stemmaIndex'
 import { StemmaIndex } from './stemmaIndex'
-import type { Stemma } from './model';
+import type { FamilyDescription, PersonDescription, Stemma } from './model';
+
+const person = (o: Omit<PersonDescription, "type">): PersonDescription => ({ type: "PersonDescription", ...o });
+const family = (o: Omit<FamilyDescription, "type">): FamilyDescription => ({ type: "FamilyDescription", ...o });
+const stemma = (o: Omit<Stemma, "type">): Stemma => ({ type: "Stemma", ...o });
 
 /*
     JJ family:
@@ -26,27 +30,26 @@ const july = "7"
 const jeff = "8"
 const joseph = "9"
 
-let jjFamily: Stemma = {
+let jjFamily: Stemma = stemma({
     people: [
-        { id: jane, name: "Jane", readOnly: false },
-        { id: john, name: "John", readOnly: false },
-        { id: josh, name: "Josh", readOnly: false },
-        { id: jill, name: "Jill", readOnly: false },
-        { id: jake, name: "Jake", readOnly: false },
-        { id: james, name: "James", readOnly: false },
-        { id: july, name: "July", readOnly: false },
-        { id: jeff, name: "Jeff", readOnly: false },
-        { id: joseph, name: "Joseph", readOnly: false },
-
+        person({ id: jane, name: "Jane", readOnly: false }),
+        person({ id: john, name: "John", readOnly: false }),
+        person({ id: josh, name: "Josh", readOnly: false }),
+        person({ id: jill, name: "Jill", readOnly: false }),
+        person({ id: jake, name: "Jake", readOnly: false }),
+        person({ id: james, name: "James", readOnly: false }),
+        person({ id: july, name: "July", readOnly: false }),
+        person({ id: jeff, name: "Jeff", readOnly: false }),
+        person({ id: joseph, name: "Joseph", readOnly: false }),
     ],
     families: [
-        { id: "1", parents: [jane, john], "children": [josh, jill], readOnly: false },
-        { id: "2", parents: [jill, jake], "children": [james], readOnly: false },
-        { id: "3", parents: [july], "children": [jake], readOnly: false },
-        { id: "4", parents: [james], "children": [jeff], readOnly: false },
-        { id: "5", parents: [joseph], "children": [july], readOnly: false },
-    ]
-}
+        family({ id: "1", parents: [jane, john], children: [josh, jill], readOnly: false }),
+        family({ id: "2", parents: [jill, jake], children: [james], readOnly: false }),
+        family({ id: "3", parents: [july], children: [jake], readOnly: false }),
+        family({ id: "4", parents: [james], children: [jeff], readOnly: false }),
+        family({ id: "5", parents: [joseph], children: [july], readOnly: false }),
+    ],
+})
 
 test('Jane is the first in her lineage and is a direct relative of Josh, Jill, James and Jeff', () => {
     let lineage = new StemmaIndex(jjFamily).lineage(jane)
@@ -78,19 +81,19 @@ const dasha = "4"
 const lena = "5"
 
 test("lineage takes into account all children from all families", () => {
-    let mashaFamily = {
+    let mashaFamily = stemma({
         families: [
-            { id: "1", parents: [masha, katya], children: [petya], readOnly: false },
-            { id: "2", parents: [masha, dasha], children: [lena], readOnly: false },
+            family({ id: "1", parents: [masha, katya], children: [petya], readOnly: false }),
+            family({ id: "2", parents: [masha, dasha], children: [lena], readOnly: false }),
         ],
         people: [
-            { id: masha, name: "masha", readOnly: false },
-            { id: katya, name: "katya", readOnly: false },
-            { id: petya, name: "petya", readOnly: false },
-            { id: dasha, name: "dasha", readOnly: false },
-            { id: lena, name: "lena", readOnly: false },
+            person({ id: masha, name: "masha", readOnly: false }),
+            person({ id: katya, name: "katya", readOnly: false }),
+            person({ id: petya, name: "petya", readOnly: false }),
+            person({ id: dasha, name: "dasha", readOnly: false }),
+            person({ id: lena, name: "lena", readOnly: false }),
         ],
-    }
+    })
 
     let lineage = new StemmaIndex(mashaFamily).lineage(masha)
     expect(lineage).toEqual({
@@ -106,15 +109,15 @@ test("calculates max generation", () => {
 })
 
 test("lineage skips empty families", () => {
-    let mashaFamily = {
+    let mashaFamily = stemma({
         families: [
-            { id: "1", parents: [masha, katya], children: [], readOnly: false },
+            family({ id: "1", parents: [masha, katya], children: [], readOnly: false }),
         ],
         people: [
-            { id: masha, name: "masha", readOnly: false },
-            { id: katya, name: "katya", readOnly: false }
+            person({ id: masha, name: "masha", readOnly: false }),
+            person({ id: katya, name: "katya", readOnly: false }),
         ],
-    }
+    })
 
     let lineage = new StemmaIndex(mashaFamily).lineage(masha)
     expect(lineage).toEqual({

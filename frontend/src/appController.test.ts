@@ -7,8 +7,15 @@ function drainPromises() {
 }
 
 describe("AppController", () => {
-    const stemmaA: Stemma = { people: [], families: [] };
-    const stemmaB: Stemma = { people: [{ id: "1", name: "Ann", readOnly: false }], families: [] };
+    const stemmaA: Stemma = { type: "Stemma", people: [], families: [] };
+    const stemmaB: Stemma = {
+        type: "Stemma",
+        people: [{ type: "PersonDescription", id: "1", name: "Ann", readOnly: false }],
+        families: [],
+    };
+
+    const stemmaDescA = { type: "StemmaDescription" as const, id: "a", name: "A", removable: true };
+    const stemmaDescB = { type: "StemmaDescription" as const, id: "b", name: "B", removable: true };
 
     beforeEach(() => {
         localStorage.clear();
@@ -17,10 +24,7 @@ describe("AppController", () => {
     test("uses last stemma id on authenticate and fetches it when not first", async () => {
         const model = {
             listDescribeStemmas: jest.fn().mockResolvedValue({
-                stemmas: [
-                    { id: "a", name: "A", removable: true },
-                    { id: "b", name: "B", removable: true },
-                ],
+                stemmas: [stemmaDescA, stemmaDescB],
                 firstStemma: stemmaA,
             }),
             getStemma: jest.fn().mockResolvedValue(stemmaB),
@@ -41,10 +45,7 @@ describe("AppController", () => {
     test("falls back to first stemma when no last id", async () => {
         const model = {
             listDescribeStemmas: jest.fn().mockResolvedValue({
-                stemmas: [
-                    { id: "a", name: "A", removable: true },
-                    { id: "b", name: "B", removable: true },
-                ],
+                stemmas: [stemmaDescA, stemmaDescB],
                 firstStemma: stemmaA,
             }),
             getStemma: jest.fn().mockResolvedValue(stemmaB),
