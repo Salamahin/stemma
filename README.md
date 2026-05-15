@@ -12,23 +12,24 @@ Stemma is a collaborative family tree editor. It lets multiple people build and 
 
 ## Tech stack
 - Frontend: Svelte + Rollup
-- Backend: Scala (ZIO, zhttp)
-- Storage: PostgreSQL
+- Backend: Python 3.13 (FastAPI, SQLAlchemy, pydantic), managed with [`uv`](https://docs.astral.sh/uv/)
+- Storage: PostgreSQL locally, CockroachDB serverless in production
 
 ## Repository layout
-- `backend/`: Scala backend root
-- `backend/build.sbt`, `backend/project/`: SBT root and build config
-- `backend/src/api/`: domain model and core services
-- `backend/src/api_impl_restful/`: REST API implementation (local server)
-- `backend/src/api_impl_aws_lambda/`: AWS Lambda implementation
+- `backend_py/`: Python backend
+  - `src/stemma/domain/`: domain dataclasses, tagged `Request`/`Response`/`StemmaError` unions, pydantic codec
+  - `src/stemma/services/`, `src/stemma/storage/`: business logic and persistence
+  - `src/stemma/apis/request_handler.py`: central dispatcher
+  - `src/stemma/apps/`: REST server, Lambda handler, migration Lambda
+  - `migrations/`: plain SQL migrations
 - `frontend/`: Svelte frontend
 - `e2e/`: Playwright end-to-end tests and local dev stack launcher
+- `template.yaml`, `Makefile`: AWS SAM infrastructure
 
 ## Quick start (local)
 
 ### Prerequisites
-- Java 11+
-- sbt
+- Python 3.13 and [`uv`](https://docs.astral.sh/uv/)
 - Node.js + npm
 - PostgreSQL (or Docker)
 
@@ -47,8 +48,9 @@ export INVITE_SECRET=your_invite_secret
 export JDBC_URL=jdbc:postgresql://localhost:5432/stemma
 export JDBC_USER=postgres
 export JDBC_PASSWORD=mysecretpassword
-cd backend
-sbt "project api_impl_restful" run
+cd backend_py
+uv sync
+uv run python -m stemma.apps.rest_main
 ```
 
 The REST API listens on `http://localhost:8090`.
@@ -67,8 +69,8 @@ Open the dev server URL printed by Rollup.
 
 ## Tests
 ```bash
-cd backend
-sbt test
+cd backend_py
+uv run pytest
 ```
 
 ```bash
@@ -88,7 +90,7 @@ Backend:
 - `JDBC_URL`: PostgreSQL JDBC URL
 - `JDBC_USER`: database user
 - `JDBC_PASSWORD`: database password
-- `E2E_AUTH_BYPASS` (optional): when set to `1` in `api_impl_restful`, any bearer token is accepted (for E2E only)
+- `E2E_AUTH_BYPASS` (optional): when set to `1`, the REST server accepts any bearer token (for E2E only)
 
 Frontend:
 - `GOOGLE_CLIENT_ID`: same client ID as backend
