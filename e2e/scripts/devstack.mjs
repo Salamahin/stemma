@@ -8,7 +8,7 @@ import net from "node:net";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const e2eDir = resolve(__dirname, "..");
 const repoRoot = resolve(e2eDir, "..");
-const backendDir = resolve(repoRoot, "backend");
+const backendDir = resolve(repoRoot, "backend_py");
 const frontendDir = resolve(repoRoot, "frontend");
 
 const postgresContainer = "stemma-e2e-postgres";
@@ -108,7 +108,7 @@ async function main() {
     process.env.SHELL || "bash",
     [
       "-lc",
-      'sbt "project api_impl_restful" run'
+      "uv run python -m stemma.apps.rest_main"
     ],
     {
       cwd: backendDir,

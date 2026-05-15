@@ -1,4 +1,4 @@
-name: Scala CI
+name: CI
 on:
   pull_request:
     branches: [ "master" ]
@@ -8,18 +8,22 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up JDK 11
-      uses: actions/setup-java@v3
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
-        java-version: '11'
-        distribution: 'temurin'
-        cache: 'sbt'
-    - name: Set up sbt
-      uses: sbt/setup-sbt@v1
-    - name: Run tests
-      run: sbt test
-      working-directory: backend
+        python-version: '3.13'
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+        cache-dependency-glob: backend_py/uv.lock
+    - name: Install backend deps
+      run: uv sync --all-groups
+      working-directory: backend_py
+    - name: Run backend tests
+      run: uv run pytest
+      working-directory: backend_py
     - name: Set up Node
       uses: actions/setup-node@v4
       with:
@@ -35,15 +39,19 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up JDK 11
-      uses: actions/setup-java@v3
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
-        java-version: '11'
-        distribution: 'temurin'
-        cache: 'sbt'
-    - name: Set up sbt
-      uses: sbt/setup-sbt@v1
+        python-version: '3.13'
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+        cache-dependency-glob: backend_py/uv.lock
+    - name: Install backend deps
+      run: uv sync
+      working-directory: backend_py
     - name: Set up Node
       uses: actions/setup-node@v4
       with:

@@ -9,27 +9,28 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: 'sbt'
+          python-version: '3.13'
 
-      - name: Set up sbt
-        uses: sbt/setup-sbt@v1
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend_py/uv.lock
 
-      - name: Build backend
-        run: sbt 'clean;package;pack'
-        working-directory: backend
+      - name: Export backend requirements
+        working-directory: backend_py
+        run: uv export --no-dev --no-hashes --format requirements.txt -o requirements.txt
 
       - name: Setup SAM
         uses: aws-actions/setup-sam@v2
 
       - name: Configure AWS creds
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -60,7 +61,7 @@ jobs:
           fi
 
       - name: Install node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18
 
