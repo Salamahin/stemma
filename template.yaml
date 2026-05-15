@@ -12,11 +12,8 @@ Globals:
       - arm64
     Environment:
       Variables:
-        JDBC_URL: "{{resolve:secretsmanager:prod/jdbc:SecretString:JDBC_URL}}"
-        JDBC_USER: "{{resolve:secretsmanager:prod/jdbc:SecretString:JDBC_USER}}"
-        JDBC_PASSWORD: "{{resolve:secretsmanager:prod/jdbc:SecretString:JDBC_PASSWORD}}"
-        JDBC_CERT: "{{resolve:secretsmanager:prod/jdbc:SecretString:JDBC_CERT}}"
-        INVITE_SECRET: "{{resolve:secretsmanager:prod/invite:SecretString:INVITE_SECRET}}"
+        STEMMA_DB_SECRET_NAME: "prod/jdbc"
+        STEMMA_INVITE_SECRET_NAME: "prod/invite"
         GOOGLE_CLIENT_ID: !Sub "${googleAuthClientId}"
     Layers:
       - !Ref MyLayer
@@ -201,6 +198,10 @@ Resources:
       Policies:
         - S3FullAccessPolicy:
             BucketName: stemma-app-backend-assets
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/jdbc-*"
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/invite-*"
   MigrationFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -212,6 +213,11 @@ Resources:
       Environment:
         Variables:
           STEMMA_MIGRATIONS_DIR: /var/task/migrations
+      Policies:
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/jdbc-*"
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/invite-*"
 
 Outputs:
   ApiEndpoint:

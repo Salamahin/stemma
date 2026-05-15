@@ -1,10 +1,31 @@
 import base64
+import json
 import os
 from pathlib import Path
 
 from sqlalchemy import Engine, create_engine
 
 _COCKROACH_CERT_PATH = Path("/tmp/cockroach-proud-gnoll.crt")
+
+
+def populate_env_from_secrets() -> None:
+    secret_names = [
+        name
+        for name in (
+            os.environ.get("STEMMA_DB_SECRET_NAME"),
+            os.environ.get("STEMMA_INVITE_SECRET_NAME"),
+        )
+        if name
+    ]
+    if not secret_names:
+        return
+    import boto3  # pyright: ignore[reportMissingImports]  # provided by Lambda runtime
+
+    client = boto3.client("secretsmanager")
+    for name in secret_names:
+        payload = json.loads(client.get_secret_value(SecretId=name)["SecretString"])
+        for key, value in payload.items():
+            os.environ.setdefault(key, value)
 
 
 def write_root_cert() -> None:
