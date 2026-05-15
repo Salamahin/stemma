@@ -70,6 +70,18 @@ export class HiglightLineages implements Highlight {
         return !this.lineagesData.length || this.allFamilies.has(familyId) || this.allMariages.has(familyId) || this.allUncleFamilies.has(familyId)
     }
 
+    isActive(): boolean {
+        return this.lineagesData.length > 0
+    }
+
+    highlightedPeopleIds(): Set<string> {
+        return this.allPeople
+    }
+
+    highlightedFamilyIds(): Set<string> {
+        return new Set([...this.allFamilies, ...this.allMariages, ...this.allUncleFamilies])
+    }
+
     pushPerson(personId: string) {
         this.lineagesData.push(this.personToLineageData(personId))
         this.remakeCashes()

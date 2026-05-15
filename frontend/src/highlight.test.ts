@@ -48,4 +48,25 @@ describe("HiglightLineages", () => {
         highlight.pop();
         expect(highlight.personIsHighlighted("3")).toBe(false);
     });
+
+    test("reports inactive when nothing is selected", () => {
+        const index = new StemmaIndex(stemma);
+        const highlight = new HiglightLineages(index, []);
+        expect(highlight.isActive()).toBe(false);
+        expect(highlight.highlightedPeopleIds().size).toBe(0);
+        expect(highlight.highlightedFamilyIds().size).toBe(0);
+    });
+
+    test("exposes highlighted people and families for active lineage", () => {
+        const index = new StemmaIndex(stemma);
+        const highlight = new HiglightLineages(index, ["1"]);
+        expect(highlight.isActive()).toBe(true);
+        const people = highlight.highlightedPeopleIds();
+        const families = highlight.highlightedFamilyIds();
+        expect(people.has("1")).toBe(true);
+        expect(people.has("2")).toBe(true);
+        expect(people.has("3")).toBe(false);
+        expect(families.has("f1")).toBe(true);
+        expect(families.has("f2")).toBe(false);
+    });
 });

@@ -137,12 +137,14 @@
                 if (node.type == "person") {
                     highlight.pushPerson(denormalizeId(node.id));
                     renderFullStemma();
+                    dispatch("highlightChanged");
                     d3.select(this).select("circle").attr("r", hoveredPersonR);
                     d3.select(this).select("text").attr("font-weight", "bold");
                 }
                 if (node.type == "family") {
                     highlight.pushFamily(denormalizeId(node.id));
                     renderFullStemma();
+                    dispatch("highlightChanged");
                     d3.select(this).select("circle").attr("r", hoveredFamilyR);
                 }
             })
@@ -150,6 +152,7 @@
                 if (isDragging) return;
                 highlight.pop();
                 renderFullStemma();
+                dispatch("highlightChanged");
             })
             .on("click", (event, node) => {
                 if (node.type == "person") {
