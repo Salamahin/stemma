@@ -97,17 +97,19 @@ class RequestHandler:
         return self._storage.stemma(user.user_id, request.stemma_id)
 
     def _delete_person(self, user: User, request: DeletePersonRequest) -> Stemma:
-        self._storage.remove_person(user.user_id, request.person_id)
+        self._storage.remove_person(user.user_id, request.stemma_id, request.person_id)
         return self._storage.stemma(user.user_id, request.stemma_id)
 
     def _update_person(self, user: User, request: UpdatePersonRequest) -> Stemma:
-        self._storage.update_person(user.user_id, request.person_id, request.person_descr)
+        self._storage.update_person(
+            user.user_id, request.stemma_id, request.person_id, request.person_descr
+        )
         return self._storage.stemma(user.user_id, request.stemma_id)
 
     def _create_invitation_token(
         self, user: User, request: CreateInvitationTokenRequest
     ) -> InviteToken:
-        if not self._storage.owns_person(user.user_id, request.target_person_id):
+        if not self._storage.owns_person(user.user_id, request.stemma_id, request.target_person_id):
             raise AccessToPersonDenied(person_id=request.target_person_id)
         token = self._users.create_invite_token(
             request.target_person_email, request.stemma_id, request.target_person_id
@@ -119,11 +121,13 @@ class RequestHandler:
         return stemma
 
     def _delete_family(self, user: User, request: DeleteFamilyRequest) -> Stemma:
-        self._storage.remove_family(user.user_id, request.family_id)
+        self._storage.remove_family(user.user_id, request.stemma_id, request.family_id)
         return self._storage.stemma(user.user_id, request.stemma_id)
 
     def _update_family(self, user: User, request: UpdateFamilyRequest) -> Stemma:
-        stemma, _ = self._storage.update_family(user.user_id, request.family_id, request.family_descr)
+        stemma, _ = self._storage.update_family(
+            user.user_id, request.stemma_id, request.family_id, request.family_descr
+        )
         return stemma
 
     def _clone_stemma(self, user: User, request: CloneStemmaRequest) -> CloneResult:

@@ -12,16 +12,15 @@ Stemma is a collaborative family tree editor. It lets multiple people build and 
 
 ## Tech stack
 - Frontend: Svelte + Rollup
-- Backend: Python 3.13 (FastAPI, SQLAlchemy, pydantic), managed with [`uv`](https://docs.astral.sh/uv/)
-- Storage: PostgreSQL locally, CockroachDB serverless in production
+- Backend: Python 3.13 (FastAPI, boto3, pydantic), managed with [`uv`](https://docs.astral.sh/uv/)
+- Storage: DynamoDB (single table; DynamoDB Local for dev/e2e)
 
 ## Repository layout
 - `backend_py/`: Python backend
   - `src/stemma/domain/`: domain dataclasses, tagged `Request`/`Response`/`StemmaError` unions, pydantic codec
   - `src/stemma/services/`, `src/stemma/storage/`: business logic and persistence
   - `src/stemma/apis/request_handler.py`: central dispatcher
-  - `src/stemma/apps/`: REST server, Lambda handler, migration Lambda
-  - `migrations/`: plain SQL migrations
+  - `src/stemma/apps/`: REST server and Lambda handler
 - `frontend/`: Svelte frontend
 - `e2e/`: Playwright end-to-end tests and local dev stack launcher
 - `template.yaml`, `Makefile`: AWS SAM infrastructure
@@ -31,23 +30,24 @@ Stemma is a collaborative family tree editor. It lets multiple people build and 
 ### Prerequisites
 - Python 3.13 and [`uv`](https://docs.astral.sh/uv/)
 - Node.js + npm
-- PostgreSQL (or Docker)
+- Docker (for DynamoDB Local)
 
-### 1) Start Postgres (Docker)
+### 1) Start DynamoDB Local (Docker)
 ```bash
-docker run --name stemma-postgres \
-  -e POSTGRES_PASSWORD=mysecretpassword \
-  -e POSTGRES_DB=stemma \
-  --rm -p 5432:5432 postgres
+docker run --name stemma-dynamodb \
+  --rm -p 8000:8000 amazon/dynamodb-local
 ```
 
 ### 2) Run the backend
 ```bash
 export GOOGLE_CLIENT_ID=your_google_client_id
 export INVITE_SECRET=your_invite_secret
-export JDBC_URL=jdbc:postgresql://localhost:5432/stemma
-export JDBC_USER=postgres
-export JDBC_PASSWORD=mysecretpassword
+export STEMMA_TABLE_NAME=stemma-dev
+export STEMMA_AUTO_CREATE_TABLE=1
+export DYNAMODB_ENDPOINT_URL=http://127.0.0.1:8000
+export AWS_REGION=eu-central-1
+export AWS_ACCESS_KEY_ID=local
+export AWS_SECRET_ACCESS_KEY=local
 cd backend_py
 uv sync
 uv run python -m stemma.apps.rest_main
@@ -87,9 +87,10 @@ npm test
 Backend:
 - `GOOGLE_CLIENT_ID`: Google OAuth client ID
 - `INVITE_SECRET`: secret for invitation token signing
-- `JDBC_URL`: PostgreSQL JDBC URL
-- `JDBC_USER`: database user
-- `JDBC_PASSWORD`: database password
+- `STEMMA_TABLE_NAME`: DynamoDB table name
+- `DYNAMODB_ENDPOINT_URL` (optional): override the DynamoDB endpoint — set for DynamoDB Local
+- `STEMMA_AUTO_CREATE_TABLE` (optional): when set to `1`, create the table on startup if missing (local/e2e only)
+- `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`: standard AWS SDK config
 - `E2E_AUTH_BYPASS` (optional): when set to `1`, the REST server accepts any bearer token (for E2E only)
 
 Frontend:
@@ -97,4 +98,4 @@ Frontend:
 - `STEMMA_BACKEND_URL`: backend base URL (for example `http://localhost:8090`)
 
 ## Notes
-- If you change the schema or need a clean start, drop the database and re-run the backend to recreate the schema.
+- For a clean local slate, stop and re-run the DynamoDB container — its in-memory data is wiped on restart.

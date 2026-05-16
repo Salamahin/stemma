@@ -1,8 +1,11 @@
+import uuid
 from collections import defaultdict
-from dataclasses import replace
+from dataclasses import dataclass, replace
+from datetime import date
+from typing import Any
 
-from sqlalchemy import Engine, and_, delete, exists, func, insert, select, text, update
-from sqlalchemy.engine import Connection
+from boto3.dynamodb.conditions import Key
+from botocore.exceptions import ClientError
 
 from stemma.domain.errors import (
     AccessToFamilyDenied,
@@ -18,467 +21,457 @@ from stemma.domain.errors import (
 from stemma.domain.requests import CreateFamily, CreateNewPerson, ExistingPerson, PersonDefinition
 from stemma.domain.responses import FamilyDescription, PersonDescription, Stemma, StemmaDescription
 from stemma.domain.user import User
+from stemma.services.kinship import FamilyLink, kinsmen_families, members_of
 from stemma.services.stemma_dfs import has_cycles
 from stemma.storage.effects import ChownEffect
 from stemma.storage.schema import (
-    children,
-    families,
-    family_owners,
-    people,
-    person_owners,
-    spouses,
-    stemma_owners,
-    stemma_users,
-    stemmas,
+    FAMILY_OWNER_PREFIX,
+    FAMILY_PREFIX,
+    GSI1_INDEX_NAME,
+    PERSON_OWNER_PREFIX,
+    PERSON_PREFIX,
+    SK_META,
+    SK_PROFILE,
+    STEMMA_OWNER_PREFIX,
+    STEMMA_PK_PREFIX,
+    family_owner_sk,
+    family_sk,
+    parse_id_after_prefix,
+    parse_owner_composite,
+    person_owner_sk,
+    person_sk,
+    stemma_owner_sk,
+    stemma_pk,
+    user_email_pk,
+    user_gsi_pk,
+    user_gsi_sk,
 )
 
 
+@dataclass(frozen=True)
+class _PersonRow:
+    id: str
+    name: str
+    birth_date: date | None
+    death_date: date | None
+    bio: str | None
+
+
+@dataclass(frozen=True)
+class _FamilyRow:
+    id: str
+    parents: list[str]
+    children: list[str]
+
+
+@dataclass(frozen=True)
+class _StemmaSnapshot:
+    stemma_id: str
+    people: dict[str, _PersonRow]
+    families: dict[str, _FamilyRow]
+    stemma_owners: set[str]
+    person_owners: set[tuple[str, str]]
+    family_owners: set[tuple[str, str]]
+
+
 class StorageService:
-    def __init__(self, engine: Engine) -> None:
-        self._engine = engine
+    def __init__(self, table: Any) -> None:
+        self._table = table
+
+    # ---------- users ----------
 
     def get_or_create_user(self, email: str) -> User:
-        with self._engine.begin() as conn:
-            row = conn.execute(select(stemma_users.c.id).where(stemma_users.c.email == email)).first()
-            if row is not None:
-                return User(user_id=str(row.id), email=email)
-            user_id = conn.execute(
-                insert(stemma_users).values(email=email).returning(stemma_users.c.id)
-            ).scalar_one()
-            return User(user_id=str(user_id), email=email)
+        key = {"pk": user_email_pk(email), "sk": SK_PROFILE}
+        item = self._table.get_item(Key=key).get("Item")
+        if item:
+            return User(user_id=item["user_id"], email=email)
+        user_id = uuid.uuid4().hex
+        try:
+            self._table.put_item(
+                Item={**key, "user_id": user_id, "email": email},
+                ConditionExpression="attribute_not_exists(pk)",
+            )
+            return User(user_id=user_id, email=email)
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+                raise
+            existing = self._table.get_item(Key=key)["Item"]
+            return User(user_id=existing["user_id"], email=email)
+
+    # ---------- stemmas ----------
 
     def create_stemma(self, user_id: str, name: str) -> str:
-        user_pk = int(user_id)
-        with self._engine.begin() as conn:
-            return self._make_new_stemma(conn, user_pk, name)
+        stemma_id = uuid.uuid4().hex
+        self._table.put_item(Item={"pk": stemma_pk(stemma_id), "sk": SK_META, "name": name})
+        self._put_stemma_owner(stemma_id, user_id)
+        return stemma_id
 
     def list_owned_stemmas(self, user_id: str) -> list[StemmaDescription]:
-        user_pk = int(user_id)
-        with self._engine.begin() as conn:
-            owned = (
-                select(stemma_owners.c.stemmaId).where(stemma_owners.c.ownerId == user_pk).subquery()
+        owner_rows = self._table.query(
+            IndexName=GSI1_INDEX_NAME,
+            KeyConditionExpression=Key("gsi1pk").eq(user_gsi_pk(user_id)),
+        ).get("Items", [])
+        stemma_ids = [parse_id_after_prefix(row["gsi1sk"], STEMMA_PK_PREFIX) for row in owner_rows]
+        if not stemma_ids:
+            return []
+        descriptions: list[StemmaDescription] = []
+        for sid in stemma_ids:
+            meta = self._table.get_item(Key={"pk": stemma_pk(sid), "sk": SK_META}).get("Item")
+            if meta is None:
+                continue
+            owners_count = self._count_stemma_owners(sid)
+            descriptions.append(
+                StemmaDescription(id=sid, name=meta["name"], removable=owners_count == 1)
             )
-            owners_counted = (
-                select(owned.c.stemmaId.label("sid"), func.count(stemma_owners.c.ownerId).label("n"))
-                .join_from(owned, stemma_owners, owned.c.stemmaId == stemma_owners.c.stemmaId)
-                .group_by(owned.c.stemmaId)
-                .subquery()
-            )
-            stmt = select(stemmas.c.id, stemmas.c.name, owners_counted.c.n).join_from(
-                stemmas, owners_counted, stemmas.c.id == owners_counted.c.sid
-            )
-            return [
-                StemmaDescription(id=str(sid), name=sname, removable=n == 1)
-                for (sid, sname, n) in conn.execute(stmt)
-            ]
+        return descriptions
 
     def remove_stemma(self, user_id: str, stemma_id: str) -> None:
-        user_pk, stemma_pk = int(user_id), int(stemma_id)
-        with self._engine.begin() as conn:
-            self._check_stemma_access(conn, stemma_pk, user_pk)
-            owners_count = conn.execute(
-                select(func.count())
-                .select_from(stemma_owners)
-                .where(stemma_owners.c.stemmaId == stemma_pk)
-            ).scalar_one()
-            if owners_count != 1:
-                raise IsNotTheOnlyStemmaOwner(stemma_id=stemma_id)
-            conn.execute(delete(stemmas).where(stemmas.c.id == stemma_pk))
+        snapshot = self._load_snapshot(stemma_id)
+        self._require_stemma_access(snapshot, user_id)
+        if len(snapshot.stemma_owners) != 1:
+            raise IsNotTheOnlyStemmaOwner(stemma_id=stemma_id)
+        self._delete_entire_stemma(stemma_id)
+
+    def stemma(self, user_id: str, stemma_id: str) -> Stemma:
+        snapshot = self._load_snapshot(stemma_id)
+        self._require_stemma_access(snapshot, user_id)
+        return _describe_stemma(snapshot, user_id)
+
+    def clone_stemma(self, user_id: str, stemma_id: str, new_stemma_name: str) -> Stemma:
+        source = self._load_snapshot(stemma_id)
+        self._require_stemma_access(source, user_id)
+
+        new_stemma_id = uuid.uuid4().hex
+        person_id_map = {old: uuid.uuid4().hex for old in source.people}
+        family_id_map = {old: uuid.uuid4().hex for old in source.families}
+
+        with self._table.batch_writer() as batch:
+            batch.put_item(Item={"pk": stemma_pk(new_stemma_id), "sk": SK_META, "name": new_stemma_name})
+            batch.put_item(
+                Item={
+                    "pk": stemma_pk(new_stemma_id),
+                    "sk": stemma_owner_sk(user_id),
+                    "gsi1pk": user_gsi_pk(user_id),
+                    "gsi1sk": user_gsi_sk(new_stemma_id),
+                }
+            )
+            for old_pid, new_pid in person_id_map.items():
+                person = source.people[old_pid]
+                batch.put_item(Item=_person_item(new_stemma_id, replace(person, id=new_pid)))
+                batch.put_item(
+                    Item={"pk": stemma_pk(new_stemma_id), "sk": person_owner_sk(new_pid, user_id)}
+                )
+            for old_fid, new_fid in family_id_map.items():
+                fam = source.families[old_fid]
+                new_fam = _FamilyRow(
+                    id=new_fid,
+                    parents=[person_id_map[p] for p in fam.parents],
+                    children=[person_id_map[c] for c in fam.children],
+                )
+                batch.put_item(Item=_family_item(new_stemma_id, new_fam))
+                batch.put_item(
+                    Item={"pk": stemma_pk(new_stemma_id), "sk": family_owner_sk(new_fid, user_id)}
+                )
+
+        cloned_snapshot = _StemmaSnapshot(
+            stemma_id=new_stemma_id,
+            people={new_pid: replace(source.people[old], id=new_pid) for old, new_pid in person_id_map.items()},
+            families={
+                new_fid: _FamilyRow(
+                    id=new_fid,
+                    parents=[person_id_map[p] for p in source.families[old].parents],
+                    children=[person_id_map[c] for c in source.families[old].children],
+                )
+                for old, new_fid in family_id_map.items()
+            },
+            stemma_owners={user_id},
+            person_owners={(pid, user_id) for pid in person_id_map.values()},
+            family_owners={(fid, user_id) for fid in family_id_map.values()},
+        )
+        return _describe_stemma(cloned_snapshot, user_id)
+
+    # ---------- families ----------
 
     def create_family(
         self, user_id: str, stemma_id: str, family: CreateFamily
     ) -> tuple[Stemma, FamilyDescription]:
-        user_pk, stemma_pk = int(user_id), int(stemma_id)
-        with self._engine.begin() as conn:
-            self._check_stemma_access(conn, stemma_pk, user_pk)
-            parents = [p for p in (family.parent1, family.parent2) if p is not None]
-            existing_match = self._try_find_matching_family(conn, parents, user_pk)
-            if existing_match is not None:
-                family_pk = existing_match
-            else:
-                family_pk = conn.execute(
-                    insert(families).values(stemmaId=stemma_pk).returning(families.c.id)
-                ).scalar_one()
-                self._grant_family_owner(conn, user_pk, family_pk)
-
-            descr = self._link_family_members(conn, user_pk, stemma_pk, family_pk, family)
-            stemma = self._describe_stemma(conn, user_pk, stemma_pk)
-            if has_cycles(stemma):
-                raise StemmaHasCycles()
-            return stemma, descr
+        snapshot = self._load_snapshot(stemma_id)
+        self._require_stemma_access(snapshot, user_id)
+        return self._apply_family_change(snapshot, user_id, target_family_id=None, family=family)
 
     def update_family(
-        self, user_id: str, family_id: str, family: CreateFamily
+        self, user_id: str, stemma_id: str, family_id: str, family: CreateFamily
     ) -> tuple[Stemma, FamilyDescription]:
-        user_pk, family_pk = int(user_id), int(family_id)
-        with self._engine.begin() as conn:
-            self._check_family_access(conn, family_pk, user_pk)
-            self._unlink_family_members(conn, family_pk)
-            stemma_pk = conn.execute(
-                select(families.c.stemmaId).where(families.c.id == family_pk)
-            ).scalar_one()
-            descr = self._link_family_members(conn, user_pk, stemma_pk, family_pk, family)
-            stemma = self._describe_stemma(conn, user_pk, stemma_pk)
-            if has_cycles(stemma):
-                raise StemmaHasCycles()
-            return stemma, descr
+        snapshot = self._load_snapshot(stemma_id)
+        self._require_family_access(snapshot, user_id, family_id)
+        return self._apply_family_change(snapshot, user_id, target_family_id=family_id, family=family)
 
-    def remove_person(self, user_id: str, person_id: str) -> None:
-        user_pk, person_pk = int(user_id), int(person_id)
-        with self._engine.begin() as conn:
-            self._check_person_access(conn, person_pk, user_pk)
-            conn.execute(delete(people).where(people.c.id == person_pk))
-            self._drop_empty_families(conn)
+    def remove_family(self, user_id: str, stemma_id: str, family_id: str) -> None:
+        snapshot = self._load_snapshot(stemma_id)
+        self._require_family_access(snapshot, user_id, family_id)
+        self._delete_family(stemma_id, family_id, snapshot.family_owners)
 
-    def remove_family(self, user_id: str, family_id: str) -> None:
-        user_pk, family_pk = int(user_id), int(family_id)
-        with self._engine.begin() as conn:
-            self._check_family_access(conn, family_pk, user_pk)
-            self._unlink_family_members(conn, family_pk)
-            conn.execute(delete(families).where(families.c.id == family_pk))
+    # ---------- people ----------
 
-    def update_person(self, user_id: str, person_id: str, description: CreateNewPerson) -> None:
-        user_pk, person_pk = int(user_id), int(person_id)
-        with self._engine.begin() as conn:
-            self._check_person_access(conn, person_pk, user_pk)
-            conn.execute(
-                update(people)
-                .where(people.c.id == person_pk)
-                .values(
-                    name=description.name,
-                    birthDate=description.birth_date,
-                    deathDate=description.death_date,
-                    bio=description.bio,
+    def remove_person(self, user_id: str, stemma_id: str, person_id: str) -> None:
+        snapshot = self._load_snapshot(stemma_id)
+        self._require_person_access(snapshot, user_id, person_id)
+
+        affected_families: list[_FamilyRow] = []
+        for fam in snapshot.families.values():
+            if person_id in fam.parents or person_id in fam.children:
+                affected_families.append(
+                    _FamilyRow(
+                        id=fam.id,
+                        parents=[p for p in fam.parents if p != person_id],
+                        children=[c for c in fam.children if c != person_id],
+                    )
                 )
-            )
 
-    def clone_stemma(self, user_id: str, stemma_id: str, new_stemma_name: str) -> Stemma:
-        user_pk, stemma_pk = int(user_id), int(stemma_id)
-        with self._engine.begin() as conn:
-            self._check_stemma_access(conn, stemma_pk, user_pk)
-            new_stemma_id = int(self._make_new_stemma(conn, user_pk, new_stemma_name))
-            source = self._describe_stemma(conn, user_pk, stemma_pk)
-            person_id_map = self._clone_people(conn, user_pk, new_stemma_id, source.people)
-            family_id_map = self._clone_families(conn, user_pk, new_stemma_id, source.families, person_id_map)
-            return _rewrite_stemma_ids(source, person_id_map, family_id_map)
+        with self._table.batch_writer() as batch:
+            batch.delete_item(Key={"pk": stemma_pk(stemma_id), "sk": person_sk(person_id)})
+            for owned_pid, owner_uid in snapshot.person_owners:
+                if owned_pid == person_id:
+                    batch.delete_item(
+                        Key={
+                            "pk": stemma_pk(stemma_id),
+                            "sk": person_owner_sk(person_id, owner_uid),
+                        }
+                    )
+            for fam in affected_families:
+                if len(fam.parents) + len(fam.children) < 2:
+                    batch.delete_item(
+                        Key={"pk": stemma_pk(stemma_id), "sk": family_sk(fam.id)}
+                    )
+                    for owned_fid, owner_uid in snapshot.family_owners:
+                        if owned_fid == fam.id:
+                            batch.delete_item(
+                                Key={
+                                    "pk": stemma_pk(stemma_id),
+                                    "sk": family_owner_sk(fam.id, owner_uid),
+                                }
+                            )
+                else:
+                    batch.put_item(Item=_family_item(stemma_id, fam))
 
-    def stemma(self, user_id: str, stemma_id: str) -> Stemma:
-        user_pk, stemma_pk = int(user_id), int(stemma_id)
-        with self._engine.begin() as conn:
-            self._check_stemma_access(conn, stemma_pk, user_pk)
-            return self._describe_stemma(conn, user_pk, stemma_pk)
+    def update_person(
+        self, user_id: str, stemma_id: str, person_id: str, description: CreateNewPerson
+    ) -> None:
+        if not self.owns_person(user_id, stemma_id, person_id):
+            raise AccessToPersonDenied(person_id=person_id)
+        existing = self._table.get_item(
+            Key={"pk": stemma_pk(stemma_id), "sk": person_sk(person_id)}
+        ).get("Item")
+        if existing is None:
+            raise NoSuchPersonId(id=person_id)
+        updated = _make_person_row(person_id, description)
+        self._table.put_item(Item=_person_item(stemma_id, updated))
+
+    # ---------- ownership ----------
 
     def chown(self, user_id: str, stemma_id: str, target_person_id: str) -> ChownEffect:
-        user_pk, stemma_pk, target_pk = int(user_id), int(stemma_id), int(target_person_id)
-        with self._engine.begin() as conn:
-            kinsmen_families = [
-                row[0]
-                for row in conn.execute(_KINSMEN_FAMILIES_SQL, {"init_person_id": target_pk})
-            ]
-            affected_people = self._members_of_families(conn, kinsmen_families) if kinsmen_families else []
+        snapshot = self._load_snapshot(stemma_id)
+        family_links = [
+            FamilyLink(family_id=f.id, parents=frozenset(f.parents), children=frozenset(f.children))
+            for f in snapshot.families.values()
+        ]
+        affected_families = kinsmen_families(target_person_id, family_links)
+        affected_people = members_of(family_links, affected_families)
 
-            for fid in kinsmen_families:
-                self._grant_family_owner(conn, user_pk, fid)
-            for pid in affected_people:
-                self._grant_person_owner(conn, user_pk, pid)
-            self._grant_stemma_owner(conn, user_pk, stemma_pk)
-
-            return ChownEffect(
-                affected_families=[str(f) for f in kinsmen_families],
-                affected_people=[str(p) for p in affected_people],
-            )
-
-    def owns_person(self, user_id: str, person_id: str) -> bool:
-        user_pk, person_pk = int(user_id), int(person_id)
-        with self._engine.begin() as conn:
-            return self._owns(
-                conn, person_owners.c.ownerId, person_owners.c.personId, user_pk, person_pk
-            )
-
-    def _make_new_stemma(self, conn: Connection, user_id: int, name: str) -> str:
-        new_id = conn.execute(insert(stemmas).values(name=name).returning(stemmas.c.id)).scalar_one()
-        self._grant_stemma_owner(conn, user_id, new_id)
-        return str(new_id)
-
-    def _owns(self, conn: Connection, owner_col, target_col, user_id: int, target_id: int) -> bool:
-        return conn.execute(
-            select(exists().where(and_(owner_col == user_id, target_col == target_id)))
-        ).scalar_one()
-
-    def _check_stemma_access(self, conn: Connection, stemma_id: int, user_id: int) -> None:
-        if not self._owns(conn, stemma_owners.c.ownerId, stemma_owners.c.stemmaId, user_id, stemma_id):
-            raise AccessToStemmaDenied(stemma_id=str(stemma_id))
-
-    def _check_person_access(self, conn: Connection, person_id: int, user_id: int) -> None:
-        if not self._owns(conn, person_owners.c.ownerId, person_owners.c.personId, user_id, person_id):
-            raise AccessToPersonDenied(person_id=str(person_id))
-
-    def _check_family_access(self, conn: Connection, family_id: int, user_id: int) -> None:
-        if not self._owns(conn, family_owners.c.ownerId, family_owners.c.familyId, user_id, family_id):
-            raise AccessToFamilyDenied(family_id=str(family_id))
-
-    def _grant_stemma_owner(self, conn: Connection, user_id: int, stemma_id: int) -> None:
-        if not self._owns(conn, stemma_owners.c.ownerId, stemma_owners.c.stemmaId, user_id, stemma_id):
-            conn.execute(insert(stemma_owners).values(ownerId=user_id, stemmaId=stemma_id))
-
-    def _grant_person_owner(self, conn: Connection, user_id: int, person_id: int) -> None:
-        if not self._owns(conn, person_owners.c.ownerId, person_owners.c.personId, user_id, person_id):
-            conn.execute(insert(person_owners).values(ownerId=user_id, personId=person_id))
-
-    def _grant_family_owner(self, conn: Connection, user_id: int, family_id: int) -> None:
-        if not self._owns(conn, family_owners.c.ownerId, family_owners.c.familyId, user_id, family_id):
-            conn.execute(insert(family_owners).values(ownerId=user_id, familyId=family_id))
-
-    def _check_person_belongs_to_stemma(self, conn: Connection, person_id: int, stemma_id: int) -> None:
-        present = conn.execute(
-            select(exists().where(and_(people.c.id == person_id, people.c.stemmaId == stemma_id)))
-        ).scalar_one()
-        if not present:
-            raise NoSuchPersonId(id=str(person_id))
-
-    def _get_or_create_person(
-        self, conn: Connection, stemma_id: int, user_id: int, pd: PersonDefinition
-    ) -> int:
-        match pd:
-            case ExistingPerson(id=pid):
-                self._check_person_access(conn, int(pid), user_id)
-                self._check_person_belongs_to_stemma(conn, int(pid), stemma_id)
-                return int(pid)
-            case CreateNewPerson():
-                new_id = conn.execute(
-                    insert(people)
-                    .values(
-                        name=pd.name,
-                        birthDate=pd.birth_date,
-                        deathDate=pd.death_date,
-                        bio=pd.bio,
-                        stemmaId=stemma_id,
+        with self._table.batch_writer() as batch:
+            if user_id not in snapshot.stemma_owners:
+                batch.put_item(
+                    Item={
+                        "pk": stemma_pk(stemma_id),
+                        "sk": stemma_owner_sk(user_id),
+                        "gsi1pk": user_gsi_pk(user_id),
+                        "gsi1sk": user_gsi_sk(stemma_id),
+                    }
+                )
+            for fid in affected_families:
+                if (fid, user_id) not in snapshot.family_owners:
+                    batch.put_item(
+                        Item={"pk": stemma_pk(stemma_id), "sk": family_owner_sk(fid, user_id)}
                     )
-                    .returning(people.c.id)
-                ).scalar_one()
-                self._grant_person_owner(conn, user_id, new_id)
-                return new_id
+            for pid in affected_people:
+                if (pid, user_id) not in snapshot.person_owners:
+                    batch.put_item(
+                        Item={"pk": stemma_pk(stemma_id), "sk": person_owner_sk(pid, user_id)}
+                    )
 
-    def _link_family_members(
-        self, conn: Connection, user_id: int, stemma_id: int, family_id: int, family: CreateFamily
-    ) -> FamilyDescription:
+        return ChownEffect(
+            affected_families=sorted(affected_families),
+            affected_people=sorted(affected_people),
+        )
+
+    def owns_person(self, user_id: str, stemma_id: str, person_id: str) -> bool:
+        item = self._table.get_item(
+            Key={"pk": stemma_pk(stemma_id), "sk": person_owner_sk(person_id, user_id)}
+        ).get("Item")
+        return item is not None
+
+    # ---------- internals ----------
+
+    def _load_snapshot(self, stemma_id: str) -> _StemmaSnapshot:
+        items = self._query_all(KeyConditionExpression=Key("pk").eq(stemma_pk(stemma_id)))
+
+        people: dict[str, _PersonRow] = {}
+        families: dict[str, _FamilyRow] = {}
+        stemma_owners: set[str] = set()
+        person_owners: set[tuple[str, str]] = set()
+        family_owners: set[tuple[str, str]] = set()
+
+        for item in items:
+            sk = item["sk"]
+            if sk == SK_META:
+                continue
+            if sk.startswith(PERSON_PREFIX) and not sk.startswith(PERSON_OWNER_PREFIX):
+                pid = parse_id_after_prefix(sk, PERSON_PREFIX)
+                people[pid] = _PersonRow(
+                    id=pid,
+                    name=item["name"],
+                    birth_date=_parse_date(item.get("birth_date")),
+                    death_date=_parse_date(item.get("death_date")),
+                    bio=item.get("bio"),
+                )
+            elif sk.startswith(FAMILY_PREFIX) and not sk.startswith(FAMILY_OWNER_PREFIX):
+                fid = parse_id_after_prefix(sk, FAMILY_PREFIX)
+                families[fid] = _FamilyRow(
+                    id=fid,
+                    parents=list(item.get("parents", [])),
+                    children=list(item.get("children", [])),
+                )
+            elif sk.startswith(STEMMA_OWNER_PREFIX):
+                stemma_owners.add(parse_id_after_prefix(sk, STEMMA_OWNER_PREFIX))
+            elif sk.startswith(PERSON_OWNER_PREFIX):
+                person_owners.add(parse_owner_composite(sk, PERSON_OWNER_PREFIX))
+            elif sk.startswith(FAMILY_OWNER_PREFIX):
+                family_owners.add(parse_owner_composite(sk, FAMILY_OWNER_PREFIX))
+
+        return _StemmaSnapshot(
+            stemma_id=stemma_id,
+            people=people,
+            families=families,
+            stemma_owners=stemma_owners,
+            person_owners=person_owners,
+            family_owners=family_owners,
+        )
+
+    def _query_all(self, **kwargs) -> list[dict]:
+        response = self._table.query(**kwargs)
+        items = list(response.get("Items", []))
+        while "LastEvaluatedKey" in response:
+            response = self._table.query(ExclusiveStartKey=response["LastEvaluatedKey"], **kwargs)
+            items.extend(response.get("Items", []))
+        return items
+
+    def _put_stemma_owner(self, stemma_id: str, user_id: str) -> None:
+        self._table.put_item(
+            Item={
+                "pk": stemma_pk(stemma_id),
+                "sk": stemma_owner_sk(user_id),
+                "gsi1pk": user_gsi_pk(user_id),
+                "gsi1sk": user_gsi_sk(stemma_id),
+            }
+        )
+
+    def _count_stemma_owners(self, stemma_id: str) -> int:
+        response = self._table.query(
+            KeyConditionExpression=Key("pk").eq(stemma_pk(stemma_id))
+            & Key("sk").begins_with(STEMMA_OWNER_PREFIX),
+            Select="COUNT",
+        )
+        return int(response.get("Count", 0))
+
+    def _delete_entire_stemma(self, stemma_id: str) -> None:
+        items = self._query_all(
+            KeyConditionExpression=Key("pk").eq(stemma_pk(stemma_id)),
+            ProjectionExpression="pk, sk",
+        )
+        with self._table.batch_writer() as batch:
+            for item in items:
+                batch.delete_item(Key={"pk": item["pk"], "sk": item["sk"]})
+
+    def _delete_family(self, stemma_id: str, family_id: str, family_owners: set[tuple[str, str]]) -> None:
+        with self._table.batch_writer() as batch:
+            batch.delete_item(Key={"pk": stemma_pk(stemma_id), "sk": family_sk(family_id)})
+            for fid, uid in family_owners:
+                if fid == family_id:
+                    batch.delete_item(
+                        Key={"pk": stemma_pk(stemma_id), "sk": family_owner_sk(family_id, uid)}
+                    )
+
+    def _require_stemma_access(self, snapshot: _StemmaSnapshot, user_id: str) -> None:
+        if user_id not in snapshot.stemma_owners:
+            raise AccessToStemmaDenied(stemma_id=snapshot.stemma_id)
+
+    def _require_person_access(self, snapshot: _StemmaSnapshot, user_id: str, person_id: str) -> None:
+        if (person_id, user_id) not in snapshot.person_owners:
+            raise AccessToPersonDenied(person_id=person_id)
+
+    def _require_family_access(self, snapshot: _StemmaSnapshot, user_id: str, family_id: str) -> None:
+        if (family_id, user_id) not in snapshot.family_owners:
+            raise AccessToFamilyDenied(family_id=family_id)
+
+    def _apply_family_change(
+        self,
+        snapshot: _StemmaSnapshot,
+        user_id: str,
+        target_family_id: str | None,
+        family: CreateFamily,
+    ) -> tuple[Stemma, FamilyDescription]:
         parents = [p for p in (family.parent1, family.parent2) if p is not None]
         kids = family.children
         if len(parents) + len(kids) < 2:
             raise IncompleteFamily()
         _ensure_no_duplicate_ids(parents + kids)
+        _validate_existing_definitions(parents + kids, snapshot, user_id)
 
-        parent_ids = [self._get_or_create_person(conn, stemma_id, user_id, p) for p in parents]
-        child_ids = [self._get_or_create_person(conn, stemma_id, user_id, c) for c in kids]
+        family_id, reuse_match = _resolve_target_family(target_family_id, parents, snapshot, user_id)
 
-        for pid in parent_ids:
-            self._create_spouse_relation_if_not_exist(conn, pid, family_id)
-        for cid in child_ids:
-            self._create_child_relation_or_fail(conn, cid, family_id)
+        parent_ids, new_parent_rows = _materialize_definitions(parents)
+        child_ids, new_child_rows = _materialize_definitions(kids)
+        new_people = new_parent_rows + new_child_rows
 
-        return FamilyDescription(
-            id=str(family_id),
-            parents=[str(p) for p in parent_ids],
-            children=[str(c) for c in child_ids],
-            read_only=True,
+        _check_no_child_conflicts(child_ids, family_id, snapshot)
+
+        family_id, final_parents, final_children, owner_grant_needed = _compose_family_members(
+            family_id, reuse_match, parent_ids, child_ids, snapshot
         )
+        new_family = _FamilyRow(id=family_id, parents=final_parents, children=final_children)
 
-    def _unlink_family_members(self, conn: Connection, family_id: int) -> None:
-        conn.execute(delete(spouses).where(spouses.c.familyId == family_id))
-        conn.execute(delete(children).where(children.c.familyId == family_id))
+        planned_snapshot = _plan_snapshot(snapshot, user_id, new_people, new_family)
+        if has_cycles(_describe_stemma(planned_snapshot, user_id)):
+            raise StemmaHasCycles()
 
-    def _try_find_matching_family(
-        self, conn: Connection, parents: list[PersonDefinition], user_id: int
-    ) -> int | None:
-        existing_parent_ids = [int(p.id) for p in parents if isinstance(p, ExistingPerson)]
-        if not parents or len(parents) != len(existing_parent_ids):
-            return None
+        self._write_family_change(snapshot.stemma_id, user_id, new_people, new_family, owner_grant_needed)
 
-        head_pid = existing_parent_ids[0]
-        target_set = set(existing_parent_ids)
-
-        rows = conn.execute(
-            select(spouses.c.familyId, spouses.c.personId).where(
-                spouses.c.familyId.in_(select(spouses.c.familyId).where(spouses.c.personId == head_pid))
-            )
-        ).all()
-
-        by_family: dict[int, set[int]] = defaultdict(set)
-        for fid, pid in rows:
-            by_family[fid].add(pid)
-
-        for fid, members in by_family.items():
-            if members == target_set:
-                self._check_family_access(conn, fid, user_id)
-                return fid
-        return None
-
-    def _describe_stemma(self, conn: Connection, user_id: int, stemma_id: int) -> Stemma:
-        people_descr = self._load_people(conn, user_id, stemma_id)
-        families_descr = self._load_families(conn, user_id, stemma_id)
-        return Stemma(people=people_descr, families=families_descr)
-
-    def _load_people(self, conn: Connection, user_id: int, stemma_id: int) -> list[PersonDescription]:
-        rows = conn.execute(
-            select(
-                people.c.id,
-                people.c.name,
-                people.c.birthDate,
-                people.c.deathDate,
-                people.c.bio,
-                exists()
-                .where(
-                    and_(
-                        person_owners.c.ownerId == user_id,
-                        person_owners.c.personId == people.c.id,
-                    )
-                )
-                .label("is_owner"),
-            ).where(people.c.stemmaId == stemma_id)
-        ).all()
-        return [
-            PersonDescription(
-                id=str(pid),
-                name=name,
-                birth_date=birth,
-                death_date=death,
-                bio=bio,
-                read_only=not is_owner,
-            )
-            for (pid, name, birth, death, bio, is_owner) in rows
-        ]
-
-    def _load_families(self, conn: Connection, user_id: int, stemma_id: int) -> list[FamilyDescription]:
-        fam_ids_for_stemma = (
-            select(families.c.id).where(families.c.stemmaId == stemma_id).scalar_subquery()
-        )
-        spouse_rows = conn.execute(
-            select(
-                spouses.c.familyId,
-                spouses.c.personId,
-                exists()
-                .where(
-                    and_(
-                        family_owners.c.ownerId == user_id,
-                        family_owners.c.familyId == spouses.c.familyId,
-                    )
-                )
-                .label("is_owner"),
-            ).where(spouses.c.familyId.in_(fam_ids_for_stemma))
-        ).all()
-        child_rows = conn.execute(
-            select(
-                children.c.familyId,
-                children.c.personId,
-                exists()
-                .where(
-                    and_(
-                        family_owners.c.ownerId == user_id,
-                        family_owners.c.familyId == children.c.familyId,
-                    )
-                )
-                .label("is_owner"),
-            ).where(children.c.familyId.in_(fam_ids_for_stemma))
-        ).all()
-
-        read_only: dict[str, bool] = {}
-        spouses_by_family: dict[str, set[str]] = defaultdict(set)
-        children_by_family: dict[str, set[str]] = defaultdict(set)
-
-        for fid, pid, is_owner in spouse_rows:
-            spouses_by_family[str(fid)].add(str(pid))
-            read_only[str(fid)] = not is_owner
-        for fid, pid, is_owner in child_rows:
-            children_by_family[str(fid)].add(str(pid))
-            read_only[str(fid)] = not is_owner
-
-        return [
+        return (
+            _describe_stemma(planned_snapshot, user_id),
             FamilyDescription(
-                id=fid,
-                parents=list(spouses_by_family[fid]),
-                children=list(children_by_family[fid]),
-                read_only=ro,
-            )
-            for fid, ro in read_only.items()
-        ]
-
-    def _members_of_families(self, conn: Connection, family_ids: list[int]) -> list[int]:
-        rows = conn.execute(
-            select(spouses.c.personId)
-            .where(spouses.c.familyId.in_(family_ids))
-            .union(select(children.c.personId).where(children.c.familyId.in_(family_ids)))
-        ).all()
-        return [row[0] for row in rows]
-
-    def _clone_people(
-        self, conn: Connection, user_id: int, new_stemma_id: int, source_people: list[PersonDescription]
-    ) -> dict[str, int]:
-        old_to_new: dict[str, int] = {}
-        for person in source_people:
-            new_id = conn.execute(
-                insert(people)
-                .values(
-                    name=person.name,
-                    birthDate=person.birth_date,
-                    deathDate=person.death_date,
-                    bio=person.bio,
-                    stemmaId=new_stemma_id,
-                )
-                .returning(people.c.id)
-            ).scalar_one()
-            old_to_new[person.id] = new_id
-            self._grant_person_owner(conn, user_id, new_id)
-        return old_to_new
-
-    def _clone_families(
-        self,
-        conn: Connection,
-        user_id: int,
-        new_stemma_id: int,
-        source_families: list[FamilyDescription],
-        person_id_map: dict[str, int],
-    ) -> dict[str, int]:
-        old_to_new: dict[str, int] = {}
-        for fam in source_families:
-            new_fid = conn.execute(
-                insert(families).values(stemmaId=new_stemma_id).returning(families.c.id)
-            ).scalar_one()
-            old_to_new[fam.id] = new_fid
-            self._grant_family_owner(conn, user_id, new_fid)
-            for parent_old in fam.parents:
-                conn.execute(insert(spouses).values(personId=person_id_map[parent_old], familyId=new_fid))
-            for child_old in fam.children:
-                conn.execute(insert(children).values(personId=person_id_map[child_old], familyId=new_fid))
-        return old_to_new
-
-    def _drop_empty_families(self, conn: Connection) -> None:
-        combined = select(spouses.c.familyId).union_all(select(children.c.familyId)).subquery()
-        empty_family_ids = (
-            select(combined.c.familyId).group_by(combined.c.familyId).having(func.count() < 2)
+                id=family_id, parents=final_parents, children=final_children, read_only=False
+            ),
         )
-        fids = [row[0] for row in conn.execute(empty_family_ids)]
-        if fids:
-            conn.execute(delete(families).where(families.c.id.in_(fids)))
 
-    def _create_spouse_relation_if_not_exist(self, conn: Connection, person_id: int, family_id: int) -> None:
-        present = conn.execute(
-            select(exists().where(and_(spouses.c.personId == person_id, spouses.c.familyId == family_id)))
-        ).scalar_one()
-        if not present:
-            conn.execute(insert(spouses).values(personId=person_id, familyId=family_id))
-
-    def _create_child_relation_or_fail(self, conn: Connection, person_id: int, family_id: int) -> None:
-        existing = [
-            row[0]
-            for row in conn.execute(select(children.c.familyId).where(children.c.personId == person_id))
-        ]
-        if not existing:
-            conn.execute(insert(children).values(personId=person_id, familyId=family_id))
-            return
-        if len(existing) == 1 and existing[0] == family_id:
-            return
-        other = next(f for f in existing if f != family_id)
-        raise ChildAlreadyBelongsToFamily(family_id=str(other), person_id=str(person_id))
+    def _write_family_change(
+        self,
+        stemma_id: str,
+        user_id: str,
+        new_people: list[_PersonRow],
+        new_family: _FamilyRow,
+        owner_grant_needed: bool,
+    ) -> None:
+        with self._table.batch_writer() as batch:
+            for row in new_people:
+                batch.put_item(Item=_person_item(stemma_id, row))
+                batch.put_item(
+                    Item={"pk": stemma_pk(stemma_id), "sk": person_owner_sk(row.id, user_id)}
+                )
+            batch.put_item(Item=_family_item(stemma_id, new_family))
+            if owner_grant_needed:
+                batch.put_item(
+                    Item={"pk": stemma_pk(stemma_id), "sk": family_owner_sk(new_family.id, user_id)}
+                )
 
 
 def _ensure_no_duplicate_ids(definitions: list[PersonDefinition]) -> None:
@@ -491,57 +484,166 @@ def _ensure_no_duplicate_ids(definitions: list[PersonDefinition]) -> None:
             raise DuplicatedIds(duplicated_ids=pid)
 
 
-def _rewrite_stemma_ids(
-    source: Stemma, person_id_map: dict[str, int], family_id_map: dict[str, int]
-) -> Stemma:
-    return Stemma(
-        people=[replace(p, id=str(person_id_map[p.id]), read_only=False) for p in source.people],
-        families=[
-            FamilyDescription(
-                id=str(family_id_map[f.id]),
-                parents=[str(person_id_map[pid]) for pid in f.parents],
-                children=[str(person_id_map[cid]) for cid in f.children],
-                read_only=False,
-            )
-            for f in source.families
-        ],
+def _validate_existing_definitions(
+    definitions: list[PersonDefinition], snapshot: _StemmaSnapshot, user_id: str
+) -> None:
+    for d in definitions:
+        if not isinstance(d, ExistingPerson):
+            continue
+        if d.id not in snapshot.people:
+            raise NoSuchPersonId(id=d.id)
+        if (d.id, user_id) not in snapshot.person_owners:
+            raise AccessToPersonDenied(person_id=d.id)
+
+
+def _materialize_definitions(
+    definitions: list[PersonDefinition],
+) -> tuple[list[str], list[_PersonRow]]:
+    ids: list[str] = []
+    new_rows: list[_PersonRow] = []
+    for d in definitions:
+        if isinstance(d, ExistingPerson):
+            ids.append(d.id)
+        else:
+            new_pid = uuid.uuid4().hex
+            new_rows.append(_make_person_row(new_pid, d))
+            ids.append(new_pid)
+    return ids, new_rows
+
+
+def _check_no_child_conflicts(
+    child_ids: list[str], current_family_id: str | None, snapshot: _StemmaSnapshot
+) -> None:
+    for cid in child_ids:
+        for fam in snapshot.families.values():
+            if cid in fam.children and fam.id != current_family_id:
+                raise ChildAlreadyBelongsToFamily(family_id=fam.id, person_id=cid)
+
+
+def _resolve_target_family(
+    target_family_id: str | None,
+    parents: list[PersonDefinition],
+    snapshot: _StemmaSnapshot,
+    user_id: str,
+) -> tuple[str | None, str | None]:
+    if target_family_id is not None:
+        return target_family_id, None
+    reuse_match = _find_family_with_existing_parents(parents, snapshot)
+    if reuse_match is None:
+        return None, None
+    if (reuse_match, user_id) not in snapshot.family_owners:
+        raise AccessToFamilyDenied(family_id=reuse_match)
+    return reuse_match, reuse_match
+
+
+def _compose_family_members(
+    family_id: str | None,
+    reuse_match: str | None,
+    parent_ids: list[str],
+    child_ids: list[str],
+    snapshot: _StemmaSnapshot,
+) -> tuple[str, list[str], list[str], bool]:
+    if family_id is None:
+        return uuid.uuid4().hex, parent_ids, child_ids, True
+    if reuse_match is not None:
+        existing = snapshot.families[family_id]
+        merged_children = list(existing.children) + [c for c in child_ids if c not in existing.children]
+        return family_id, list(existing.parents), merged_children, False
+    return family_id, parent_ids, child_ids, False
+
+
+def _plan_snapshot(
+    snapshot: _StemmaSnapshot,
+    user_id: str,
+    new_people: list[_PersonRow],
+    new_family: _FamilyRow,
+) -> _StemmaSnapshot:
+    planned_families = dict(snapshot.families)
+    planned_families[new_family.id] = new_family
+    planned_people = dict(snapshot.people)
+    for row in new_people:
+        planned_people[row.id] = row
+    return replace(
+        snapshot,
+        people=planned_people,
+        families=planned_families,
+        person_owners=snapshot.person_owners | {(row.id, user_id) for row in new_people},
+        family_owners=snapshot.family_owners | {(new_family.id, user_id)},
     )
 
 
-_KINSMEN_FAMILIES_SQL = text(
-    """
-    with recursive
-      "PersonFamilies" as (
-        select coalesce(s."personId", c."personId") as "personId",
-               s."familyId" as "spouseOf",
-               c."familyId" as "childOf"
-        from "Spouse" s full join "Child" c on s."personId" = c."personId"
-      ),
-      "Ancestors" as (
-        select "personId", "spouseOf", "childOf" from "PersonFamilies" where "personId" = :init_person_id
-        union
-        select pf."personId", pf."spouseOf", pf."childOf"
-        from "Ancestors" anc inner join "PersonFamilies" pf on anc."childOf" = pf."spouseOf"
-      ),
-      "Siblings" as (
-        select pf."personId", pf."spouseOf", pf."childOf"
-        from "Ancestors" a
-        inner join "PersonFamilies" pf on pf."childOf" = a."childOf"
-      ),
-      "BloodRelatives" as (
-        select * from "Ancestors" union select * from "Siblings"
-      ),
-      "Dependees" as (
-        select * from "BloodRelatives"
-        union
-        select pf."personId", pf."spouseOf", pf."childOf"
-        from "Dependees" dep inner join "PersonFamilies" pf on dep."spouseOf" = pf."childOf"
-      ),
-      "KinsmenFamilies" as (
-        select "spouseOf" as "familyId" from "Dependees"
-        union
-        select "childOf" as "familyId" from "Dependees"
-      )
-    select "familyId" from "KinsmenFamilies" where "familyId" is not null
-    """
-)
+def _find_family_with_existing_parents(
+    parents: list[PersonDefinition], snapshot: _StemmaSnapshot
+) -> str | None:
+    if not parents or not all(isinstance(p, ExistingPerson) for p in parents):
+        return None
+    target = {p.id for p in parents if isinstance(p, ExistingPerson)}
+    for fam in snapshot.families.values():
+        if set(fam.parents) == target:
+            return fam.id
+    return None
+
+
+def _make_person_row(pid: str, definition: CreateNewPerson) -> _PersonRow:
+    return _PersonRow(
+        id=pid,
+        name=definition.name,
+        birth_date=definition.birth_date,
+        death_date=definition.death_date,
+        bio=definition.bio,
+    )
+
+
+def _person_item(stemma_id: str, person: _PersonRow) -> dict:
+    item: dict = {
+        "pk": stemma_pk(stemma_id),
+        "sk": person_sk(person.id),
+        "name": person.name,
+    }
+    if person.birth_date is not None:
+        item["birth_date"] = person.birth_date.isoformat()
+    if person.death_date is not None:
+        item["death_date"] = person.death_date.isoformat()
+    if person.bio is not None:
+        item["bio"] = person.bio
+    return item
+
+
+def _family_item(stemma_id: str, family: _FamilyRow) -> dict:
+    return {
+        "pk": stemma_pk(stemma_id),
+        "sk": family_sk(family.id),
+        "parents": family.parents,
+        "children": family.children,
+    }
+
+
+def _parse_date(value: str | None) -> date | None:
+    if value is None:
+        return None
+    return date.fromisoformat(value)
+
+
+def _describe_stemma(snapshot: _StemmaSnapshot, user_id: str) -> Stemma:
+    return Stemma(
+        people=[
+            PersonDescription(
+                id=p.id,
+                name=p.name,
+                birth_date=p.birth_date,
+                death_date=p.death_date,
+                bio=p.bio,
+                read_only=(p.id, user_id) not in snapshot.person_owners,
+            )
+            for p in snapshot.people.values()
+        ],
+        families=[
+            FamilyDescription(
+                id=f.id,
+                parents=list(f.parents),
+                children=list(f.children),
+                read_only=(f.id, user_id) not in snapshot.family_owners,
+            )
+            for f in snapshot.families.values()
+        ],
+    )

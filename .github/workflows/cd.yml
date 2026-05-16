@@ -42,28 +42,10 @@ jobs:
       - name: Deploy backend
         run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
 
-      - name: Run database migrations
-        run: |
-          FUNCTION_NAME=$(aws cloudformation describe-stack-resource \
-            --stack-name stemma-app \
-            --logical-resource-id MigrationFunction \
-            --query 'StackResourceDetail.PhysicalResourceId' \
-            --output text)
-          aws lambda invoke \
-            --function-name "$FUNCTION_NAME" \
-            --cli-binary-format raw-in-base64-out \
-            --payload '{}' \
-            /tmp/migration-output.json
-          cat /tmp/migration-output.json
-          if jq -e '.errorMessage' /tmp/migration-output.json > /dev/null 2>&1; then
-            echo "Migration failed!"
-            exit 1
-          fi
-
       - name: Install node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
 
       - name: Install frontend deps
         working-directory: frontend

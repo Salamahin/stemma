@@ -1,85 +1,99 @@
-from sqlalchemy import (
-    BigInteger,
-    Column,
-    Date,
-    ForeignKey,
-    Identity,
-    MetaData,
-    PrimaryKeyConstraint,
-    String,
-    Table,
-)
+"""DynamoDB key encoders and item shape constants.
 
-metadata = MetaData()
+Single-table layout. Every item is keyed by (pk, sk). GSI1 lets us list every
+stemma a user owns by querying gsi1pk = USER#<user_id>.
 
-stemma_users = Table(
-    "StemmaUsers",
-    metadata,
-    Column("id", BigInteger, Identity(always=False), primary_key=True),
-    Column("email", String, nullable=False, unique=True),
-)
+    pk                      | sk                                | item
+    ----------------------- | --------------------------------- | -----------------------
+    USER#EMAIL#<email>      | PROFILE                           | user lookup by email
+    STEMMA#<sid>            | META                              | stemma metadata
+    STEMMA#<sid>            | PERSON#<pid>                      | person attributes
+    STEMMA#<sid>            | FAMILY#<fid>                      | family + parents/children
+    STEMMA#<sid>            | OWNER#STEMMA#<uid>                | stemma ownership (also on GSI1)
+    STEMMA#<sid>            | OWNER#PERSON#<pid>#<uid>          | person ownership
+    STEMMA#<sid>            | OWNER#FAMILY#<fid>#<uid>          | family ownership
+"""
 
-stemmas = Table(
-    "Stemma",
-    metadata,
-    Column("id", BigInteger, Identity(always=False), primary_key=True),
-    Column("name", String, nullable=False),
-)
+SK_PROFILE = "PROFILE"
+SK_META = "META"
 
-people = Table(
-    "Person",
-    metadata,
-    Column("id", BigInteger, Identity(always=False), primary_key=True),
-    Column("name", String, nullable=False),
-    Column("birthDate", Date),
-    Column("deathDate", Date),
-    Column("bio", String),
-    Column("stemmaId", BigInteger, ForeignKey("Stemma.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False),
-)
+STEMMA_PK_PREFIX = "STEMMA#"
+PERSON_PREFIX = "PERSON#"
+FAMILY_PREFIX = "FAMILY#"
+STEMMA_OWNER_PREFIX = "OWNER#STEMMA#"
+PERSON_OWNER_PREFIX = "OWNER#PERSON#"
+FAMILY_OWNER_PREFIX = "OWNER#FAMILY#"
 
-families = Table(
-    "Family",
-    metadata,
-    Column("id", BigInteger, Identity(always=False), primary_key=True),
-    Column("stemmaId", BigInteger, ForeignKey("Stemma.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False),
-)
+GSI1_INDEX_NAME = "UserStemmasIndex"
 
-family_owners = Table(
-    "FamilyOwner",
-    metadata,
-    Column("ownerId", BigInteger, ForeignKey("StemmaUsers.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False),
-    Column("familyId", BigInteger, ForeignKey("Family.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False),
-    PrimaryKeyConstraint("ownerId", "familyId", name="PK_FamilyOwner"),
-)
 
-person_owners = Table(
-    "PersonOwner",
-    metadata,
-    Column("ownerId", BigInteger, ForeignKey("StemmaUsers.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False),
-    Column("personId", BigInteger, ForeignKey("Person.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False),
-    PrimaryKeyConstraint("ownerId", "personId", name="PK_PersonOwner"),
-)
+TABLE_DEFINITION: dict = {
+    "AttributeDefinitions": [
+        {"AttributeName": "pk", "AttributeType": "S"},
+        {"AttributeName": "sk", "AttributeType": "S"},
+        {"AttributeName": "gsi1pk", "AttributeType": "S"},
+        {"AttributeName": "gsi1sk", "AttributeType": "S"},
+    ],
+    "KeySchema": [
+        {"AttributeName": "pk", "KeyType": "HASH"},
+        {"AttributeName": "sk", "KeyType": "RANGE"},
+    ],
+    "GlobalSecondaryIndexes": [
+        {
+            "IndexName": GSI1_INDEX_NAME,
+            "KeySchema": [
+                {"AttributeName": "gsi1pk", "KeyType": "HASH"},
+                {"AttributeName": "gsi1sk", "KeyType": "RANGE"},
+            ],
+            "Projection": {"ProjectionType": "ALL"},
+        }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+}
 
-stemma_owners = Table(
-    "StemmaOwner",
-    metadata,
-    Column("ownerId", BigInteger, ForeignKey("StemmaUsers.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False),
-    Column("stemmaId", BigInteger, ForeignKey("Stemma.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False),
-    PrimaryKeyConstraint("ownerId", "stemmaId", name="PK_StemmaOwner"),
-)
 
-spouses = Table(
-    "Spouse",
-    metadata,
-    Column("personId", BigInteger, ForeignKey("Person.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False),
-    Column("familyId", BigInteger, ForeignKey("Family.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False),
-    PrimaryKeyConstraint("personId", "familyId", name="PK_Spouse"),
-)
+def user_email_pk(email: str) -> str:
+    return f"USER#EMAIL#{email}"
 
-children = Table(
-    "Child",
-    metadata,
-    Column("personId", BigInteger, ForeignKey("Person.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False),
-    Column("familyId", BigInteger, ForeignKey("Family.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False),
-    PrimaryKeyConstraint("personId", "familyId", name="PK_Child"),
-)
+
+def stemma_pk(stemma_id: str) -> str:
+    return f"{STEMMA_PK_PREFIX}{stemma_id}"
+
+
+def person_sk(person_id: str) -> str:
+    return f"{PERSON_PREFIX}{person_id}"
+
+
+def family_sk(family_id: str) -> str:
+    return f"{FAMILY_PREFIX}{family_id}"
+
+
+def stemma_owner_sk(user_id: str) -> str:
+    return f"{STEMMA_OWNER_PREFIX}{user_id}"
+
+
+def person_owner_sk(person_id: str, user_id: str) -> str:
+    return f"{PERSON_OWNER_PREFIX}{person_id}#{user_id}"
+
+
+def family_owner_sk(family_id: str, user_id: str) -> str:
+    return f"{FAMILY_OWNER_PREFIX}{family_id}#{user_id}"
+
+
+def user_gsi_pk(user_id: str) -> str:
+    return f"USER#{user_id}"
+
+
+def user_gsi_sk(stemma_id: str) -> str:
+    return f"{STEMMA_PK_PREFIX}{stemma_id}"
+
+
+def parse_id_after_prefix(sk: str, prefix: str) -> str:
+    return sk[len(prefix) :]
+
+
+def parse_owner_composite(sk: str, prefix: str) -> tuple[str, str]:
+    """For OWNER#PERSON#<pid>#<uid> and OWNER#FAMILY#<fid>#<uid>."""
+    remainder = sk[len(prefix) :]
+    head, _, tail = remainder.partition("#")
+    return head, tail

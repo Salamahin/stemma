@@ -5,7 +5,7 @@ import os
 from functools import cache
 
 from stemma.apis.request_handler import RequestHandler
-from stemma.apps.bootstrap import engine_from_env, populate_env_from_secrets, write_root_cert
+from stemma.apps.bootstrap import dynamo_table_from_env, populate_env_from_secrets
 from stemma.domain.codec import decode_request, encode_error, encode_response
 from stemma.domain.errors import RequestDeserializationProblem, StemmaError, UnknownError
 from stemma.services.user_service import UserService
@@ -17,12 +17,11 @@ logger.setLevel(logging.INFO)
 
 @cache
 def _build() -> tuple[RequestHandler, UserService]:
-    # Cached so warm Lambda invocations reuse the engine + handler instead of
-    # rebuilding (and rehitting Secrets Manager) on every request.
+    # Cached so warm Lambda invocations reuse the table client + handler instead
+    # of rebuilding (and rehitting Secrets Manager) on every request.
     populate_env_from_secrets()
-    write_root_cert()
-    engine = engine_from_env(pool_pre_ping=True, pool_recycle=300)
-    storage = StorageService(engine)
+    table = dynamo_table_from_env()
+    storage = StorageService(table)
     users = UserService(storage, os.environ["INVITE_SECRET"])
     return RequestHandler(storage, users), users
 
