@@ -54,12 +54,17 @@ export function initChart(svgSelector) {
 
 let sessionPositions = new Map()
 let cachedStemmaId = null
+let activeLayoutCache = null
 
 export function resetSessionPositions(stemmaId) {
     if (cachedStemmaId !== stemmaId) {
         sessionPositions = new Map()
         cachedStemmaId = stemmaId
     }
+}
+
+export function setActiveLayoutCache(cache) {
+    activeLayoutCache = cache || null
 }
 
 export function configureSimulation(svg, nodes, relations, width, height) {
@@ -82,6 +87,7 @@ export function configureSimulation(svg, nodes, relations, width, height) {
                 .selectAll("g")
                 .attr("transform", (d) => {
                     sessionPositions.set(d.id, [d.x, d.y])
+                    if (activeLayoutCache) activeLayoutCache.set(d.id, d.x, d.y, d.vx ?? 0, d.vy ?? 0)
                     return "translate(" + d.x + "," + d.y + ")"
                 });
 
@@ -90,6 +96,9 @@ export function configureSimulation(svg, nodes, relations, width, height) {
                 .attr("y1", (d) => d.source.y)
                 .attr("x2", (d) => d.target.x)
                 .attr("y2", (d) => d.target.y);
+        })
+        .on("end", () => {
+            if (activeLayoutCache) activeLayoutCache.save()
         });
 }
 
@@ -156,11 +165,17 @@ export function mergeData(svg, nodes, relations, width, height, initialPositions
 
     nodes.forEach(n => {
         let pos;
+        let vel;
         if (!ignoreCache) {
             if (n.type === "person" && pinnedPeople) {
                 const personId = denormalizeId(n.id);
                 const pinned = pinnedPeople.getPosition(personId);
                 if (pinned) pos = pinned;
+            }
+            if (!pos && activeLayoutCache && activeLayoutCache.has(n.id)) {
+                const cached = activeLayoutCache.get(n.id);
+                pos = [cached.x, cached.y];
+                vel = [cached.vx, cached.vy];
             }
             if (!pos && sessionPositions.has(n.id)) {
                 pos = sessionPositions.get(n.id);
@@ -175,6 +190,10 @@ export function mergeData(svg, nodes, relations, width, height, initialPositions
 
         n.x = pos[0];
         n.y = pos[1];
+        if (vel) {
+            n.vx = vel[0];
+            n.vy = vel[1];
+        }
     })
 
     svg.select("g.main")

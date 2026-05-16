@@ -9,6 +9,7 @@
     import {
         configureSimulation,
         resetSessionPositions,
+        setActiveLayoutCache,
         initChart,
         makeDrag,
         makeNodesAndRelations,
@@ -19,6 +20,7 @@
         denormalizeId,
     } from "../graphTools";
     import { computeInitialLayout } from "../initialLayout";
+    import { NodeLayoutCache } from "../nodeLayoutCache";
     import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
 
     const dispatch = createEventDispatcher();
@@ -39,8 +41,17 @@
     let svg;
     let isDragging = false;
     let pendingMouseLeave = false;
+    let layoutCache: NodeLayoutCache | null = null;
+    let layoutCacheStemmaId: string | null = null;
 
     $: if (svg && stemma) {
+        if (layoutCacheStemmaId !== currentStemmaId) {
+            if (layoutCache) layoutCache.save();
+            layoutCache = new NodeLayoutCache(currentStemmaId);
+            layoutCache.load();
+            layoutCacheStemmaId = currentStemmaId;
+        }
+        setActiveLayoutCache(layoutCache);
         resetSessionPositions(currentStemmaId);
         let people, families;
 
@@ -126,10 +137,15 @@
 
     let simulation;
     function reconfigureGraph(nodes, relations, initialPositions) {
+        const fullyCached =
+            !!layoutCache && nodes.length > 0 && layoutCache.coverage(nodes.map((n) => n.id)) === 1;
+
         if (!simulation) simulation = configureSimulation(svg, nodes, relations, window.innerWidth, window.innerHeight);
         else updateSimulation(simulation, nodes, relations);
 
         mergeData(svg, nodes, relations, window.innerWidth, window.innerHeight, initialPositions, pinnedPeople);
+
+        if (fullyCached) simulation.alphaTarget(0).alpha(0);
 
         svg.select("g.main")
             .selectAll("g")
