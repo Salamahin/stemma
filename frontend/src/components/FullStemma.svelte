@@ -42,6 +42,7 @@
 
     let svg;
     let isDragging = false;
+    let pendingMouseLeave = false;
 
     $: if (svg && stemma) {
         loadCoordinates(currentStemmaId);
@@ -133,7 +134,10 @@
         svg.select("g.main")
             .selectAll("g")
             .on("mouseenter", function (event, node) {
-                if (isDragging) return;
+                if (isDragging) {
+                    pendingMouseLeave = false;
+                    return;
+                }
                 if (node.type == "person") {
                     highlight.pushPerson(denormalizeId(node.id));
                     renderFullStemma();
@@ -149,7 +153,10 @@
                 }
             })
             .on("mouseleave", (_event, node) => {
-                if (isDragging) return;
+                if (isDragging) {
+                    pendingMouseLeave = true;
+                    return;
+                }
                 highlight.pop();
                 renderFullStemma();
                 dispatch("highlightChanged");
@@ -167,7 +174,23 @@
             });
 
         renderChart(svg, highlight, stemmaIndex);
-        makeDrag(svg, simulation, currentStemmaId, () => isDragging = true, () => isDragging = false);
+        makeDrag(
+            svg,
+            simulation,
+            currentStemmaId,
+            () => {
+                isDragging = true;
+            },
+            () => {
+                isDragging = false;
+                if (pendingMouseLeave) {
+                    pendingMouseLeave = false;
+                    highlight.pop();
+                    renderFullStemma();
+                    dispatch("highlightChanged");
+                }
+            }
+        );
     }
 
     onMount(() => {
