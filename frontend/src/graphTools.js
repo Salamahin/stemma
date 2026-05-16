@@ -52,15 +52,14 @@ export function initChart(svgSelector) {
 }
 
 
-let coordinatesCache = new Map()
+let sessionPositions = new Map()
+let cachedStemmaId = null
 
-export function loadCoordinates(stemmaId) {
-    const coordsObj = JSON.parse(localStorage.getItem(`coords-${stemmaId}`));
-    if (coordsObj) coordinatesCache = new Map(Object.entries(coordsObj));
-}
-
-export function saveCoordinates(stemmaId) {
-    localStorage.setItem(`coords-${stemmaId}`, JSON.stringify(Object.fromEntries(coordinatesCache)));
+export function resetSessionPositions(stemmaId) {
+    if (cachedStemmaId !== stemmaId) {
+        sessionPositions = new Map()
+        cachedStemmaId = stemmaId
+    }
 }
 
 export function configureSimulation(svg, nodes, relations, width, height) {
@@ -82,7 +81,7 @@ export function configureSimulation(svg, nodes, relations, width, height) {
             svg.select("g.main")
                 .selectAll("g")
                 .attr("transform", (d) => {
-                    coordinatesCache.set(d.id, [d.x, d.y])
+                    sessionPositions.set(d.id, [d.x, d.y])
                     return "translate(" + d.x + "," + d.y + ")"
                 });
 
@@ -101,7 +100,7 @@ export function updateSimulation(simulation, nodes, relations) {
     simulation.alphaTarget(0.3).restart()
 }
 
-export function makeDrag(svg, simulation, stemmaId, onDragStart, onDragEnd) {
+export function makeDrag(svg, simulation, pinnedPeople, onDragStart, onDragEnd) {
     function drag() {
         function dragstarted(event) {
             if (!event.active) simulation.alphaTarget(0.3).restart();
@@ -122,7 +121,12 @@ export function makeDrag(svg, simulation, stemmaId, onDragStart, onDragEnd) {
                 event.subject.fy = null;
             }
 
-            if (stemmaId) saveCoordinates(stemmaId)
+            if (pinnedPeople && event.subject.type === "person") {
+                const personId = denormalizeId(event.subject.id);
+                if (pinnedPeople.isPinned(personId)) {
+                    pinnedPeople.updatePosition(personId, event.subject.x, event.subject.y);
+                }
+            }
             if (onDragEnd) onDragEnd();
         }
 
@@ -140,7 +144,7 @@ export function denormalizeId(id) {
     return id.split("_")[1]
 }
 
-export function mergeData(svg, nodes, relations, widht, height, ignoreLocations) {
+export function mergeData(svg, nodes, relations, width, height, initialPositions, pinnedPeople, ignoreCache) {
     svg.select("g.main")
         .selectAll("line")
         .data(relations, (r) => r.id)
@@ -151,16 +155,26 @@ export function mergeData(svg, nodes, relations, widht, height, ignoreLocations)
         );
 
     nodes.forEach(n => {
-        let x, y;
-        if (!ignoreLocations && coordinatesCache.has(n.id)) {
-            [x, y] = coordinatesCache.get(n.id)
-        } else {
-            x = widht / 2;
-            y = height / 2
+        let pos;
+        if (!ignoreCache) {
+            if (n.type === "person" && pinnedPeople) {
+                const personId = denormalizeId(n.id);
+                const pinned = pinnedPeople.getPosition(personId);
+                if (pinned) pos = pinned;
+            }
+            if (!pos && sessionPositions.has(n.id)) {
+                pos = sessionPositions.get(n.id);
+            }
+            if (!pos && initialPositions && initialPositions.has(n.id)) {
+                pos = initialPositions.get(n.id);
+            }
+        }
+        if (!pos) {
+            pos = [width / 2, height / 2];
         }
 
-        n.x = x
-        n.y = y
+        n.x = pos[0];
+        n.y = pos[1];
     })
 
     svg.select("g.main")

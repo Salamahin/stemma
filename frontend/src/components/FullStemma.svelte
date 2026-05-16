@@ -8,8 +8,7 @@
     import { HiglightLineages } from "../highlight";
     import {
         configureSimulation,
-        saveCoordinates,
-        loadCoordinates,
+        resetSessionPositions,
         initChart,
         makeDrag,
         makeNodesAndRelations,
@@ -19,6 +18,7 @@
         updateSimulation,
         denormalizeId,
     } from "../graphTools";
+    import { computeInitialLayout } from "../initialLayout";
     import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
 
     const dispatch = createEventDispatcher();
@@ -36,28 +36,25 @@
     export let hidden: boolean;
     export let viewMode: ViewMode;
 
-    window.addEventListener("beforeunload", (e) => {
-        saveCoordinates(currentStemmaId);
-    });
-
     let svg;
     let isDragging = false;
     let pendingMouseLeave = false;
 
     $: if (svg && stemma) {
-        loadCoordinates(currentStemmaId);
-        let nodes, relations;
-        
+        resetSessionPositions(currentStemmaId);
+        let people, families;
+
         if (viewMode == ViewMode.ALL) {
-            [nodes, relations] = makeNodesAndRelations(stemma.people, stemma.families);
+            people = stemma.people;
+            families = stemma.families;
         } else if (viewMode == ViewMode.EDITABLE_ONLY) {
-            [nodes, relations] = makeNodesAndRelations(
-                stemma.people.filter((p) => !p.readOnly),
-                stemma.families.filter((f) => !f.readOnly)
-            );
+            people = stemma.people.filter((p) => !p.readOnly);
+            families = stemma.families.filter((f) => !f.readOnly);
         }
 
-        reconfigureGraph(nodes, relations);
+        let [nodes, relations] = makeNodesAndRelations(people, families);
+        let initialPositions = computeInitialLayout(stemmaIndex, people, families, window.innerWidth, window.innerHeight);
+        reconfigureGraph(nodes, relations, initialPositions);
     }
 
     $: if (highlight && pinnedPeople && stemmaIndex && svg) {
@@ -76,9 +73,9 @@
 
         pinnedPeople
             .allPinned()
-            .map((id) => normalizeId("person", id))
             .forEach((personId) => {
-                d3.select(`#${personId}`)
+                const nodeId = normalizeId("person", personId);
+                d3.select(`#${nodeId}`)
                     .append("path")
                     .attr("d", pin)
                     .attr("class", "pin")
@@ -88,6 +85,9 @@
                         d.fixed = true;
                         d.fx = d.x;
                         d.fy = d.y;
+                        if (!pinnedPeople.getPosition(personId)) {
+                            pinnedPeople.updatePosition(personId, d.x, d.y);
+                        }
                     });
             });
 
@@ -125,11 +125,11 @@
     }
 
     let simulation;
-    function reconfigureGraph(nodes, relations) {
+    function reconfigureGraph(nodes, relations, initialPositions) {
         if (!simulation) simulation = configureSimulation(svg, nodes, relations, window.innerWidth, window.innerHeight);
         else updateSimulation(simulation, nodes, relations);
 
-        mergeData(svg, nodes, relations, window.innerWidth, window.innerHeight, false);
+        mergeData(svg, nodes, relations, window.innerWidth, window.innerHeight, initialPositions, pinnedPeople);
 
         svg.select("g.main")
             .selectAll("g")
@@ -177,7 +177,7 @@
         makeDrag(
             svg,
             simulation,
-            currentStemmaId,
+            pinnedPeople,
             () => {
                 isDragging = true;
             },
