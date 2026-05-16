@@ -619,7 +619,7 @@ def _family_item(stemma_id: str, family: _FamilyRow) -> dict:
 
 
 def _parse_date(value: str | None) -> date | None:
-    if value is None:
+    if not value:
         return None
     return date.fromisoformat(value)
 
