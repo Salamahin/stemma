@@ -100,6 +100,8 @@ Optional / context-dependent:
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — Standard boto3 config. For Lambda, the runtime injects these; for local use any non-empty values when pointed at DynamoDB Local.
 - `E2E_AUTH_BYPASS` — When `"1"`, the REST server accepts any bearer token (e2e use only).
 
+One-off corrections to the production DynamoDB table go through the `stemma-migration` skill (see `.claude/skills/stemma-migration/`).
+
 Lambda-only (set in `template.yaml` Globals or by `bootstrap`):
 - `STEMMA_INVITE_SECRET_NAME` — Secrets Manager ID fetched at cold start; its JSON contents populate `INVITE_SECRET` via `os.environ.setdefault`.
 
