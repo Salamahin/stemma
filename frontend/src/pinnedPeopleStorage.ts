@@ -1,42 +1,75 @@
 
+export type PinnedPosition = [number, number];
+
+type StoredEntry = { id: string; x?: number; y?: number };
+
 export class PinnedPeopleStorage {
-    private stemmaId;
-    private pinnedPeople: Set<string>
+    private storageKey: string;
+    private items: Map<string, PinnedPosition | null>;
 
     constructor(stemmaId: string) {
-        this.stemmaId = `pinned.${stemmaId}`
+        this.storageKey = `pinned.${stemmaId}`;
+        this.items = new Map();
     }
 
     load() {
-        let value = localStorage.getItem(this.stemmaId)
-        if (value) this.pinnedPeople = new Set(JSON.parse(value).items)
-        else this.pinnedPeople = new Set()
+        this.items = new Map();
+        const raw = localStorage.getItem(this.storageKey);
+        if (!raw) return;
+        try {
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed?.items)) return;
+            for (const entry of parsed.items) {
+                if (typeof entry === "string") {
+                    this.items.set(entry, null);
+                } else if (entry && typeof entry.id === "string") {
+                    const pos = typeof entry.x === "number" && typeof entry.y === "number"
+                        ? [entry.x, entry.y] as PinnedPosition
+                        : null;
+                    this.items.set(entry.id, pos);
+                }
+            }
+        } catch {
+            // ignore corrupted storage
+        }
     }
 
     private save() {
-        let value = JSON.stringify({
-            items: [...this.pinnedPeople]
-        })
-        localStorage.setItem(this.stemmaId, value)
+        const items: StoredEntry[] = [...this.items.entries()].map(([id, pos]) =>
+            pos ? { id, x: pos[0], y: pos[1] } : { id }
+        );
+        localStorage.setItem(this.storageKey, JSON.stringify({ items }));
     }
 
     add(personId: string) {
-        this.pinnedPeople.add(personId)
-        this.save()
+        if (!this.items.has(personId)) {
+            this.items.set(personId, null);
+            this.save();
+        }
         return this;
     }
 
     remove(personId: string) {
-        this.pinnedPeople.delete(personId)
-        this.save()
+        if (this.items.delete(personId)) this.save();
         return this;
     }
 
-    allPinned() {
-        return [...this.pinnedPeople]
+    updatePosition(personId: string, x: number, y: number) {
+        if (!this.items.has(personId)) return this;
+        this.items.set(personId, [x, y]);
+        this.save();
+        return this;
     }
 
-    isPinned(personId: string) {
-        return this.pinnedPeople.has(personId)
+    allPinned(): string[] {
+        return [...this.items.keys()];
+    }
+
+    isPinned(personId: string): boolean {
+        return this.items.has(personId);
+    }
+
+    getPosition(personId: string): PinnedPosition | null {
+        return this.items.get(personId) ?? null;
     }
 }
