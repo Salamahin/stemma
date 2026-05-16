@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 
 from stemma.domain.errors import (
@@ -10,7 +12,7 @@ from stemma.domain.errors import (
     NoSuchPersonId,
     StemmaHasCycles,
 )
-from stemma.storage.storage_service import StorageService
+from stemma.storage.storage_service import StorageService, _parse_date
 
 from tests.factories import (
     JOHNS_BIRTHDAY,
@@ -361,3 +363,12 @@ def test_loops_prohibited(storage: StorageService) -> None:
     jabe_id = f3.children[0]
     with pytest.raises(StemmaHasCycles):
         storage.create_family(user.user_id, sid, family(existing(jabe_id), existing(jill_id))())
+
+
+@pytest.mark.parametrize("value", [None, ""])
+def test_parse_date_returns_none_for_falsy(value: str | None) -> None:
+    assert _parse_date(value) is None
+
+
+def test_parse_date_parses_iso_string() -> None:
+    assert _parse_date("1900-01-15") == date(1900, 1, 15)
