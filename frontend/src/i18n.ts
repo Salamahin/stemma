@@ -136,6 +136,10 @@ export const en: Record<string, string> = {
     'stemma.cloneTitle': 'Clone family tree',
     'stemma.clone': 'Clone',
 
+    // Rename stemma modal
+    'stemma.renameTitle': 'Rename family tree',
+    'stemma.rename': 'Rename',
+
     // Family details modal
     'family.compositionTitle': 'Family composition',
     'family.selectMemberTitle': 'Select family member',
@@ -268,6 +272,10 @@ export const ru: Record<string, string> = {
     // Clone stemma modal
     'stemma.cloneTitle': 'Клонировать родословную',
     'stemma.clone': 'Клонировать',
+
+    // Rename stemma modal
+    'stemma.renameTitle': 'Переименовать родословную',
+    'stemma.rename': 'Переименовать',
 
     // Family details modal
     'family.compositionTitle': 'Состав семьи',

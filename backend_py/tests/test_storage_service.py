@@ -326,6 +326,36 @@ def test_can_remove_stemma_if_only_owner(storage: StorageService) -> None:
     assert storage.list_owned_stemmas(user.user_id) == []
 
 
+def test_rename_stemma_only_affects_caller(storage: StorageService) -> None:
+    creator = storage.get_or_create_user("creator@test.com")
+    accessor = storage.get_or_create_user("accessor@test.com")
+    sid = storage.create_stemma(creator.user_id, "shared name")
+    _, fam = storage.create_family(creator.user_id, sid, family(create_jane)(create_jill))
+    jill = fam.children[0]
+    storage.chown(accessor.user_id, sid, jill)
+
+    storage.rename_stemma(accessor.user_id, sid, "my private name")
+
+    assert [s.name for s in storage.list_owned_stemmas(creator.user_id)] == ["shared name"]
+    assert [s.name for s in storage.list_owned_stemmas(accessor.user_id)] == ["my private name"]
+
+
+def test_rename_stemma_overwrites_previous_override(storage: StorageService) -> None:
+    user = storage.get_or_create_user("user@test.com")
+    sid = storage.create_stemma(user.user_id, "first")
+    storage.rename_stemma(user.user_id, sid, "second")
+    storage.rename_stemma(user.user_id, sid, "third")
+    assert [s.name for s in storage.list_owned_stemmas(user.user_id)] == ["third"]
+
+
+def test_rename_stemma_denied_if_not_owner(storage: StorageService) -> None:
+    creator = storage.get_or_create_user("creator@test.com")
+    other = storage.get_or_create_user("other@test.com")
+    sid = storage.create_stemma(creator.user_id, "shared")
+    with pytest.raises(AccessToStemmaDenied):
+        storage.rename_stemma(other.user_id, sid, "hijack")
+
+
 def test_can_clone_stemma(storage: StorageService) -> None:
     user = storage.get_or_create_user("user1@test.com")
     sid = storage.create_stemma(user.user_id, "original stemma")

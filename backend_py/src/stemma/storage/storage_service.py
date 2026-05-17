@@ -25,6 +25,7 @@ from stemma.services.kinship import FamilyLink, kinsmen_families, members_of
 from stemma.services.stemma_dfs import has_cycles
 from stemma.storage.effects import ChownEffect
 from stemma.storage.schema import (
+    ATTR_DISPLAY_NAME,
     FAMILY_OWNER_PREFIX,
     FAMILY_PREFIX,
     GSI1_INDEX_NAME,
@@ -111,19 +112,33 @@ class StorageService:
             IndexName=GSI1_INDEX_NAME,
             KeyConditionExpression=Key("gsi1pk").eq(user_gsi_pk(user_id)),
         ).get("Items", [])
-        stemma_ids = [parse_id_after_prefix(row["gsi1sk"], STEMMA_PK_PREFIX) for row in owner_rows]
-        if not stemma_ids:
+        if not owner_rows:
             return []
         descriptions: list[StemmaDescription] = []
-        for sid in stemma_ids:
+        for row in owner_rows:
+            sid = parse_id_after_prefix(row["gsi1sk"], STEMMA_PK_PREFIX)
             meta = self._table.get_item(Key={"pk": stemma_pk(sid), "sk": SK_META}).get("Item")
             if meta is None:
                 continue
             owners_count = self._count_stemma_owners(sid)
+            display_name = row.get(ATTR_DISPLAY_NAME) or meta["name"]
             descriptions.append(
-                StemmaDescription(id=sid, name=meta["name"], removable=owners_count == 1)
+                StemmaDescription(id=sid, name=display_name, removable=owners_count == 1)
             )
         return descriptions
+
+    def rename_stemma(self, user_id: str, stemma_id: str, new_name: str) -> StemmaDescription:
+        snapshot = self._load_snapshot(stemma_id)
+        self._require_stemma_access(snapshot, user_id)
+        self._table.update_item(
+            Key={"pk": stemma_pk(stemma_id), "sk": stemma_owner_sk(user_id)},
+            UpdateExpression="SET #n = :n",
+            ExpressionAttributeNames={"#n": ATTR_DISPLAY_NAME},
+            ExpressionAttributeValues={":n": new_name},
+        )
+        return StemmaDescription(
+            id=stemma_id, name=new_name, removable=len(snapshot.stemma_owners) == 1
+        )
 
     def remove_stemma(self, user_id: str, stemma_id: str) -> None:
         snapshot = self._load_snapshot(stemma_id)

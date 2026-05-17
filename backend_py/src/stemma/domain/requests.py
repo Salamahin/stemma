@@ -101,6 +101,13 @@ class CloneStemmaRequest:
 
 
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
+class RenameStemmaRequest:
+    stemma_id: str
+    new_name: str
+    type: Literal["RenameStemmaRequest"] = "RenameStemmaRequest"
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class DeletePersonRequest:
     stemma_id: str
     person_id: str
@@ -126,6 +133,7 @@ Request = Annotated[
     | DeleteStemmaRequest
     | ListDescribeStemmasRequest
     | CloneStemmaRequest
+    | RenameStemmaRequest
     | DeletePersonRequest
     | UpdatePersonRequest,
     Discriminator("type"),

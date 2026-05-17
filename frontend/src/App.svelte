@@ -19,6 +19,7 @@
     import AboutModal from "./components/about/About.svelte";
     import { AppController } from "./appController";
     import CloneStemmaModal from "./components/clone_stemma_modal/CloneStemmaModal.svelte";
+    import RenameStemmaModal from "./components/rename_stemma_modal/RenameStemmaModal.svelte";
     import SettingsModal from "./components/settings_modal/SettingsModal.svelte";
     import StatsCard from "./components/stats_card/StatsCard.svelte";
     import { SettingsStorage } from "./settingsStroage";
@@ -31,6 +32,7 @@
 
     let addStemmaModal;
     let cloneStemmaModal;
+    let renameStemmaModal;
     let removeStemmaModal;
     let familySelectionModal;
     let personSelectionModal;
@@ -112,6 +114,7 @@
     <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={(e) => controller.addStemma(e.detail)} />
     <RemoveStemmaModal bind:this={removeStemmaModal} on:stemmaRemoved={(e) => controller.removeStemma(e.detail)} />
     <CloneStemmaModal bind:this={cloneStemmaModal} on:stemmaCloned={(e) => controller.cloneStemma(e.detail.name, e.detail.stemmaId)} />
+    <RenameStemmaModal bind:this={renameStemmaModal} on:stemmaRenamed={(e) => controller.renameStemma(e.detail.stemmaId, e.detail.name)} />
     <SettingsModal
         bind:this={settingsModal}
         on:settingsChanged={(e) => {
@@ -146,6 +149,7 @@
         on:selectStemma={(e) => controller.selectStemma(e.detail)}
         on:createNewStemma={() => addStemmaModal.promptNewStemma()}
         on:cloneStemma={(e) => cloneStemmaModal.promptStemmaClone(e.detail)}
+        on:renameStemma={(e) => renameStemmaModal.promptStemmaRename(e.detail.id, e.detail.name)}
         on:createNewFamily={() => familySelectionModal.promptNewFamily()}
         on:removeStemma={(e) => removeStemmaModal.askForConfirmation(e.detail)}
         on:invite={() => inviteModal.showInvintation()}

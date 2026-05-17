@@ -60,6 +60,36 @@ def test_create_family_returns_stemma_with_family_and_people(
     assert names == ["Jane", "John", "Josh"]
 
 
+def test_rename_stemma_updates_only_callers_display_name(
+    storage: StorageService, users: UserService
+) -> None:
+    client = _client(storage, users)
+    headers = {"Authorization": "Bearer user@example.com"}
+    listed = client.post(
+        "/stemma",
+        headers=headers,
+        json={"type": "ListDescribeStemmasRequest", "defaultStemmaName": "Original"},
+    ).json()
+    stemma_id = listed["stemmas"][0]["id"]
+
+    response = client.post(
+        "/stemma",
+        headers=headers,
+        json={"type": "RenameStemmaRequest", "stemmaId": stemma_id, "newName": "My label"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["type"] == "StemmaDescription"
+    assert body["name"] == "My label"
+
+    re_listed = client.post(
+        "/stemma",
+        headers=headers,
+        json={"type": "ListDescribeStemmasRequest", "defaultStemmaName": "Unused"},
+    ).json()
+    assert re_listed["stemmas"][0]["name"] == "My label"
+
+
 def test_missing_authorization_header_returns_401(
     storage: StorageService, users: UserService
 ) -> None:
