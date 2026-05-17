@@ -17,6 +17,8 @@ stemma a user owns by querying gsi1pk = USER#<user_id>.
 SK_PROFILE = "PROFILE"
 SK_META = "META"
 
+ATTR_DISPLAY_NAME = "display_name"
+
 STEMMA_PK_PREFIX = "STEMMA#"
 PERSON_PREFIX = "PERSON#"
 FAMILY_PREFIX = "FAMILY#"

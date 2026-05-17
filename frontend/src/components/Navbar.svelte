@@ -62,6 +62,12 @@
                                                 href="/"
                                                 on:click|preventDefault={() => dispatch("selectStemma", s.id)}>{s.name}</a
                                             >
+                                            <button
+                                                type="button"
+                                                class="btn btn-outline-secondary btn-sm ms-1 {disabled ? 'd-none' : ''}"
+                                                aria-label={$t("stemma.rename")}
+                                                on:click={() => dispatch("renameStemma", s)}><i class="bi bi-pencil"></i></button
+                                            >
                                             {#if s.id != currentStemmaId && s.removable}
                                                 <button
                                                     type="button"

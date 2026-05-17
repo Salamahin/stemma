@@ -136,6 +136,23 @@ export class AppController {
             .finally(() => this.isWorking.set(false))
     }
 
+    renameStemma(stemmaId: string, newName: string) {
+        this.isWorking.set(true)
+        this.err.set(null)
+        this.model
+            .renameStemma(stemmaId, newName)
+            .then((updated) => {
+                this.ownedStemmas.update((stemmas) =>
+                    stemmas.map((s) => (s.id === updated.id ? updated : s))
+                )
+            })
+            .catch(err => {
+                this.err.set(err)
+                console.error('Err when renaming stemma: ', err.stack);
+            })
+            .finally(() => this.isWorking.set(false))
+    }
+
     addStemma(stemmaName: string) {
         this.isWorking.set(true)
         this.err.set(null)

@@ -38,6 +38,7 @@ export type UpdateFamilyRequest = { type: "UpdateFamilyRequest", stemmaId: strin
 export type BearInvitationRequest = { type: "BearInvitationRequest", encodedToken: string }
 export type CloneStemmaRequest = { type: "CloneStemmaRequest", stemmaId: string, stemmaName: string }
 export type ListDescribeStemmasRequest = { type: "ListDescribeStemmasRequest", defaultStemmaName: string }
+export type RenameStemmaRequest = { type: "RenameStemmaRequest", stemmaId: string, newName: string }
 
 type Request =
     | CreateFamilyRequest
@@ -52,6 +53,7 @@ type Request =
     | DeletePersonRequest
     | UpdatePersonRequest
     | CloneStemmaRequest
+    | RenameStemmaRequest
 
 
 //responses
@@ -187,6 +189,10 @@ export class Model {
 
     async cloneStemma(stemmaId: string, name: string): Promise<CloneResult> {
         return this.send<CloneResult>({ type: "CloneStemmaRequest", stemmaId, stemmaName: name }, null)
+    }
+
+    async renameStemma(stemmaId: string, newName: string): Promise<StemmaDescription> {
+        return this.send<StemmaDescription>({ type: "RenameStemmaRequest", stemmaId, newName }, null)
     }
 
     private async send<R extends StemmaResponse>(request: Request, stemmaIndex: StemmaIndex | null): Promise<R> {

@@ -12,6 +12,7 @@ from stemma.domain.requests import (
     DeleteStemmaRequest,
     GetStemmaRequest,
     ListDescribeStemmasRequest,
+    RenameStemmaRequest,
     Request,
     UpdateFamilyRequest,
     UpdatePersonRequest,
@@ -63,6 +64,8 @@ class RequestHandler:
                 return self._update_person(user, request)
             case CloneStemmaRequest():
                 return self._clone_stemma(user, request)
+            case RenameStemmaRequest():
+                return self._rename_stemma(user, request)
 
     def _list_describe_stemmas(self, user: User, request: ListDescribeStemmasRequest) -> OwnedStemmas:
         existing = self._storage.list_owned_stemmas(user.user_id)
@@ -134,3 +137,6 @@ class RequestHandler:
         cloned = self._storage.clone_stemma(user.user_id, request.stemma_id, request.stemma_name)
         owned = self._storage.list_owned_stemmas(user.user_id)
         return CloneResult(created_stemma=cloned, stemmas=owned)
+
+    def _rename_stemma(self, user: User, request: RenameStemmaRequest) -> StemmaDescription:
+        return self._storage.rename_stemma(user.user_id, request.stemma_id, request.new_name)
