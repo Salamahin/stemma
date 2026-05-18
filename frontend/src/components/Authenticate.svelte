@@ -11,11 +11,15 @@
 
     onMount(() => {
         mounted = true;
+        const ready = window.__gsiReady;
+        if (ready && typeof ready.then === "function") {
+            ready.then(() => {
+                gsiLoaded = true;
+            });
+        } else if (window.google && window.google.accounts) {
+            gsiLoaded = true;
+        }
     });
-
-    function gsiLoad() {
-        gsiLoaded = true;
-    }
 
     function handleCredentialResponse(response) {
         let decoded = jwtDecode(response.credential);
@@ -45,7 +49,6 @@
 </script>
 
 <svelte:head>
-    <script defer async src="https://accounts.google.com/gsi/client" on:load={gsiLoad}></script>
     <meta name="google-signin-client_id" content={google_client_id} />
 </svelte:head>
 
