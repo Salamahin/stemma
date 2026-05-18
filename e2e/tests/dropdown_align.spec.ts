@@ -6,8 +6,9 @@ test("stemma dropdown buttons line up", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.locator("#navbarDropdownMenuLink")).toBeVisible();
-  // Wait for initial load (creates a default stemma) to finish.
-  await expect(page.locator(".dropdown-menu .stemma-row")).toHaveCount(1, { timeout: 30_000 });
+  // Wait for first-login seeding (My Stemma + European Kings) to finish.
+  const seededCount = 2;
+  await expect(page.locator(".dropdown-menu .stemma-row")).toHaveCount(seededCount, { timeout: 30_000 });
 
   for (const name of NAMES) {
     await page.locator("#navbarDropdownMenuLink").click();
@@ -21,7 +22,7 @@ test("stemma dropdown buttons line up", async ({ page }) => {
 
   await page.locator("#navbarDropdownMenuLink").click();
   const rows = page.locator(".dropdown-menu .stemma-row");
-  await expect(rows).toHaveCount(NAMES.length + 1, { timeout: 30_000 });
+  await expect(rows).toHaveCount(NAMES.length + seededCount, { timeout: 30_000 });
 
   const renameRights: number[] = [];
   const lastRights: number[] = [];
