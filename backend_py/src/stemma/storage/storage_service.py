@@ -21,10 +21,12 @@ from stemma.domain.errors import (
 from stemma.domain.requests import CreateFamily, CreateNewPerson, ExistingPerson, PersonDefinition
 from stemma.domain.responses import FamilyDescription, PersonDescription, Stemma, StemmaDescription
 from stemma.domain.user import User
+from stemma.seed.kings_of_europe import SeedStemma
 from stemma.services.kinship import FamilyLink, kinsmen_families, members_of
 from stemma.services.stemma_dfs import has_cycles
 from stemma.storage.effects import ChownEffect
 from stemma.storage.schema import (
+    ATTR_DEFAULT_STEMMA_ID,
     ATTR_DISPLAY_NAME,
     FAMILY_OWNER_PREFIX,
     FAMILY_PREFIX,
@@ -85,7 +87,11 @@ class StorageService:
         key = {"pk": user_email_pk(email), "sk": SK_PROFILE}
         item = self._table.get_item(Key=key).get("Item")
         if item:
-            return User(user_id=item["user_id"], email=email)
+            return User(
+                user_id=item["user_id"],
+                email=email,
+                default_stemma_id=item.get(ATTR_DEFAULT_STEMMA_ID),
+            )
         user_id = uuid.uuid4().hex
         try:
             self._table.put_item(
@@ -97,7 +103,19 @@ class StorageService:
             if exc.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
                 raise
             existing = self._table.get_item(Key=key)["Item"]
-            return User(user_id=existing["user_id"], email=email)
+            return User(
+                user_id=existing["user_id"],
+                email=email,
+                default_stemma_id=existing.get(ATTR_DEFAULT_STEMMA_ID),
+            )
+
+    def set_default_stemma_id(self, email: str, stemma_id: str) -> None:
+        self._table.update_item(
+            Key={"pk": user_email_pk(email), "sk": SK_PROFILE},
+            UpdateExpression="SET #d = :v",
+            ExpressionAttributeNames={"#d": ATTR_DEFAULT_STEMMA_ID},
+            ExpressionAttributeValues={":v": stemma_id},
+        )
 
     # ---------- stemmas ----------
 
@@ -106,6 +124,58 @@ class StorageService:
         self._table.put_item(Item={"pk": stemma_pk(stemma_id), "sk": SK_META, "name": name})
         self._put_stemma_owner(stemma_id, user_id)
         return stemma_id
+
+    def seed_stemma_with(self, user_id: str, name: str, seed: SeedStemma) -> tuple[str, Stemma]:
+        stemma_id = uuid.uuid4().hex
+        person_id_map = {p.id: uuid.uuid4().hex for p in seed.persons}
+        family_id_map = {f.id: uuid.uuid4().hex for f in seed.families}
+        persons = [
+            _PersonRow(
+                id=person_id_map[sp.id],
+                name=sp.name,
+                birth_date=sp.birth_date,
+                death_date=sp.death_date,
+                bio=sp.bio,
+            )
+            for sp in seed.persons
+        ]
+        families = [
+            _FamilyRow(
+                id=family_id_map[sf.id],
+                parents=[person_id_map[p] for p in sf.parent_ids],
+                children=[person_id_map[c] for c in sf.child_ids],
+            )
+            for sf in seed.families
+        ]
+        with self._table.batch_writer() as batch:
+            batch.put_item(Item={"pk": stemma_pk(stemma_id), "sk": SK_META, "name": name})
+            batch.put_item(
+                Item={
+                    "pk": stemma_pk(stemma_id),
+                    "sk": stemma_owner_sk(user_id),
+                    "gsi1pk": user_gsi_pk(user_id),
+                    "gsi1sk": user_gsi_sk(stemma_id),
+                }
+            )
+            for p in persons:
+                batch.put_item(Item=_person_item(stemma_id, p))
+                batch.put_item(
+                    Item={"pk": stemma_pk(stemma_id), "sk": person_owner_sk(p.id, user_id)}
+                )
+            for f in families:
+                batch.put_item(Item=_family_item(stemma_id, f))
+                batch.put_item(
+                    Item={"pk": stemma_pk(stemma_id), "sk": family_owner_sk(f.id, user_id)}
+                )
+        snapshot = _StemmaSnapshot(
+            stemma_id=stemma_id,
+            people={p.id: p for p in persons},
+            families={f.id: f for f in families},
+            stemma_owners={user_id},
+            person_owners={(p.id, user_id) for p in persons},
+            family_owners={(f.id, user_id) for f in families},
+        )
+        return stemma_id, _describe_stemma(snapshot, user_id)
 
     def list_owned_stemmas(self, user_id: str) -> list[StemmaDescription]:
         owner_rows = self._table.query(

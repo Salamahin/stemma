@@ -61,6 +61,65 @@ describe("AppController", () => {
         expect(localStorage.getItem("stemma_last_stemma_id")).toBe("a");
     });
 
+    test("prefers defaultStemmaId over first when no last id", async () => {
+        const model = {
+            listDescribeStemmas: jest.fn().mockResolvedValue({
+                stemmas: [stemmaDescA, stemmaDescB],
+                firstStemma: stemmaA,
+                defaultStemmaId: "b",
+            }),
+            getStemma: jest.fn().mockResolvedValue(stemmaB),
+        };
+
+        const controller = new AppController("http://example", () => model as any);
+        controller.authenticateAndListStemmas({ id_token: "token" });
+        await drainPromises();
+
+        expect(model.getStemma).toHaveBeenCalledWith("b");
+        expect(get(controller.currentStemmaId)).toBe("b");
+        expect(get(controller.stemma)).toEqual(stemmaB);
+        expect(localStorage.getItem("stemma_last_stemma_id")).toBe("b");
+    });
+
+    test("lastStemmaId beats defaultStemmaId", async () => {
+        const model = {
+            listDescribeStemmas: jest.fn().mockResolvedValue({
+                stemmas: [stemmaDescA, stemmaDescB],
+                firstStemma: stemmaA,
+                defaultStemmaId: "b",
+            }),
+            getStemma: jest.fn(),
+        };
+
+        localStorage.setItem("stemma_last_stemma_id", "a");
+
+        const controller = new AppController("http://example", () => model as any);
+        controller.authenticateAndListStemmas({ id_token: "token" });
+        await drainPromises();
+
+        expect(model.getStemma).not.toHaveBeenCalled();
+        expect(get(controller.currentStemmaId)).toBe("a");
+    });
+
+    test("empty stemma list leaves controller idle", async () => {
+        const model = {
+            listDescribeStemmas: jest.fn().mockResolvedValue({
+                stemmas: [],
+                firstStemma: null,
+                defaultStemmaId: null,
+            }),
+            getStemma: jest.fn(),
+        };
+
+        const controller = new AppController("http://example", () => model as any);
+        controller.authenticateAndListStemmas({ id_token: "token" });
+        await drainPromises();
+
+        expect(model.getStemma).not.toHaveBeenCalled();
+        expect(get(controller.currentStemmaId)).toBeNull();
+        expect(get(controller.ownedStemmas)).toEqual([]);
+    });
+
     test("selectStemma updates current stemma and stores it", async () => {
         const model = {
             getStemma: jest.fn().mockResolvedValue(stemmaB),

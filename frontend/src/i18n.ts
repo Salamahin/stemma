@@ -131,6 +131,7 @@ export const en: Record<string, string> = {
     'stemma.addTitle': 'Add new family tree',
     'stemma.nameLabel': 'Family tree name',
     'stemma.defaultName': 'My family tree',
+    'stemma.kingsOfEuropeName': 'European Kings',
 
     // Clone stemma modal
     'stemma.cloneTitle': 'Clone family tree',
@@ -268,6 +269,7 @@ export const ru: Record<string, string> = {
     'stemma.addTitle': 'Добавить новую родословную',
     'stemma.nameLabel': 'Название родословной',
     'stemma.defaultName': 'Моя родословная',
+    'stemma.kingsOfEuropeName': 'Короли Европы',
 
     // Clone stemma modal
     'stemma.cloneTitle': 'Клонировать родословную',
