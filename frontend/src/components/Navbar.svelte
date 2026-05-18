@@ -56,32 +56,39 @@
                             <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
                                 {#each ownedStemmas as s}
                                     <li>
-                                        <div class="d-flex flex-row mt-1 me-1">
+                                        <div class="stemma-row d-flex flex-row align-items-center mt-1 me-1">
                                             <a
-                                                class="dropdown-item {s.id == currentStemmaId ? 'active' : ''}  {disabled ? 'd-none' : ''}"
+                                                class="dropdown-item stemma-name {s.id == currentStemmaId ? 'active' : ''}  {disabled ? 'd-none' : ''}"
                                                 href="/"
                                                 on:click|preventDefault={() => dispatch("selectStemma", s.id)}>{s.name}</a
                                             >
                                             <button
                                                 type="button"
-                                                class="btn btn-outline-secondary btn-sm ms-1 {disabled ? 'd-none' : ''}"
+                                                class="btn btn-outline-secondary btn-sm ms-1 stemma-action {disabled ? 'd-none' : ''}"
                                                 aria-label={$t("stemma.rename")}
                                                 on:click={() => dispatch("renameStemma", s)}><i class="bi bi-pencil"></i></button
                                             >
                                             {#if s.id != currentStemmaId && s.removable}
                                                 <button
                                                     type="button"
-                                                    class="btn btn-danger btn-sm ms-1 {disabled ? 'd-none' : ''}"
+                                                    class="btn btn-danger btn-sm ms-1 stemma-action {disabled ? 'd-none' : ''}"
                                                     aria-label={$t("common.delete")}
                                                     on:click={(e) => dispatch("removeStemma", s)}><i class="bi bi-trash"></i></button
                                                 >
                                             {:else if s.id == currentStemmaId}
                                                 <button
                                                     type="button"
-                                                    class="btn btn-primary btn-sm ms-1 {disabled ? 'd-none' : ''}"
+                                                    class="btn btn-primary btn-sm ms-1 stemma-action {disabled ? 'd-none' : ''}"
                                                     aria-label={$t("stemma.clone")}
                                                     on:click={(e) => dispatch("cloneStemma", s.id)}><i class="bi bi-subtract"></i></button
                                                 >
+                                            {:else}
+                                                <button
+                                                    type="button"
+                                                    tabindex="-1"
+                                                    aria-hidden="true"
+                                                    class="btn btn-sm ms-1 stemma-action stemma-action-placeholder"
+                                                ><i class="bi bi-trash"></i></button>
                                             {/if}
                                         </div>
                                     </li>
@@ -152,5 +159,22 @@
     .lang-switch:focus-visible {
         color: rgba(255, 255, 255, 0.75);
         text-decoration: none;
+    }
+
+    .stemma-row .stemma-name {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .stemma-row .stemma-action {
+        flex: 0 0 auto;
+    }
+
+    .stemma-action-placeholder {
+        visibility: hidden;
+        pointer-events: none;
     }
 </style>
