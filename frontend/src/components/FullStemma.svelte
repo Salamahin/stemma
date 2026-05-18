@@ -39,6 +39,7 @@
     export let viewMode: ViewMode;
 
     let svg;
+    let markers;
     let isDragging = false;
     let pendingMouseLeave = false;
     let layoutCache: NodeLayoutCache | null = null;
@@ -73,7 +74,7 @@
     }
 
     function renderFullStemma() {
-        renderChart(svg, highlight, stemmaIndex);
+        renderChart(svg, highlight, stemmaIndex, markers);
 
         d3.selectAll("path.pin").remove();
         d3.select("g.main")
@@ -189,7 +190,7 @@
                 }
             });
 
-        renderChart(svg, highlight, stemmaIndex);
+        renderChart(svg, highlight, stemmaIndex, markers);
         makeDrag(
             svg,
             simulation,
@@ -210,7 +211,7 @@
     }
 
     onMount(() => {
-        svg = initChart("#chart");
+        ({ svg, markers } = initChart("#chart"));
         svg.call(zoomHandler);
     });
 </script>

@@ -43,12 +43,11 @@ export function makeNodesAndRelations(people, families) {
 
 export function initChart(svgSelector) {
     let svg = d3.select(svgSelector);
-    addArrowMarkers(svg);
-
+    const markers = addArrowMarkers(svg);
 
     svg.append("g").attr("class", "main");
 
-    return svg
+    return { svg, markers };
 }
 
 
@@ -221,7 +220,7 @@ export function mergeData(svg, nodes, relations, width, height, initialPositions
         );
 }
 
-export function renderChart(svg, highlight, stemmaIndex) {
+export function renderChart(svg, highlight, stemmaIndex, markers) {
     function getNodeColor(node) {
         if (node.type == "person") {
             let d = stemmaIndex.lineage(denormalizeId(node.id)).generation / stemmaIndex.maxGeneration();
@@ -250,8 +249,8 @@ export function renderChart(svg, highlight, stemmaIndex) {
     }
 
     function markerEnd(line) {
-        if (line.type == "familyToChild") return "url(#arrow-to-person)";
-        else return "url(#arrow-to-family)";
+        if (line.type == "familyToChild") return markers.person;
+        else return markers.family;
     }
 
     svg.selectAll("line")

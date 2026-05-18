@@ -25,7 +25,7 @@
             .attr("width", "100%")
             .attr("height", "100%");
 
-        addArrowMarkers(svg);
+        const markers = addArrowMarkers(svg);
 
         const parentsY = 40;
         const familyY = 110;
@@ -42,7 +42,7 @@
             .attr("x2", familyX).attr("y2", familyY)
             .attr("stroke", relationsColor)
             .attr("stroke-width", familyRelationWidth)
-            .attr("marker-end", "url(#arrow-to-family)");
+            .attr("marker-end", markers.family);
 
         // Parent-right → family link
         svg.append("line")
@@ -50,7 +50,7 @@
             .attr("x2", familyX).attr("y2", familyY)
             .attr("stroke", relationsColor)
             .attr("stroke-width", familyRelationWidth)
-            .attr("marker-end", "url(#arrow-to-family)");
+            .attr("marker-end", markers.family);
 
         // Family → child link
         svg.append("line")
@@ -58,7 +58,7 @@
             .attr("x2", childX).attr("y2", childY)
             .attr("stroke", relationsColor)
             .attr("stroke-width", childRelationWidth)
-            .attr("marker-end", "url(#arrow-to-person)");
+            .attr("marker-end", markers.person);
 
         // Parent-left node
         svg.append("circle")

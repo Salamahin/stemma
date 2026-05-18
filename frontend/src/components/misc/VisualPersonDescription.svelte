@@ -10,12 +10,13 @@
     export let stemmaIndex: StemmaIndex;
 
     let svg;
+    let markers;
     let width, height;
     let nodes, relations;
     let sim;
 
     onMount(() => {
-        svg = initChart(`#${chartId}`);
+        ({ svg, markers } = initChart(`#${chartId}`));
     });
 
     $: {
@@ -39,7 +40,7 @@
             sim = configureSimulation(svg, nodes, relations, width, height);
             mergeData(svg, nodes, relations, width, height, null, null, true);
             makeDrag(svg, sim, null);
-            renderChart(svg, new HighlightAll(), stemmaIndex);
+            renderChart(svg, new HighlightAll(), stemmaIndex, markers);
         }
     }
 </script>
