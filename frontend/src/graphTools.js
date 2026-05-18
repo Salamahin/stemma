@@ -250,8 +250,7 @@ export function renderChart(svg, highlight, stemmaIndex) {
     }
 
     function markerEnd(line) {
-        if (!lineHighlighted(line)) return null;
-        else if (line.type == "familyToChild") return "url(#arrow-to-person)";
+        if (line.type == "familyToChild") return "url(#arrow-to-person)";
         else return "url(#arrow-to-family)";
     }
 
