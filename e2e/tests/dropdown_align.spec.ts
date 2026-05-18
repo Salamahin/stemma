@@ -1,14 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { SEEDED_STEMMA_COUNT, waitForFirstLoginSeeded } from "./_seeded";
 
 const NAMES = ["A", "A very long stemma name that should ellipsize quite far", "Middle"];
 
 test("stemma dropdown buttons line up", async ({ page }) => {
   await page.goto("/");
-
-  await expect(page.locator("#navbarDropdownMenuLink")).toBeVisible();
-  // Wait for first-login seeding (My Stemma + European Kings) to finish.
-  const seededCount = 2;
-  await expect(page.locator(".dropdown-menu .stemma-row")).toHaveCount(seededCount, { timeout: 30_000 });
+  await waitForFirstLoginSeeded(page);
 
   for (const name of NAMES) {
     await page.locator("#navbarDropdownMenuLink").click();
@@ -22,7 +19,7 @@ test("stemma dropdown buttons line up", async ({ page }) => {
 
   await page.locator("#navbarDropdownMenuLink").click();
   const rows = page.locator(".dropdown-menu .stemma-row");
-  await expect(rows).toHaveCount(NAMES.length + seededCount, { timeout: 30_000 });
+  await expect(rows).toHaveCount(NAMES.length + SEEDED_STEMMA_COUNT, { timeout: 30_000 });
 
   const renameRights: number[] = [];
   const lastRights: number[] = [];

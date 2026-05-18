@@ -26,13 +26,21 @@ export function personColor(generationRatio) {
     return d3.interpolatePlasma(generationRatio);
 }
 
-// Add arrow marker defs to an SVG selection
+// Marker IDs must be unique document-wide; `url(#id)` resolves to the
+// first matching element in tree order, and if that element sits inside
+// a hidden subtree the browser won't render it.
+let _markerScope = 0;
+
 export function addArrowMarkers(svg) {
+    const scope = ++_markerScope;
+    const familyId = `arrow-to-family-${scope}`;
+    const personId = `arrow-to-person-${scope}`;
+
     let defs = svg.select("defs");
     if (defs.empty()) defs = svg.append("defs");
 
     defs.append("marker")
-        .attr("id", "arrow-to-family")
+        .attr("id", familyId)
         .attr("viewBox", "0 0 10 6")
         .attr("refX", 16)
         .attr("refY", 3)
@@ -45,7 +53,7 @@ export function addArrowMarkers(svg) {
         .attr("d", arrowPath);
 
     defs.append("marker")
-        .attr("id", "arrow-to-person")
+        .attr("id", personId)
         .attr("viewBox", "0 0 10 6")
         .attr("refX", 26)
         .attr("refY", 3)
@@ -56,4 +64,6 @@ export function addArrowMarkers(svg) {
         .style("fill", relationsColor)
         .append("path")
         .attr("d", arrowPath);
+
+    return { family: `url(#${familyId})`, person: `url(#${personId})` };
 }
