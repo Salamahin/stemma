@@ -126,7 +126,6 @@ class StorageService:
         return stemma_id
 
     def seed_stemma_with(self, user_id: str, name: str, seed: SeedStemma) -> tuple[str, Stemma]:
-        stemma_id = uuid.uuid4().hex
         person_id_map = {p.id: uuid.uuid4().hex for p in seed.persons}
         family_id_map = {f.id: uuid.uuid4().hex for f in seed.families}
         persons = [
@@ -147,6 +146,16 @@ class StorageService:
             )
             for sf in seed.families
         ]
+        return self._write_owned_stemma(user_id, name, persons, families)
+
+    def _write_owned_stemma(
+        self,
+        user_id: str,
+        name: str,
+        persons: list[_PersonRow],
+        families: list[_FamilyRow],
+    ) -> tuple[str, Stemma]:
+        stemma_id = uuid.uuid4().hex
         with self._table.batch_writer() as batch:
             batch.put_item(Item={"pk": stemma_pk(stemma_id), "sk": SK_META, "name": name})
             batch.put_item(
@@ -225,55 +234,21 @@ class StorageService:
     def clone_stemma(self, user_id: str, stemma_id: str, new_stemma_name: str) -> Stemma:
         source = self._load_snapshot(stemma_id)
         self._require_stemma_access(source, user_id)
-
-        new_stemma_id = uuid.uuid4().hex
         person_id_map = {old: uuid.uuid4().hex for old in source.people}
         family_id_map = {old: uuid.uuid4().hex for old in source.families}
-
-        with self._table.batch_writer() as batch:
-            batch.put_item(Item={"pk": stemma_pk(new_stemma_id), "sk": SK_META, "name": new_stemma_name})
-            batch.put_item(
-                Item={
-                    "pk": stemma_pk(new_stemma_id),
-                    "sk": stemma_owner_sk(user_id),
-                    "gsi1pk": user_gsi_pk(user_id),
-                    "gsi1sk": user_gsi_sk(new_stemma_id),
-                }
+        persons = [
+            replace(source.people[old], id=new) for old, new in person_id_map.items()
+        ]
+        families = [
+            _FamilyRow(
+                id=new,
+                parents=[person_id_map[p] for p in source.families[old].parents],
+                children=[person_id_map[c] for c in source.families[old].children],
             )
-            for old_pid, new_pid in person_id_map.items():
-                person = source.people[old_pid]
-                batch.put_item(Item=_person_item(new_stemma_id, replace(person, id=new_pid)))
-                batch.put_item(
-                    Item={"pk": stemma_pk(new_stemma_id), "sk": person_owner_sk(new_pid, user_id)}
-                )
-            for old_fid, new_fid in family_id_map.items():
-                fam = source.families[old_fid]
-                new_fam = _FamilyRow(
-                    id=new_fid,
-                    parents=[person_id_map[p] for p in fam.parents],
-                    children=[person_id_map[c] for c in fam.children],
-                )
-                batch.put_item(Item=_family_item(new_stemma_id, new_fam))
-                batch.put_item(
-                    Item={"pk": stemma_pk(new_stemma_id), "sk": family_owner_sk(new_fid, user_id)}
-                )
-
-        cloned_snapshot = _StemmaSnapshot(
-            stemma_id=new_stemma_id,
-            people={new_pid: replace(source.people[old], id=new_pid) for old, new_pid in person_id_map.items()},
-            families={
-                new_fid: _FamilyRow(
-                    id=new_fid,
-                    parents=[person_id_map[p] for p in source.families[old].parents],
-                    children=[person_id_map[c] for c in source.families[old].children],
-                )
-                for old, new_fid in family_id_map.items()
-            },
-            stemma_owners={user_id},
-            person_owners={(pid, user_id) for pid in person_id_map.values()},
-            family_owners={(fid, user_id) for fid in family_id_map.values()},
-        )
-        return _describe_stemma(cloned_snapshot, user_id)
+            for old, new in family_id_map.items()
+        ]
+        _, stemma = self._write_owned_stemma(user_id, new_stemma_name, persons, families)
+        return stemma
 
     # ---------- families ----------
 
