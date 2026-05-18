@@ -17,7 +17,8 @@ Kept in the repo so the data is reviewable / diffable without re-querying AWS.
 - Stemma id: `1cd5147ad05b5b619cb5e0efb9ccfab8`
 - DynamoDB table: `stemma-app-StemmaTable-17GSYHFZQU76H` (region `eu-central-1`)
 - Snapshot date: 2026-05-18
-- Persons: 318 — Families: 80
+- Persons: 328 — Families: 82
+- Connected components: 1 (fully linked)
 
 ## How to regenerate
 

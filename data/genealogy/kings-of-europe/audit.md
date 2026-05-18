@@ -1,9 +1,10 @@
 # Audit — Kings of Europe stemma
 
-Snapshot date: 2026-05-18 (post-fix). 318 persons, 80 families.
+Snapshot date: 2026-05-18 (post-fix). 328 persons, 82 families, **1 connected component**.
 
 ## Applied fixes (2026-05-17 / 2026-05-18)
 
+- **A1** — built the Hohenzollern-Sigmaringen bridge connecting Кароль I Румынский to Фердинанд I Румынский: added Карл Антон + Жозефина Баденская and their 4 other children (Стефания queen of Portugal, Антон, Фридрих, Мария countess of Flanders), added Леопольд + Антония Португальская and their 2 other children (Вильгельм, Карл Антон мл.); plus the two FAMILY rows linking these generations. Component 2 is gone.
 - **A3** — deleted 2 duplicate childless FAMILY rows (Елизавета II + Филипп, Вильгельм II + Августа Виктория).
 - **A2** — renamed 12 ambiguous-name persons (Анна Иоанновна, Анна Петровна, Иоанн V, Алексей Петрович (царевич), Фёдор III Алексеевич, Елизавета Петровна, Софья Алексеевна, Екатерина Иоанновна, two Павла Петровичей, two Петра Петровичей).
 - **B1–B6, C1–C4** — added 31 missing children + linked 1 existing person (Анна-Мария) to her parents.
@@ -11,15 +12,10 @@ Snapshot date: 2026-05-18 (post-fix). 318 persons, 80 families.
 - **C6–C8** — added 3 Sandro-like links: Августа Саксен-Веймарская to her mother Мария Павловна (via new Karl Friedrich SW); Фридерика Ганноверская to her mother Виктория Луиза (via new Ernst August III Brunswick); Александрина и Цецилия Мекленбург to their mother Анастасия Михайловна (via new Friedrich Franz III Mecklenburg).
 - **Bio rewrite** — every non-infant person now has a 200–600 char anecdotal bio (origin, marriage, scandal, historical fact). Infant deaths kept as one-line factual notes (year of death + burial location).
 
-## Remaining open items
+## A. Structural — original audit (resolved)
 
-### A1 — disconnected component (not fixed)
-`components.md` still shows 2 components. Component 2 is **Кароль I Румынский + Елизавета Вид-Нойвидская**, isolated — they have no surviving children, and the Hohenzollern-Sigmaringen bridge to Ferdinand I (nephew) was not built since it requires non-royal-line intermediates.
-
-## A. Structural — original audit (most resolved)
-
-### A1. Disconnected component — *still open*
-Component 2 is just **Кароль I Румынский + Елизавета Вид-Нойвидская**, isolated. They have no surviving children, and the rest of the Romanian royals (Фердинанд I, Кароль II, Михай I, …) belong to component 1. Carol I was Ferdinand I's uncle (brother of Leopold of Hohenzollern‑Sigmaringen); the bridge persons (Leopold + Antonia of Portugal + their parents Karl Anton + Joséphine of Baden) are not in the tree, so the connection cannot be made without adding them. **Not applied.**
+### A1. Disconnected component — *resolved 2026-05-18*
+Бывший компонент 2 (Кароль I Румынский + Елизавета Вид-Нойвидская) теперь связан с основным деревом через добавленную линию Гогенцоллернов-Зигмарингенов: общие предки Карл Антон + Жозефина Баденская связывают Кароля I и его брата Леопольда (отца Фердинанда I); семья Леопольд + Антония Португальская связывает Фердинанда I со старшим братом Вильгельмом и младшим Карлом Антоном-мл.
 
 ### A2. Same-name persons (not duplicates, just ambiguous labels)
 Each pair below is two distinct historical figures, but the display name doesn't disambiguate. Suggested renames:
