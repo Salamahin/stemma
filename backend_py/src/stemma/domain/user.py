@@ -5,3 +5,4 @@ from dataclasses import dataclass
 class User:
     user_id: str
     email: str
+    default_stemma_id: str | None = None

@@ -47,6 +47,7 @@ class Stemma:
 class OwnedStemmas:
     stemmas: list[StemmaDescription]
     first_stemma: Stemma | None
+    default_stemma_id: str | None = None
     type: Literal["OwnedStemmas"] = "OwnedStemmas"
 
 

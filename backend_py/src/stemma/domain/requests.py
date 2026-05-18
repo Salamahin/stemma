@@ -90,6 +90,7 @@ class DeleteStemmaRequest:
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
 class ListDescribeStemmasRequest:
     default_stemma_name: str
+    kings_of_europe_stemma_name: str
     type: Literal["ListDescribeStemmasRequest"] = "ListDescribeStemmasRequest"
 
 

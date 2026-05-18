@@ -24,4 +24,16 @@ describe("selectStemmaId", () => {
     test("returns null for empty list", () => {
         expect(selectStemmaId([], "a")).toBeNull();
     });
+
+    test("prefers defaultStemmaId when no lastStemmaId", () => {
+        expect(selectStemmaId(stemmas, undefined, "b")).toBe("b");
+    });
+
+    test("lastStemmaId wins over defaultStemmaId", () => {
+        expect(selectStemmaId(stemmas, "c", "b")).toBe("c");
+    });
+
+    test("falls back to first when defaultStemmaId is missing from list", () => {
+        expect(selectStemmaId(stemmas, undefined, "zzz")).toBe("a");
+    });
 });

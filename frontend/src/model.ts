@@ -37,7 +37,7 @@ export type UpdatePersonRequest = { type: "UpdatePersonRequest", stemmaId: strin
 export type UpdateFamilyRequest = { type: "UpdateFamilyRequest", stemmaId: string, familyId: string, familyDescr: CreateFamily }
 export type BearInvitationRequest = { type: "BearInvitationRequest", encodedToken: string }
 export type CloneStemmaRequest = { type: "CloneStemmaRequest", stemmaId: string, stemmaName: string }
-export type ListDescribeStemmasRequest = { type: "ListDescribeStemmasRequest", defaultStemmaName: string }
+export type ListDescribeStemmasRequest = { type: "ListDescribeStemmasRequest", defaultStemmaName: string, kingsOfEuropeStemmaName: string }
 export type RenameStemmaRequest = { type: "RenameStemmaRequest", stemmaId: string, newName: string }
 
 type Request =
@@ -59,7 +59,7 @@ type Request =
 //responses
 export type FamilyDescription = { type: "FamilyDescription", id: string, parents: Array<string>, children: Array<string>, readOnly: boolean }
 export type InviteToken = { type: "InviteToken", token: string }
-export type OwnedStemmas = { type: "OwnedStemmas", stemmas: Array<StemmaDescription>, firstStemma: Stemma }
+export type OwnedStemmas = { type: "OwnedStemmas", stemmas: Array<StemmaDescription>, firstStemma: Stemma, defaultStemmaId?: string | null }
 export type Stemma = { type: "Stemma", people: Array<PersonDescription>, families: Array<FamilyDescription> }
 export type StemmaDescription = { type: "StemmaDescription", id: string, name: string, removable: Boolean }
 export type PersonDescription = { type: "PersonDescription", id: string, name: string, birthDate?: string, deathDate?: string, bio?: string, readOnly: boolean }
@@ -121,7 +121,11 @@ export class Model {
 
     async listDescribeStemmas(): Promise<OwnedStemmas> {
         return this.send<OwnedStemmas>(
-            { type: "ListDescribeStemmasRequest", defaultStemmaName: this.translate("stemma.defaultName") },
+            {
+                type: "ListDescribeStemmasRequest",
+                defaultStemmaName: this.translate("stemma.defaultName"),
+                kingsOfEuropeStemmaName: this.translate("stemma.kingsOfEuropeName"),
+            },
             null,
         )
     }

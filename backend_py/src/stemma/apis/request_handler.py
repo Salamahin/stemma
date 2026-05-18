@@ -27,6 +27,7 @@ from stemma.domain.responses import (
     TokenAccepted,
 )
 from stemma.domain.user import User
+from stemma.seed.kings_of_europe import load_kings_of_europe
 from stemma.services.user_service import UserService
 from stemma.storage.storage_service import StorageService
 
@@ -69,14 +70,27 @@ class RequestHandler:
 
     def _list_describe_stemmas(self, user: User, request: ListDescribeStemmasRequest) -> OwnedStemmas:
         existing = self._storage.list_owned_stemmas(user.user_id)
-        if not existing:
-            new_id = self._storage.create_stemma(user.user_id, request.default_stemma_name)
-            return OwnedStemmas(
-                stemmas=[StemmaDescription(id=new_id, name=request.default_stemma_name, removable=True)],
-                first_stemma=Stemma(),
-            )
-        first = self._storage.stemma(user.user_id, existing[0].id)
-        return OwnedStemmas(stemmas=existing, first_stemma=first)
+        if user.default_stemma_id is None and not existing:
+            return self._seed_new_user(user, request)
+        ordered = _order_with_default_first(existing, user.default_stemma_id)
+        first = self._storage.stemma(user.user_id, ordered[0].id) if ordered else None
+        return OwnedStemmas(
+            stemmas=ordered, first_stemma=first, default_stemma_id=user.default_stemma_id
+        )
+
+    def _seed_new_user(self, user: User, request: ListDescribeStemmasRequest) -> OwnedStemmas:
+        my_stemma_id = self._storage.create_stemma(user.user_id, request.default_stemma_name)
+        kings_id, kings_stemma = self._storage.seed_stemma_with(
+            user.user_id, request.kings_of_europe_stemma_name, load_kings_of_europe()
+        )
+        self._storage.set_default_stemma_id(user.email, kings_id)
+        stemmas = [
+            StemmaDescription(id=kings_id, name=request.kings_of_europe_stemma_name, removable=True),
+            StemmaDescription(id=my_stemma_id, name=request.default_stemma_name, removable=True),
+        ]
+        return OwnedStemmas(
+            stemmas=stemmas, first_stemma=kings_stemma, default_stemma_id=kings_id
+        )
 
     def _bear_invitation(self, user: User, request: BearInvitationRequest) -> TokenAccepted:
         token = self._users.decode_invite_token(request.encoded_token)
@@ -140,3 +154,13 @@ class RequestHandler:
 
     def _rename_stemma(self, user: User, request: RenameStemmaRequest) -> StemmaDescription:
         return self._storage.rename_stemma(user.user_id, request.stemma_id, request.new_name)
+
+
+def _order_with_default_first(
+    stemmas: list[StemmaDescription], default_id: str | None
+) -> list[StemmaDescription]:
+    if default_id is None:
+        return stemmas
+    head = [s for s in stemmas if s.id == default_id]
+    tail = [s for s in stemmas if s.id != default_id]
+    return head + tail

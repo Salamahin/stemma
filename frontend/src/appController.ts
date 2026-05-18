@@ -37,7 +37,15 @@ export class AppController {
         this.model
             .listDescribeStemmas()
             .then((result) => {
-                const selectedId = selectStemmaId(result.stemmas, this.loadLastStemmaId());
+                if (result.stemmas.length === 0) {
+                    this.ownedStemmas.set(result.stemmas)
+                    return
+                }
+                const selectedId = selectStemmaId(
+                    result.stemmas,
+                    this.loadLastStemmaId(),
+                    result.defaultStemmaId,
+                );
                 const selectedStemma = result.stemmas.find((s) => s.id === selectedId);
                 const stemmaPromise = selectedStemma.id === result.stemmas[0].id
                     ? Promise.resolve(result.firstStemma)

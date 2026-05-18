@@ -62,6 +62,7 @@ def test_encode_owned_stemmas_response_tags_with_type_field() -> None:
     assert encoded == {
         "type": "OwnedStemmas",
         "stemmas": [{"type": "StemmaDescription", "id": "3", "name": "Tree", "removable": True}],
+        "defaultStemmaId": None,
         "firstStemma": {
             "type": "Stemma",
             "people": [

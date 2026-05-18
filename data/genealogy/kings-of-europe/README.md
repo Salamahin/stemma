@@ -3,10 +3,14 @@
 Frozen export of the `Короли Европы` stemma from the production DynamoDB table.
 Kept in the repo so the data is reviewable / diffable without re-querying AWS.
 
+The canonical JSON (`persons.json` + `families.json`) used by backend seeding lives
+under `backend_py/src/stemma/seed/data/kings_of_europe/` so it ships inside the
+Lambda artifact. The markdown analyses below stay here for reference.
+
 ## Files
 
-- `persons.json` — every person (id, name, dates, bio), sorted by birth date.
-- `families.json` — every family with parent / child ids **and** resolved names, sorted by earliest parent's birth date.
+- `backend_py/src/stemma/seed/data/kings_of_europe/persons.json` — every person (id, name, dates, bio), sorted by birth date.
+- `backend_py/src/stemma/seed/data/kings_of_europe/families.json` — every family with parent / child ids **and** resolved names, sorted by earliest parent's birth date.
 - `persons.md` — same persons, as a markdown table.
 - `families.md` — same families, as a readable list.
 - `components.md` — connected-component analysis of the parent/child graph.
