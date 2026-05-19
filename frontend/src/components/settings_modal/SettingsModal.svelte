@@ -1,20 +1,23 @@
 <script lang="ts">
     import * as bootstrap from "bootstrap";
-    import { createEventDispatcher } from "svelte";
     import type { Settings } from "../../model";
     import { DEFAULT_SETTINGS, ViewMode } from "../../model";
     import { t } from "../../i18n";
 
-    let modalEl;
-    let _settings: Settings = DEFAULT_SETTINGS;
+    type Props = {
+        onsettingsChanged?: (settings: Settings) => void;
+    };
 
-    const dispatch = createEventDispatcher();
+    let { onsettingsChanged }: Props = $props();
+
+    let modalEl = $state<HTMLElement>(null);
+    let _settings = $state<Settings>(DEFAULT_SETTINGS);
 
     function saveSettings() {
         const showAllInput = document.getElementById("showAll") as HTMLInputElement | null;
         const viewAll = showAllInput?.checked ?? false;
 
-        dispatch("settingsChanged", {
+        onsettingsChanged?.({
             viewMode: viewAll ? ViewMode.ALL : ViewMode.EDITABLE_ONLY,
         });
 
@@ -45,7 +48,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{$t("common.cancel")}</button>
-                <button type="button" class="btn btn-primary" on:click={saveSettings}>{$t("common.save")}</button>
+                <button type="button" class="btn btn-primary" onclick={saveSettings}>{$t("common.save")}</button>
             </div>
         </div>
     </div>

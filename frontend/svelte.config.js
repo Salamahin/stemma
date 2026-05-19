@@ -6,6 +6,6 @@ module.exports = {
         style: less(),
     }),
     compilerOptions: {
-        runes: false,
+        runes: true,
     },
 };

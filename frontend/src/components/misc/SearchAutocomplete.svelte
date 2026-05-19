@@ -1,29 +1,29 @@
 <script lang="ts">
-    import { createEventDispatcher } from "svelte";
     import fuzzysort from "fuzzysort";
     import type { PersonDescription } from "../../model";
     import { t } from "../../i18n";
 
-    export let people: PersonDescription[] = [];
-    export let disabled: boolean = false;
+    type Props = {
+        people?: PersonDescription[];
+        disabled?: boolean;
+        onselect?: (id: string) => void;
+    };
 
-    const dispatch = createEventDispatcher();
+    let { people = [], disabled = false, onselect }: Props = $props();
 
-    let query = "";
-    let activeIndex = -1;
-    let showDropdown = false;
+    let query = $state("");
+    let activeIndex = $state(-1);
+    let showDropdown = $state(false);
     let blurTimeout: ReturnType<typeof setTimeout>;
 
-    $: results = query.length >= 2
-        ? fuzzysort.go(query, people, { key: "name", limit: 8 })
-        : [];
+    const results = $derived(
+        query.length >= 2 ? fuzzysort.go(query, people, { key: "name", limit: 8 }) : []
+    );
 
-    $: if (results.length > 0 && query.length >= 2) {
-        showDropdown = true;
+    $effect(() => {
+        showDropdown = results.length > 0 && query.length >= 2;
         activeIndex = -1;
-    } else {
-        showDropdown = false;
-    }
+    });
 
     function lifespan(p: PersonDescription): string {
         const parts = [p.birthDate || "?", p.deathDate].filter(Boolean);
@@ -31,7 +31,7 @@
     }
 
     function selectPerson(id: string) {
-        dispatch("select", id);
+        onselect?.(id);
         query = "";
         showDropdown = false;
     }
@@ -76,9 +76,9 @@
         placeholder={$t("search.placeholder")}
         bind:value={query}
         {disabled}
-        on:keydown={handleKeydown}
-        on:blur={handleBlur}
-        on:focus={handleFocus}
+        onkeydown={handleKeydown}
+        onblur={handleBlur}
+        onfocus={handleFocus}
     />
     {#if showDropdown && results.length > 0}
         <ul class="dropdown-menu show w-100" style="max-height: 320px; overflow-y: auto">
@@ -87,7 +87,7 @@
                     <button
                         class="dropdown-item {i === activeIndex ? 'active' : ''}"
                         type="button"
-                        on:mousedown|preventDefault={() => selectPerson(result.obj.id)}
+                        onmousedown={(e) => { e.preventDefault(); selectPerson(result.obj.id); }}
                     >
                         <span>{@html result.highlight('<b>', '</b>')}</span>
                         {#if lifespan(result.obj)}

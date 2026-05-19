@@ -4,10 +4,14 @@
     import { HiglightLineages } from "../../highlight";
     import { t } from "../../i18n";
 
-    export let stemma: Stemma;
-    export let stemmaIndex: StemmaIndex;
-    export let highlight: HiglightLineages;
-    export let highlightVersion: number;
+    type Props = {
+        stemma: Stemma;
+        stemmaIndex: StemmaIndex;
+        highlight: HiglightLineages;
+        highlightVersion: number;
+    };
+
+    let { stemma, stemmaIndex, highlight, highlightVersion }: Props = $props();
 
     type Stats = {
         active: boolean;
@@ -47,12 +51,13 @@
         };
     }
 
-    $: stats =
+    const stats = $derived(
         stemma && stemmaIndex && highlight && highlightVersion >= 0
             ? highlight.isActive()
                 ? highlightedStats()
                 : totalStats()
-            : null;
+            : null
+    );
 </script>
 
 {#if stats}

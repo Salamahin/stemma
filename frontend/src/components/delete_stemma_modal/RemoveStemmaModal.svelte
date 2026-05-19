@@ -1,17 +1,20 @@
 <script lang="ts">
-    import { createEventDispatcher } from "svelte";
     import * as bootstrap from "bootstrap";
     import type { StemmaDescription } from "../../model";
     import { t } from "../../i18n";
 
-    const dispatch = createEventDispatcher();
+    type Props = {
+        onstemmaRemoved?: (id: string) => void;
+    };
 
-    let modalEl;
-    let selectedStemma: StemmaDescription;
+    let { onstemmaRemoved }: Props = $props();
+
+    let modalEl = $state<HTMLElement>(null);
+    let selectedStemma = $state<StemmaDescription>(null);
 
     function handleRemoveStemmaClick() {
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-        dispatch("stemmaRemoved", selectedStemma.id);
+        onstemmaRemoved?.(selectedStemma.id);
     }
 
     export function askForConfirmation(s: StemmaDescription) {
@@ -31,7 +34,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{$t("common.cancel")}</button>
-                <button type="button" class="btn btn-danger" on:click={(e) => handleRemoveStemmaClick()}>{$t("common.delete")}</button>
+                <button type="button" class="btn btn-danger" onclick={handleRemoveStemmaClick}>{$t("common.delete")}</button>
             </div>
         </div>
     </div>

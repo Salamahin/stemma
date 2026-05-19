@@ -1,4 +1,4 @@
-<script context="module" lang="ts">
+<script module lang="ts">
     import type { PersonDescription, CreateNewPerson } from "../../model";
     import { imask } from "@imask/svelte";
 
@@ -16,32 +16,39 @@
 
 <script lang="ts">
     import * as bootstrap from "bootstrap";
-    import { createEventDispatcher } from "svelte";
     import { t } from "../../i18n";
 
-    let modalEl;
-    const dispatch = createEventDispatcher();
+    type Props = {
+        onpersonUpdated?: (payload: UpdatePerson) => void;
+        onpersonRemoved?: (id: string) => void;
+    };
 
-    let pinned: boolean;
-    let name: string;
-    let birthDate: Date;
-    let deathDate: Date;
-    let bio: string;
-    let id: string;
-    let readOnly: boolean;
+    let { onpersonUpdated, onpersonRemoved }: Props = $props();
 
-    let birthDateErrString: string;
-    let deathDateErrString: string;
+    let modalEl = $state<HTMLElement>(null);
+    let birthInputEl = $state<HTMLInputElement>(null);
+    let deathInputEl = $state<HTMLInputElement>(null);
+
+    let pinned = $state<boolean>(false);
+    let name = $state<string>("");
+    let birthDate = $state<Date>(null);
+    let deathDate = $state<Date>(null);
+    let bio = $state<string>("");
+    let id = $state<string>("");
+    let readOnly = $state<boolean>(false);
+
+    let birthDateErrString = $state<string>(null);
+    let deathDateErrString = $state<string>(null);
 
     function personUpdated() {
-        dispatch("personUpdated", {
-            id: id,
+        onpersonUpdated?.({
+            id,
             description: {
                 type: "CreateNewPerson",
-                name: name,
+                name,
                 birthDate: dateToIsoLocalTime(birthDate),
                 deathDate: dateToIsoLocalTime(deathDate),
-                bio: bio,
+                bio,
             },
             pin: pinned,
         });
@@ -50,20 +57,19 @@
     }
 
     function personRemoved() {
-        dispatch("personRemoved", id);
-
+        onpersonRemoved?.(id);
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     }
 
     function dateToIsoLocalTime(d: Date) {
         if (!d) return null;
 
-        let date = d.getDate();
-        let month = d.getMonth() + 1;
-        let year = d.getFullYear();
+        const date = d.getDate();
+        const month = d.getMonth() + 1;
+        const year = d.getFullYear();
 
-        let dateStr = date < 10 ? "0" + date : date.toString();
-        let monthStr = month < 10 ? "0" + month : month.toString();
+        const dateStr = date < 10 ? "0" + date : date.toString();
+        const monthStr = month < 10 ? "0" + month : month.toString();
 
         return `${year}-${monthStr}-${dateStr}`;
     }
@@ -73,10 +79,8 @@
         name = p.description.name;
         birthDate = p.description.birthDate ? new Date(p.description.birthDate) : null;
         deathDate = p.description.deathDate ? new Date(p.description.deathDate) : null;
-        const birthInput = document.getElementById("birthDateInput") as HTMLInputElement | null;
-        if (birthInput) birthInput.value = dateToMaskedDateStr(birthDate) ?? "";
-        const deathInput = document.getElementById("deathDateInput") as HTMLInputElement | null;
-        if (deathInput) deathInput.value = dateToMaskedDateStr(deathDate) ?? "";
+        if (birthInputEl) birthInputEl.value = dateToMaskedDateStr(birthDate) ?? "";
+        if (deathInputEl) deathInputEl.value = dateToMaskedDateStr(deathDate) ?? "";
         bio = p.description.bio;
         pinned = p.pin;
         readOnly = p.description.readOnly;
@@ -87,20 +91,20 @@
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
-    function parseMaskedDateStr(str: String) {
-        var [day, month, year] = str.split(".");
+    function parseMaskedDateStr(str: string) {
+        const [day, month, year] = str.split(".");
         return new Date(Number(year), Number(month) - 1, Number(day));
     }
 
     function dateToMaskedDateStr(date: Date) {
         if (!date) return null;
 
-        let day = date.getDate();
-        let month = date.getMonth() + 1;
-        let year = date.getFullYear();
+        const day = date.getDate();
+        const month = date.getMonth() + 1;
+        const year = date.getFullYear();
 
-        let dayStr = day < 10 ? "0" + day : day.toString();
-        let monthStr = month < 10 ? "0" + month : month.toString();
+        const dayStr = day < 10 ? "0" + day : day.toString();
+        const monthStr = month < 10 ? "0" + month : month.toString();
 
         return [dayStr, monthStr, year.toString()].join(".");
     }
@@ -113,27 +117,46 @@
         parse: parseMaskedDateStr,
     };
 
-    function acceptBirthDate({ detail: maskRef }) {
-        if (!maskRef.unmaskedValue) birthDateErrString = null;
-        else birthDateErrString = $t("person.incompleteDate");
+    function attachMaskedDateListeners(
+        el: HTMLInputElement,
+        setErr: (err: string | null) => void,
+        setDate: (d: Date) => void,
+    ) {
+        function onAccept(e: Event) {
+            const maskRef = (e as CustomEvent).detail;
+            setErr(maskRef.unmaskedValue ? $t("person.incompleteDate") : null);
+        }
+        function onComplete(e: Event) {
+            const maskRef = (e as CustomEvent).detail;
+            setErr(null);
+            setDate(parseMaskedDateStr(maskRef.value));
+            validateLifetimeRange();
+        }
+        el.addEventListener("accept", onAccept);
+        el.addEventListener("complete", onComplete);
+        return () => {
+            el.removeEventListener("accept", onAccept);
+            el.removeEventListener("complete", onComplete);
+        };
     }
 
-    function completeBirthDate({ detail: maskRef }) {
-        birthDateErrString = null;
-        birthDate = parseMaskedDateStr(maskRef.value);
-        validateLifetimeRange();
-    }
+    $effect(() => {
+        if (!birthInputEl) return;
+        return attachMaskedDateListeners(
+            birthInputEl,
+            (err) => (birthDateErrString = err),
+            (d) => (birthDate = d),
+        );
+    });
 
-    function acceptDeathDate({ detail: maskRef }) {
-        if (!maskRef.unmaskedValue) deathDateErrString = null;
-        else deathDateErrString = $t("person.incompleteDate");
-    }
-
-    function completeDeathDate({ detail: maskRef }) {
-        deathDateErrString = null;
-        deathDate = parseMaskedDateStr(maskRef.value);
-        validateLifetimeRange();
-    }
+    $effect(() => {
+        if (!deathInputEl) return;
+        return attachMaskedDateListeners(
+            deathInputEl,
+            (err) => (deathDateErrString = err),
+            (d) => (deathDate = d),
+        );
+    });
 
     function validateLifetimeRange() {
         if (!birthDate || !deathDate) return;
@@ -164,11 +187,10 @@
                     <div class="mt-3 mb-2">{$t("person.lifeYears")}</div>
                     <div class="col-md-6 mb-2">
                         <input
+                            bind:this={birthInputEl}
                             id="birthDateInput"
                             value={dateToMaskedDateStr(birthDate)}
                             use:imask={dateMaskingOpts}
-                            on:accept={acceptBirthDate}
-                            on:complete={completeBirthDate}
                             class="form-control birthdate-input {birthDateErrString ? 'is-invalid' : ''}"
                             readonly={readOnly}
                             placeholder={$t("person.datePlaceholder")}
@@ -177,11 +199,10 @@
                     </div>
                     <div class="col-md-6 mb-2">
                         <input
+                            bind:this={deathInputEl}
                             id="deathDateInput"
                             value={dateToMaskedDateStr(deathDate)}
                             use:imask={dateMaskingOpts}
-                            on:accept={acceptDeathDate}
-                            on:complete={completeDeathDate}
                             class="form-control deathdate-input {deathDateErrString ? 'is-invalid' : ''}"
                             readonly={readOnly}
                             placeholder={$t("person.datePlaceholder")}
@@ -203,14 +224,14 @@
             </div>
             <div class="modal-footer">
                 {#if !readOnly}
-                    <button type="button" class="btn btn-danger me-auto" on:click={() => personRemoved()}>{$t("common.delete")}</button>
+                    <button type="button" class="btn btn-danger me-auto" onclick={personRemoved}>{$t("common.delete")}</button>
                 {/if}
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{$t("common.cancel")}</button>
                 <button
                     type="button"
                     class="btn btn-primary"
                     disabled={birthDateErrString != null || deathDateErrString != null}
-                    on:click={() => personUpdated()}>{$t("common.save")}</button
+                    onclick={personUpdated}>{$t("common.save")}</button
                 >
             </div>
         </div>

@@ -1,14 +1,17 @@
 <script lang="ts">
-    import { createEventDispatcher } from "svelte";
     import { onMount } from "svelte";
     import * as bootstrap from "bootstrap";
     import { t } from "../../i18n";
 
-    const dispatch = createEventDispatcher();
+    type Props = {
+        onstemmaRenamed?: (payload: { stemmaId: string; name: string }) => void;
+    };
 
-    let modalEl;
-    let input;
-    let renamedStemmaId;
+    let { onstemmaRenamed }: Props = $props();
+
+    let modalEl = $state<HTMLElement>(null);
+    let input = $state<HTMLInputElement>(null);
+    let renamedStemmaId = $state<string>(null);
 
     onMount(() => {
         modalEl.addEventListener("shown.bs.modal", () => input.focus());
@@ -16,9 +19,9 @@
 
     function handleRenameClick() {
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-        let name = input.value;
+        const name = input.value;
         input.value = "";
-        dispatch("stemmaRenamed", { stemmaId: renamedStemmaId, name: name });
+        onstemmaRenamed?.({ stemmaId: renamedStemmaId, name });
     }
 
     export function promptStemmaRename(stemmaId: string, currentName: string) {
@@ -50,7 +53,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{$t("common.cancel")}</button>
-                <button type="button" class="btn btn-primary" on:click={handleRenameClick}>{$t("stemma.rename")}</button>
+                <button type="button" class="btn btn-primary" onclick={handleRenameClick}>{$t("stemma.rename")}</button>
             </div>
         </div>
     </div>

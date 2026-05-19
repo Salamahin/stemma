@@ -1,13 +1,25 @@
 <script lang="ts">
     import type { CreateNewPerson, PersonDescription } from "../../model";
-    import { createEventDispatcher } from "svelte";
     import VisualPersonDescription from "./VisualPersonDescription.svelte";
     import { StemmaIndex } from "../../stemmaIndex";
     import { t } from "../../i18n";
     import { filterEditablePeople } from "../../personSelectionRules";
 
-    let dispatch = createEventDispatcher();
-    let selectedPerson: CreateNewPerson | PersonDescription;
+    type Props = {
+        people?: (CreateNewPerson | PersonDescription)[];
+        stemmaIndex: StemmaIndex;
+        onselect?: (person: CreateNewPerson | PersonDescription) => void;
+    };
+
+    let { people = [], stemmaIndex, onselect }: Props = $props();
+
+    let selectedPerson = $state<CreateNewPerson | PersonDescription>(null);
+
+    const filteredPeople = $derived(filterEditablePeople(people));
+
+    $effect(() => {
+        if (filteredPeople.length > 0) selectPerson(filteredPeople[0]);
+    });
 
     function tabName(p: PersonDescription | CreateNewPerson, i: number) {
         if ("id" in p) return $t("personSelector.namesake", { index: String(i + 1) });
@@ -16,14 +28,8 @@
 
     function selectPerson(p: PersonDescription | CreateNewPerson) {
         selectedPerson = p;
+        onselect?.(p);
     }
-
-    export let people: (CreateNewPerson | PersonDescription)[] = [];
-    export let stemmaIndex: StemmaIndex;
-
-    $: filteredPeople = filterEditablePeople(people);
-    $: if (filteredPeople) selectedPerson = filteredPeople[0];
-    $: if (selectedPerson) dispatch("select", selectedPerson);
 </script>
 
 {#if filteredPeople && filteredPeople.length}
@@ -37,7 +43,7 @@
                                 class="nav-link {p == selectedPerson ? 'active' : ''}"
                                 aria-current={p == selectedPerson ? "page" : null}
                                 href="/"
-                                on:click|preventDefault={() => selectPerson(p)}>{tabName(p, i)}</a
+                                onclick={(e) => { e.preventDefault(); selectPerson(p); }}>{tabName(p, i)}</a
                             >
                         </li>
                     {/each}
