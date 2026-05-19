@@ -1,4 +1,4 @@
-<script context="module" lang="ts">
+<script module lang="ts">
     import type { CreateNewPerson, FamilyDescription, PersonDefinition, PersonDescription } from "../../model";
     import * as bootstrap from "bootstrap";
 
@@ -14,29 +14,30 @@
     import { StemmaIndex } from "../../stemmaIndex";
     import CreateSelectPerson from "./CreateSelectPerson.svelte";
     import FamilyGeneration from "./FamilyGeneration.svelte";
-
-    import { createEventDispatcher } from "svelte";
     import { t } from "../../i18n";
 
-    let modalEl;
-    let mode = "familyComposition";
+    type Props = {
+        stemma: Stemma;
+        stemmaIndex: StemmaIndex;
+        onfamilyAdded?: (payload: { parents: PersonDefinition[]; children: PersonDefinition[] }) => void;
+        onfamilyUpdated?: (payload: { familyId: string; parents: PersonDefinition[]; children: PersonDefinition[] }) => void;
+        onfamilyRemoved?: (familyId: string) => void;
+    };
 
-    let createSelectEl;
+    let { stemma, stemmaIndex, onfamilyAdded, onfamilyUpdated, onfamilyRemoved }: Props = $props();
 
-    let selectParent: boolean;
-    let selected = null;
-    let familyId = null;
+    let modalEl = $state<HTMLElement>(null);
+    let mode = $state("familyComposition");
+    let createSelectEl = $state<ReturnType<typeof CreateSelectPerson>>(null);
+    let selectParent = $state<boolean>(false);
+    let selected = $state<CreateNewPerson | PersonDescription>(null);
+    let familyId = $state<string>(null);
+    let parents = $state<(CreateNewPerson | PersonDescription)[]>([]);
+    let children = $state<(CreateNewPerson | PersonDescription)[]>([]);
+    let readOnly = $state(false);
 
-    let parents: (CreateNewPerson | PersonDescription)[] = [];
-    let children: (CreateNewPerson | PersonDescription)[] = [];
-
-    let selectedParentsCount, selectedChildrenCount;
-    let readOnly: boolean;
-
-    let dispatch = createEventDispatcher();
-
-    export let stemma: Stemma;
-    export let stemmaIndex: StemmaIndex;
+    const selectedParentsCount = $derived(parents.length);
+    const selectedChildrenCount = $derived(children.length);
 
     export function showExistingFamily(details: FamilyDescription) {
         familyId = details.id;
@@ -59,19 +60,16 @@
         mode = "familyComposition";
     }
 
-    function showPersonSelection(isParent) {
+    function showPersonSelection(isParent: boolean) {
         selectParent = isParent;
-
         if (createSelectEl) createSelectEl.reset();
         selected = null;
-
         mode = "personSelection";
     }
 
     function confirmPersonSelection() {
         if (selectParent) parents = [...parents, { ...selected }];
         else children = [...children, { ...selected }];
-
         showFamilyComposition();
     }
 
@@ -81,23 +79,18 @@
     }
 
     function saveFamily() {
-        let pp = parents.map((p) => toPersonDefinition(p));
-        let cc = children.map((c) => toPersonDefinition(c));
+        const pp = parents.map((p) => toPersonDefinition(p));
+        const cc = children.map((c) => toPersonDefinition(c));
 
-        if (familyId == null) dispatch("familyAdded", { parents: pp, children: cc });
-        else dispatch("familyUpdated", { familyId: familyId, parents: pp, children: cc });
+        if (familyId == null) onfamilyAdded?.({ parents: pp, children: cc });
+        else onfamilyUpdated?.({ familyId, parents: pp, children: cc });
 
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     }
 
     function removeFamily() {
-        dispatch("familyRemoved", familyId);
+        onfamilyRemoved?.(familyId);
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-    }
-
-    $: {
-        selectedParentsCount = parents ? parents.length : 0;
-        selectedChildrenCount = children ? children.length : 0;
     }
 </script>
 
@@ -121,7 +114,7 @@
                     <p class="fs-5">{$t("family.parents")}</p>
                     <FamilyGeneration bind:selectedPeople={parents} {readOnly} />
                     {#if selectedParentsCount < 2 && !readOnly}
-                        <button type="button" class="btn btn-primary btn-sm" on:click={(e) => showPersonSelection(true)}
+                        <button type="button" class="btn btn-primary btn-sm" onclick={() => showPersonSelection(true)}
                             ><i class="bi bi-person-plus-fill"></i> {$t("common.add")}</button
                         >
                     {/if}
@@ -131,27 +124,27 @@
                     <p class="fs-5">{$t("family.children")}</p>
                     <FamilyGeneration bind:selectedPeople={children} {readOnly} />
                     {#if !readOnly}
-                        <button type="button" class="btn btn-primary btn-sm" on:click={(e) => showPersonSelection(false)}
+                        <button type="button" class="btn btn-primary btn-sm" onclick={() => showPersonSelection(false)}
                             ><i class="bi bi-person-plus-fill"></i> {$t("common.add")}</button
                         >
                     {/if}
                 {:else}
-                    <CreateSelectPerson {stemma} {stemmaIndex} bind:this={createSelectEl} on:selected={(e) => (selected = e.detail)} />
+                    <CreateSelectPerson {stemma} {stemmaIndex} bind:this={createSelectEl} onselected={(p) => (selected = p)} />
                 {/if}
             </div>
             {#if !readOnly}
                 <div class="modal-footer">
                     {#if mode == "familyComposition"}
                         {#if familyId != null}
-                            <button type="button" class="btn btn-danger me-auto" on:click={() => removeFamily()}>{$t("common.delete")}</button>
+                            <button type="button" class="btn btn-danger me-auto" onclick={removeFamily}>{$t("common.delete")}</button>
                         {/if}
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{$t("common.cancel")}</button>
-                        <button type="button" class="btn btn-primary" disabled={selectedParentsCount + selectedChildrenCount < 2} on:click={(e) => saveFamily()}
+                        <button type="button" class="btn btn-primary" disabled={selectedParentsCount + selectedChildrenCount < 2} onclick={saveFamily}
                             >{$t("common.save")}</button
                         >
                     {:else}
-                        <button type="button" class="btn btn-secondary" on:click={(e) => showFamilyComposition()}>{$t("common.back")}</button>
-                        <button type="button" class="btn btn-primary" disabled={selected == null} on:click={(e) => confirmPersonSelection()}>{$t("common.select")}</button>
+                        <button type="button" class="btn btn-secondary" onclick={showFamilyComposition}>{$t("common.back")}</button>
+                        <button type="button" class="btn btn-primary" disabled={selected == null} onclick={confirmPersonSelection}>{$t("common.select")}</button>
                     {/if}
                 </div>
             {/if}

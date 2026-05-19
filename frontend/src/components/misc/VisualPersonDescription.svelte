@@ -5,23 +5,29 @@
     import { configureSimulation, initChart, makeDrag, makeNodesAndRelations, mergeData, renderChart } from "../../graphTools";
     import { HighlightAll } from "../../highlight";
 
-    export let chartId;
-    export let selectedPerson: PersonDescription | CreateNewPerson;
-    export let stemmaIndex: StemmaIndex;
+    type Props = {
+        chartId: string;
+        selectedPerson: PersonDescription | CreateNewPerson;
+        stemmaIndex: StemmaIndex;
+    };
 
-    let svg;
-    let markers;
-    let width, height;
-    let nodes, relations;
-    let sim;
+    let { chartId, selectedPerson, stemmaIndex }: Props = $props();
+
+    let svg = $state<any>(null);
+    let markers: any = null;
+    let width = $state(0);
+    let height = $state(0);
+    let nodes = $state<any[]>(null);
+    let relations = $state<any[]>(null);
+    let sim: any = null;
 
     onMount(() => {
         ({ svg, markers } = initChart(`#${chartId}`));
     });
 
-    $: {
+    $effect(() => {
         if (svg && selectedPerson) {
-            let relativies, families;
+            let relativies: any[], families: any[];
 
             if ("id" in selectedPerson) {
                 relativies = stemmaIndex.relativies(selectedPerson.id);
@@ -33,16 +39,16 @@
 
             [nodes, relations] = makeNodesAndRelations(relativies, families);
         }
-    }
+    });
 
-    $: {
+    $effect(() => {
         if (width && height && svg && nodes && relations) {
             sim = configureSimulation(svg, nodes, relations, width, height);
             mergeData(svg, nodes, relations, width, height, null, null, true);
             makeDrag(svg, sim, null);
             renderChart(svg, new HighlightAll(), stemmaIndex, markers);
         }
-    }
+    });
 </script>
 
 <div bind:clientWidth={width} bind:clientHeight={height} class="h-100 w-100">

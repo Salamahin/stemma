@@ -1,33 +1,37 @@
 <script lang="ts">
-  import type { CreateNewPerson, PersonDescription } from "../../model";
-  import { t } from "../../i18n";
+    import type { CreateNewPerson, PersonDescription } from "../../model";
+    import { t } from "../../i18n";
 
-  export let selectedPeople: (PersonDescription | CreateNewPerson)[] = [];
-  export let readOnly: boolean;
+    type Props = {
+        selectedPeople?: (PersonDescription | CreateNewPerson)[];
+        readOnly: boolean;
+    };
 
-  function remove(index: number) {
-    selectedPeople = selectedPeople.filter((element, i) => i != index);
-  }
+    let { selectedPeople = $bindable([]), readOnly }: Props = $props();
+
+    function remove(index: number) {
+        selectedPeople = selectedPeople.filter((_, i) => i !== index);
+    }
 </script>
 
 {#if !selectedPeople.length}
-  <p class="text-center text-secondary fs-6">{$t('family.noInfo')}</p>
+    <p class="text-center text-secondary fs-6">{$t('family.noInfo')}</p>
 {:else}
-  <table class="table">
-    <tbody>
-      {#each selectedPeople as p, i}
-        <tr>
-          <th class="align-middle" scope="row">{i + 1}</th>
-          <td class="align-middle">{p.name}</td>
-          <td class="align-middle">
-            {#if !readOnly}
-              <div class="float-end">
-                <button type="button" class="btn btn-sm btn-danger" aria-label={$t("common.delete")} on:click={(e) => remove(i)}><i class="bi bi-trash"></i></button>
-              </div>
-            {/if}
-          </td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
+    <table class="table">
+        <tbody>
+            {#each selectedPeople as p, i}
+                <tr>
+                    <th class="align-middle" scope="row">{i + 1}</th>
+                    <td class="align-middle">{p.name}</td>
+                    <td class="align-middle">
+                        {#if !readOnly}
+                            <div class="float-end">
+                                <button type="button" class="btn btn-sm btn-danger" aria-label={$t("common.delete")} onclick={() => remove(i)}><i class="bi bi-trash"></i></button>
+                            </div>
+                        {/if}
+                    </td>
+                </tr>
+            {/each}
+        </tbody>
+    </table>
 {/if}

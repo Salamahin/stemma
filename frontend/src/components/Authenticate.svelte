@@ -1,51 +1,56 @@
-<script>
-    import { createEventDispatcher } from "svelte";
+<script lang="ts">
     import { jwtDecode } from "jwt-decode";
     import { onMount } from "svelte";
 
-    const dispatch = createEventDispatcher();
+    type Props = {
+        google_client_id: string;
+        onsignIn?: (user: { name: string; image_url: string; id_token: string }) => void;
+    };
 
-    export let google_client_id;
+    let { google_client_id, onsignIn }: Props = $props();
 
-    let gsiLoaded, mounted;
+    let gsiLoaded = $state(false);
+    let mounted = $state(false);
 
     onMount(() => {
         mounted = true;
-        const ready = window.__gsiReady;
+        const ready = (window as any).__gsiReady;
         if (ready && typeof ready.then === "function") {
             ready.then(() => {
                 gsiLoaded = true;
             });
-        } else if (window.google && window.google.accounts) {
+        } else if ((window as any).google && (window as any).google.accounts) {
             gsiLoaded = true;
         }
     });
 
-    function handleCredentialResponse(response) {
-        let decoded = jwtDecode(response.credential);
+    function handleCredentialResponse(response: any) {
+        const decoded = jwtDecode<{ given_name: string; picture: string }>(response.credential);
 
-        dispatch("signIn", {
+        onsignIn?.({
             name: decoded.given_name,
             image_url: decoded.picture,
             id_token: response.credential,
         });
     }
 
-    $: if (gsiLoaded && mounted) {
-        google.accounts.id.initialize({
-            client_id: google_client_id,
-            callback: handleCredentialResponse,
-            auto_select: true,
-        });
-        google.accounts.id.prompt((notification) => {
-            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                google.accounts.id.renderButton(
-                    document.getElementById("signin"),
-                    { theme: "outline", size: "large"  }
-                );
-            }
-        });
-    }
+    $effect(() => {
+        if (gsiLoaded && mounted) {
+            (window as any).google.accounts.id.initialize({
+                client_id: google_client_id,
+                callback: handleCredentialResponse,
+                auto_select: true,
+            });
+            (window as any).google.accounts.id.prompt((notification: any) => {
+                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                    (window as any).google.accounts.id.renderButton(
+                        document.getElementById("signin"),
+                        { theme: "outline", size: "large" }
+                    );
+                }
+            });
+        }
+    });
 </script>
 
 <svelte:head>

@@ -494,20 +494,24 @@ this.others.set(others);
 
 # Svelte-specific (Svelte 5, runes)
 
-> Note: parts of `frontend/` are still written in legacy mode (`runes: false`, `$:` reactivity, `export let`, `createEventDispatcher`). When **writing new components or refactoring existing ones**, use the runes-mode patterns below. Match the surrounding file's style when making small in-place edits to legacy components — do not partially migrate.
+The entire `frontend/` codebase uses Svelte 5 runes mode (`runes: true` in `rollup.config.js` and `svelte.config.js`). Do not use legacy patterns (`export let`, `$:`, `createEventDispatcher`, `on:event` directives). Third-party legacy Svelte packages are compiled with a separate plugin instance that keeps `runes: false` — do not add `<svelte:options runes={...} />` to project files.
 
 * **State is `$state`.** Component-local mutable data goes through `$state(...)`. Don't use plain `let foo = ...` for things you mutate; the reactivity won't fire.
-* **Derived data is `$derived`.** Replaces `$:` reactive declarations. Keep derivations pure — no side effects.
-* **Side effects are `$effect`.** Replaces `onMount` / `$:` blocks that perform side effects (DOM init, store subscriptions, third-party setup). Return a teardown function from `$effect` instead of `onDestroy`.
-* **Props are `$props`.** Replaces `export let`. Destructure with defaults: `let { stemma, onSelect = () => {} }: Props = $props();`. Declare the `Props` type as a `type` alias at the top of the script.
-* **Two-way binding is `$bindable`.** Mark a prop `$bindable()` only when the parent legitimately needs to write back; otherwise prefer callback props.
-* **Events are callback props, not `createEventDispatcher`.** Pass `onSomething: (payload: T) => void` props instead of dispatching events. They're typed, traceable through "go to definition", and don't need `bubbles`/`cancelable` ceremony.
-* **Children are snippets.** Replaces slots — declare `children?: Snippet` (or named snippets) in props and render with `{@render children?.()}`. Use snippet parameters to pass data into a render slot.
-* **Components are still boundaries.** They own DOM access, `bootstrap.Modal` calls, snippet rendering, and store subscriptions. Keep business logic out of `<script>` blocks; put it in a sibling `.ts` module so it can be unit-tested. If a component's `<script>` has logic worth testing, that's a signal to extract it (this is exactly why `appController.ts`, `personSelectionRules.ts`, `stemmaErrorMapping.ts`, etc. are separate modules).
-* **Module-scoped helpers** still go in `<script context="module">` — that mechanism is unchanged.
+* **Derived data is `$derived`.** Use `$derived(expr)` for single-expression derivations and `$derived.by(() => { ...; return value })` for multi-step ones. Keep derivations pure — no side effects.
+* **Side effects are `$effect`.** Use for DOM init, store subscriptions, third-party setup. Return a teardown function from `$effect` instead of `onDestroy`. `$effect` runs after mount — if logic must run synchronously during initialization, call it directly or use `$derived`.
+* **Props are `$props`.** Declare a `Props` type alias, then destructure: `let { foo, bar = defaultValue }: Props = $props();`. Always declare the `Props` type explicitly at the top of the script.
+* **Two-way binding is `$bindable`.** Mark a prop `$bindable()` only when the parent legitimately needs to write back (e.g. `FamilyGeneration`'s `selectedPeople`); otherwise prefer callback props.
+* **Events are callback props.** Pass `onSomething: (payload: T) => void` props instead of dispatching events. Call them directly: `onSomething?.(payload)`. The parent passes them as `onSomething={(p) => ...}`. They're typed, traceable through "go to definition", and don't need `bubbles`/`cancelable` ceremony.
+* **DOM event handlers** use `oneventname` attributes (`onclick`, `onkeydown`, etc.) instead of `on:event` directives. For `preventDefault`, wrap inline: `onclick={(e) => { e.preventDefault(); fn(); }}`.
+* **Custom DOM events** (e.g. from `@imask/svelte` which fires `accept`/`complete` via `el.dispatchEvent`) cannot use `on:` or `on*` attributes. Register them via `$effect` with `addEventListener`/`removeEventListener` and return the teardown.
+* **Legacy third-party component events** (e.g. `svelte-select` using `createEventDispatcher`) are consumed with `on:select`, `on:clear` etc. — the `on:` directive is still valid for receiving events dispatched by legacy-mode components.
+* **Slots from legacy components** (e.g. `svelte-select`) are still filled with `<svelte:fragment slot="...">` — the slot mechanism is backward-compatible.
+* **Exported functions** (imperative component API exposed via `bind:this`) use the plain `export function` syntax. They are accessible on the bound component instance as before.
+* **Module-scoped declarations** go in `<script module lang="ts">` (the `module` attribute replaces the deprecated `context="module"` form).
 * **Stores** still work (`writable`, `readable`) and `$store` auto-subscription is unchanged, but for new state that lives inside a single component prefer `$state`. Cross-component state can use either — pick one consistently per concern.
+* **Components are still boundaries.** They own DOM access, `bootstrap.Modal` calls, and store subscriptions. Keep business logic out of `<script>` blocks; put it in a sibling `.ts` module so it can be unit-tested (see `appController.ts`, `personSelectionRules.ts`, etc.).
 
-**Bad example**: legacy patterns in new code
+**Bad example**: legacy patterns
 ```svelte
 <script lang="ts">
     import { createEventDispatcher, onMount } from "svelte";
@@ -518,6 +522,7 @@ this.others.set(others);
     onMount(() => { /* ... */ });
     function pin() { pinned = true; dispatch("pinned", { id: stemma.id }); }
 </script>
+<button on:click={pin}>Pin</button>
 ```
 
 **Good example**: runes + callback props
@@ -525,9 +530,9 @@ this.others.set(others);
 <script lang="ts">
     type Props = {
         stemma: Stemma;
-        onPinned: (payload: { id: string }) => void;
+        onpinned: (payload: { id: string }) => void;
     };
-    let { stemma, onPinned }: Props = $props();
+    let { stemma, onpinned }: Props = $props();
 
     let pinned = $state(false);
     const peopleCount = $derived(stemma.people.length);
@@ -539,9 +544,10 @@ this.others.set(others);
 
     function pin() {
         pinned = true;
-        onPinned({ id: stemma.id });
+        onpinned({ id: stemma.id });
     }
 </script>
+<button onclick={pin}>Pin</button>
 ```
 
 

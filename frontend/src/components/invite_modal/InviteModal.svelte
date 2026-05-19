@@ -1,4 +1,4 @@
-<script context="module" lang="ts">
+<script module lang="ts">
     export type CreateInviteLink = {
         personId: string;
         email: string;
@@ -10,26 +10,37 @@
     import * as bootstrap from "bootstrap";
     import type { Stemma, PersonDescription } from "../../model";
     import ClearIcon from "../misc/ClearIconTranslated.svelte";
-    import { createEventDispatcher } from "svelte";
     import { StemmaIndex } from "../../stemmaIndex";
     import PersonSelector from "../misc/PersonSelector.svelte";
     import { t } from "../../i18n";
 
-    let modalEl;
+    type Props = {
+        stemmaIndex: StemmaIndex;
+        stemma: Stemma;
+        oninvite?: (payload: CreateInviteLink) => void;
+    };
 
-    export let stemmaIndex: StemmaIndex;
-    export let stemma: Stemma;
+    let { stemmaIndex, stemma, oninvite }: Props = $props();
 
-    let namesakes: PersonDescription[] = [];
-    let selectedPerson: PersonDescription;
+    let modalEl = $state<HTMLElement>(null);
+
+    let namesakes = $state<PersonDescription[]>([]);
+    let selectedPerson = $state<PersonDescription>(null);
     type SelectItem = { label: string; value: string };
-    let peopleNames: string[];
-    let peopleItems: SelectItem[] = [];
-    let selectedItem: SelectItem = null;
-    let email;
-    let inviteLink = "";
+    let email = $state<string>(null);
+    let inviteLink = $state("");
 
-    let dispatch = createEventDispatcher();
+    const peopleNames = $derived(
+        stemma ? [...new Set(stemma.people.map((p) => p.name))] : []
+    );
+
+    const peopleItems = $derived<SelectItem[]>(
+        peopleNames.map((name) => ({ label: name, value: name }))
+    );
+
+    const selectedItem = $derived<SelectItem | null>(
+        selectedPerson ? { label: selectedPerson.name, value: selectedPerson.name } : null
+    );
 
     function nameChanged(newName: string) {
         namesakes = [...stemmaIndex.namesakes(newName).filter((p) => !p.readOnly)];
@@ -51,11 +62,7 @@
         inviteLink = link;
     }
 
-    $: if (stemma) peopleNames = [...new Set(stemma.people.map((p) => p.name))];
-    $: peopleItems = peopleNames ? peopleNames.map((name) => ({ label: name, value: name })) : [];
-    $: selectedItem = selectedPerson ? { label: selectedPerson.name, value: selectedPerson.name } : null;
-
-    function handleSelect(e) {
+    function handleSelect(e: any) {
         const detail = e?.detail as SelectItem | undefined;
         const value = detail?.value ?? detail?.label ?? "";
         if (value) nameChanged(value);
@@ -90,7 +97,7 @@
                             </Select>
                         </div>
                         <div class="flex-grow-1 mt-2" style="min-height:400px">
-                            <PersonSelector people={namesakes} {stemmaIndex} on:select={(e) => (selectedPerson = e.detail)} />
+                            <PersonSelector people={namesakes} {stemmaIndex} onselect={(p) => (selectedPerson = p as PersonDescription)} />
                         </div>
                         <div class="flex-shrink-1 mb-2">
                             <div class="mt-2">
@@ -104,7 +111,7 @@
                                     class="btn btn-outline-primary"
                                     type="button"
                                     disabled={!email || !selectedPerson}
-                                    on:click={(e) => dispatch("invite", { personId: selectedPerson.id, email: email })}>{$t("invite.create")}</button
+                                    onclick={() => oninvite?.({ personId: selectedPerson.id, email })}>{$t("invite.create")}</button
                                 >
                                 <input
                                     type="text"
@@ -120,7 +127,7 @@
                                     type="button"
                                     aria-label="Copy invitation link"
                                     disabled={inviteLink == undefined || !inviteLink.length}
-                                    on:click={() => navigator.clipboard.writeText(inviteLink)}><i class="bi bi-clipboard"></i></button
+                                    onclick={() => navigator.clipboard.writeText(inviteLink)}><i class="bi bi-clipboard"></i></button
                                 >
                             </div>
                         </div>

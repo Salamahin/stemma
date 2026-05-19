@@ -76,10 +76,18 @@ export default {
             preventAssignment: true,
         }),
         svelte({
+            include: /^(?!.*node_modules).*\.svelte$/,
             preprocess: sveltePreprocess({
                 sourceMap: !production,
                 style: less(),
             }),
+            compilerOptions: {
+                dev: !production,
+                runes: true
+            }
+        }),
+        svelte({
+            include: /node_modules.*\.svelte$/,
             compilerOptions: {
                 dev: !production,
                 runes: false

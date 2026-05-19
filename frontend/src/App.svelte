@@ -25,37 +25,41 @@
     import { SettingsStorage } from "./settingsStroage";
     import { LocalizedError, t } from "./i18n";
     import { loadCredential, saveCredential } from "./credentialStorage";
-    import { onMount } from "svelte";
+    import { onMount, untrack } from "svelte";
 
-    export let google_client_id;
-    export let stemma_backend_url;
+    type Props = {
+        google_client_id: string;
+        stemma_backend_url: string;
+    };
 
-    let addStemmaModal;
-    let cloneStemmaModal;
-    let renameStemmaModal;
-    let removeStemmaModal;
-    let familySelectionModal;
-    let personSelectionModal;
-    let stemmaChart;
-    let inviteModal;
-    let aboutModal;
-    let settingsModal;
+    let { google_client_id, stemma_backend_url }: Props = $props();
 
-    let signedIn = false;
+    let addStemmaModal = $state<ReturnType<typeof AddStemmaModal>>(null);
+    let cloneStemmaModal = $state<ReturnType<typeof CloneStemmaModal>>(null);
+    let renameStemmaModal = $state<ReturnType<typeof RenameStemmaModal>>(null);
+    let removeStemmaModal = $state<ReturnType<typeof RemoveStemmaModal>>(null);
+    let familySelectionModal = $state<ReturnType<typeof FamilySelectionModal>>(null);
+    let personSelectionModal = $state<ReturnType<typeof PersonSelectionModal>>(null);
+    let stemmaChart = $state<ReturnType<typeof FullStemma>>(null);
+    let inviteModal = $state<ReturnType<typeof InviteModal>>(null);
+    let aboutModal = $state<ReturnType<typeof AboutModal>>(null);
+    let settingsModal = $state<ReturnType<typeof SettingsModal>>(null);
 
-    let ownedStemmas: StemmaDescription[];
-    let currentStemmaId: string;
-    let stemma: Stemma;
-    let stemmaIndex: StemmaIndex;
-    let highlight: HiglightLineages;
-    let pinnedPeople: PinnedPeopleStorage;
-    let isWorking: boolean;
-    let error: Error;
-    let settingsStorage: SettingsStorage;
-    let settings: Settings = DEFAULT_SETTINGS;
-    let highlightVersion = 0;
+    let signedIn = $state(false);
 
-    let controller = new AppController(stemma_backend_url);
+    let ownedStemmas = $state<StemmaDescription[]>(null);
+    let currentStemmaId = $state<string>(null);
+    let stemma = $state<Stemma>(null);
+    let stemmaIndex = $state<StemmaIndex>(null);
+    let highlight = $state<HiglightLineages>(null);
+    let pinnedPeople = $state<PinnedPeopleStorage>(null);
+    let isWorking = $state<boolean>(false);
+    let error = $state<Error>(null);
+    let settingsStorage = $state<SettingsStorage>(null);
+    let settings = $state<Settings>(DEFAULT_SETTINGS);
+    let highlightVersion = $state(0);
+
+    const controller = new AppController(untrack(() => stemma_backend_url));
 
     controller.currentStemmaId.subscribe((s) => (currentStemmaId = s));
     controller.stemma.subscribe((s) => (stemma = s));
@@ -67,7 +71,7 @@
     controller.err.subscribe((e) => (error = e));
     controller.settingsStorage.subscribe((ss) => {
         settingsStorage = ss;
-        if (settingsStorage) settings = ss.get();
+        if (ss) settings = ss.get();
     });
     controller.invitationToken.subscribe((it) => {
         if (inviteModal) inviteModal.setInviteLink(it);
@@ -81,9 +85,9 @@
     function handleSignIn(user: User) {
         saveCredential(user.id_token);
 
-        let urlParams = new URLSearchParams(window.location.search);
+        const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has("inviteToken")) {
-            let token = urlParams.get("inviteToken");
+            const token = urlParams.get("inviteToken");
             urlParams.delete("inviteToken");
             window.history.pushState({}, document.title, window.location.pathname);
 
@@ -107,19 +111,18 @@
             handleSignIn({ id_token: cached.token });
         }
     });
-
 </script>
 
 {#if signedIn}
-    <AddStemmaModal bind:this={addStemmaModal} on:stemmaAdded={(e) => controller.addStemma(e.detail)} />
-    <RemoveStemmaModal bind:this={removeStemmaModal} on:stemmaRemoved={(e) => controller.removeStemma(e.detail)} />
-    <CloneStemmaModal bind:this={cloneStemmaModal} on:stemmaCloned={(e) => controller.cloneStemma(e.detail.name, e.detail.stemmaId)} />
-    <RenameStemmaModal bind:this={renameStemmaModal} on:stemmaRenamed={(e) => controller.renameStemma(e.detail.stemmaId, e.detail.name)} />
+    <AddStemmaModal bind:this={addStemmaModal} onstemmaAdded={(name) => controller.addStemma(name)} />
+    <RemoveStemmaModal bind:this={removeStemmaModal} onstemmaRemoved={(id) => controller.removeStemma(id)} />
+    <CloneStemmaModal bind:this={cloneStemmaModal} onstemmaCloned={(p) => controller.cloneStemma(p.name, p.stemmaId)} />
+    <RenameStemmaModal bind:this={renameStemmaModal} onstemmaRenamed={(p) => controller.renameStemma(p.stemmaId, p.name)} />
     <SettingsModal
         bind:this={settingsModal}
-        on:settingsChanged={(e) => {
-            settings = e.detail;
-            settingsStorage.store(settings);
+        onsettingsChanged={(s) => {
+            settings = s;
+            settingsStorage.store(s);
         }}
     />
 
@@ -127,18 +130,18 @@
         bind:this={familySelectionModal}
         {stemma}
         {stemmaIndex}
-        on:familyAdded={(e) => controller.createFamily(e.detail.parents, e.detail.children)}
-        on:familyUpdated={(e) => controller.updateFamily(e.detail.familyId, e.detail.parents, e.detail.children)}
-        on:familyRemoved={(e) => controller.removeFamily(e.detail)}
+        onfamilyAdded={(p) => controller.createFamily(p.parents, p.children)}
+        onfamilyUpdated={(p) => controller.updateFamily(p.familyId, p.parents, p.children)}
+        onfamilyRemoved={(id) => controller.removeFamily(id)}
     />
 
     <PersonSelectionModal
         bind:this={personSelectionModal}
-        on:personRemoved={(e) => controller.removePerson(e.detail)}
-        on:personUpdated={(e) => controller.updatePerson(e.detail.id, e.detail.description, e.detail.pin)}
+        onpersonRemoved={(id) => controller.removePerson(id)}
+        onpersonUpdated={(p) => controller.updatePerson(p.id, p.description, p.pin)}
     />
 
-    <InviteModal bind:this={inviteModal} {stemma} {stemmaIndex} on:invite={(e) => controller.createInvitationToken(e.detail.personId, e.detail.email)} />
+    <InviteModal bind:this={inviteModal} {stemma} {stemmaIndex} oninvite={(p) => controller.createInvitationToken(p.personId, p.email)} />
     <AboutModal bind:this={aboutModal} />
 
     <Navbar
@@ -146,16 +149,16 @@
         {currentStemmaId}
         disabled={isWorking}
         people={stemma ? stemma.people : []}
-        on:selectStemma={(e) => controller.selectStemma(e.detail)}
-        on:createNewStemma={() => addStemmaModal.promptNewStemma()}
-        on:cloneStemma={(e) => cloneStemmaModal.promptStemmaClone(e.detail)}
-        on:renameStemma={(e) => renameStemmaModal.promptStemmaRename(e.detail.id, e.detail.name)}
-        on:createNewFamily={() => familySelectionModal.promptNewFamily()}
-        on:removeStemma={(e) => removeStemmaModal.askForConfirmation(e.detail)}
-        on:invite={() => inviteModal.showInvintation()}
-        on:about={() => aboutModal.show()}
-        on:settings={() => settingsModal.show()}
-        on:zoomToPerson={(e) => stemmaChart.zoomToNode(e.detail)}
+        onselectStemma={(id) => controller.selectStemma(id)}
+        oncreateNewStemma={() => addStemmaModal.promptNewStemma()}
+        oncloneStemma={(id) => cloneStemmaModal.promptStemmaClone(id)}
+        onrenameStemma={(s) => renameStemmaModal.promptStemmaRename(s.id, s.name)}
+        oncreateNewFamily={() => familySelectionModal.promptNewFamily()}
+        onremoveStemma={(s) => removeStemmaModal.askForConfirmation(s)}
+        oninvite={() => inviteModal.showInvintation()}
+        onabout={() => aboutModal.show()}
+        onsettings={() => settingsModal.show()}
+        onzoomToPerson={(id) => stemmaChart.zoomToNode(id)}
     />
 
     {#if error}
@@ -182,9 +185,9 @@
         {highlight}
         {pinnedPeople}
         viewMode={settings.viewMode}
-        on:personSelected={(e) => personSelectionModal.showPersonDetails({ description: e.detail, pin: pinnedPeople.isPinned(e.detail.id) })}
-        on:familySelected={(e) => familySelectionModal.showExistingFamily(e.detail)}
-        on:highlightChanged={() => highlightVersion++}
+        onpersonSelected={(p) => personSelectionModal.showPersonDetails({ description: p, pin: pinnedPeople.isPinned(p.id) })}
+        onfamilySelected={(f) => familySelectionModal.showExistingFamily(f)}
+        onhighlightChanged={() => highlightVersion++}
     />
 
     {#if !isWorking && stemma && stemmaIndex && highlight}
@@ -193,7 +196,7 @@
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
-            <Authenticate {google_client_id} on:signIn={(e) => handleSignIn(e.detail)} />
+            <Authenticate {google_client_id} onsignIn={(user) => handleSignIn(user)} />
         </div>
     </div>
 {/if}

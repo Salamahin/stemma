@@ -1,14 +1,17 @@
 <script lang="ts">
-    import { createEventDispatcher } from "svelte";
     import { onMount } from "svelte";
     import * as bootstrap from "bootstrap";
     import { t } from "../../i18n";
 
-    const dispatch = createEventDispatcher();
+    type Props = {
+        onstemmaCloned?: (payload: { name: string; stemmaId: string }) => void;
+    };
 
-    let modalEl;
-    let input;
-    let clonedStemmaId;
+    let { onstemmaCloned }: Props = $props();
+
+    let modalEl = $state<HTMLElement>(null);
+    let input = $state<HTMLInputElement>(null);
+    let clonedStemmaId = $state<string>(null);
 
     onMount(() => {
         modalEl.addEventListener("shown.bs.modal", () => input.focus());
@@ -16,9 +19,9 @@
 
     function handleCloneStemmaClick() {
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-        let name = input.value;
+        const name = input.value;
         input.value = "";
-        dispatch("stemmaCloned", { name: name, stemmaId: clonedStemmaId });
+        onstemmaCloned?.({ name, stemmaId: clonedStemmaId });
     }
 
     export function promptStemmaClone(stemmaId: string) {
@@ -49,7 +52,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{$t("common.cancel")}</button>
-                <button type="button" class="btn btn-primary" on:click={handleCloneStemmaClick}>{$t("stemma.clone")}</button>
+                <button type="button" class="btn btn-primary" onclick={handleCloneStemmaClick}>{$t("stemma.clone")}</button>
             </div>
         </div>
     </div>

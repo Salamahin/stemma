@@ -26,7 +26,7 @@ Stemma is a collaborative family tree editor. Multiple users build shared geneal
   - `src/stemma/storage/` — DynamoDB single-table schema (`schema.py`: key encoders) and `StorageService` (boto3 Table-resource-backed).
   - `src/stemma/apis/request_handler.py` — Central dispatcher: takes a `User` + parsed `Request`, returns a `Response`.
   - `src/stemma/apps/` — Transport adapters: `rest_main`/`rest_app` (local Uvicorn server on :8090), `lambda_main` (HTTP API handler), and `bootstrap` (Secrets Manager + DynamoDB Table construction).
-- `frontend/` — Svelte 5 (legacy mode, `runes: false`) + TypeScript UI (Rollup bundler).
+- `frontend/` — Svelte 5 (runes mode) + TypeScript UI (Rollup bundler).
 - `e2e/` — Playwright end-to-end tests with full local stack orchestration (`scripts/devstack.mjs`).
 - `template.yaml` / `samconfig.toml` — AWS SAM infrastructure (Python 3.13 arm64 Lambda + shared layer + DynamoDB table).
 - `Makefile` — `sam build` hooks that assemble the Lambda artifacts and shared layer from `backend_py/`.
@@ -118,7 +118,7 @@ Lambda-only (set in `template.yaml` Globals or by `bootstrap`):
 - The local REST server has a **2-second artificial delay** on every request (`DEFAULT_REQUEST_DELAY_SECONDS` in `apps/rest_app.py`); it is **not** applied in Lambda.
 - E2E tests run serially (`workers: 1`, `fullyParallel: false`) because they share a single table.
 - The Playwright config auto-launches the full stack via `webServer.command` — no manual setup needed for `npm test` in `e2e/`.
-- Svelte is in **legacy mode** (`runes: false`). Use `mount()` from `svelte`; do not introduce runes.
+- Svelte runs in **runes mode** (`runes: true`). Use `$state`, `$derived`, `$effect`, `$props`, and callback props. Do not use `export let`, `$:`, or `createEventDispatcher`.
 - Storage methods that target a specific person/family take `stemma_id` alongside the entity id — items are keyed by `STEMMA#<sid>`, so the stemma id is part of every DynamoDB key.
 - `bootstrap.populate_env_from_secrets()` uses `os.environ.setdefault`, so secrets do not overwrite values that were already exported — useful for local override but be aware in debugging.
 - DynamoDB has no schema for non-key attributes; field rename/split migrations are scan-and-rewrite scripts rather than SQL migrations.

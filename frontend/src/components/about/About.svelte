@@ -8,8 +8,8 @@
         personColor, addArrowMarkers
     } from "../../graphStyles";
 
-    let modalEl;
-    let diagramEl: HTMLDivElement;
+    let modalEl = $state<HTMLElement>(null);
+    let diagramEl = $state<HTMLDivElement>(null);
 
     const width = 360;
     const height = 220;
@@ -103,9 +103,11 @@
         label(translate("about.diagram.child"), childX, childY + personR + 18);
     }
 
-    $: if (diagramEl && $t) {
-        renderDiagram($t);
-    }
+    $effect(() => {
+        if (diagramEl && $t) {
+            renderDiagram($t);
+        }
+    });
 
     export function show() {
         bootstrap.Modal.getOrCreateInstance(modalEl).show();

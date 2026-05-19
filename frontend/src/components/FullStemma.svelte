@@ -4,7 +4,6 @@
     import { ViewMode } from "../model";
     import { StemmaIndex } from "../stemmaIndex";
     import { onMount } from "svelte";
-    import { createEventDispatcher } from "svelte";
     import { HiglightLineages } from "../highlight";
     import {
         configureSimulation,
@@ -23,55 +22,77 @@
     import { NodeLayoutCache } from "../nodeLayoutCache";
     import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
 
-    const dispatch = createEventDispatcher();
+    type Props = {
+        stemma: Stemma;
+        currentStemmaId: string;
+        stemmaIndex: StemmaIndex;
+        highlight: HiglightLineages;
+        pinnedPeople: PinnedPeopleStorage;
+        hidden: boolean;
+        viewMode: ViewMode;
+        onpersonSelected?: (person: any) => void;
+        onfamilySelected?: (family: any) => void;
+        onhighlightChanged?: () => void;
+    };
+
+    let {
+        stemma,
+        currentStemmaId,
+        stemmaIndex,
+        highlight,
+        pinnedPeople,
+        hidden,
+        viewMode,
+        onpersonSelected,
+        onfamilySelected,
+        onhighlightChanged,
+    }: Props = $props();
 
     const hoveredPersonR = 25;
     const hoveredFamilyR = 10;
     const pin =
         "M4.146.146A.5.5 0 0 1 4.5 0h7a.5.5 0 0 1 .5.5c0 .68-.342 1.174-.646 1.479-.126.125-.25.224-.354.298v4.431l.078.048c.203.127.476.314.751.555C12.36 7.775 13 8.527 13 9.5a.5.5 0 0 1-.5.5h-4v4.5c0 .276-.224 1.5-.5 1.5s-.5-1.224-.5-1.5V10h-4a.5.5 0 0 1-.5-.5c0-.973.64-1.725 1.17-2.189A5.921 5.921 0 0 1 5 6.708V2.277a2.77 2.77 0 0 1-.354-.298C4.342 1.674 4 1.179 4 .5a.5.5 0 0 1 .146-.354z";
 
-    export let stemma: Stemma;
-    export let currentStemmaId: string;
-    export let stemmaIndex: StemmaIndex;
-    export let highlight: HiglightLineages;
-    export let pinnedPeople: PinnedPeopleStorage;
-    export let hidden: boolean;
-    export let viewMode: ViewMode;
-
-    let svg;
-    let markers;
+    let svg = $state<any>(null);
+    let markers: any = null;
     let isDragging = false;
     let pendingMouseLeave = false;
     let layoutCache: NodeLayoutCache | null = null;
     let layoutCacheStemmaId: string | null = null;
+    let simulation: any = null;
 
-    $: if (svg && stemma) {
-        if (layoutCacheStemmaId !== currentStemmaId) {
-            if (layoutCache) layoutCache.save();
-            layoutCache = new NodeLayoutCache(currentStemmaId);
-            layoutCache.load();
-            layoutCacheStemmaId = currentStemmaId;
+    $effect(() => {
+        if (svg && stemma) {
+            if (layoutCacheStemmaId !== currentStemmaId) {
+                if (layoutCache) layoutCache.save();
+                layoutCache = new NodeLayoutCache(currentStemmaId);
+                layoutCache.load();
+                layoutCacheStemmaId = currentStemmaId;
+            }
+            setActiveLayoutCache(layoutCache);
+            resetSessionPositions(currentStemmaId);
+
+            let people: any[], families: any[];
+
+            if (viewMode == ViewMode.ALL) {
+                people = stemma.people;
+                families = stemma.families;
+            } else if (viewMode == ViewMode.EDITABLE_ONLY) {
+                people = stemma.people.filter((p) => !p.readOnly);
+                families = stemma.families.filter((f) => !f.readOnly);
+            }
+
+            const [nodes, relations] = makeNodesAndRelations(people, families);
+            const initialPositions = computeInitialLayout(stemmaIndex, people, families, window.innerWidth, window.innerHeight);
+            reconfigureGraph(nodes, relations, initialPositions);
         }
-        setActiveLayoutCache(layoutCache);
-        resetSessionPositions(currentStemmaId);
-        let people, families;
+    });
 
-        if (viewMode == ViewMode.ALL) {
-            people = stemma.people;
-            families = stemma.families;
-        } else if (viewMode == ViewMode.EDITABLE_ONLY) {
-            people = stemma.people.filter((p) => !p.readOnly);
-            families = stemma.families.filter((f) => !f.readOnly);
+    $effect(() => {
+        if (highlight && pinnedPeople && stemmaIndex && svg) {
+            renderFullStemma();
         }
-
-        let [nodes, relations] = makeNodesAndRelations(people, families);
-        let initialPositions = computeInitialLayout(stemmaIndex, people, families, window.innerWidth, window.innerHeight);
-        reconfigureGraph(nodes, relations, initialPositions);
-    }
-
-    $: if (highlight && pinnedPeople && stemmaIndex && svg) {
-        renderFullStemma();
-    }
+    });
 
     function renderFullStemma() {
         renderChart(svg, highlight, stemmaIndex, markers);
@@ -120,10 +141,10 @@
     });
 
     export function zoomToNode(id: string) {
-        let scaleZoom = 2;
-        let node = d3.select("#" + normalizeId("person", id));
+        const scaleZoom = 2;
+        const node = d3.select("#" + normalizeId("person", id));
         if (node.size()) {
-            let nodeDatum = node.datum();
+            const nodeDatum = node.datum() as any;
 
             svg.transition()
                 .duration(750)
@@ -136,8 +157,7 @@
         }
     }
 
-    let simulation;
-    function reconfigureGraph(nodes, relations, initialPositions) {
+    function reconfigureGraph(nodes: any[], relations: any[], initialPositions: any) {
         const fullyCached =
             !!layoutCache && nodes.length > 0 && layoutCache.coverage(nodes.map((n) => n.id)) === 1;
 
@@ -150,7 +170,7 @@
 
         svg.select("g.main")
             .selectAll("g")
-            .on("mouseenter", function (event, node) {
+            .on("mouseenter", function (event: any, node: any) {
                 if (isDragging) {
                     pendingMouseLeave = false;
                     return;
@@ -158,35 +178,35 @@
                 if (node.type == "person") {
                     highlight.pushPerson(denormalizeId(node.id));
                     renderFullStemma();
-                    dispatch("highlightChanged");
+                    onhighlightChanged?.();
                     d3.select(this).select("circle").attr("r", hoveredPersonR);
                     d3.select(this).select("text").attr("font-weight", "bold");
                 }
                 if (node.type == "family") {
                     highlight.pushFamily(denormalizeId(node.id));
                     renderFullStemma();
-                    dispatch("highlightChanged");
+                    onhighlightChanged?.();
                     d3.select(this).select("circle").attr("r", hoveredFamilyR);
                 }
             })
-            .on("mouseleave", (_event, node) => {
+            .on("mouseleave", (_event: any, _node: any) => {
                 if (isDragging) {
                     pendingMouseLeave = true;
                     return;
                 }
                 highlight.pop();
                 renderFullStemma();
-                dispatch("highlightChanged");
+                onhighlightChanged?.();
             })
-            .on("click", (event, node) => {
+            .on("click", (_event: any, node: any) => {
                 if (node.type == "person") {
-                    let selectedPerson = stemmaIndex.person(denormalizeId(node.id));
-                    dispatch("personSelected", selectedPerson);
+                    const selectedPerson = stemmaIndex.person(denormalizeId(node.id));
+                    onpersonSelected?.(selectedPerson);
                 }
 
                 if (node.type == "family") {
-                    let selectedFamily = stemmaIndex.family(denormalizeId(node.id));
-                    dispatch("familySelected", selectedFamily);
+                    const selectedFamily = stemmaIndex.family(denormalizeId(node.id));
+                    onfamilySelected?.(selectedFamily);
                 }
             });
 
@@ -204,7 +224,7 @@
                     pendingMouseLeave = false;
                     highlight.pop();
                     renderFullStemma();
-                    dispatch("highlightChanged");
+                    onhighlightChanged?.();
                 }
             }
         );

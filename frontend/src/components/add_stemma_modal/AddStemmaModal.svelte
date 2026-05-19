@@ -1,13 +1,16 @@
 <script lang="ts">
-    import { createEventDispatcher } from "svelte";
     import { onMount } from "svelte";
     import * as bootstrap from "bootstrap";
     import { t } from "../../i18n";
 
-    const dispatch = createEventDispatcher();
+    type Props = {
+        onstemmaAdded?: (name: string) => void;
+    };
 
-    let modalEl;
-    let input;
+    let { onstemmaAdded }: Props = $props();
+
+    let modalEl = $state<HTMLElement>(null);
+    let input = $state<HTMLInputElement>(null);
 
     onMount(() => {
         modalEl.addEventListener("shown.bs.modal", () => input.focus());
@@ -15,9 +18,9 @@
 
     function handleAddStemmaClick() {
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-        let name = input.value;
+        const name = input.value;
         input.value = "";
-        dispatch("stemmaAdded", name);
+        onstemmaAdded?.(name);
     }
 
     export function promptNewStemma() {
@@ -47,7 +50,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{$t("common.cancel")}</button>
-                <button type="button" class="btn btn-primary" on:click={handleAddStemmaClick}>{$t("common.add")}</button>
+                <button type="button" class="btn btn-primary" onclick={handleAddStemmaClick}>{$t("common.add")}</button>
             </div>
         </div>
     </div>
