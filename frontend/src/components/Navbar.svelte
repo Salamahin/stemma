@@ -18,6 +18,7 @@
         oninvite?: () => void;
         onabout?: () => void;
         onsettings?: () => void;
+        onexport?: () => void;
         onzoomToPerson?: (id: string) => void;
     };
 
@@ -35,6 +36,7 @@
         oninvite,
         onabout,
         onsettings,
+        onexport,
         onzoomToPerson,
     }: Props = $props();
 
@@ -142,6 +144,11 @@
                     <li class="nav-item">
                         <a class="nav-link {disabled ? 'd-none' : ''}" href="/" onclick={(e) => { e.preventDefault(); onsettings?.(); }}
                             ><i class="bi bi-gear-fill"></i> {$t('nav.settings')}</a
+                        >
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {disabled ? 'd-none' : ''}" href="/" onclick={(e) => { e.preventDefault(); onexport?.(); }}
+                            ><i class="bi bi-download"></i> {$t('nav.export')}</a
                         >
                     </li>
                 </ul>

@@ -41,6 +41,8 @@ export const en: Record<string, string> = {
     'nav.settings': 'Settings',
     'nav.about': 'About',
     'nav.language': 'Language',
+    'nav.export': 'Export SVG',
+    'nav.exportDefaultName': 'stemma',
 
     // Common buttons
     'common.cancel': 'Cancel',
@@ -179,6 +181,8 @@ export const ru: Record<string, string> = {
     'nav.settings': 'Настройки',
     'nav.about': 'О проекте',
     'nav.language': 'Язык',
+    'nav.export': 'Скачать SVG',
+    'nav.exportDefaultName': 'родословная',
 
     // Common buttons
     'common.cancel': 'Отмена',
