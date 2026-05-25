@@ -21,6 +21,7 @@
     import { computeInitialLayout } from "../initialLayout";
     import { NodeLayoutCache } from "../nodeLayoutCache";
     import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
+    import { exportChartSvg } from "../svgExport";
 
     type Props = {
         stemma: Stemma;
@@ -139,6 +140,12 @@
     const zoomHandler = d3.zoom().on("zoom", (e) => {
         svg.select("g.main").attr("transform", e.transform);
     });
+
+    export function exportSvg(filename: string) {
+        if (!svg) return;
+        const node = svg.node() as SVGSVGElement | null;
+        if (node) exportChartSvg(node, filename);
+    }
 
     export function zoomToNode(id: string) {
         const scaleZoom = 2;

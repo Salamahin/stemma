@@ -82,6 +82,12 @@
         return err.message;
     }
 
+    function exportFilename(): string {
+        const current = ownedStemmas?.find((s) => s.id === currentStemmaId);
+        const base = (current?.name ?? $t("nav.exportDefaultName")).trim().replace(/[\\/:*?"<>|]+/g, "_");
+        return `${base || "stemma"}.svg`;
+    }
+
     function handleSignIn(user: User) {
         saveCredential(user.id_token);
 
@@ -158,6 +164,7 @@
         oninvite={() => inviteModal.showInvintation()}
         onabout={() => aboutModal.show()}
         onsettings={() => settingsModal.show()}
+        onexport={() => stemmaChart.exportSvg(exportFilename())}
         onzoomToPerson={(id) => stemmaChart.zoomToNode(id)}
     />
 
