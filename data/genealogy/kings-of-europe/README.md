@@ -29,7 +29,7 @@ Lambda artifact. The markdown analyses below stay here for reference.
 Need SSO access to the prod table. The dump scripts live in `.claude/skills/stemma-migration/scripts/`:
 
 ```sh
-AWS_PROFILE=<profile> uvx --with boto3 python \
+AWS_PROFILE=stemma uvx --with boto3 python \
   .claude/skills/stemma-migration/scripts/dump_stemma.py \
   --table stemma-app-StemmaTable-17GSYHFZQU76H --region eu-central-1 \
   --stemma 1cd5147ad05b5b619cb5e0efb9ccfab8 \

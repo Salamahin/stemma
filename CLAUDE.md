@@ -102,6 +102,16 @@ Optional / context-dependent:
 
 One-off corrections to the production DynamoDB table go through the `stemma-migration` skill (see `.claude/skills/stemma-migration/`).
 
+### AWS access (production)
+
+Production access uses AWS Identity Center (SSO). The local profile is named `stemma`:
+
+```sh
+aws sso login --profile stemma
+AWS_PROFILE=stemma aws sts get-caller-identity   # sanity check
+AWS_PROFILE=stemma sam deploy                    # local SAM deploys (CI uses access keys, not profile)
+```
+
 Lambda-only (set in `template.yaml` Globals or by `bootstrap`):
 - `STEMMA_INVITE_SECRET_NAME` — Secrets Manager ID fetched at cold start; its JSON contents populate `INVITE_SECRET` via `os.environ.setdefault`.
 
