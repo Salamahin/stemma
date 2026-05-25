@@ -23,30 +23,30 @@ new `Request` dataclass + handler branch instead — do not migrate around the A
 
 ## AWS access
 
-Production uses AWS Identity Center (SSO). One-time setup:
+Production uses AWS Identity Center (SSO). Profile name is `stemma`. One-time setup:
 
 ```sh
 aws configure sso
 # Prompts (values come from your Identity Center portal / admin):
-#   SSO session name        — any label, e.g. "stemma"
+#   SSO session name        — "stemma"
 #   SSO start URL           — your organisation's Identity Center start URL
 #   SSO region              — region where the SSO directory lives (often us-east-1)
 #   Account + role          — pick from the list shown
 #   CLI default Region      — eu-central-1 for this project
-#   Profile name            — auto-suggested, accept or customize
+#   Profile name            — "stemma"
 ```
 
 Refresh the SSO session whenever it expires (~8 h):
 
 ```sh
-aws sso login --profile <profile>
-AWS_PROFILE=<profile> aws sts get-caller-identity   # sanity check before any write
+aws sso login --profile stemma
+AWS_PROFILE=stemma aws sts get-caller-identity   # sanity check before any write
 ```
 
 Discover the DynamoDB table name (CloudFormation generates it; never hardcode):
 
 ```sh
-AWS_PROFILE=<profile> aws dynamodb list-tables --region eu-central-1
+AWS_PROFILE=stemma aws dynamodb list-tables --region eu-central-1
 # look for stemma-app-StemmaTable-XXXXX
 ```
 
@@ -97,7 +97,7 @@ hex chars). Dates are ISO strings (`YYYY-MM-DD`).
 Run pattern (no project venv needed — scripts only depend on `boto3`):
 
 ```sh
-AWS_PROFILE=<profile> uvx --with boto3 python \
+AWS_PROFILE=stemma uvx --with boto3 python \
   .claude/skills/stemma-migration/scripts/<script>.py \
   --table stemma-app-StemmaTable-XXXXX --region eu-central-1 --dry-run
 ```
@@ -105,7 +105,7 @@ AWS_PROFILE=<profile> uvx --with boto3 python \
 Or, if you're already in `backend_py/` with `uv sync` done:
 
 ```sh
-AWS_PROFILE=<profile> uv run python \
+AWS_PROFILE=stemma uv run python \
   ../.claude/skills/stemma-migration/scripts/<script>.py …
 ```
 
