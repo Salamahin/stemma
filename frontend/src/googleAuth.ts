@@ -28,7 +28,7 @@ type CredentialListener = (token: string) => void;
 
 const REFRESH_TIMEOUT_MS = 8_000;
 
-let initialized = false;
+let initPromise: Promise<void> | null = null;
 const listeners = new Set<CredentialListener>();
 
 function gsi(): Gsi | null {
@@ -44,17 +44,18 @@ async function awaitGsi(): Promise<Gsi> {
     return g;
 }
 
-export async function initializeGoogleAuth(clientId: string): Promise<void> {
-    if (initialized) return;
-    const g = await awaitGsi();
-    g.accounts.id.initialize({
-        client_id: clientId,
-        callback: (resp) => {
-            for (const l of Array.from(listeners)) l(resp.credential);
-        },
-        auto_select: true,
+export function initializeGoogleAuth(clientId: string): Promise<void> {
+    if (initPromise) return initPromise;
+    initPromise = awaitGsi().then((g) => {
+        g.accounts.id.initialize({
+            client_id: clientId,
+            callback: (resp) => {
+                for (const l of Array.from(listeners)) l(resp.credential);
+            },
+            auto_select: true,
+        });
     });
-    initialized = true;
+    return initPromise;
 }
 
 export function onCredential(listener: CredentialListener): () => void {
@@ -71,10 +72,11 @@ export async function promptInitialSignIn(fallbackTarget: HTMLElement | null): P
     });
 }
 
-export function refreshCredential(): Promise<string> {
-    if (!initialized) return Promise.reject(new Error("Google Identity Services not initialized"));
+export async function refreshCredential(): Promise<string> {
+    if (!initPromise) throw new Error("Google Identity Services not initialized");
+    await initPromise;
     const g = gsi();
-    if (!g) return Promise.reject(new Error("Google Identity Services not loaded"));
+    if (!g) throw new Error("Google Identity Services not loaded");
 
     return new Promise<string>((resolve, reject) => {
         let settled = false;
