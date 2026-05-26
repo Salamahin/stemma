@@ -1,16 +1,19 @@
 import { test, expect } from "@playwright/test";
-import { waitForFirstLoginSeeded } from "./_seeded";
 
 const SAMPLE_PHOTO = "tests/fixtures/sample_photo.jpg";
+
+async function waitForChartReady(page: import("@playwright/test").Page) {
+  await expect(page.locator("#navbarDropdownMenuLink")).toBeVisible();
+  const svg = page.locator("svg#chart");
+  await expect(svg).toBeVisible();
+  await expect(svg.locator("g.main > g")).not.toHaveCount(0, { timeout: 30_000 });
+  return svg;
+}
 
 test("person details modal screenshots — desktop and mobile", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/");
-  await waitForFirstLoginSeeded(page);
-
-  const svg = page.locator("svg#chart");
-  await expect(svg).toBeVisible();
-  await expect(svg.locator("g.main > g")).not.toHaveCount(0, { timeout: 30_000 });
+  const svg = await waitForChartReady(page);
 
   const personNode = svg.locator("g.main > g").filter({ has: page.locator("text") }).first();
   await expect(personNode).toBeVisible();
@@ -30,11 +33,7 @@ test("person details modal screenshots — desktop and mobile", async ({ page })
 test("photo cropper screenshot — desktop", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/");
-  await waitForFirstLoginSeeded(page);
-
-  const svg = page.locator("svg#chart");
-  await expect(svg).toBeVisible();
-  await expect(svg.locator("g.main > g")).not.toHaveCount(0, { timeout: 30_000 });
+  const svg = await waitForChartReady(page);
 
   const personNode = svg.locator("g.main > g").filter({ has: page.locator("text") }).first();
   await personNode.dispatchEvent("click");
