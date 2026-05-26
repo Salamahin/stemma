@@ -47,7 +47,9 @@
     let aboutModal = $state<ReturnType<typeof AboutModal>>(null);
     let settingsModal = $state<ReturnType<typeof SettingsModal>>(null);
 
-    let signedIn = $state(false);
+    const e2eAutoLoginEnabled = typeof E2E_AUTO_LOGIN !== "undefined" && E2E_AUTO_LOGIN === "1";
+    const initialCached = e2eAutoLoginEnabled ? null : loadCredential();
+    let signedIn = $state(e2eAutoLoginEnabled || initialCached !== null);
 
     let ownedStemmas = $state<StemmaDescription[]>(null);
     let currentStemmaId = $state<string>(null);
@@ -158,7 +160,6 @@
     }
 
     onMount(() => {
-        const e2eAutoLoginEnabled = typeof E2E_AUTO_LOGIN !== "undefined" && E2E_AUTO_LOGIN === "1";
         if (e2eAutoLoginEnabled) {
             e2eMode = true;
             handleSignIn({ id_token: "e2e-user@stemma.local" } as User);
@@ -167,9 +168,8 @@
 
         initializeGoogleAuth(google_client_id).catch((err) => console.error("Google Identity init failed", err));
 
-        const cached = loadCredential();
-        if (cached) {
-            handleSignIn({ id_token: cached.token });
+        if (initialCached) {
+            handleSignIn({ id_token: initialCached.token });
         }
     });
 </script>
