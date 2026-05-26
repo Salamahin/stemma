@@ -192,48 +192,58 @@ export class AppController {
         this.manipulateStemma((model, stemmaId) => model.removeFamily(stemmaId, familyId))
     }
 
-    updatePerson(personId: string, descr: CreateNewPerson, pin: boolean) {
-        let si = get(this.stemmaIndex)
+    savePerson(personId: string, descr: CreateNewPerson, pin: boolean, photoUpload: Blob | null, photoRemove: boolean) {
+        const stemmaId = get(this.currentStemmaId)
+        const si = get(this.stemmaIndex)
         this.refreshVisual(si, personId, pin);
 
-        let originalPerson = si.person(personId);
-        if (
-            originalPerson.birthDate != descr.birthDate ||
-            originalPerson.deathDate != descr.deathDate ||
-            originalPerson.name != descr.name ||
-            originalPerson.bio != descr.bio
-        ) {
-            this.manipulateStemma((model, stemmaId) => model.updatePerson(stemmaId, personId, descr, si))
-        }
-    }
+        const original = si.person(personId);
+        const fieldsChanged =
+            original.birthDate != descr.birthDate ||
+            original.deathDate != descr.deathDate ||
+            original.name != descr.name ||
+            original.bio != descr.bio;
 
-    removePerson(personId: string) {
-        this.manipulateStemma((model, stemmaId) => model.removePerson(stemmaId, personId, get(this.stemmaIndex)))
-    }
+        if (!photoUpload && !photoRemove && !fieldsChanged) return;
 
-    uploadPersonPhoto(personId: string, file: Blob) {
-        let stemmaId = get(this.currentStemmaId)
         this.isWorking.set(true)
         this.err.set(null)
-        this.model
-            .requestPhotoUploadUrl(stemmaId, personId, file.type)
-            .then((urlInfo) =>
-                this.model.uploadPhotoToPresignedUrl(urlInfo.uploadUrl, file).then(() => urlInfo.photoKey),
-            )
-            .then((photoKey) => this.model.setPersonPhoto(stemmaId, personId, photoKey, get(this.stemmaIndex)))
-            .then((result) => {
-                this.refreshIndexes(result, stemmaId)
-                this.stemma.set(result)
+
+        const photoStep: Promise<void> = photoUpload
+            ? this.model
+                  .requestPhotoUploadUrl(stemmaId, personId, photoUpload.type)
+                  .then((urlInfo) =>
+                      this.model.uploadPhotoToPresignedUrl(urlInfo.uploadUrl, photoUpload).then(() => urlInfo.photoKey),
+                  )
+                  .then((photoKey) => this.model.setPersonPhoto(stemmaId, personId, photoKey, get(this.stemmaIndex)))
+                  .then((result) => {
+                      this.refreshIndexes(result, stemmaId)
+                      this.stemma.set(result)
+                  })
+            : photoRemove
+              ? this.model.setPersonPhoto(stemmaId, personId, null, get(this.stemmaIndex)).then((result) => {
+                    this.refreshIndexes(result, stemmaId)
+                    this.stemma.set(result)
+                })
+              : Promise.resolve()
+
+        photoStep
+            .then(() => {
+                if (!fieldsChanged) return
+                return this.model.updatePerson(stemmaId, personId, descr, get(this.stemmaIndex)).then((result) => {
+                    this.refreshIndexes(result, stemmaId)
+                    this.stemma.set(result)
+                })
             })
             .catch((err) => {
                 this.err.set(err)
-                console.error('Err when uploading person photo: ', err.stack)
+                console.error('Err when saving person: ', err.stack)
             })
             .finally(() => this.isWorking.set(false))
     }
 
-    removePersonPhoto(personId: string) {
-        this.manipulateStemma((model, stemmaId) => model.setPersonPhoto(stemmaId, personId, null, get(this.stemmaIndex)))
+    removePerson(personId: string) {
+        this.manipulateStemma((model, stemmaId) => model.removePerson(stemmaId, personId, get(this.stemmaIndex)))
     }
 
     createInvitationToken(personId: string, email: string) {
