@@ -2,11 +2,16 @@ import { jwtDecode } from "jwt-decode";
 
 const STORAGE_KEY = "stemma_credential";
 const EXPIRY_BUFFER_MS = 60_000;
+const REFRESH_LEAD_MS = 5 * 60_000;
 
 export type StoredCredential = {
     token: string;
     expiresAt: number;
 };
+
+export function msUntilRefresh(expiresAt: number, now: number = Date.now(), leadMs: number = REFRESH_LEAD_MS): number {
+    return Math.max(0, expiresAt - leadMs - now);
+}
 
 function decodeExpiry(token: string): number | null {
     const decoded = jwtDecode<{ exp?: number }>(token);

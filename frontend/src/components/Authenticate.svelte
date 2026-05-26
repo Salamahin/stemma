@@ -1,6 +1,7 @@
 <script lang="ts">
     import { jwtDecode } from "jwt-decode";
     import { onMount } from "svelte";
+    import { initializeGoogleAuth, onCredential, promptInitialSignIn } from "../googleAuth";
 
     type Props = {
         google_client_id: string;
@@ -9,47 +10,21 @@
 
     let { google_client_id, onsignIn }: Props = $props();
 
-    let gsiLoaded = $state(false);
-    let mounted = $state(false);
-
-    onMount(() => {
-        mounted = true;
-        const ready = (window as any).__gsiReady;
-        if (ready && typeof ready.then === "function") {
-            ready.then(() => {
-                gsiLoaded = true;
-            });
-        } else if ((window as any).google && (window as any).google.accounts) {
-            gsiLoaded = true;
-        }
-    });
-
-    function handleCredentialResponse(response: any) {
-        const decoded = jwtDecode<{ given_name: string; picture: string }>(response.credential);
-
+    function handleCredential(credential: string) {
+        const decoded = jwtDecode<{ given_name: string; picture: string }>(credential);
         onsignIn?.({
             name: decoded.given_name,
             image_url: decoded.picture,
-            id_token: response.credential,
+            id_token: credential,
         });
     }
 
-    $effect(() => {
-        if (gsiLoaded && mounted) {
-            (window as any).google.accounts.id.initialize({
-                client_id: google_client_id,
-                callback: handleCredentialResponse,
-                auto_select: true,
-            });
-            (window as any).google.accounts.id.prompt((notification: any) => {
-                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                    (window as any).google.accounts.id.renderButton(
-                        document.getElementById("signin"),
-                        { theme: "outline", size: "large" }
-                    );
-                }
-            });
-        }
+    onMount(() => {
+        const unsubscribe = onCredential(handleCredential);
+        initializeGoogleAuth(google_client_id)
+            .then(() => promptInitialSignIn(document.getElementById("signin")))
+            .catch((err) => console.error("Google Identity init failed", err));
+        return unsubscribe;
     });
 </script>
 
