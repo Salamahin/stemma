@@ -76,6 +76,7 @@ export const en: Record<string, string> = {
     'error.invalidInviteToken': 'Please check the invitation link',
     'error.foreignInviteToken': 'It seems you are using someone else\'s invitation link',
     'error.stemmaHasCycles': 'Invalid family composition — a cyclic dependency was detected',
+    'error.unsupportedPhotoType': 'Unsupported photo format. Please use JPEG, PNG, or WebP',
     'error.noDescription': '[NO DESCRIPTION]',
     'error.defaultStemmaName': 'My family tree',
 
@@ -119,6 +120,13 @@ export const en: Record<string, string> = {
     'person.datePlaceholder': 'dd.mm.yyyy',
     'person.incompleteDate': 'Incomplete date',
     'person.invalidDateRange': 'Invalid date range',
+    'person.photo': 'Photo',
+    'person.photoUpload': 'Upload photo',
+    'person.photoReplace': 'Replace photo',
+    'person.photoRemove': 'Remove photo',
+    'person.photoTooLarge': 'Photo is too large (max 5 MB)',
+    'person.photoUnsupportedType': 'Unsupported photo format. Use JPEG, PNG, or WebP',
+    'person.photoUploadFailed': 'Photo upload failed. Try again',
 
     // Settings modal
     'settings.title': 'Display settings',
@@ -216,6 +224,7 @@ export const ru: Record<string, string> = {
     'error.invalidInviteToken': 'Проверьте правильность ссылки-приглашения',
     'error.foreignInviteToken': 'Похоже, вы используете чужую ссылку-приглашение',
     'error.stemmaHasCycles': 'Неверная композиция семьи - обнаружена циклическая зависимость',
+    'error.unsupportedPhotoType': 'Неподдерживаемый формат фото. Используйте JPEG, PNG или WebP',
     'error.noDescription': '[НЕТ ОПИСАНИЯ]',
     'error.defaultStemmaName': 'Моя родословная',
 
@@ -259,6 +268,13 @@ export const ru: Record<string, string> = {
     'person.datePlaceholder': 'дд.мм.гггг',
     'person.incompleteDate': 'Неполная дата',
     'person.invalidDateRange': 'Неверный диапазон дат',
+    'person.photo': 'Фото',
+    'person.photoUpload': 'Загрузить фото',
+    'person.photoReplace': 'Заменить фото',
+    'person.photoRemove': 'Удалить фото',
+    'person.photoTooLarge': 'Фото слишком большое (макс. 5 МБ)',
+    'person.photoUnsupportedType': 'Неподдерживаемый формат фото. Используйте JPEG, PNG или WebP',
+    'person.photoUploadFailed': 'Не удалось загрузить фото. Попробуйте еще раз',
 
     // Settings modal
     'settings.title': 'Настройки отображения',

@@ -27,6 +27,8 @@ export function mapStemmaError<T extends StemmaResponse>(response: T, describePe
             throw new LocalizedError("error.foreignInviteToken")
         case "StemmaHasCycles":
             throw new LocalizedError("error.stemmaHasCycles")
+        case "UnsupportedPhotoType":
+            throw new LocalizedError("error.unsupportedPhotoType")
         default:
             return response
     }

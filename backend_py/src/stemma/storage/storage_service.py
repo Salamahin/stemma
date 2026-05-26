@@ -23,6 +23,7 @@ from stemma.domain.responses import FamilyDescription, PersonDescription, Stemma
 from stemma.domain.user import User
 from stemma.seed.kings_of_europe import SeedStemma
 from stemma.services.kinship import FamilyLink, kinsmen_families, members_of
+from stemma.services.photo_service import PhotoStore
 from stemma.services.stemma_dfs import has_cycles
 from stemma.storage.effects import ChownEffect
 from stemma.storage.schema import (
@@ -58,6 +59,7 @@ class _PersonRow:
     birth_date: date | None
     death_date: date | None
     bio: str | None
+    photo_key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -78,8 +80,9 @@ class _StemmaSnapshot:
 
 
 class StorageService:
-    def __init__(self, table: Any) -> None:
+    def __init__(self, table: Any, photo_store: PhotoStore | None = None) -> None:
         self._table = table
+        self._photo_store = photo_store
 
     # ---------- users ----------
 
@@ -184,7 +187,7 @@ class StorageService:
             person_owners={(p.id, user_id) for p in persons},
             family_owners={(f.id, user_id) for f in families},
         )
-        return stemma_id, _describe_stemma(snapshot, user_id)
+        return stemma_id, _describe_stemma(snapshot, user_id, self._photo_store)
 
     def list_owned_stemmas(self, user_id: str) -> list[StemmaDescription]:
         owner_rows = self._table.query(
@@ -219,17 +222,19 @@ class StorageService:
             id=stemma_id, name=new_name, removable=len(snapshot.stemma_owners) == 1
         )
 
-    def remove_stemma(self, user_id: str, stemma_id: str) -> None:
+    def remove_stemma(self, user_id: str, stemma_id: str) -> list[str]:
         snapshot = self._load_snapshot(stemma_id)
         self._require_stemma_access(snapshot, user_id)
         if len(snapshot.stemma_owners) != 1:
             raise IsNotTheOnlyStemmaOwner(stemma_id=stemma_id)
+        photo_keys = [p.photo_key for p in snapshot.people.values() if p.photo_key is not None]
         self._delete_entire_stemma(stemma_id)
+        return photo_keys
 
     def stemma(self, user_id: str, stemma_id: str) -> Stemma:
         snapshot = self._load_snapshot(stemma_id)
         self._require_stemma_access(snapshot, user_id)
-        return _describe_stemma(snapshot, user_id)
+        return _describe_stemma(snapshot, user_id, self._photo_store)
 
     def clone_stemma(self, user_id: str, stemma_id: str, new_stemma_name: str) -> Stemma:
         source = self._load_snapshot(stemma_id)
@@ -273,7 +278,7 @@ class StorageService:
 
     # ---------- people ----------
 
-    def remove_person(self, user_id: str, stemma_id: str, person_id: str) -> None:
+    def remove_person(self, user_id: str, stemma_id: str, person_id: str) -> list[str]:
         snapshot = self._load_snapshot(stemma_id)
         self._require_person_access(snapshot, user_id, person_id)
 
@@ -287,6 +292,11 @@ class StorageService:
                         children=[c for c in fam.children if c != person_id],
                     )
                 )
+
+        removed_photos: list[str] = []
+        person_row = snapshot.people.get(person_id)
+        if person_row is not None and person_row.photo_key is not None:
+            removed_photos.append(person_row.photo_key)
 
         with self._table.batch_writer() as batch:
             batch.delete_item(Key={"pk": stemma_pk(stemma_id), "sk": person_sk(person_id)})
@@ -314,6 +324,8 @@ class StorageService:
                 else:
                     batch.put_item(Item=_family_item(stemma_id, fam))
 
+        return removed_photos
+
     def update_person(
         self, user_id: str, stemma_id: str, person_id: str, description: CreateNewPerson
     ) -> None:
@@ -324,8 +336,31 @@ class StorageService:
         ).get("Item")
         if existing is None:
             raise NoSuchPersonId(id=person_id)
-        updated = _make_person_row(person_id, description)
+        updated = replace(_make_person_row(person_id, description), photo_key=existing.get("photo_key"))
         self._table.put_item(Item=_person_item(stemma_id, updated))
+
+    def set_person_photo(
+        self, user_id: str, stemma_id: str, person_id: str, photo_key: str | None
+    ) -> str | None:
+        if not self.owns_person(user_id, stemma_id, person_id):
+            raise AccessToPersonDenied(person_id=person_id)
+        key = {"pk": stemma_pk(stemma_id), "sk": person_sk(person_id)}
+        existing = self._table.get_item(Key=key).get("Item")
+        if existing is None:
+            raise NoSuchPersonId(id=person_id)
+        previous_key = existing.get("photo_key")
+        if photo_key is None:
+            self._table.update_item(
+                Key=key,
+                UpdateExpression="REMOVE photo_key",
+            )
+        else:
+            self._table.update_item(
+                Key=key,
+                UpdateExpression="SET photo_key = :v",
+                ExpressionAttributeValues={":v": photo_key},
+            )
+        return previous_key
 
     # ---------- ownership ----------
 
@@ -393,6 +428,7 @@ class StorageService:
                     birth_date=_parse_date(item.get("birth_date")),
                     death_date=_parse_date(item.get("death_date")),
                     bio=item.get("bio"),
+                    photo_key=item.get("photo_key"),
                 )
             elif sk.startswith(FAMILY_PREFIX) and not sk.startswith(FAMILY_OWNER_PREFIX):
                 fid = parse_id_after_prefix(sk, FAMILY_PREFIX)
@@ -507,7 +543,7 @@ class StorageService:
         self._write_family_change(snapshot.stemma_id, user_id, new_people, new_family, owner_grant_needed)
 
         return (
-            _describe_stemma(planned_snapshot, user_id),
+            _describe_stemma(planned_snapshot, user_id, self._photo_store),
             FamilyDescription(
                 id=family_id, parents=final_parents, children=final_children, read_only=False
             ),
@@ -666,6 +702,8 @@ def _person_item(stemma_id: str, person: _PersonRow) -> dict:
         item["death_date"] = person.death_date.isoformat()
     if person.bio is not None:
         item["bio"] = person.bio
+    if person.photo_key is not None:
+        item["photo_key"] = person.photo_key
     return item
 
 
@@ -684,7 +722,16 @@ def _parse_date(value: str | None) -> date | None:
     return date.fromisoformat(value)
 
 
-def _describe_stemma(snapshot: _StemmaSnapshot, user_id: str) -> Stemma:
+def _describe_stemma(
+    snapshot: _StemmaSnapshot,
+    user_id: str,
+    photo_store: PhotoStore | None = None,
+) -> Stemma:
+    def _photo_url(key: str | None) -> str | None:
+        if key is None or photo_store is None:
+            return None
+        return photo_store.issue_get_url(key)
+
     return Stemma(
         people=[
             PersonDescription(
@@ -694,6 +741,7 @@ def _describe_stemma(snapshot: _StemmaSnapshot, user_id: str) -> Stemma:
                 death_date=p.death_date,
                 bio=p.bio,
                 read_only=(p.id, user_id) not in snapshot.person_owners,
+                photo_url=_photo_url(p.photo_key),
             )
             for p in snapshot.people.values()
         ],

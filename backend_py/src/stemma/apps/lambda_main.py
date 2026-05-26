@@ -9,7 +9,11 @@ import os  # noqa: E402
 from functools import cache  # noqa: E402
 
 from stemma.apis.request_handler import RequestHandler  # noqa: E402
-from stemma.apps.bootstrap import dynamo_table_from_env, populate_env_from_secrets  # noqa: E402
+from stemma.apps.bootstrap import (  # noqa: E402
+    dynamo_table_from_env,
+    photo_store_from_env,
+    populate_env_from_secrets,
+)
 from stemma.domain.codec import decode_request, encode_error, encode_response  # noqa: E402
 from stemma.domain.errors import RequestDeserializationProblem, StemmaError, UnknownError  # noqa: E402
 from stemma.services.user_service import UserService  # noqa: E402
@@ -30,9 +34,10 @@ def _build() -> tuple[RequestHandler, UserService]:
     secrets_done = time.perf_counter()
     table = dynamo_table_from_env()
     table_done = time.perf_counter()
-    storage = StorageService(table)
+    photo_store = photo_store_from_env()
+    storage = StorageService(table, photo_store=photo_store)
     users = UserService(storage, os.environ["INVITE_SECRET"])
-    handler = RequestHandler(storage, users)
+    handler = RequestHandler(storage, users, photo_store=photo_store)
     services_done = time.perf_counter()
     logger.info(
         "cold_start_phases imports_ms=%.1f secrets_ms=%.1f dynamo_ms=%.1f services_ms=%.1f init_total_ms=%.1f",

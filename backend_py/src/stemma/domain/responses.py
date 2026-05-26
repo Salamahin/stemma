@@ -25,7 +25,16 @@ class PersonDescription:
     death_date: date | None
     bio: str | None
     read_only: bool
+    photo_url: str | None = None
     type: Literal["PersonDescription"] = "PersonDescription"
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
+class PhotoUploadUrl:
+    upload_url: str
+    photo_key: str
+    expires_in_seconds: int
+    type: Literal["PhotoUploadUrl"] = "PhotoUploadUrl"
 
 
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
@@ -79,6 +88,7 @@ Response = Annotated[
     | PersonDescription
     | InviteToken
     | CloneResult
-    | TokenAccepted,
+    | TokenAccepted
+    | PhotoUploadUrl,
     Discriminator("type"),
 ]

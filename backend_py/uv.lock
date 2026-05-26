@@ -479,6 +479,10 @@ dynamodb = [
     { name = "docker" },
     { name = "py-partiql-parser" },
 ]
+s3 = [
+    { name = "py-partiql-parser" },
+    { name = "pyyaml" },
+]
 
 [[package]]
 name = "mypy-boto3-dynamodb"
@@ -851,7 +855,7 @@ dependencies = [
 dev = [
     { name = "boto3-stubs", extra = ["dynamodb"] },
     { name = "httpx" },
-    { name = "moto", extra = ["dynamodb"] },
+    { name = "moto", extra = ["dynamodb", "s3"] },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -873,7 +877,7 @@ requires-dist = [
 dev = [
     { name = "boto3-stubs", extras = ["dynamodb"], specifier = ">=1.35" },
     { name = "httpx", specifier = ">=0.27" },
-    { name = "moto", extras = ["dynamodb"], specifier = ">=5.0" },
+    { name = "moto", extras = ["dynamodb", "s3"], specifier = ">=5.0" },
     { name = "pyright", specifier = ">=1.1.385" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
