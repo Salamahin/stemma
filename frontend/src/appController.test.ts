@@ -33,7 +33,7 @@ describe("AppController", () => {
         localStorage.setItem("stemma_last_stemma_id", "b");
 
         const controller = new AppController("http://example", () => model as any);
-        controller.authenticateAndListStemmas({ id_token: "token" });
+        controller.authenticateAndListStemmas({ getToken: () => "token", refresh: () => Promise.resolve("token") });
         await drainPromises();
 
         expect(model.getStemma).toHaveBeenCalledWith("b");
@@ -52,7 +52,7 @@ describe("AppController", () => {
         };
 
         const controller = new AppController("http://example", () => model as any);
-        controller.authenticateAndListStemmas({ id_token: "token" });
+        controller.authenticateAndListStemmas({ getToken: () => "token", refresh: () => Promise.resolve("token") });
         await drainPromises();
 
         expect(model.getStemma).not.toHaveBeenCalled();
@@ -72,7 +72,7 @@ describe("AppController", () => {
         };
 
         const controller = new AppController("http://example", () => model as any);
-        controller.authenticateAndListStemmas({ id_token: "token" });
+        controller.authenticateAndListStemmas({ getToken: () => "token", refresh: () => Promise.resolve("token") });
         await drainPromises();
 
         expect(model.getStemma).toHaveBeenCalledWith("b");
@@ -94,7 +94,7 @@ describe("AppController", () => {
         localStorage.setItem("stemma_last_stemma_id", "a");
 
         const controller = new AppController("http://example", () => model as any);
-        controller.authenticateAndListStemmas({ id_token: "token" });
+        controller.authenticateAndListStemmas({ getToken: () => "token", refresh: () => Promise.resolve("token") });
         await drainPromises();
 
         expect(model.getStemma).not.toHaveBeenCalled();
@@ -112,7 +112,7 @@ describe("AppController", () => {
         };
 
         const controller = new AppController("http://example", () => model as any);
-        controller.authenticateAndListStemmas({ id_token: "token" });
+        controller.authenticateAndListStemmas({ getToken: () => "token", refresh: () => Promise.resolve("token") });
         await drainPromises();
 
         expect(model.getStemma).not.toHaveBeenCalled();

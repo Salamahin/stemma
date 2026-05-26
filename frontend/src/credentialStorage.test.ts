@@ -1,4 +1,4 @@
-import { clearCredential, loadCredential, saveCredential } from "./credentialStorage";
+import { clearCredential, loadCredential, msUntilRefresh, saveCredential } from "./credentialStorage";
 
 function makeToken(expSeconds: number): string {
     const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
@@ -70,5 +70,17 @@ describe("credentialStorage", () => {
         clearCredential();
 
         expect(localStorage.getItem("stemma_credential")).toBeNull();
+    });
+
+    test("msUntilRefresh returns lead time before expiry", () => {
+        const now = 1_000_000;
+        const expiresAt = now + 60 * 60_000;
+        expect(msUntilRefresh(expiresAt, now)).toBe(55 * 60_000);
+    });
+
+    test("msUntilRefresh clamps to zero when expiry is near", () => {
+        const now = 1_000_000;
+        const expiresAt = now + 30_000;
+        expect(msUntilRefresh(expiresAt, now)).toBe(0);
     });
 });

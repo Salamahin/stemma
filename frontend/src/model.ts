@@ -106,16 +106,24 @@ export type StemmaResponse =
 
 //aux
 export type User = { id_token: string }
+export type TokenProvider = {
+    getToken: () => string;
+    refresh: () => Promise<string>;
+}
 
 export class Model {
     endpoint: string;
-    commonHeader;
+    private tokenProvider: TokenProvider;
 
-    constructor(endpoint: string, user: User) {
+    constructor(endpoint: string, tokenProvider: TokenProvider) {
         this.endpoint = endpoint
-        this.commonHeader = {
+        this.tokenProvider = tokenProvider
+    }
+
+    private headers(token: string) {
+        return {
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'Authorization': `Bearer ${user.id_token}`
+            'Authorization': `Bearer ${token}`,
         }
     }
 
@@ -200,15 +208,28 @@ export class Model {
     }
 
     private async send<R extends StemmaResponse>(request: Request, stemmaIndex: StemmaIndex | null): Promise<R> {
-        const response = await fetch(`${this.endpoint}/stemma`, {
+        const body = JSON.stringify(request)
+        let response = await fetch(`${this.endpoint}/stemma`, {
             method: 'POST',
-            headers: this.commonHeader,
-            body: JSON.stringify(request),
+            headers: this.headers(this.tokenProvider.getToken()),
+            body,
         })
-        if (response.status === 401) throw new LocalizedError("error.sessionExpired")
+        if (response.status === 401) {
+            try {
+                const refreshed = await this.tokenProvider.refresh()
+                response = await fetch(`${this.endpoint}/stemma`, {
+                    method: 'POST',
+                    headers: this.headers(refreshed),
+                    body,
+                })
+            } catch {
+                throw new LocalizedError("error.sessionExpired")
+            }
+            if (response.status === 401) throw new LocalizedError("error.sessionExpired")
+        }
         if (!response.ok) throw new LocalizedError("error.unexpectedResponse")
-        const body = (await response.json()) as StemmaResponse
-        return mapStemmaError(body, (id) => this.describePerson(id, stemmaIndex)) as R
+        const payload = (await response.json()) as StemmaResponse
+        return mapStemmaError(payload, (id) => this.describePerson(id, stemmaIndex)) as R
     }
 
     private describePerson(id: string, stemmaIndex?: StemmaIndex) {

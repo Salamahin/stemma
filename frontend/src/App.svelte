@@ -24,7 +24,9 @@
     import StatsCard from "./components/stats_card/StatsCard.svelte";
     import { SettingsStorage } from "./settingsStroage";
     import { LocalizedError, t } from "./i18n";
-    import { loadCredential, saveCredential } from "./credentialStorage";
+    import { clearCredential, loadCredential, msUntilRefresh, saveCredential } from "./credentialStorage";
+    import type { TokenProvider } from "./model";
+    import { initializeGoogleAuth, refreshCredential } from "./googleAuth";
     import { onMount, untrack } from "svelte";
 
     type Props = {
@@ -88,8 +90,58 @@
         return `${base || "stemma"}.svg`;
     }
 
+    let currentToken = $state<string>(null);
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let inflightRefresh: Promise<string> | null = null;
+    let e2eMode = false;
+
+    function scheduleRefresh(expiresAt: number) {
+        if (refreshTimer) clearTimeout(refreshTimer);
+        if (e2eMode) return;
+        refreshTimer = setTimeout(() => {
+            void runRefresh();
+        }, msUntilRefresh(expiresAt));
+    }
+
+    function adoptToken(token: string) {
+        const saved = saveCredential(token);
+        currentToken = token;
+        if (saved) scheduleRefresh(saved.expiresAt);
+    }
+
+    function endSession() {
+        if (refreshTimer) clearTimeout(refreshTimer);
+        refreshTimer = null;
+        clearCredential();
+        currentToken = null;
+        signedIn = false;
+    }
+
+    function runRefresh(): Promise<string> {
+        if (e2eMode) return Promise.resolve(currentToken);
+        if (inflightRefresh) return inflightRefresh;
+        inflightRefresh = refreshCredential()
+            .then((token) => {
+                adoptToken(token);
+                return token;
+            })
+            .catch((err) => {
+                endSession();
+                throw err;
+            })
+            .finally(() => {
+                inflightRefresh = null;
+            });
+        return inflightRefresh;
+    }
+
+    const tokenProvider: TokenProvider = {
+        getToken: () => currentToken,
+        refresh: () => runRefresh(),
+    };
+
     function handleSignIn(user: User) {
-        saveCredential(user.id_token);
+        adoptToken(user.id_token);
 
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has("inviteToken")) {
@@ -97,9 +149,9 @@
             urlParams.delete("inviteToken");
             window.history.pushState({}, document.title, window.location.pathname);
 
-            controller.authenticateAndBearToken(user, token);
+            controller.authenticateAndBearToken(tokenProvider, token);
         } else {
-            controller.authenticateAndListStemmas(user);
+            controller.authenticateAndListStemmas(tokenProvider);
         }
 
         signedIn = true;
@@ -108,9 +160,12 @@
     onMount(() => {
         const e2eAutoLoginEnabled = typeof E2E_AUTO_LOGIN !== "undefined" && E2E_AUTO_LOGIN === "1";
         if (e2eAutoLoginEnabled) {
+            e2eMode = true;
             handleSignIn({ id_token: "e2e-user@stemma.local" } as User);
             return;
         }
+
+        initializeGoogleAuth(google_client_id).catch((err) => console.error("Google Identity init failed", err));
 
         const cached = loadCredential();
         if (cached) {
