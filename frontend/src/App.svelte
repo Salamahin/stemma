@@ -229,7 +229,7 @@
         <div>
             <div class="alert alert-danger alert-dismissible fade mt-2 mx-2 show">
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label={$t("common.close")}></button>
-                <div><strong>{$t('app.oops')} </strong>{errorMessage(error)}</div>
+                <div><strong>{$t('app.oops')}</strong> {errorMessage(error)}</div>
             </div>
         </div>
     {/if}
