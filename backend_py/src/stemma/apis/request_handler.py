@@ -116,8 +116,7 @@ class RequestHandler:
         return TokenAccepted(stemmas=owned, last_stemma=last_stemma)
 
     def _delete_stemma(self, user: User, request: DeleteStemmaRequest) -> OwnedStemmas:
-        photo_keys = self._storage.remove_stemma(user.user_id, request.stemma_id)
-        self._delete_photos(photo_keys)
+        self._storage.remove_stemma(user.user_id, request.stemma_id)
         owned = self._storage.list_owned_stemmas(user.user_id)
         return OwnedStemmas(stemmas=owned, first_stemma=None)
 
@@ -129,10 +128,7 @@ class RequestHandler:
         return self._storage.stemma(user.user_id, request.stemma_id)
 
     def _delete_person(self, user: User, request: DeletePersonRequest) -> Stemma:
-        photo_keys = self._storage.remove_person(
-            user.user_id, request.stemma_id, request.person_id
-        )
-        self._delete_photos(photo_keys)
+        self._storage.remove_person(user.user_id, request.stemma_id, request.person_id)
         return self._storage.stemma(user.user_id, request.stemma_id)
 
     def _update_person(self, user: User, request: UpdatePersonRequest) -> Stemma:
@@ -188,17 +184,10 @@ class RequestHandler:
         )
 
     def _set_person_photo(self, user: User, request: SetPersonPhotoRequest) -> Stemma:
-        previous = self._storage.set_person_photo(
+        self._storage.set_person_photo(
             user.user_id, request.stemma_id, request.person_id, request.photo_key
         )
-        if previous is not None and previous != request.photo_key:
-            self._delete_photos([previous])
         return self._storage.stemma(user.user_id, request.stemma_id)
-
-    def _delete_photos(self, keys: list[str]) -> None:
-        if not keys or self._photo_store is None:
-            return
-        self._photo_store.delete(keys)
 
 
 def _order_with_default_first(
