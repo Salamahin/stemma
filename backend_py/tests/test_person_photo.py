@@ -144,7 +144,7 @@ def test_handler_request_photo_upload_url_returns_signed_url(
     assert response.upload_url.startswith("https://")
 
 
-def test_handler_set_person_photo_replaces_previous_and_deletes_from_s3(
+def test_handler_set_person_photo_leaves_previous_object_in_s3(
     storage: StorageService, users: UserService, photo_store: S3PhotoService, s3_client
 ) -> None:
     _, sid, pid = _seed_person(storage)
@@ -161,11 +161,11 @@ def test_handler_set_person_photo_replaces_previous_and_deletes_from_s3(
         user, SetPersonPhotoRequest(stemma_id=sid, person_id=pid, photo_key=new_key)
     )
     assert isinstance(response, Stemma)
-    assert not _object_exists(s3_client, old_key)
+    assert _object_exists(s3_client, old_key)
     assert _object_exists(s3_client, new_key)
 
 
-def test_handler_delete_person_cascades_photo_delete(
+def test_handler_delete_person_leaves_photo_in_s3(
     storage: StorageService, users: UserService, photo_store: S3PhotoService, s3_client
 ) -> None:
     _, sid, pid = _seed_person(storage)
@@ -176,10 +176,10 @@ def test_handler_delete_person_cascades_photo_delete(
     storage.set_person_photo(user.user_id, sid, pid, key)
 
     handler.handle(user, DeletePersonRequest(stemma_id=sid, person_id=pid))
-    assert not _object_exists(s3_client, key)
+    assert _object_exists(s3_client, key)
 
 
-def test_handler_delete_stemma_cascades_photo_delete(
+def test_handler_delete_stemma_leaves_photo_in_s3(
     storage: StorageService, users: UserService, photo_store: S3PhotoService, s3_client
 ) -> None:
     _, sid, pid = _seed_person(storage)
@@ -190,7 +190,32 @@ def test_handler_delete_stemma_cascades_photo_delete(
     storage.set_person_photo(user.user_id, sid, pid, key)
 
     handler.handle(user, DeleteStemmaRequest(stemma_id=sid))
-    assert not _object_exists(s3_client, key)
+    assert _object_exists(s3_client, key)
+
+
+def test_handler_clone_stemma_shares_photo_keys_and_survives_replace(
+    storage: StorageService, users: UserService, photo_store: S3PhotoService, s3_client
+) -> None:
+    _, sid, pid = _seed_person(storage)
+    handler = RequestHandler(storage, users, photo_store=photo_store)
+    user = storage.get_or_create_user("user@test.com")
+    original_key = photo_key(sid, pid)
+    _put_object(s3_client, original_key)
+    storage.set_person_photo(user.user_id, sid, pid, original_key)
+
+    cloned = storage.clone_stemma(user.user_id, sid, "clone")
+    cloned_person = next(p for p in cloned.people if p.photo_url is not None)
+    assert cloned_person.photo_url is not None
+    assert original_key in cloned_person.photo_url
+
+    replacement_key = "replacement_key"
+    _put_object(s3_client, replacement_key)
+    handler.handle(
+        user,
+        SetPersonPhotoRequest(stemma_id=sid, person_id=pid, photo_key=replacement_key),
+    )
+    assert _object_exists(s3_client, original_key)
+    assert _object_exists(s3_client, replacement_key)
 
 
 def test_set_person_photo_missing_person_raises(storage: StorageService) -> None:
