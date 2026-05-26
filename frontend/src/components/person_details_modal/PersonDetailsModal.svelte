@@ -12,6 +12,14 @@
         pin: boolean;
         description: PersonDescription;
     };
+
+    export type UploadPersonPhoto = {
+        id: string;
+        file: File;
+    };
+
+    const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+    const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 </script>
 
 <script lang="ts">
@@ -21,13 +29,16 @@
     type Props = {
         onpersonUpdated?: (payload: UpdatePerson) => void;
         onpersonRemoved?: (id: string) => void;
+        onphotoUploaded?: (payload: UploadPersonPhoto) => void;
+        onphotoRemoved?: (id: string) => void;
     };
 
-    let { onpersonUpdated, onpersonRemoved }: Props = $props();
+    let { onpersonUpdated, onpersonRemoved, onphotoUploaded, onphotoRemoved }: Props = $props();
 
     let modalEl = $state<HTMLElement>(null);
     let birthInputEl = $state<HTMLInputElement>(null);
     let deathInputEl = $state<HTMLInputElement>(null);
+    let photoFileInputEl = $state<HTMLInputElement>(null);
 
     let pinned = $state<boolean>(false);
     let name = $state<string>("");
@@ -36,6 +47,8 @@
     let bio = $state<string>("");
     let id = $state<string>("");
     let readOnly = $state<boolean>(false);
+    let photoUrl = $state<string | null>(null);
+    let photoErrString = $state<string | null>(null);
 
     let birthDateErrString = $state<string>(null);
     let deathDateErrString = $state<string>(null);
@@ -84,11 +97,44 @@
         bio = p.description.bio;
         pinned = p.pin;
         readOnly = p.description.readOnly;
+        photoUrl = p.description.photoUrl ?? null;
+        photoErrString = null;
+        if (photoFileInputEl) photoFileInputEl.value = "";
 
         birthDateErrString = null;
         deathDateErrString = null;
 
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    function pickPhoto() {
+        photoErrString = null;
+        photoFileInputEl?.click();
+    }
+
+    function onPhotoFileChange(event: Event) {
+        const input = event.currentTarget as HTMLInputElement;
+        const file = input.files && input.files[0];
+        if (!file) return;
+        if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+            photoErrString = $t("person.photoUnsupportedType");
+            input.value = "";
+            return;
+        }
+        if (file.size > MAX_PHOTO_BYTES) {
+            photoErrString = $t("person.photoTooLarge");
+            input.value = "";
+            return;
+        }
+        photoErrString = null;
+        onphotoUploaded?.({ id, file });
+        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+    }
+
+    function removePhoto() {
+        photoErrString = null;
+        onphotoRemoved?.(id);
+        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     }
 
     function parseMaskedDateStr(str: string) {
@@ -211,6 +257,40 @@
                     </div>
 
                     <div class="col-12 mt-2">
+                        <div class="form-label">{$t("person.photo")}</div>
+                        <div class="d-flex align-items-start gap-3">
+                            {#if photoUrl}
+                                <img src={photoUrl} alt={name} class="person-photo-preview rounded border" />
+                            {:else}
+                                <div class="person-photo-placeholder rounded border d-flex align-items-center justify-content-center text-muted">
+                                    {$t("person.photo")}
+                                </div>
+                            {/if}
+                            {#if !readOnly}
+                                <div class="d-flex flex-column gap-2">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick={pickPhoto}>
+                                        {photoUrl ? $t("person.photoReplace") : $t("person.photoUpload")}
+                                    </button>
+                                    {#if photoUrl}
+                                        <button type="button" class="btn btn-outline-danger btn-sm" onclick={removePhoto}>
+                                            {$t("person.photoRemove")}
+                                        </button>
+                                    {/if}
+                                </div>
+                                <input
+                                    bind:this={photoFileInputEl}
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    class="d-none"
+                                    onchange={onPhotoFileChange}
+                                />
+                            {/if}
+                        </div>
+                        {#if photoErrString}
+                            <div class="text-danger mt-2">{photoErrString}</div>
+                        {/if}
+                    </div>
+                    <div class="col-12 mt-2">
                         <label for="personBioInput" class="form-label">{$t("person.bio")}</label>
                         <textarea class="form-control" rows="6" id="personBioInput" bind:value={bio} readonly={readOnly}></textarea>
                     </div>
@@ -237,3 +317,17 @@
         </div>
     </div>
 </div>
+
+<style>
+    .person-photo-preview {
+        width: 120px;
+        height: 120px;
+        object-fit: cover;
+    }
+    .person-photo-placeholder {
+        width: 120px;
+        height: 120px;
+        background-color: var(--bs-light, #f8f9fa);
+        font-size: 0.875rem;
+    }
+</style>

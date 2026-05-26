@@ -14,6 +14,7 @@ Globals:
       Variables:
         STEMMA_INVITE_SECRET_NAME: "prod/invite"
         STEMMA_TABLE_NAME: !Ref StemmaTable
+        STEMMA_PHOTO_BUCKET: !Ref PersonPhotoBucket
         GOOGLE_CLIENT_ID: !Sub "${googleAuthClientId}"
     Layers:
       - !Ref MyLayer
@@ -106,6 +107,25 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+  PersonPhotoBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedMethods: [PUT, GET]
+            AllowedOrigins: ["*"]
+            AllowedHeaders: ["*"]
+            ExposedHeaders: [ETag]
+            MaxAge: 600
 
   AppBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -231,6 +251,13 @@ Resources:
             SecretArn: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/invite-*"
         - DynamoDBCrudPolicy:
             TableName: !Ref StemmaTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+                - s3:DeleteObject
+              Resource: !Sub "${PersonPhotoBucket.Arn}/*"
 
 Outputs:
   ApiEndpoint:

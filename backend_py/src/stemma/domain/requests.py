@@ -123,6 +123,22 @@ class UpdatePersonRequest:
     type: Literal["UpdatePersonRequest"] = "UpdatePersonRequest"
 
 
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
+class RequestPhotoUploadUrlRequest:
+    stemma_id: str
+    person_id: str
+    content_type: str
+    type: Literal["RequestPhotoUploadUrlRequest"] = "RequestPhotoUploadUrlRequest"
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
+class SetPersonPhotoRequest:
+    stemma_id: str
+    person_id: str
+    photo_key: str | None
+    type: Literal["SetPersonPhotoRequest"] = "SetPersonPhotoRequest"
+
+
 Request = Annotated[
     CreateFamilyRequest
     | UpdateFamilyRequest
@@ -136,6 +152,8 @@ Request = Annotated[
     | CloneStemmaRequest
     | RenameStemmaRequest
     | DeletePersonRequest
-    | UpdatePersonRequest,
+    | UpdatePersonRequest
+    | RequestPhotoUploadUrlRequest
+    | SetPersonPhotoRequest,
     Discriminator("type"),
 ]

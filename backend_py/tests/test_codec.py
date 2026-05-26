@@ -6,9 +6,18 @@ from stemma.domain.requests import (
     CreateFamilyRequest,
     CreateNewPerson,
     ExistingPerson,
+    RequestPhotoUploadUrlRequest,
+    SetPersonPhotoRequest,
     UpdatePersonRequest,
 )
-from stemma.domain.responses import FamilyDescription, OwnedStemmas, PersonDescription, Stemma, StemmaDescription
+from stemma.domain.responses import (
+    FamilyDescription,
+    OwnedStemmas,
+    PersonDescription,
+    PhotoUploadUrl,
+    Stemma,
+    StemmaDescription,
+)
 
 
 def test_decode_create_family_request_with_mixed_person_definitions() -> None:
@@ -74,6 +83,7 @@ def test_encode_owned_stemmas_response_tags_with_type_field() -> None:
                     "deathDate": None,
                     "bio": None,
                     "readOnly": False,
+                    "photoUrl": None,
                 }
             ],
             "families": [
@@ -93,3 +103,49 @@ def test_encode_error_with_fields() -> None:
 def test_encode_error_without_fields() -> None:
     assert encode_error(IncompleteFamily()) == {"type": "IncompleteFamily"}
     assert encode_error(InvalidInviteToken()) == {"type": "InvalidInviteToken"}
+
+
+def test_decode_request_photo_upload_url_request() -> None:
+    payload = {
+        "type": "RequestPhotoUploadUrlRequest",
+        "stemmaId": "s1",
+        "personId": "p1",
+        "contentType": "image/jpeg",
+    }
+    request = decode_request(payload)
+    assert isinstance(request, RequestPhotoUploadUrlRequest)
+    assert request.content_type == "image/jpeg"
+
+
+def test_decode_set_person_photo_request_with_null_key() -> None:
+    payload = {"type": "SetPersonPhotoRequest", "stemmaId": "s1", "personId": "p1", "photoKey": None}
+    request = decode_request(payload)
+    assert isinstance(request, SetPersonPhotoRequest)
+    assert request.photo_key is None
+
+
+def test_encode_photo_upload_url_response() -> None:
+    response = PhotoUploadUrl(
+        upload_url="https://example/upload", photo_key="some/key", expires_in_seconds=300
+    )
+    encoded = encode_response(response)
+    assert encoded == {
+        "type": "PhotoUploadUrl",
+        "uploadUrl": "https://example/upload",
+        "photoKey": "some/key",
+        "expiresInSeconds": 300,
+    }
+
+
+def test_encode_person_description_includes_photo_url() -> None:
+    response = PersonDescription(
+        id="1",
+        name="John",
+        birth_date=None,
+        death_date=None,
+        bio=None,
+        read_only=False,
+        photo_url="https://example/get",
+    )
+    encoded = encode_response(response)
+    assert encoded["photoUrl"] == "https://example/get"

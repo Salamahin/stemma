@@ -211,6 +211,31 @@ export class AppController {
         this.manipulateStemma((model, stemmaId) => model.removePerson(stemmaId, personId, get(this.stemmaIndex)))
     }
 
+    uploadPersonPhoto(personId: string, file: Blob) {
+        let stemmaId = get(this.currentStemmaId)
+        this.isWorking.set(true)
+        this.err.set(null)
+        this.model
+            .requestPhotoUploadUrl(stemmaId, personId, file.type)
+            .then((urlInfo) =>
+                this.model.uploadPhotoToPresignedUrl(urlInfo.uploadUrl, file).then(() => urlInfo.photoKey),
+            )
+            .then((photoKey) => this.model.setPersonPhoto(stemmaId, personId, photoKey, get(this.stemmaIndex)))
+            .then((result) => {
+                this.refreshIndexes(result, stemmaId)
+                this.stemma.set(result)
+            })
+            .catch((err) => {
+                this.err.set(err)
+                console.error('Err when uploading person photo: ', err.stack)
+            })
+            .finally(() => this.isWorking.set(false))
+    }
+
+    removePersonPhoto(personId: string) {
+        this.manipulateStemma((model, stemmaId) => model.setPersonPhoto(stemmaId, personId, null, get(this.stemmaIndex)))
+    }
+
     createInvitationToken(personId: string, email: string) {
         this.invitationToken.set(null)
         this.model

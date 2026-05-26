@@ -39,6 +39,8 @@ export type BearInvitationRequest = { type: "BearInvitationRequest", encodedToke
 export type CloneStemmaRequest = { type: "CloneStemmaRequest", stemmaId: string, stemmaName: string }
 export type ListDescribeStemmasRequest = { type: "ListDescribeStemmasRequest", defaultStemmaName: string, kingsOfEuropeStemmaName: string }
 export type RenameStemmaRequest = { type: "RenameStemmaRequest", stemmaId: string, newName: string }
+export type RequestPhotoUploadUrlRequest = { type: "RequestPhotoUploadUrlRequest", stemmaId: string, personId: string, contentType: string }
+export type SetPersonPhotoRequest = { type: "SetPersonPhotoRequest", stemmaId: string, personId: string, photoKey: string | null }
 
 type Request =
     | CreateFamilyRequest
@@ -54,6 +56,8 @@ type Request =
     | UpdatePersonRequest
     | CloneStemmaRequest
     | RenameStemmaRequest
+    | RequestPhotoUploadUrlRequest
+    | SetPersonPhotoRequest
 
 
 //responses
@@ -62,13 +66,15 @@ export type InviteToken = { type: "InviteToken", token: string }
 export type OwnedStemmas = { type: "OwnedStemmas", stemmas: Array<StemmaDescription>, firstStemma: Stemma, defaultStemmaId?: string | null }
 export type Stemma = { type: "Stemma", people: Array<PersonDescription>, families: Array<FamilyDescription> }
 export type StemmaDescription = { type: "StemmaDescription", id: string, name: string, removable: Boolean }
-export type PersonDescription = { type: "PersonDescription", id: string, name: string, birthDate?: string, deathDate?: string, bio?: string, readOnly: boolean }
+export type PersonDescription = { type: "PersonDescription", id: string, name: string, birthDate?: string, deathDate?: string, bio?: string, readOnly: boolean, photoUrl?: string | null }
 export type TokenAccepted = { type: "TokenAccepted", stemmas: Array<StemmaDescription>, lastStemma: Stemma }
 export type CloneResult = { type: "CloneResult", createdStemma: Stemma, stemmas: Array<StemmaDescription> }
+export type PhotoUploadUrl = { type: "PhotoUploadUrl", uploadUrl: string, photoKey: string, expiresInSeconds: number }
 
 //errors
 export type UnknownError = { type: "UnknownError", cause: string }
 export type RequestDeserializationProblem = { type: "RequestDeserializationProblem", descr: string }
+export type UnsupportedPhotoType = { type: "UnsupportedPhotoType", contentType: string }
 export type NoSuchPersonId = { type: "NoSuchPersonId", id: string }
 export type ChildAlreadyBelongsToFamily = { type: "ChildAlreadyBelongsToFamily", familyId: string, personId: string }
 export type IncompleteFamily = { type: "IncompleteFamily" }
@@ -90,6 +96,7 @@ export type StemmaResponse =
     | PersonDescription
     | TokenAccepted
     | CloneResult
+    | PhotoUploadUrl
     | UnknownError
     | RequestDeserializationProblem
     | NoSuchPersonId
@@ -103,6 +110,7 @@ export type StemmaResponse =
     | InvalidInviteToken
     | ForeignInviteToken
     | StemmaHasCycles
+    | UnsupportedPhotoType
 
 //aux
 export type User = { id_token: string }
@@ -205,6 +213,29 @@ export class Model {
 
     async renameStemma(stemmaId: string, newName: string): Promise<StemmaDescription> {
         return this.send<StemmaDescription>({ type: "RenameStemmaRequest", stemmaId, newName }, null)
+    }
+
+    async requestPhotoUploadUrl(stemmaId: string, personId: string, contentType: string): Promise<PhotoUploadUrl> {
+        return this.send<PhotoUploadUrl>(
+            { type: "RequestPhotoUploadUrlRequest", stemmaId, personId, contentType },
+            null,
+        )
+    }
+
+    async setPersonPhoto(stemmaId: string, personId: string, photoKey: string | null, stemmaIndex: StemmaIndex): Promise<Stemma> {
+        return this.send<Stemma>(
+            { type: "SetPersonPhotoRequest", stemmaId, personId, photoKey },
+            stemmaIndex,
+        )
+    }
+
+    async uploadPhotoToPresignedUrl(uploadUrl: string, file: Blob): Promise<void> {
+        const response = await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': file.type },
+            body: file,
+        })
+        if (!response.ok) throw new LocalizedError("error.unexpectedResponse")
     }
 
     private async send<R extends StemmaResponse>(request: Request, stemmaIndex: StemmaIndex | null): Promise<R> {

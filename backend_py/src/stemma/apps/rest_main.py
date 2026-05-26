@@ -5,7 +5,7 @@ import uvicorn
 
 from stemma.apis.request_handler import RequestHandler
 from stemma.apps.auth import AllowAnyTokenVerifier, GoogleTokenVerifier, TokenVerifier
-from stemma.apps.bootstrap import dynamo_table_from_env
+from stemma.apps.bootstrap import dynamo_table_from_env, photo_store_from_env
 from stemma.apps.rest_app import build_app
 from stemma.services.user_service import UserService
 from stemma.storage.storage_service import StorageService
@@ -22,9 +22,10 @@ def build_verifier() -> TokenVerifier:
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     table = dynamo_table_from_env()
-    storage = StorageService(table)
+    photo_store = photo_store_from_env()
+    storage = StorageService(table, photo_store=photo_store)
     users = UserService(storage, os.environ["INVITE_SECRET"])
-    handler = RequestHandler(storage, users)
+    handler = RequestHandler(storage, users, photo_store=photo_store)
     app = build_app(handler, build_verifier(), users)
     uvicorn.run(app, host="0.0.0.0", port=8090)
 

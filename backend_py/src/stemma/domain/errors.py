@@ -85,6 +85,12 @@ class StemmaHasCycles(StemmaError):
     type: Literal["StemmaHasCycles"] = "StemmaHasCycles"
 
 
+@dataclass(config=DOMAIN_CONFIG)
+class UnsupportedPhotoType(StemmaError):
+    content_type: str
+    type: Literal["UnsupportedPhotoType"] = "UnsupportedPhotoType"
+
+
 StemmaErrorUnion = Annotated[
     UnknownError
     | RequestDeserializationProblem
@@ -98,6 +104,7 @@ StemmaErrorUnion = Annotated[
     | IsNotTheOnlyStemmaOwner
     | InvalidInviteToken
     | ForeignInviteToken
-    | StemmaHasCycles,
+    | StemmaHasCycles
+    | UnsupportedPhotoType,
     Discriminator("type"),
 ]

@@ -14,6 +14,8 @@ from stemma.domain.requests import (
     ListDescribeStemmasRequest,
     RenameStemmaRequest,
     Request,
+    RequestPhotoUploadUrlRequest,
+    SetPersonPhotoRequest,
     UpdateFamilyRequest,
     UpdatePersonRequest,
 )
@@ -21,6 +23,7 @@ from stemma.domain.responses import (
     CloneResult,
     InviteToken,
     OwnedStemmas,
+    PhotoUploadUrl,
     Response,
     Stemma,
     StemmaDescription,
@@ -28,6 +31,7 @@ from stemma.domain.responses import (
 )
 from stemma.domain.user import User
 from stemma.seed.kings_of_europe import load_kings_of_europe
+from stemma.services.photo_service import PUT_URL_EXPIRES_SECONDS, PhotoStore
 from stemma.services.user_service import UserService
 from stemma.storage.storage_service import StorageService
 
@@ -35,9 +39,15 @@ logger = logging.getLogger(__name__)
 
 
 class RequestHandler:
-    def __init__(self, storage: StorageService, users: UserService) -> None:
+    def __init__(
+        self,
+        storage: StorageService,
+        users: UserService,
+        photo_store: PhotoStore | None = None,
+    ) -> None:
         self._storage = storage
         self._users = users
+        self._photo_store = photo_store
 
     def handle(self, user: User, request: Request) -> Response:
         match request:
@@ -67,6 +77,10 @@ class RequestHandler:
                 return self._clone_stemma(user, request)
             case RenameStemmaRequest():
                 return self._rename_stemma(user, request)
+            case RequestPhotoUploadUrlRequest():
+                return self._request_photo_upload_url(user, request)
+            case SetPersonPhotoRequest():
+                return self._set_person_photo(user, request)
 
     def _list_describe_stemmas(self, user: User, request: ListDescribeStemmasRequest) -> OwnedStemmas:
         existing = self._storage.list_owned_stemmas(user.user_id)
@@ -102,7 +116,8 @@ class RequestHandler:
         return TokenAccepted(stemmas=owned, last_stemma=last_stemma)
 
     def _delete_stemma(self, user: User, request: DeleteStemmaRequest) -> OwnedStemmas:
-        self._storage.remove_stemma(user.user_id, request.stemma_id)
+        photo_keys = self._storage.remove_stemma(user.user_id, request.stemma_id)
+        self._delete_photos(photo_keys)
         owned = self._storage.list_owned_stemmas(user.user_id)
         return OwnedStemmas(stemmas=owned, first_stemma=None)
 
@@ -114,7 +129,10 @@ class RequestHandler:
         return self._storage.stemma(user.user_id, request.stemma_id)
 
     def _delete_person(self, user: User, request: DeletePersonRequest) -> Stemma:
-        self._storage.remove_person(user.user_id, request.stemma_id, request.person_id)
+        photo_keys = self._storage.remove_person(
+            user.user_id, request.stemma_id, request.person_id
+        )
+        self._delete_photos(photo_keys)
         return self._storage.stemma(user.user_id, request.stemma_id)
 
     def _update_person(self, user: User, request: UpdatePersonRequest) -> Stemma:
@@ -154,6 +172,33 @@ class RequestHandler:
 
     def _rename_stemma(self, user: User, request: RenameStemmaRequest) -> StemmaDescription:
         return self._storage.rename_stemma(user.user_id, request.stemma_id, request.new_name)
+
+    def _request_photo_upload_url(
+        self, user: User, request: RequestPhotoUploadUrlRequest
+    ) -> PhotoUploadUrl:
+        if self._photo_store is None:
+            raise RuntimeError("photo_store not configured")
+        if not self._storage.owns_person(user.user_id, request.stemma_id, request.person_id):
+            raise AccessToPersonDenied(person_id=request.person_id)
+        url, key = self._photo_store.issue_upload_url(
+            request.stemma_id, request.person_id, request.content_type
+        )
+        return PhotoUploadUrl(
+            upload_url=url, photo_key=key, expires_in_seconds=PUT_URL_EXPIRES_SECONDS
+        )
+
+    def _set_person_photo(self, user: User, request: SetPersonPhotoRequest) -> Stemma:
+        previous = self._storage.set_person_photo(
+            user.user_id, request.stemma_id, request.person_id, request.photo_key
+        )
+        if previous is not None and previous != request.photo_key:
+            self._delete_photos([previous])
+        return self._storage.stemma(user.user_id, request.stemma_id)
+
+    def _delete_photos(self, keys: list[str]) -> None:
+        if not keys or self._photo_store is None:
+            return
+        self._photo_store.delete(keys)
 
 
 def _order_with_default_first(

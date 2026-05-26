@@ -200,6 +200,8 @@
         bind:this={personSelectionModal}
         onpersonRemoved={(id) => controller.removePerson(id)}
         onpersonUpdated={(p) => controller.updatePerson(p.id, p.description, p.pin)}
+        onphotoUploaded={(p) => controller.uploadPersonPhoto(p.id, p.file)}
+        onphotoRemoved={(id) => controller.removePersonPhoto(id)}
     />
 
     <InviteModal bind:this={inviteModal} {stemma} {stemmaIndex} oninvite={(p) => controller.createInvitationToken(p.personId, p.email)} />
