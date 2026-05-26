@@ -56,7 +56,7 @@ def photo_store_from_env():
 def _s3_signature_config():
     from botocore.config import Config
 
-    return Config(signature_version="s3v4")
+    return Config(signature_version="s3v4", s3={"addressing_style": "virtual"})
 
 
 def _ensure_table(resource, table_name: str) -> None:
