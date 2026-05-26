@@ -6,16 +6,13 @@
         id: string;
         pin: boolean;
         description: CreateNewPerson;
+        photoUpload: Blob | null;
+        photoRemove: boolean;
     };
 
     export type ShowPerson = {
         pin: boolean;
         description: PersonDescription;
-    };
-
-    export type UploadPersonPhoto = {
-        id: string;
-        file: Blob;
     };
 
     const CROP_OUTPUT_SIZE = 512;
@@ -52,11 +49,9 @@
     type Props = {
         onpersonUpdated?: (payload: UpdatePerson) => void;
         onpersonRemoved?: (id: string) => void;
-        onphotoUploaded?: (payload: UploadPersonPhoto) => void;
-        onphotoRemoved?: (id: string) => void;
     };
 
-    let { onpersonUpdated, onpersonRemoved, onphotoUploaded, onphotoRemoved }: Props = $props();
+    let { onpersonUpdated, onpersonRemoved }: Props = $props();
 
     let modalEl = $state<HTMLElement>(null);
     let birthInputEl = $state<HTMLInputElement>(null);
@@ -72,6 +67,10 @@
     let readOnly = $state<boolean>(false);
     let photoUrl = $state<string | null>(null);
     let photoErrString = $state<string | null>(null);
+    let originalPhotoUrl: string | null = null;
+    let pendingPhotoBlob = $state<Blob | null>(null);
+    let pendingPhotoPreviewUrl = $state<string | null>(null);
+    let pendingPhotoRemove = $state<boolean>(false);
 
     let cropImageEl = $state<HTMLImageElement>(null);
     let cropContainerEl = $state<HTMLElement>(null);
@@ -100,6 +99,8 @@
                 bio,
             },
             pin: pinned,
+            photoUpload: pendingPhotoBlob,
+            photoRemove: pendingPhotoRemove,
         });
 
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
@@ -133,15 +134,24 @@
         bio = p.description.bio;
         pinned = p.pin;
         readOnly = p.description.readOnly;
-        photoUrl = p.description.photoUrl ?? null;
+        originalPhotoUrl = p.description.photoUrl ?? null;
+        photoUrl = originalPhotoUrl;
         photoErrString = null;
         if (photoFileInputEl) photoFileInputEl.value = "";
         resetCropState();
+        resetPendingPhoto();
 
         birthDateErrString = null;
         deathDateErrString = null;
 
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    function resetPendingPhoto() {
+        if (pendingPhotoPreviewUrl) URL.revokeObjectURL(pendingPhotoPreviewUrl);
+        pendingPhotoPreviewUrl = null;
+        pendingPhotoBlob = null;
+        pendingPhotoRemove = false;
     }
 
     function resetCropState() {
@@ -275,9 +285,12 @@
                     photoErrString = $t("person.photoUploadFailed");
                     return;
                 }
-                onphotoUploaded?.({ id, file: blob });
+                if (pendingPhotoPreviewUrl) URL.revokeObjectURL(pendingPhotoPreviewUrl);
+                pendingPhotoBlob = blob;
+                pendingPhotoPreviewUrl = URL.createObjectURL(blob);
+                pendingPhotoRemove = false;
+                photoUrl = pendingPhotoPreviewUrl;
                 resetCropState();
-                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
             },
             CROP_OUTPUT_MIME,
             CROP_OUTPUT_QUALITY,
@@ -286,8 +299,17 @@
 
     function removePhoto() {
         photoErrString = null;
-        onphotoRemoved?.(id);
-        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        if (pendingPhotoBlob) {
+            if (pendingPhotoPreviewUrl) URL.revokeObjectURL(pendingPhotoPreviewUrl);
+            pendingPhotoPreviewUrl = null;
+            pendingPhotoBlob = null;
+            photoUrl = originalPhotoUrl;
+            return;
+        }
+        if (originalPhotoUrl) {
+            pendingPhotoRemove = true;
+            photoUrl = null;
+        }
     }
 
     function parseMaskedDateStr(str: string) {
