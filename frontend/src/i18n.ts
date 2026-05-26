@@ -127,6 +127,8 @@ export const en: Record<string, string> = {
     'person.photoTooLarge': 'Photo is too large (max 5 MB)',
     'person.photoUnsupportedType': 'Unsupported photo format. Use JPEG, PNG, or WebP',
     'person.photoUploadFailed': 'Photo upload failed. Try again',
+    'person.photoAdjustTitle': 'Adjust photo',
+    'person.photoAdjustHint': 'Drag to position, use the slider to zoom',
 
     // Settings modal
     'settings.title': 'Display settings',
@@ -275,6 +277,8 @@ export const ru: Record<string, string> = {
     'person.photoTooLarge': 'Фото слишком большое (макс. 5 МБ)',
     'person.photoUnsupportedType': 'Неподдерживаемый формат фото. Используйте JPEG, PNG или WebP',
     'person.photoUploadFailed': 'Не удалось загрузить фото. Попробуйте еще раз',
+    'person.photoAdjustTitle': 'Подгонка фото',
+    'person.photoAdjustHint': 'Двигайте мышью, масштабируйте ползунком',
 
     // Settings modal
     'settings.title': 'Настройки отображения',
