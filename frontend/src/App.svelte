@@ -170,6 +170,8 @@
 
         if (initialCached) {
             handleSignIn({ id_token: initialCached.token });
+        } else {
+            fetch(`${stemma_backend_url}/warmup`).catch(() => {});
         }
     });
 </script>
