@@ -52,6 +52,8 @@ def _build() -> tuple[RequestHandler, UserService]:
 
 def lambda_handler(event: dict, context: object) -> str:
     handler, users = _build()
+    if event.get("rawPath", "").endswith("/warmup"):
+        return json.dumps({"ok": True})
     email = event["requestContext"]["authorizer"]["jwt"]["claims"]["email"]
     body = event.get("body") or ""
     if event.get("isBase64Encoded"):

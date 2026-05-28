@@ -169,6 +169,10 @@ Resources:
         AllowMethods:
           - '*'
         MaxAge: 600
+      RouteSettings:
+        "GET /warmup":
+          ThrottlingBurstLimit: 5
+          ThrottlingRateLimit: 1
       Domain:
         DomainName: !Sub "${apiAlias}"
         CertificateArn: !Sub "${certificateArnEurope}"
@@ -244,6 +248,14 @@ Resources:
             ApiId: !Ref MyApi
             Path: /stemma
             Method: post
+        WarmupEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyApi
+            Path: /warmup
+            Method: get
+            Auth:
+              Authorizer: NONE
       Policies:
         - S3FullAccessPolicy:
             BucketName: stemma-app-backend-assets
