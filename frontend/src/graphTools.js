@@ -1,4 +1,5 @@
 import * as d3 from "d3";
+import { layoutGreedy, layoutRemoveOverlaps } from "d3fc-label-layout";
 import {
     personR, familyR, defaultFamilyColor, shadedNodeColor,
     relationsColor, shadedRelationColor, childRelationWidth,
@@ -67,7 +68,7 @@ export function setActiveLayoutCache(cache) {
 }
 
 export function configureSimulation(svg, nodes, relations, width, height) {
-    return d3
+    const sim = d3
         .forceSimulation(nodes)
         .force(
             "link",
@@ -80,25 +81,70 @@ export function configureSimulation(svg, nodes, relations, width, height) {
             d3.forceCollide().radius((d) => d.r * 20)
         )
         .force("repelForce", d3.forceManyBody().strength(-1500).distanceMin(85))
-        .velocityDecay(0.8)
-        .on("tick", () => {
-            svg.select("g.main")
-                .selectAll("g")
-                .attr("transform", (d) => {
-                    sessionPositions.set(d.id, [d.x, d.y])
-                    if (activeLayoutCache) activeLayoutCache.set(d.id, d.x, d.y, d.vx ?? 0, d.vy ?? 0)
-                    return "translate(" + d.x + "," + d.y + ")"
-                });
+        .velocityDecay(0.8);
 
-            svg.selectAll("line")
-                .attr("x1", (d) => d.source.x)
-                .attr("y1", (d) => d.source.y)
-                .attr("x2", (d) => d.target.x)
-                .attr("y2", (d) => d.target.y);
-        })
-        .on("end", () => {
-            if (activeLayoutCache) activeLayoutCache.save()
-        });
+    sim.on("tick", () => {
+        svg.select("g.main")
+            .selectAll("g")
+            .attr("transform", (d) => {
+                sessionPositions.set(d.id, [d.x, d.y])
+                if (activeLayoutCache) activeLayoutCache.set(d.id, d.x, d.y, d.vx ?? 0, d.vy ?? 0)
+                return "translate(" + d.x + "," + d.y + ")"
+            });
+
+        svg.selectAll("line")
+            .attr("x1", (d) => d.source.x)
+            .attr("y1", (d) => d.source.y)
+            .attr("x2", (d) => d.target.x)
+            .attr("y2", (d) => d.target.y);
+    });
+
+    sim.on("end", () => {
+        applyLabelLayout(svg, sim.nodes());
+        if (activeLayoutCache) activeLayoutCache.save();
+    });
+
+    return sim;
+}
+
+export function applyLabelLayout(svg, nodes) {
+    const persons = nodes.filter((n) => n.type === "person");
+    if (persons.length === 0) return;
+
+    const rects = persons.map((p) => {
+        const t = document.querySelector(`#${CSS.escape(p.id)} text`);
+        let w = 80, h = 20;
+        if (t) {
+            const bb = t.getBBox();
+            w = bb.width + 4;
+            h = bb.height + 4;
+        }
+        return {
+            hidden: false,
+            x: p.x - personR,
+            y: p.y + 20,
+            width: w,
+            height: h,
+            _origin: p,
+            _w: w,
+            _h: h,
+        };
+    });
+
+    const strategy = layoutRemoveOverlaps(layoutGreedy());
+    const placed = strategy(rects);
+
+    persons.forEach((p, i) => {
+        const slot = placed[i];
+        const before = rects[i];
+        const dx = slot.x - p.x;
+        const dy = slot.y - p.y;
+        const node = svg.select(`#${CSS.escape(p.id)}`);
+        node.select("text")
+            .attr("dx", dx)
+            .attr("dy", dy + before._h * 0.7)
+            .style("display", slot.hidden ? "none" : null);
+    });
 }
 
 export function updateSimulation(simulation, nodes, relations) {
@@ -205,7 +251,9 @@ export function mergeData(svg, nodes, relations, width, height, initialPositions
                     .append("g")
                     .attr("id", n => n.id);
                 people.append("circle");
-                people.append("text");
+                people.append("text")
+                    .attr("dx", -personR)
+                    .attr("dy", 40);
 
                 enter
                     .filter(n => n.type == "family")
@@ -284,7 +332,5 @@ export function renderChart(svg, highlight, stemmaIndex, markers) {
     svg.selectAll("text")
         .raise()
         .text((node) => node.name)
-        .style("font-size", labelFontSize)
-        .attr("dy", 40)
-        .attr("dx", -personR);
+        .style("font-size", labelFontSize);
 }

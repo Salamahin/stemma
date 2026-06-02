@@ -6,6 +6,7 @@
     import { onMount } from "svelte";
     import { HiglightLineages } from "../highlight";
     import {
+        applyLabelLayout,
         configureSimulation,
         resetSessionPositions,
         setActiveLayoutCache,
@@ -218,6 +219,7 @@
             });
 
         renderChart(svg, highlight, stemmaIndex, markers);
+        if (fullyCached) applyLabelLayout(svg, nodes);
         makeDrag(
             svg,
             simulation,
