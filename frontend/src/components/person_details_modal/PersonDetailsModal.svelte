@@ -45,6 +45,7 @@
 <script lang="ts">
     import * as bootstrap from "bootstrap";
     import { t } from "../../i18n";
+    import { renderBioMarkdown } from "../../bioMarkdown";
 
     type Props = {
         onpersonUpdated?: (payload: UpdatePerson) => void;
@@ -87,6 +88,9 @@
 
     let birthDateErrString = $state<string>(null);
     let deathDateErrString = $state<string>(null);
+
+    let bioTab = $state<"edit" | "preview">("edit");
+    const bioHtml = $derived(renderBioMarkdown(bio));
 
     function personUpdated() {
         onpersonUpdated?.({
@@ -134,6 +138,7 @@
         bio = p.description.bio;
         pinned = p.pin;
         readOnly = p.description.readOnly;
+        bioTab = p.description.readOnly ? "preview" : "edit";
         originalPhotoUrl = p.description.photoUrl ?? null;
         photoUrl = originalPhotoUrl;
         photoErrString = null;
@@ -516,8 +521,34 @@
                     </div>
 
                     <div class="col-12">
-                        <label for="personBioInput" class="form-label">{$t("person.bio")}</label>
-                        <textarea class="form-control" rows="6" id="personBioInput" bind:value={bio} readonly={readOnly}></textarea>
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                            <label for="personBioInput" class="form-label mb-0">{$t("person.bio")}</label>
+                            {#if !readOnly}
+                                <div class="btn-group btn-group-sm" role="tablist" aria-label={$t("person.bio")}>
+                                    <button
+                                        type="button"
+                                        class="btn btn-outline-secondary {bioTab === 'edit' ? 'active' : ''}"
+                                        aria-pressed={bioTab === "edit"}
+                                        onclick={() => (bioTab = "edit")}
+                                    >{$t("person.bioEdit")}</button>
+                                    <button
+                                        type="button"
+                                        class="btn btn-outline-secondary {bioTab === 'preview' ? 'active' : ''}"
+                                        aria-pressed={bioTab === "preview"}
+                                        onclick={() => (bioTab = "preview")}
+                                    >{$t("person.bioPreview")}</button>
+                                </div>
+                            {/if}
+                        </div>
+                        {#if !readOnly && bioTab === "edit"}
+                            <textarea class="form-control bio-textarea" rows="8" id="personBioInput" bind:value={bio}></textarea>
+                            <div class="form-text">{$t("person.bioMarkdownHint")}</div>
+                        {:else if bioHtml}
+                            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                            <div class="bio-preview">{@html bioHtml}</div>
+                        {:else}
+                            <div class="bio-preview text-muted fst-italic">{$t("person.bioEmpty")}</div>
+                        {/if}
                     </div>
                     <div class="col-12">
                         <div class="form-check form-switch">
@@ -634,5 +665,90 @@
         inset: 0;
         pointer-events: none;
         box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+    }
+    .bio-preview {
+        min-height: 6rem;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.375rem;
+        background-color: var(--bs-body-bg, #fff);
+        line-height: 1.5;
+        font-size: 0.95rem;
+        overflow-wrap: anywhere;
+    }
+    .bio-preview :global(p) {
+        margin-top: 0;
+        margin-bottom: 0.75rem;
+    }
+    .bio-preview :global(p:last-child) {
+        margin-bottom: 0;
+    }
+    .bio-preview :global(h1),
+    .bio-preview :global(h2),
+    .bio-preview :global(h3),
+    .bio-preview :global(h4),
+    .bio-preview :global(h5),
+    .bio-preview :global(h6) {
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
+    .bio-preview :global(h1) { font-size: 1.4rem; }
+    .bio-preview :global(h2) { font-size: 1.25rem; }
+    .bio-preview :global(h3) { font-size: 1.1rem; }
+    .bio-preview :global(h4),
+    .bio-preview :global(h5),
+    .bio-preview :global(h6) { font-size: 1rem; }
+    .bio-preview :global(ul),
+    .bio-preview :global(ol) {
+        padding-left: 1.25rem;
+        margin-bottom: 0.75rem;
+    }
+    .bio-preview :global(li) {
+        margin-bottom: 0.15rem;
+    }
+    .bio-preview :global(a) {
+        color: var(--bs-link-color, #0d6efd);
+        word-break: break-word;
+    }
+    .bio-preview :global(blockquote) {
+        margin: 0 0 0.75rem;
+        padding: 0.25rem 0.75rem;
+        border-left: 3px solid var(--bs-border-color, #dee2e6);
+        color: var(--bs-secondary-color, #6c757d);
+    }
+    .bio-preview :global(code) {
+        padding: 0.1em 0.3em;
+        font-size: 0.875em;
+        background-color: rgba(0, 0, 0, 0.06);
+        border-radius: 0.25rem;
+    }
+    .bio-preview :global(pre) {
+        padding: 0.5rem 0.75rem;
+        background-color: rgba(0, 0, 0, 0.06);
+        border-radius: 0.375rem;
+        overflow-x: auto;
+    }
+    .bio-preview :global(pre code) {
+        padding: 0;
+        background: transparent;
+    }
+    .bio-preview :global(hr) {
+        margin: 0.75rem 0;
+    }
+    .bio-preview :global(table) {
+        width: 100%;
+        margin-bottom: 0.75rem;
+        border-collapse: collapse;
+    }
+    .bio-preview :global(th),
+    .bio-preview :global(td) {
+        padding: 0.25rem 0.5rem;
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        text-align: left;
+    }
+    .bio-textarea {
+        font-family: var(--bs-font-monospace, ui-monospace, SFMono-Regular, monospace);
+        font-size: 0.9rem;
     }
 </style>

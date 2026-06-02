@@ -46,10 +46,12 @@
   "dependencies": {
     "@imask/svelte": "^6.6.3",
     "d3fc-label-layout": "^5.1.0",
+    "dompurify": "^3.4.7",
     "fuzzysort": "^3.1.0",
     "jwt-decode": "^4.0.0",
     "lodash.clone": "^4.5.0",
     "lodash.isequal": "^4.5.0",
+    "marked": "^18.0.4",
     "sirv-cli": "^3.0.1",
     "svelte-loading-spinners": "^0.3.6",
     "svelte-select": "^5.8.3"
