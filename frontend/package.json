@@ -45,6 +45,7 @@
   },
   "dependencies": {
     "@imask/svelte": "^6.6.3",
+    "d3fc-label-layout": "^5.1.0",
     "fuzzysort": "^3.1.0",
     "jwt-decode": "^4.0.0",
     "lodash.clone": "^4.5.0",
