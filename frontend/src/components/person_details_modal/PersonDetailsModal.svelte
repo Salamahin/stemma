@@ -46,6 +46,7 @@
     import * as bootstrap from "bootstrap";
     import { t } from "../../i18n";
     import { renderBioMarkdown } from "../../bioMarkdown";
+    import { isUnknownPerson } from "../../personDisplayName";
 
     type Props = {
         onpersonUpdated?: (payload: UpdatePerson) => void;
@@ -60,6 +61,7 @@
     let photoFileInputEl = $state<HTMLInputElement>(null);
 
     let pinned = $state<boolean>(false);
+    let unknown = $state<boolean>(false);
     let name = $state<string>("");
     let birthDate = $state<Date>(null);
     let deathDate = $state<Date>(null);
@@ -97,7 +99,7 @@
             id,
             description: {
                 type: "CreateNewPerson",
-                name,
+                name: unknown ? "" : name,
                 birthDate: dateToIsoLocalTime(birthDate),
                 deathDate: dateToIsoLocalTime(deathDate),
                 bio,
@@ -131,6 +133,7 @@
     export function showPersonDetails(p: ShowPerson) {
         id = p.description.id;
         name = p.description.name;
+        unknown = isUnknownPerson(p.description.name);
         birthDate = p.description.birthDate ? new Date(p.description.birthDate) : null;
         deathDate = p.description.deathDate ? new Date(p.description.deathDate) : null;
         if (birthInputEl) birthInputEl.value = dateToMaskedDateStr(birthDate) ?? "";
@@ -489,7 +492,19 @@
                     <div class="col-md-8">
                         <div class="mb-3">
                             <label for="personNameInput" class="form-label">{$t("person.name")}</label>
-                            <input class="form-control" id="personNameInput" aria-describedby="personNameHelp" bind:value={name} readonly={readOnly} />
+                            <input class="form-control" id="personNameInput" aria-describedby="personNameHelp" bind:value={name} readonly={readOnly} disabled={unknown} />
+                            {#if !readOnly}
+                                <div class="form-check form-switch mt-2">
+                                    <input
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        id="personUnknownSwitch"
+                                        bind:checked={unknown}
+                                        onchange={() => { if (unknown) name = ""; }}
+                                    />
+                                    <label class="form-check-label" for="personUnknownSwitch">{$t("person.unknownToggle")}</label>
+                                </div>
+                            {/if}
                         </div>
                         <div class="form-label">{$t("person.lifeYears")}</div>
                         <div class="row g-2">

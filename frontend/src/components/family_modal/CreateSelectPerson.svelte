@@ -6,6 +6,7 @@
     import PersonSelector from "../misc/PersonSelector.svelte";
     import { t } from "../../i18n";
     import { filterEditablePeople } from "../../personSelectionRules";
+    import { isUnknownPerson, personDisplayName } from "../../personDisplayName";
 
     type Props = {
         stemmaIndex: StemmaIndex;
@@ -18,11 +19,12 @@
     let namesakes = $state<(CreateNewPerson | PersonDescription)[]>([]);
     let selectedPerson = $state<CreateNewPerson | PersonDescription>(null);
     let filterText = $state("");
+    let unknown = $state(false);
 
     type SelectItem = { label: string; value: string; isCreator?: boolean };
 
     const peopleNames = $derived(
-        stemma ? [...new Set(filterEditablePeople(stemma.people).map((p) => p.name))] : []
+        stemma ? [...new Set(filterEditablePeople(stemma.people).map((p) => p.name).filter((n) => !isUnknownPerson(n)))] : []
     );
 
     const peopleItems = $derived.by(() => {
@@ -38,7 +40,7 @@
     });
 
     const selectedItem = $derived<SelectItem | null>(
-        selectedPerson ? { label: selectedPerson.name, value: selectedPerson.name } : null
+        selectedPerson ? { label: personDisplayName(selectedPerson.name, $t), value: selectedPerson.name } : null
     );
 
     function personSelected(p: CreateNewPerson | PersonDescription) {
@@ -54,6 +56,19 @@
         namesakes = [];
         selectedPerson = null;
         filterText = "";
+        unknown = false;
+    }
+
+    function toggleUnknown() {
+        if (unknown) {
+            const unknownPerson: CreateNewPerson = { type: "CreateNewPerson", name: "" };
+            namesakes = [unknownPerson];
+            personSelected(unknownPerson);
+        } else {
+            namesakes = [];
+            selectedPerson = null;
+            onselected?.(null);
+        }
     }
 
     function handleSelect(e: any) {
@@ -77,11 +92,22 @@
                 on:clear={() => reset()}
                 hideEmptyState={true}
                 value={selectedItem}
+                disabled={unknown}
             >
                 <svelte:fragment slot="clear-icon">
                     <ClearIcon />
                 </svelte:fragment>
             </Select>
+            <div class="form-check form-switch mt-2">
+                <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="createPersonUnknownSwitch"
+                    bind:checked={unknown}
+                    onchange={toggleUnknown}
+                />
+                <label class="form-check-label" for="createPersonUnknownSwitch">{$t("person.unknownToggle")}</label>
+            </div>
         </div>
         <div class="flex-grow-1 mt-2 mb-2" style="min-height:400px">
             <PersonSelector people={namesakes} {stemmaIndex} onselect={personSelected} />

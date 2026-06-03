@@ -4,6 +4,8 @@
     import { onMount } from "svelte";
     import { configureSimulation, initChart, makeDrag, makeNodesAndRelations, mergeData, renderChart } from "../../graphTools";
     import { HighlightAll } from "../../highlight";
+    import { personDisplayName } from "../../personDisplayName";
+    import { t } from "../../i18n";
 
     type Props = {
         chartId: string;
@@ -37,7 +39,8 @@
                 families = [];
             }
 
-            [nodes, relations] = makeNodesAndRelations(relativies, families);
+            const displayRelativies = relativies.map((p) => ({ ...p, name: personDisplayName(p.name, $t) }));
+            [nodes, relations] = makeNodesAndRelations(displayRelativies, families);
         }
     });
 

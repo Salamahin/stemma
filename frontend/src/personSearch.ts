@@ -1,6 +1,7 @@
 import Fuse, { type FuseResult, type IFuseOptions } from "fuse.js";
 import type { PersonDescription } from "./model";
 import { hasCyrillic, toLatinVariants } from "./transliteration";
+import { isUnknownPerson } from "./personDisplayName";
 
 const MIN_QUERY_LENGTH = 2;
 const DEFAULT_LIMIT = 8;
@@ -48,7 +49,8 @@ export function searchPeople(
     limit: number = DEFAULT_LIMIT,
 ): PersonSearchResult[] {
     if (query.length < MIN_QUERY_LENGTH) return [];
-    const fuse = new Fuse(people as PersonDescription[], FUSE_OPTIONS);
+    const searchable = people.filter((p) => !isUnknownPerson(p.name));
+    const fuse = new Fuse(searchable as PersonDescription[], FUSE_OPTIONS);
     const scored = new Map<string, FuseResult<PersonDescription>>();
     for (const variant of searchVariants(query)) {
         for (const result of fuse.search(variant, { limit })) {
