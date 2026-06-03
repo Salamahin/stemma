@@ -190,6 +190,9 @@
     .popover-panel {
         position: fixed;
         width: 320px;
+        max-height: calc(100vh - 32px);
+        display: flex;
+        flex-direction: column;
         background: var(--v2-bg-surface);
         border-radius: var(--v2-radius-modal);
         box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
@@ -203,6 +206,8 @@
     }
 
     .popover-body {
+        flex: 1;
+        overflow-y: auto;
         padding: 16px 18px 8px;
     }
 
