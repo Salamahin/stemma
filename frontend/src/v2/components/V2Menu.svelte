@@ -31,18 +31,18 @@
         aria-label="Menu"
         aria-expanded={open}
     >
-        <img src="assets/logo_bw_avg.webp" alt="Stemma" width="32" height="32" />
+        <img src="/assets/logo_color.webp" alt="Stemma" width="32" height="32" />
     </button>
 
     {#if open}
         <div class="menu-dropdown">
-            <button type="button" class="menu-item" onclick={() => closeAndCall(onabout)}>
+            <button type="button" class="menu-item" onclick={() => closeAndCall(onabout)} data-testid="v2-menu-about">
                 <i class="bi bi-info-circle me-2"></i>{$t("v2.about")}
             </button>
-            <button type="button" class="menu-item" onclick={() => closeAndCall(onsettings)}>
+            <button type="button" class="menu-item" onclick={() => closeAndCall(onsettings)} data-testid="v2-menu-settings">
                 <i class="bi bi-gear me-2"></i>{$t("v2.settings")}
             </button>
-            <button type="button" class="menu-item" onclick={() => closeAndCall(onexport)}>
+            <button type="button" class="menu-item" onclick={() => closeAndCall(onexport)} data-testid="v2-menu-export">
                 <i class="bi bi-download me-2"></i>{$t("v2.exportSvg")}
             </button>
             {#if showSignOut}

@@ -11,9 +11,6 @@
     import { initializeGoogleAuth, refreshCredential } from "../googleAuth";
     import Authenticate from "../components/Authenticate.svelte";
     import FullStemma from "../components/FullStemma.svelte";
-    import About from "../components/about/About.svelte";
-    import SettingsModal from "../components/settings_modal/SettingsModal.svelte";
-    import PersonDetailsModal from "../components/person_details_modal/PersonDetailsModal.svelte";
     import V2Chip from "./components/V2Chip.svelte";
     import V2Menu from "./components/V2Menu.svelte";
     import V2Fab from "./components/V2Fab.svelte";
@@ -23,6 +20,16 @@
     import V2PersonCard from "./components/V2PersonCard.svelte";
     import V2FamilyCard from "./components/V2FamilyCard.svelte";
     import V2NameModal from "./components/V2NameModal.svelte";
+    import V2AboutModal from "./components/V2AboutModal.svelte";
+    import V2SettingsModal from "./components/V2SettingsModal.svelte";
+    import V2ShareModal from "./components/V2ShareModal.svelte";
+    import V2InviteLinkModal from "./components/V2InviteLinkModal.svelte";
+    import V2PromptModal from "./components/V2PromptModal.svelte";
+    import V2ConfirmModal from "./components/V2ConfirmModal.svelte";
+    import V2PersonDetailsModal from "./components/V2PersonDetailsModal.svelte";
+    import StatsCard from "../components/stats_card/StatsCard.svelte";
+    import { buildInviteLink } from "../inviteLinkBuilder";
+    import { personDisplayName } from "../personDisplayName";
     import { Circle2 } from "svelte-loading-spinners";
 
     type StubEntry = { anchorPersonId: string; anchorRole: "parent" | "child" };
@@ -64,6 +71,7 @@
     let pinnedPeople = $state<PinnedPeopleStorage | null>(null);
     let isWorking = $state<boolean>(false);
     let error = $state<Error | null>(null);
+    let highlightVersion = $state(0);
 
     let selectedPerson = $state<PersonDescription | null>(null);
     let selectedPersonEl = $state<Element | null>(null);
@@ -75,10 +83,18 @@
     let familySheetOpen = $state(false);
 
     let v2NameModal = $state<ReturnType<typeof V2NameModal> | null>(null);
-    let personEditModal = $state<ReturnType<typeof PersonDetailsModal> | null>(null);
-    let aboutModal = $state<ReturnType<typeof About> | null>(null);
-    let settingsModal = $state<ReturnType<typeof SettingsModal> | null>(null);
+    let personEditModal = $state<ReturnType<typeof V2PersonDetailsModal> | null>(null);
+    let aboutModal = $state<ReturnType<typeof V2AboutModal> | null>(null);
+    let settingsModal = $state<ReturnType<typeof V2SettingsModal> | null>(null);
+    let shareModal = $state<ReturnType<typeof V2ShareModal> | null>(null);
+    let inviteLinkModal = $state<ReturnType<typeof V2InviteLinkModal> | null>(null);
+    let promptModal = $state<ReturnType<typeof V2PromptModal> | null>(null);
+    let confirmModal = $state<ReturnType<typeof V2ConfirmModal> | null>(null);
     let stemmaChart = $state<ReturnType<typeof FullStemma> | null>(null);
+
+    type PromptKind = "addStemma" | "renameStemma" | "cloneStemma";
+    let pendingPromptKind = $state<PromptKind | null>(null);
+    let pendingStemma = $state<StemmaDescription | null>(null);
 
     const controller = new AppController(untrack(() => stemma_backend_url));
 
@@ -93,6 +109,12 @@
     controller.pinnedStorage.subscribe((pp) => (pinnedPeople = pp));
     controller.isWorking.subscribe((iw) => (isWorking = iw));
     controller.err.subscribe((e) => (error = e));
+    controller.invitationToken.subscribe((tkn) => {
+        if (!tkn) return;
+        shareModal?.close();
+        const link = buildInviteLink(window.location.origin, tkn);
+        inviteLinkModal?.show(link);
+    });
 
     const augmentedStemma = $derived.by<Stemma | null>(() => {
         if (!stemma) return null;
@@ -301,6 +323,100 @@
         stemmaChart?.exportSvg(filename);
     }
 
+    function handlePromptCommit(value: string) {
+        const kind = pendingPromptKind;
+        const target = pendingStemma;
+        pendingPromptKind = null;
+        pendingStemma = null;
+        if (kind === "addStemma") {
+            controller.addStemma(value);
+        } else if (kind === "renameStemma" && target) {
+            controller.renameStemma(target.id, value);
+        } else if (kind === "cloneStemma" && target) {
+            controller.cloneStemma(value, target.id);
+        }
+    }
+
+    function openAddStemma() {
+        pendingPromptKind = "addStemma";
+        pendingStemma = null;
+        promptModal?.prompt({
+            title: $t("stemma.addTitle"),
+            label: $t("stemma.nameLabel"),
+            confirmLabel: $t("common.add"),
+            placeholder: $t("stemma.defaultName"),
+            testid: "v2-add-stemma-modal",
+        });
+    }
+
+    function openRenameStemma(s: StemmaDescription) {
+        pendingPromptKind = "renameStemma";
+        pendingStemma = s;
+        promptModal?.prompt({
+            title: $t("stemma.renameTitle"),
+            label: $t("stemma.nameLabel"),
+            confirmLabel: $t("stemma.rename"),
+            initial: s.name,
+            testid: "v2-rename-stemma-modal",
+        });
+    }
+
+    function openCloneStemma(s: StemmaDescription) {
+        pendingPromptKind = "cloneStemma";
+        pendingStemma = s;
+        promptModal?.prompt({
+            title: $t("stemma.cloneTitle"),
+            label: $t("stemma.nameLabel"),
+            confirmLabel: $t("stemma.clone"),
+            initial: s.name,
+            testid: "v2-clone-stemma-modal",
+        });
+    }
+
+    function openRemoveStemma(s: StemmaDescription) {
+        confirmModal?.ask({
+            title: $t("removeStemma.title", { name: s.name }),
+            confirmLabel: $t("common.delete"),
+            danger: true,
+            testid: "v2-remove-stemma-modal",
+            onaccept: () => controller.removeStemma(s.id),
+        });
+    }
+
+    function handleFamilyRemoveRequested(familyId: string) {
+        confirmModal?.ask({
+            title: $t("v2.removeFamilyTitle"),
+            message: $t("v2.removeFamilyMessage"),
+            confirmLabel: $t("common.delete"),
+            danger: true,
+            testid: "v2-remove-family-modal",
+            onaccept: () => controller.removeFamily(familyId),
+        });
+    }
+
+    function handlePersonRemoveRequested(payload: { id: string; name: string }) {
+        confirmModal?.ask({
+            title: $t("v2.removePersonTitle", { name: payload.name }),
+            message: $t("v2.removePersonMessage"),
+            confirmLabel: $t("common.delete"),
+            danger: true,
+            testid: "v2-remove-person-modal",
+            onaccept: () => {
+                controller.removePerson(payload.id);
+                personEditModal?.dismiss();
+            },
+        });
+    }
+
+    function handleShareRequested(personId: string) {
+        if (!stemmaIndex) return;
+        const p = stemmaIndex.person(personId);
+        shareModal?.show({
+            personId,
+            personName: personDisplayName(p.name, $t),
+        });
+    }
+
     onMount(() => {
         if (e2eAutoLoginEnabled) {
             e2eMode = true;
@@ -336,6 +452,7 @@
                     viewMode={ViewMode.ALL}
                     onpersonSelected={handlePersonSelected}
                     onfamilySelected={handleFamilySelected}
+                    onhighlightChanged={() => highlightVersion++}
                 />
             {/if}
 
@@ -351,6 +468,10 @@
                     {currentStemmaId}
                     disabled={isWorking}
                     onstemmaSelect={(id) => controller.selectStemma(id)}
+                    onstemmaAddNew={openAddStemma}
+                    onstemmaRename={openRenameStemma}
+                    onstemmaClone={openCloneStemma}
+                    onstemmaRemove={openRemoveStemma}
                 />
             </div>
 
@@ -378,6 +499,12 @@
                     onaddPerson={() => v2NameModal?.prompt()}
                 />
             </div>
+
+            {#if !isWorking && stemma && stemmaIndex && highlight}
+                <div class="v2-bottom-left">
+                    <StatsCard {stemma} {stemmaIndex} {highlight} {highlightVersion} />
+                </div>
+            {/if}
         </div>
 
         {#if isWorking}
@@ -415,6 +542,7 @@
                     {editMode}
                     onfamilyStubRequested={handleFamilyStubRequested}
                     onpersonEditRequested={handlePersonEditRequested}
+                    onshareRequested={handleShareRequested}
                     onclose={closePersonSheet}
                 />
             {/if}
@@ -437,6 +565,7 @@
                 oncreateFamilyFromStub={handleCreateFamilyFromStub}
                 oncreateChildInFamily={handleCreateChildInFamily}
                 oncreateSpouseInFamily={handleCreateSpouseInFamily}
+                onfamilyRemoveRequested={handleFamilyRemoveRequested}
                 onclose={closeFamilySheet}
             />
         {/snippet}
@@ -447,14 +576,21 @@
         onconfirm={(name) => controller.createOrphanPerson({ type: "CreateNewPerson", name })}
     />
 
-    <PersonDetailsModal
+    <V2PersonDetailsModal
         bind:this={personEditModal}
         onpersonUpdated={(p) => controller.savePerson(p.id, p.description, p.pin, p.photoUpload, p.photoRemove)}
-        onpersonRemoved={(id) => controller.removePerson(id)}
+        onpersonRemoveRequested={handlePersonRemoveRequested}
     />
 
-    <About bind:this={aboutModal} />
-    <SettingsModal bind:this={settingsModal} />
+    <V2AboutModal bind:this={aboutModal} />
+    <V2SettingsModal bind:this={settingsModal} />
+    <V2ShareModal
+        bind:this={shareModal}
+        oninvite={(p) => controller.createInvitationToken(p.personId, p.email)}
+    />
+    <V2InviteLinkModal bind:this={inviteLinkModal} />
+    <V2PromptModal bind:this={promptModal} oncommit={handlePromptCommit} />
+    <V2ConfirmModal bind:this={confirmModal} />
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
@@ -475,6 +611,11 @@
     .v2-canvas-layer {
         position: absolute;
         inset: 0;
+    }
+
+    :global(.v2-canvas-layer #chart) {
+        min-height: 100vh;
+        padding: 0 !important;
     }
 
     .v2-chrome {
@@ -514,6 +655,20 @@
         right: 20px;
         pointer-events: auto;
         z-index: 100;
+    }
+
+    .v2-bottom-left {
+        position: absolute;
+        bottom: 16px;
+        left: 16px;
+        pointer-events: auto;
+        z-index: 100;
+    }
+
+    :global(.v2-bottom-left .stats-card) {
+        position: static;
+        bottom: auto;
+        right: auto;
     }
 
     .v2-loading {

@@ -32,6 +32,7 @@
         oncreateFamilyFromStub?: (payload: FamilyFromStubPayload) => void;
         oncreateChildInFamily?: (payload: ChildInFamilyPayload) => void;
         oncreateSpouseInFamily?: (payload: SpouseInFamilyPayload) => void;
+        onfamilyRemoveRequested?: (familyId: string) => void;
         onclose?: () => void;
     };
 
@@ -44,6 +45,7 @@
         oncreateFamilyFromStub,
         oncreateChildInFamily,
         oncreateSpouseInFamily,
+        onfamilyRemoveRequested,
         onclose,
     }: Props = $props();
 
@@ -75,6 +77,26 @@
     });
 
     const canAddSpouse = $derived(effectiveParents.length < 2);
+    const canRemoveFamily = $derived(!isStub && family != null && !family.readOnly);
+
+    const familyTitle = $derived.by<string>(() => {
+        if (isStub) return $t("v2.stubFamily");
+        if (!family || !stemmaIndex) return $t("family.compositionTitle");
+        const parentNames = family.parents
+            .map((id) => {
+                try { return personDisplayName(stemmaIndex.person(id).name, $t); } catch { return ""; }
+            })
+            .filter((n) => n.length > 0);
+        if (parentNames.length === 0) return $t("family.compositionTitle");
+        return parentNames.join(" & ");
+    });
+
+    function requestRemove() {
+        if (!familyId) return;
+        const id = familyId;
+        onclose?.();
+        onfamilyRemoveRequested?.(id);
+    }
 
     function personName(id: string): string {
         if (!stemmaIndex) return id;
@@ -132,9 +154,7 @@
 <div>
     {#if cardMode === "info"}
         <div class="family-title">
-            <span class="title-text">
-                {isStub ? $t("v2.stubFamily") : $t("v2.familyActions")}
-            </span>
+            <span class="title-text">{familyTitle}</span>
         </div>
 
         {#if effectiveParents.length > 0}
@@ -157,8 +177,8 @@
             <p class="no-info">{$t("family.noInfo")}</p>
         {/if}
 
-        <div class="card-actions">
-            {#if editMode}
+        {#if isStub && editMode}
+            <div class="card-actions">
                 <button
                     type="button"
                     class="btn btn-outline-primary btn-sm"
@@ -169,21 +189,32 @@
                 </button>
                 <button
                     type="button"
-                    class="btn btn-outline-secondary btn-sm"
+                    class="btn btn-outline-primary btn-sm"
                     disabled={!canAddSpouse}
                     onclick={startAddSpouse}
                 >
                     {$t("v2.addSpouse")}
                 </button>
-            {/if}
-            <button
-                type="button"
-                class="btn btn-secondary btn-sm ms-auto"
-                onclick={() => onclose?.()}
-            >
-                {$t("common.close")}
-            </button>
-        </div>
+            </div>
+        {:else if editMode && canRemoveFamily}
+            <div class="card-actions justify-end">
+                <button
+                    type="button"
+                    class="btn btn-sm btn-secondary"
+                    onclick={() => onclose?.()}
+                >
+                    {$t("common.cancel")}
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-sm btn-danger"
+                    onclick={requestRemove}
+                    data-testid="v2-remove-family-action"
+                >
+                    {$t("common.delete")}
+                </button>
+            </div>
+        {/if}
     {:else}
         <div class="family-title">
             <span class="title-text">
@@ -219,7 +250,8 @@
 
 <style>
     .family-title {
-        margin-bottom: 10px;
+        margin-bottom: 14px;
+        line-height: 1.35;
     }
 
     .title-text {
@@ -228,33 +260,45 @@
     }
 
     .section-label {
-        font-size: 0.78rem;
+        font-size: 0.72rem;
         color: #6c757d;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
-        margin: 8px 0 2px;
+        letter-spacing: 0.08em;
+        margin: 12px 0 6px;
+        font-weight: 600;
     }
 
     .member-list {
         list-style: none;
         padding: 0;
-        margin: 0 0 6px;
-        font-size: 0.9rem;
+        margin: 0 0 4px;
+        font-size: 0.92rem;
+        line-height: 1.5;
+    }
+
+    .member-list li + li {
+        margin-top: 4px;
     }
 
     .no-info {
         color: #6c757d;
         font-style: italic;
         font-size: 0.9rem;
-        margin: 4px 0;
+        margin: 8px 0;
     }
 
     .card-actions {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: 8px;
         align-items: center;
-        padding-top: 10px;
+        padding-top: 16px;
+        margin-top: 4px;
+        border-top: 1px solid #f1f3f5;
+    }
+
+    .card-actions.justify-end {
+        justify-content: flex-end;
     }
 
     .person-picker-wrap {

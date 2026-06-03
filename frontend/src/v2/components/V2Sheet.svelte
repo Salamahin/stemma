@@ -82,6 +82,7 @@
             {/if}
         </div>
     {:else if anchorEl}
+        <div class="popover-backdrop" onclick={handleBackdropClick} aria-hidden="true"></div>
         <div
             class="popover-panel"
             style="top: {popoverPos.top}px; left: {popoverPos.left}px;"
@@ -117,8 +118,22 @@
     .sheet-backdrop {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.4);
+        background: rgba(0, 0, 0, 0.55);
         z-index: 1040;
+        animation: fade-in 0.12s ease-out;
+    }
+
+    .popover-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.35);
+        z-index: 1040;
+        animation: fade-in 0.12s ease-out;
+    }
+
+    @keyframes fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
     }
 
     .bottom-sheet {

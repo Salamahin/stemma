@@ -9,10 +9,11 @@
         editMode: boolean;
         onfamilyStubRequested?: (anchorPersonId: string, anchorRole: "parent" | "child") => void;
         onpersonEditRequested?: (personId: string) => void;
+        onshareRequested?: (personId: string) => void;
         onclose?: () => void;
     };
 
-    let { person, editMode, onfamilyStubRequested, onpersonEditRequested, onclose }: Props = $props();
+    let { person, editMode, onfamilyStubRequested, onpersonEditRequested, onshareRequested, onclose }: Props = $props();
 
     const bioHtml = $derived(renderBioMarkdown(person.bio));
     const displayName = $derived(personDisplayName(person.name, $t));
@@ -33,6 +34,12 @@
         const id = person.id;
         onclose?.();
         onpersonEditRequested?.(id);
+    }
+
+    function requestShare() {
+        const id = person.id;
+        onclose?.();
+        onshareRequested?.(id);
     }
 </script>
 
@@ -63,26 +70,35 @@
             </button>
             <button
                 type="button"
-                class="btn btn-outline-secondary btn-sm action-btn"
+                class="btn btn-outline-primary btn-sm action-btn"
                 onclick={requestAncestorFamily}
             >
                 {$t("v2.addAncestor")}
             </button>
             <button
                 type="button"
-                class="btn btn-outline-secondary btn-sm action-btn ms-auto"
+                class="btn btn-outline-primary btn-sm action-btn ms-auto"
                 onclick={requestEdit}
                 aria-label={$t("person.bioEdit")}
             >
                 <i class="bi bi-pencil"></i>
             </button>
-        {:else}
             <button
                 type="button"
-                class="btn btn-secondary btn-sm ms-auto"
-                onclick={() => onclose?.()}
+                class="btn btn-primary btn-sm action-btn"
+                onclick={requestShare}
+                data-testid="v2-share-action"
             >
-                {$t("common.close")}
+                <i class="bi bi-share me-1"></i>{$t("v2.share")}
+            </button>
+        {:else if !person.readOnly}
+            <button
+                type="button"
+                class="btn btn-primary btn-sm action-btn ms-auto"
+                onclick={requestShare}
+                data-testid="v2-share-action"
+            >
+                <i class="bi bi-share me-1"></i>{$t("v2.share")}
             </button>
         {/if}
     </div>
