@@ -11,6 +11,8 @@
     let confirmLabel = $state("");
     let placeholder = $state("");
     let testid = $state<string | undefined>(undefined);
+    let inputTestid = $state<string>("v2-prompt-input");
+    let confirmTestid = $state<string>("v2-prompt-confirm");
     let pendingAccept: ((value: string) => void) | null = null;
 
     export function prompt(opts: {
@@ -20,6 +22,8 @@
         initial?: string;
         placeholder?: string;
         testid?: string;
+        inputTestid?: string;
+        confirmTestid?: string;
         onaccept: (value: string) => void;
     }) {
         title = opts.title;
@@ -27,6 +31,8 @@
         confirmLabel = opts.confirmLabel;
         placeholder = opts.placeholder ?? "";
         testid = opts.testid;
+        inputTestid = opts.inputTestid ?? "v2-prompt-input";
+        confirmTestid = opts.confirmTestid ?? "v2-prompt-confirm";
         value = opts.initial ?? "";
         pendingAccept = opts.onaccept;
         open = true;
@@ -68,7 +74,7 @@
             bind:value
             onkeydown={handleKeydown}
             placeholder={placeholder}
-            data-testid="v2-prompt-input"
+            data-testid={inputTestid}
         />
     {/snippet}
 
@@ -79,7 +85,7 @@
             class="btn btn-primary"
             onclick={commit}
             disabled={!value.trim()}
-            data-testid="v2-prompt-confirm"
+            data-testid={confirmTestid}
         >
             {confirmLabel}
         </button>

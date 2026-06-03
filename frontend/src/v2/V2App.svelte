@@ -357,6 +357,8 @@
             label: $t("v2.namePlaceholder"),
             confirmLabel: $t("common.add"),
             testid: "v2-name-modal",
+            inputTestid: "v2-name-input",
+            confirmTestid: "v2-name-confirm",
             onaccept: (name) => controller.createOrphanPerson({ type: "CreateNewPerson", name }),
         });
     }

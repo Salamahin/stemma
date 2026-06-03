@@ -53,12 +53,13 @@ test("v2 screenshots: bootstrap empty stemma → orphan → stub → real family
 
   // Switch to the empty "My family tree" stemma via chip dropdown if present
   const stemmaChipBtn = page.locator(".stemma-btn");
-  if (await stemmaChipBtn.isVisible()) {
+  if (await stemmaChipBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
     await stemmaChipBtn.click();
-    const emptyOption = page.locator(".stemma-option", { hasText: /My family tree|Моя родословная/ });
-    if (await emptyOption.first().isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await emptyOption.first().click();
-      await page.waitForTimeout(800);
+    await page.waitForTimeout(300);
+    const emptyOption = page.getByRole("button", { name: /My family tree|Моя родословная/ }).first();
+    if (await emptyOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await emptyOption.click();
+      await page.waitForTimeout(1_500);
     }
   }
 
