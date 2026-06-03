@@ -8,6 +8,6 @@ s3_prefix = "stemma-app"
 region = "eu-central-1"
 confirm_changeset = false
 capabilities = ["CAPABILITY_NAMED_IAM", "CAPABILITY_AUTO_EXPAND"]
-parameter_overrides = "AppName=\"stemma-app\" Stage=\"dev_local\""
+parameter_overrides = "AppName=\"stemma-app\" Stage=\"dev_local\" cloudFrontAlias=\"stemma.link\""
 image_repositories = []
 disable_rollback = false
