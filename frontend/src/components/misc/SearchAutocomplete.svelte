@@ -1,7 +1,7 @@
 <script lang="ts">
-    import fuzzysort from "fuzzysort";
     import type { PersonDescription } from "../../model";
     import { t } from "../../i18n";
+    import { highlightMatches, searchPeople } from "../../personSearch";
 
     type Props = {
         people?: PersonDescription[];
@@ -16,9 +16,7 @@
     let showDropdown = $state(false);
     let blurTimeout: ReturnType<typeof setTimeout>;
 
-    const results = $derived(
-        query.length >= 2 ? fuzzysort.go(query, people, { key: "name", limit: 8 }) : []
-    );
+    const results = $derived(searchPeople(query, people));
 
     $effect(() => {
         showDropdown = results.length > 0 && query.length >= 2;
@@ -48,7 +46,7 @@
         } else if (e.key === "Enter") {
             e.preventDefault();
             if (activeIndex >= 0 && activeIndex < results.length) {
-                selectPerson(results[activeIndex].obj.id);
+                selectPerson(results[activeIndex].item.id);
             }
         } else if (e.key === "Escape") {
             showDropdown = false;
@@ -87,11 +85,11 @@
                     <button
                         class="dropdown-item {i === activeIndex ? 'active' : ''}"
                         type="button"
-                        onmousedown={(e) => { e.preventDefault(); selectPerson(result.obj.id); }}
+                        onmousedown={(e) => { e.preventDefault(); selectPerson(result.item.id); }}
                     >
-                        <span>{@html result.highlight('<b>', '</b>')}</span>
-                        {#if lifespan(result.obj)}
-                            <small class="text-muted ms-2">{lifespan(result.obj)}</small>
+                        <span>{@html highlightMatches(result.item.name, result.matchedIndices)}</span>
+                        {#if lifespan(result.item)}
+                            <small class="text-muted ms-2">{lifespan(result.item)}</small>
                         {/if}
                     </button>
                 </li>
