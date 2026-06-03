@@ -326,6 +326,20 @@ class StorageService:
 
         return removed_photos
 
+    def create_orphan_person(
+        self, user_id: str, stemma_id: str, description: CreateNewPerson
+    ) -> Stemma:
+        snapshot = self._load_snapshot(stemma_id)
+        self._require_stemma_access(snapshot, user_id)
+        new_pid = uuid.uuid4().hex
+        row = _make_person_row(new_pid, description)
+        with self._table.batch_writer() as batch:
+            batch.put_item(Item=_person_item(stemma_id, row))
+            batch.put_item(
+                Item={"pk": stemma_pk(stemma_id), "sk": person_owner_sk(new_pid, user_id)}
+            )
+        return self.stemma(user_id, stemma_id)
+
     def update_person(
         self, user_id: str, stemma_id: str, person_id: str, description: CreateNewPerson
     ) -> None:

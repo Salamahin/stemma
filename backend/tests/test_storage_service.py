@@ -53,6 +53,33 @@ def test_can_create_different_family_with_both_parents_and_several_children(stor
     )
 
 
+def test_create_orphan_person_adds_lone_person(storage: StorageService) -> None:
+    user = storage.get_or_create_user("user@test.com")
+    sid = storage.create_stemma(user.user_id, "test stemma")
+    stemma = storage.create_orphan_person(user.user_id, sid, create_john)
+    assert len(stemma.people) == 1
+    assert stemma.people[0].name == "John"
+    assert stemma.families == []
+
+
+def test_create_orphan_person_requires_stemma_access(storage: StorageService) -> None:
+    owner = storage.get_or_create_user("owner@test.com")
+    stranger = storage.get_or_create_user("stranger@test.com")
+    sid = storage.create_stemma(owner.user_id, "test stemma")
+    with pytest.raises(AccessToStemmaDenied):
+        storage.create_orphan_person(stranger.user_id, sid, create_john)
+
+
+def test_create_orphan_then_use_as_parent_in_family(storage: StorageService) -> None:
+    user = storage.get_or_create_user("user@test.com")
+    sid = storage.create_stemma(user.user_id, "test stemma")
+    stemma = storage.create_orphan_person(user.user_id, sid, create_john)
+    john_id = stemma.people[0].id
+    storage.create_family(user.user_id, sid, family(existing(john_id))(create_jill))
+    final = storage.stemma(user.user_id, sid)
+    assert sorted(render_families(final)) == ["(John) parentsOf (Jill)"]
+
+
 def test_cant_create_family_with_single_parent(storage: StorageService) -> None:
     user = storage.get_or_create_user("user@test.com")
     sid = storage.create_stemma(user.user_id, "test stemma")

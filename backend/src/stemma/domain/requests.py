@@ -124,6 +124,13 @@ class UpdatePersonRequest:
 
 
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
+class CreateOrphanPersonRequest:
+    stemma_id: str
+    person_descr: CreateNewPerson
+    type: Literal["CreateOrphanPersonRequest"] = "CreateOrphanPersonRequest"
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class RequestPhotoUploadUrlRequest:
     stemma_id: str
     person_id: str
@@ -153,6 +160,7 @@ Request = Annotated[
     | RenameStemmaRequest
     | DeletePersonRequest
     | UpdatePersonRequest
+    | CreateOrphanPersonRequest
     | RequestPhotoUploadUrlRequest
     | SetPersonPhotoRequest,
     Discriminator("type"),

@@ -5,6 +5,7 @@ from stemma.domain.errors import AccessToFamilyDenied, IncompleteFamily, Invalid
 from stemma.domain.requests import (
     CreateFamilyRequest,
     CreateNewPerson,
+    CreateOrphanPersonRequest,
     ExistingPerson,
     RequestPhotoUploadUrlRequest,
     SetPersonPhotoRequest,
@@ -36,6 +37,18 @@ def test_decode_create_family_request_with_mixed_person_definitions() -> None:
     assert request.family_descr.parent1 == ExistingPerson(id="1")
     assert request.family_descr.parent2 == CreateNewPerson(name="Jane", birth_date=date(1900, 1, 1))
     assert request.family_descr.children == [CreateNewPerson(name="Josh")]
+
+
+def test_decode_create_orphan_person_request() -> None:
+    payload = {
+        "type": "CreateOrphanPersonRequest",
+        "stemmaId": "s1",
+        "personDescr": {"type": "CreateNewPerson", "name": "Solo", "birthDate": "1980-05-01"},
+    }
+    request = decode_request(payload)
+    assert isinstance(request, CreateOrphanPersonRequest)
+    assert request.stemma_id == "s1"
+    assert request.person_descr == CreateNewPerson(name="Solo", birth_date=date(1980, 5, 1))
 
 
 def test_decode_update_person_request_omits_missing_optional_fields() -> None:
