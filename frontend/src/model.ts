@@ -41,6 +41,7 @@ export type ListDescribeStemmasRequest = { type: "ListDescribeStemmasRequest", d
 export type RenameStemmaRequest = { type: "RenameStemmaRequest", stemmaId: string, newName: string }
 export type RequestPhotoUploadUrlRequest = { type: "RequestPhotoUploadUrlRequest", stemmaId: string, personId: string, contentType: string }
 export type SetPersonPhotoRequest = { type: "SetPersonPhotoRequest", stemmaId: string, personId: string, photoKey: string | null }
+export type CreateOrphanPersonRequest = { type: "CreateOrphanPersonRequest", stemmaId: string, personDescr: CreateNewPerson }
 
 type Request =
     | CreateFamilyRequest
@@ -58,6 +59,7 @@ type Request =
     | RenameStemmaRequest
     | RequestPhotoUploadUrlRequest
     | SetPersonPhotoRequest
+    | CreateOrphanPersonRequest
 
 
 //responses
@@ -218,6 +220,13 @@ export class Model {
     async requestPhotoUploadUrl(stemmaId: string, personId: string, contentType: string): Promise<PhotoUploadUrl> {
         return this.send<PhotoUploadUrl>(
             { type: "RequestPhotoUploadUrlRequest", stemmaId, personId, contentType },
+            null,
+        )
+    }
+
+    async createOrphanPerson(stemmaId: string, descr: CreateNewPerson): Promise<Stemma> {
+        return this.send<Stemma>(
+            { type: "CreateOrphanPersonRequest", stemmaId, personDescr: sanitizeRequestPayload(descr) as CreateNewPerson },
             null,
         )
     }

@@ -180,6 +180,10 @@ export class AppController {
             .finally(() => this.isWorking.set(false))
     }
 
+    createOrphanPerson(descr: CreateNewPerson) {
+        this.manipulateStemma((model, stemmaId) => model.createOrphanPerson(stemmaId, descr))
+    }
+
     createFamily(parents: PersonDefinition[], children: PersonDefinition[]) {
         this.manipulateStemma((model, stemmaId) => model.createFamily(stemmaId, parents, children, get(this.stemmaIndex)))
     }
