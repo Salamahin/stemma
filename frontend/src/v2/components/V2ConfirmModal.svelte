@@ -70,7 +70,7 @@
 <style>
     .confirm-msg {
         margin: 0;
-        color: #495057;
-        font-size: 0.92rem;
+        color: var(--v2-text-secondary);
+        font-size: var(--v2-fs-body);
     }
 </style>

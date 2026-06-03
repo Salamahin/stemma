@@ -90,8 +90,8 @@
     .prompt-label {
         display: block;
         margin: 4px 0 6px;
-        font-size: 0.85rem;
-        font-weight: 500;
-        color: #495057;
+        font-size: var(--v2-fs-label);
+        font-weight: var(--v2-fw-label);
+        color: var(--v2-text-secondary);
     }
 </style>

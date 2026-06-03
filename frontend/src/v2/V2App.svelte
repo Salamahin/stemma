@@ -600,6 +600,22 @@
 {/if}
 
 <style>
+    :global(:root) {
+        --v2-text-primary: #212529;
+        --v2-text-secondary: #495057;
+        --v2-text-muted: #6c757d;
+        --v2-bg-surface: #fff;
+        --v2-border-subtle: #f0f0f0;
+        --v2-radius-modal: 16px;
+        --v2-fs-title: 1rem;
+        --v2-fs-body: 0.9rem;
+        --v2-fs-label: 0.85rem;
+        --v2-fs-hint: 0.8rem;
+        --v2-fw-title: 700;
+        --v2-fw-section: 600;
+        --v2-fw-label: 500;
+    }
+
     .v2-layout {
         position: relative;
         width: 100vw;

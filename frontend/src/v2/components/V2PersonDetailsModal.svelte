@@ -642,9 +642,9 @@
     .field-label {
         display: block;
         margin: 4px 0 6px;
-        font-size: 0.85rem;
-        color: #495057;
-        font-weight: 500;
+        font-size: var(--v2-fs-label);
+        color: var(--v2-text-secondary);
+        font-weight: var(--v2-fw-label);
     }
 
     .dates-row {
@@ -680,8 +680,8 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #6c757d;
-        font-size: 0.875rem;
+        color: var(--v2-text-muted);
+        font-size: var(--v2-fs-label);
     }
 
     .photo-upload-btn {
@@ -709,7 +709,7 @@
         padding: 0.5rem;
         background-color: rgba(0, 0, 0, 0.55);
         color: #fff;
-        font-size: 0.85rem;
+        font-size: var(--v2-fs-label);
         text-align: center;
         opacity: 0;
         transition: opacity 0.15s ease;
@@ -740,22 +740,22 @@
         padding: 4px 10px;
         background: none;
         border: none;
-        font-size: 0.8rem;
-        color: #6c757d;
+        font-size: var(--v2-fs-hint);
+        color: var(--v2-text-muted);
         border-radius: 6px;
         cursor: pointer;
-        font-weight: 500;
+        font-weight: var(--v2-fw-label);
     }
 
     .bio-tab.active {
-        background: #fff;
-        color: #212529;
+        background: var(--v2-bg-surface);
+        color: var(--v2-text-primary);
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
 
     .bio-textarea {
         font-family: ui-monospace, SFMono-Regular, monospace;
-        font-size: 0.9rem;
+        font-size: var(--v2-fs-body);
     }
 
     .bio-preview {
@@ -793,7 +793,7 @@
         margin: 0 0 0.75rem;
         padding: 0.25rem 0.75rem;
         border-left: 3px solid #e9ecef;
-        color: #6c757d;
+        color: var(--v2-text-muted);
     }
     .bio-preview :global(code) {
         padding: 0.1em 0.3em;
@@ -842,8 +842,8 @@
 
     .hint {
         margin: 0;
-        color: #6c757d;
-        font-size: 0.8rem;
+        color: var(--v2-text-muted);
+        font-size: var(--v2-fs-hint);
         text-align: center;
     }
 </style>

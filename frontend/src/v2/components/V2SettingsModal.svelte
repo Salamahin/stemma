@@ -87,7 +87,7 @@
     }
 
     .label {
-        font-size: 0.92rem;
-        color: #212529;
+        font-size: var(--v2-fs-body);
+        color: var(--v2-text-primary);
     }
 </style>

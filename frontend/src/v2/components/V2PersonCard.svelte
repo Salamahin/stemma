@@ -89,7 +89,7 @@
                 onclick={requestShare}
                 data-testid="v2-share-action"
             >
-                <i class="bi bi-share me-1"></i>{$t("v2.share")}
+                {$t("v2.share")}
             </button>
         {:else if !person.readOnly}
             <button
@@ -98,7 +98,7 @@
                 onclick={requestShare}
                 data-testid="v2-share-action"
             >
-                <i class="bi bi-share me-1"></i>{$t("v2.share")}
+                {$t("v2.share")}
             </button>
         {/if}
     </div>

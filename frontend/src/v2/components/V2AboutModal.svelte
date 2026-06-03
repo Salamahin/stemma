@@ -152,14 +152,14 @@
     }
 
     section h6 {
-        font-weight: 600;
+        font-weight: var(--v2-fw-section);
         margin-bottom: 6px;
     }
 
     section p {
         margin-bottom: 8px;
-        font-size: 0.9rem;
-        color: #495057;
+        font-size: var(--v2-fs-body);
+        color: var(--v2-text-secondary);
     }
 
     .about-diagram {
@@ -172,8 +172,8 @@
 
     ul {
         padding-left: 1.2rem;
-        font-size: 0.9rem;
-        color: #495057;
+        font-size: var(--v2-fs-body);
+        color: var(--v2-text-secondary);
     }
 
     ul li {

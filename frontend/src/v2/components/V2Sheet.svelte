@@ -141,7 +141,7 @@
         bottom: 0;
         left: 0;
         right: 0;
-        background: #fff;
+        background: var(--v2-bg-surface);
         border-radius: 20px 20px 0 0;
         box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
         z-index: 1050;
@@ -173,7 +173,7 @@
 
     .sheet-footer {
         padding: 12px 20px 20px;
-        border-top: 1px solid #f0f0f0;
+        border-top: 1px solid var(--v2-border-subtle);
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
@@ -182,8 +182,8 @@
     .popover-panel {
         position: fixed;
         width: 320px;
-        background: #fff;
-        border-radius: 16px;
+        background: var(--v2-bg-surface);
+        border-radius: var(--v2-radius-modal);
         box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
         z-index: 1050;
         animation: pop-in 0.15s ease-out;
@@ -200,7 +200,7 @@
 
     .popover-footer {
         padding: 8px 18px 16px;
-        border-top: 1px solid #f0f0f0;
+        border-top: 1px solid var(--v2-border-subtle);
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
@@ -213,8 +213,8 @@
         transform: translate(-50%, -50%);
         width: min(480px, calc(100vw - 32px));
         max-height: calc(100vh - 48px);
-        background: #fff;
-        border-radius: 16px;
+        background: var(--v2-bg-surface);
+        border-radius: var(--v2-radius-modal);
         box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
         z-index: 1050;
         display: flex;

@@ -105,8 +105,8 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background: #fff;
-        border-radius: 16px;
+        background: var(--v2-bg-surface);
+        border-radius: var(--v2-radius-modal);
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
         z-index: 1070;
         display: flex;
@@ -135,9 +135,9 @@
 
     .v2-modal-title {
         margin: 0;
-        font-weight: 700;
-        font-size: 1rem;
-        color: #212529;
+        font-weight: var(--v2-fw-title);
+        font-size: var(--v2-fs-title);
+        color: var(--v2-text-primary);
         flex: 1;
         min-width: 0;
         overflow: hidden;
@@ -162,16 +162,16 @@
         border-radius: 50%;
         background: transparent;
         border: none;
-        color: #6c757d;
+        color: var(--v2-text-muted);
         cursor: pointer;
-        font-size: 0.85rem;
+        font-size: var(--v2-fs-label);
         transition: background-color 0.12s ease, color 0.12s ease;
         flex-shrink: 0;
     }
 
     .v2-modal-close:hover {
         background: #f1f3f5;
-        color: #212529;
+        color: var(--v2-text-primary);
     }
 
     :global(.v2-modal-header-actions .header-action-btn.danger:hover) {
@@ -195,6 +195,34 @@
         flex-wrap: wrap;
         justify-content: flex-end;
         gap: 8px;
-        border-top: 1px solid #f0f0f0;
+        border-top: 1px solid var(--v2-border-subtle);
+    }
+
+    @keyframes slide-up {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+    }
+
+    @media (max-width: 767px) {
+        .v2-modal-panel,
+        .v2-modal-panel.size-sm,
+        .v2-modal-panel.size-md,
+        .v2-modal-panel.size-lg {
+            top: auto;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            max-width: 100%;
+            transform: none;
+            max-height: 85vh;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+            animation: slide-up 0.22s ease-out;
+        }
+
+        .v2-modal-body {
+            overflow-y: auto;
+        }
     }
 </style>

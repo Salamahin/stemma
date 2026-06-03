@@ -61,12 +61,12 @@
 <style>
     .hint {
         margin: 0 0 10px;
-        font-size: 0.85rem;
-        color: #495057;
+        font-size: var(--v2-fs-hint);
+        color: var(--v2-text-muted);
     }
 
     .link-input {
         font-family: ui-monospace, SFMono-Regular, monospace;
-        font-size: 0.85rem;
+        font-size: var(--v2-fs-label);
     }
 </style>
