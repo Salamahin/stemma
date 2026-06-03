@@ -8,7 +8,7 @@ import net from "node:net";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const e2eDir = resolve(__dirname, "..");
 const repoRoot = resolve(e2eDir, "..");
-const backendDir = resolve(repoRoot, "backend_py");
+const backendDir = resolve(repoRoot, "backend");
 const frontendDir = resolve(repoRoot, "frontend");
 
 const dynamoContainer = "stemma-e2e-dynamodb";

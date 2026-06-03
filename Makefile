@@ -1,7 +1,7 @@
 build-MyLayer:
 	mkdir -p $(ARTIFACTS_DIR)/python
 	pip install \
-		-r backend_py/requirements.txt \
+		-r backend/requirements.txt \
 		--target $(ARTIFACTS_DIR)/python \
 		--platform manylinux_2_28_aarch64 \
 		--platform manylinux2014_aarch64 \
@@ -11,4 +11,4 @@ build-MyLayer:
 		--upgrade
 
 build-StemmaFunction:
-	cp -r backend_py/src/stemma $(ARTIFACTS_DIR)/
+	cp -r backend/src/stemma $(ARTIFACTS_DIR)/

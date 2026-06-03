@@ -12,7 +12,7 @@ confirmation before writing. Use ``--dry-run`` to preview without writing.
 Read the items you intend to change with ``GetItem`` or ``Query`` first; never
 ``Scan`` for a production fix.
 
-Schema reference: ``backend_py/src/stemma/storage/schema.py``.
+Schema reference: ``backend/src/stemma/storage/schema.py``.
 """
 from __future__ import annotations
 

@@ -4,8 +4,32 @@ on:
     branches: [ "master" ]
 permissions:
   contents: read
+  pull-requests: read
 jobs:
-  build:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      e2e: ${{ steps.filter.outputs.e2e }}
+      workflow: ${{ steps.filter.outputs.workflow }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: |
+          backend:
+            - 'backend/**'
+          frontend:
+            - 'frontend/**'
+          e2e:
+            - 'e2e/**'
+          workflow:
+            - '.github/workflows/ci.yml'
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -17,13 +41,19 @@ jobs:
       uses: astral-sh/setup-uv@v6
       with:
         enable-cache: true
-        cache-dependency-glob: backend_py/uv.lock
+        cache-dependency-glob: backend/uv.lock
     - name: Install backend deps
       run: uv sync --all-groups
-      working-directory: backend_py
+      working-directory: backend
     - name: Run backend tests
       run: uv run pytest
-      working-directory: backend_py
+      working-directory: backend
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.workflow == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
     - name: Set up Node
       uses: actions/setup-node@v4
       with:
@@ -37,6 +67,8 @@ jobs:
       run: npm test
       working-directory: frontend
   e2e:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.e2e == 'true' || needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -48,10 +80,10 @@ jobs:
       uses: astral-sh/setup-uv@v6
       with:
         enable-cache: true
-        cache-dependency-glob: backend_py/uv.lock
+        cache-dependency-glob: backend/uv.lock
     - name: Install backend deps
       run: uv sync
-      working-directory: backend_py
+      working-directory: backend
     - name: Set up Node
       uses: actions/setup-node@v4
       with:
@@ -70,3 +102,20 @@ jobs:
     - name: Run e2e tests
       run: npm test
       working-directory: e2e
+  ci:
+    if: always()
+    needs: [changes, backend, frontend, e2e]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Verify upstream jobs
+      run: |
+        results='${{ toJson(needs) }}'
+        echo "$results"
+        echo "$results" | python3 -c '
+        import json, sys
+        data = json.load(sys.stdin)
+        bad = [n for n, v in data.items() if v["result"] not in ("success", "skipped")]
+        if bad:
+            print(f"Failed/cancelled jobs: {bad}")
+            sys.exit(1)
+        '
