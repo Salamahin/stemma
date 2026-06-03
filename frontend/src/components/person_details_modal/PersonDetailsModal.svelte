@@ -138,7 +138,7 @@
         bio = p.description.bio;
         pinned = p.pin;
         readOnly = p.description.readOnly;
-        bioTab = p.description.readOnly ? "preview" : "edit";
+        bioTab = "preview";
         originalPhotoUrl = p.description.photoUrl ?? null;
         photoUrl = originalPhotoUrl;
         photoErrString = null;
