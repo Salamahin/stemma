@@ -20,7 +20,7 @@ Stemma is a collaborative family tree editor. Multiple users build shared geneal
 
 ## Repository Layout
 
-- `backend_py/` — Python 3.13 backend (FastAPI + boto3 + pydantic, managed with `uv`).
+- `backend/` — Python 3.13 backend (FastAPI + boto3 + pydantic, managed with `uv`).
   - `src/stemma/domain/` — Domain dataclasses, tagged `Request`/`Response`/`StemmaError` unions, and the pydantic codec.
   - `src/stemma/services/` — Pure business logic (`UserService`, `invite_tokens`, `stemma_dfs`, `kinship`).
   - `src/stemma/storage/` — DynamoDB single-table schema (`schema.py`: key encoders) and `StorageService` (boto3 Table-resource-backed).
@@ -29,7 +29,7 @@ Stemma is a collaborative family tree editor. Multiple users build shared geneal
 - `frontend/` — Svelte 5 (runes mode) + TypeScript UI (Rollup bundler).
 - `e2e/` — Playwright end-to-end tests with full local stack orchestration (`scripts/devstack.mjs`).
 - `template.yaml` / `samconfig.toml` — AWS SAM infrastructure (Python 3.13 arm64 Lambda + shared layer + DynamoDB table).
-- `Makefile` — `sam build` hooks that assemble the Lambda artifacts and shared layer from `backend_py/`.
+- `Makefile` — `sam build` hooks that assemble the Lambda artifacts and shared layer from `backend/`.
 - `.github/workflows/ci.yml` — CI: runs `uv run pytest`, frontend tests, and e2e tests.
 - `.github/workflows/cd.yml` — CD: `uv export` → `sam build`/`deploy` → upload frontend → invalidate CloudFront.
 
@@ -47,7 +47,7 @@ Stemma is a collaborative family tree editor. Multiple users build shared geneal
 
 Prerequisites: Python 3.13, [`uv`](https://docs.astral.sh/uv/), Node.js, Docker (or `podman`) for DynamoDB Local (e2e only — unit tests use `moto`).
 
-### Backend (run from `backend_py/`)
+### Backend (run from `backend/`)
 
 ```sh
 uv sync --all-groups                          # Install runtime + dev deps

@@ -37,7 +37,7 @@ intersecting suites. Run them in parallel where they don't share state.
 
 | Changed paths                                              | Run                                                                                       |
 |------------------------------------------------------------|-------------------------------------------------------------------------------------------|
-| `backend_py/**` (any `.py`)                                | `uv run pytest`, `uv run ruff check`, `uv run pyright` (from `backend_py/`)               |
+| `backend/**` (any `.py`)                                | `uv run pytest`, `uv run ruff check`, `uv run pyright` (from `backend/`)               |
 | `frontend/**` (`.ts`, `.js`, `.svelte`, `.json`)           | `npm test`, `npm run check` (from `frontend/`)                                            |
 | `e2e/**`                                                   | Ask the user before running — e2e is slow. If they say yes: `npm test` from `e2e/`.       |
 | `template.yaml`, `samconfig.toml`, `Makefile`              | No test command, but call them out in the PR body so the user double-checks SAM build.    |
@@ -92,7 +92,7 @@ Print the URL `gh` returns at the end.
 ## Gotchas
 
 - **Backend test execution path**: always `uv run pytest` from
-  `backend_py/`, never `python -m pytest` or `pytest` directly — `uv`
+  `backend/`, never `python -m pytest` or `pytest` directly — `uv`
   handles the venv and Python version.
 - **Frontend cwd matters**: `npm test` / `npm run check` must run from
   `frontend/`, not the repo root.

@@ -52,7 +52,7 @@ AWS_PROFILE=stemma aws dynamodb list-tables --region eu-central-1
 
 ## Schema (single table)
 
-Authoritative encoders: `backend_py/src/stemma/storage/schema.py`.
+Authoritative encoders: `backend/src/stemma/storage/schema.py`.
 
 | Item            | `pk`                  | `sk`                              | Extra attrs                                          |
 |-----------------|-----------------------|-----------------------------------|------------------------------------------------------|
@@ -102,7 +102,7 @@ AWS_PROFILE=stemma uvx --with boto3 python \
   --table stemma-app-StemmaTable-XXXXX --region eu-central-1 --dry-run
 ```
 
-Or, if you're already in `backend_py/` with `uv sync` done:
+Or, if you're already in `backend/` with `uv sync` done:
 
 ```sh
 AWS_PROFILE=stemma uv run python \
@@ -135,7 +135,7 @@ profile = table.get_item(
 ```
 
 For larger reads (>1 MB), see the `_query_all` pagination loop in
-`backend_py/src/stemma/storage/storage_service.py`.
+`backend/src/stemma/storage/storage_service.py`.
 
 ## Gotchas
 

@@ -20,10 +20,10 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-          cache-dependency-glob: backend_py/uv.lock
+          cache-dependency-glob: backend/uv.lock
 
       - name: Export backend requirements
-        working-directory: backend_py
+        working-directory: backend
         run: uv export --no-dev --no-hashes --no-emit-project --format requirements.txt -o requirements.txt
 
       - name: Setup SAM

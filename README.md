@@ -16,7 +16,7 @@ Stemma is a collaborative family tree editor. It lets multiple people build and 
 - Storage: DynamoDB (single table; DynamoDB Local for dev/e2e)
 
 ## Repository layout
-- `backend_py/`: Python backend
+- `backend/`: Python backend
   - `src/stemma/domain/`: domain dataclasses, tagged `Request`/`Response`/`StemmaError` unions, pydantic codec
   - `src/stemma/services/`, `src/stemma/storage/`: business logic and persistence
   - `src/stemma/apis/request_handler.py`: central dispatcher
@@ -48,7 +48,7 @@ export DYNAMODB_ENDPOINT_URL=http://127.0.0.1:8000
 export AWS_REGION=eu-central-1
 export AWS_ACCESS_KEY_ID=local
 export AWS_SECRET_ACCESS_KEY=local
-cd backend_py
+cd backend
 uv sync
 uv run python -m stemma.apps.rest_main
 ```
@@ -69,7 +69,7 @@ Open the dev server URL printed by Rollup.
 
 ## Tests
 ```bash
-cd backend_py
+cd backend
 uv run pytest
 ```
 
