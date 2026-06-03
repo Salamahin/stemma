@@ -2,12 +2,6 @@
     import { t } from "../../i18n";
     import V2Modal from "./V2Modal.svelte";
 
-    type Props = {
-        oncommit?: (value: string) => void;
-    };
-
-    let { oncommit }: Props = $props();
-
     let open = $state(false);
     let inputEl = $state<HTMLInputElement | null>(null);
     let value = $state("");
@@ -17,6 +11,7 @@
     let confirmLabel = $state("");
     let placeholder = $state("");
     let testid = $state<string | undefined>(undefined);
+    let pendingAccept: ((value: string) => void) | null = null;
 
     export function prompt(opts: {
         title: string;
@@ -25,6 +20,7 @@
         initial?: string;
         placeholder?: string;
         testid?: string;
+        onaccept: (value: string) => void;
     }) {
         title = opts.title;
         label = opts.label;
@@ -32,6 +28,7 @@
         placeholder = opts.placeholder ?? "";
         testid = opts.testid;
         value = opts.initial ?? "";
+        pendingAccept = opts.onaccept;
         open = true;
         setTimeout(() => {
             inputEl?.focus();
@@ -41,13 +38,16 @@
 
     function close() {
         open = false;
+        pendingAccept = null;
     }
 
     function commit() {
         const v = value.trim();
         if (!v) return;
-        close();
-        oncommit?.(v);
+        const cb = pendingAccept;
+        open = false;
+        pendingAccept = null;
+        cb?.(v);
     }
 
     function handleKeydown(e: KeyboardEvent) {

@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { Snippet } from "svelte";
+    import { onMount } from "svelte";
 
     type Props = {
         open: boolean;
@@ -12,7 +13,14 @@
 
     let { open, anchorEl = null, onclose, body, footer, testid }: Props = $props();
 
-    const isMobile = $derived(typeof window !== "undefined" && !window.matchMedia("(min-width: 768px)").matches);
+    let isMobile = $state(typeof window !== "undefined" && !window.matchMedia("(min-width: 768px)").matches);
+
+    onMount(() => {
+        const mql = window.matchMedia("(min-width: 768px)");
+        const onChange = (e: MediaQueryListEvent) => { isMobile = !e.matches; };
+        mql.addEventListener("change", onChange);
+        return () => mql.removeEventListener("change", onChange);
+    });
 
     type PopoverPos = { top: number; left: number; placement: "right" | "left" | "below" };
 

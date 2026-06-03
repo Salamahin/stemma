@@ -59,11 +59,7 @@
 
     const family = $derived.by<FamilyDescription | null>(() => {
         if (!familyId || !stemmaIndex) return null;
-        try {
-            return stemmaIndex.family(familyId);
-        } catch {
-            return null;
-        }
+        return stemmaIndex.family(familyId) ?? null;
     });
 
     const effectiveParents = $derived.by<string[]>(() => {
@@ -82,11 +78,11 @@
     const familyTitle = $derived.by<string>(() => {
         if (isStub) return $t("v2.stubFamily");
         if (!family || !stemmaIndex) return $t("family.compositionTitle");
+        const idx = stemmaIndex;
         const parentNames = family.parents
-            .map((id) => {
-                try { return personDisplayName(stemmaIndex.person(id).name, $t); } catch { return ""; }
-            })
-            .filter((n) => n.length > 0);
+            .map((id) => idx.person(id))
+            .filter((p): p is PersonDescription => p != null)
+            .map((p) => personDisplayName(p.name, $t));
         if (parentNames.length === 0) return $t("family.compositionTitle");
         return parentNames.join(" & ");
     });
@@ -99,12 +95,8 @@
     }
 
     function personName(id: string): string {
-        if (!stemmaIndex) return id;
-        try {
-            return personDisplayName(stemmaIndex.person(id).name, $t);
-        } catch {
-            return id;
-        }
+        const p = stemmaIndex?.person(id);
+        return p ? personDisplayName(p.name, $t) : id;
     }
 
     function startAddChild() {

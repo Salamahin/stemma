@@ -19,7 +19,6 @@
     import V2Sheet from "./components/V2Sheet.svelte";
     import V2PersonCard from "./components/V2PersonCard.svelte";
     import V2FamilyCard from "./components/V2FamilyCard.svelte";
-    import V2NameModal from "./components/V2NameModal.svelte";
     import V2AboutModal from "./components/V2AboutModal.svelte";
     import V2SettingsModal from "./components/V2SettingsModal.svelte";
     import V2ShareModal from "./components/V2ShareModal.svelte";
@@ -82,7 +81,6 @@
     let selectedFamilyEl = $state<Element | null>(null);
     let familySheetOpen = $state(false);
 
-    let v2NameModal = $state<ReturnType<typeof V2NameModal> | null>(null);
     let personEditModal = $state<ReturnType<typeof V2PersonDetailsModal> | null>(null);
     let aboutModal = $state<ReturnType<typeof V2AboutModal> | null>(null);
     let settingsModal = $state<ReturnType<typeof V2SettingsModal> | null>(null);
@@ -92,29 +90,27 @@
     let confirmModal = $state<ReturnType<typeof V2ConfirmModal> | null>(null);
     let stemmaChart = $state<ReturnType<typeof FullStemma> | null>(null);
 
-    type PromptKind = "addStemma" | "renameStemma" | "cloneStemma";
-    let pendingPromptKind = $state<PromptKind | null>(null);
-    let pendingStemma = $state<StemmaDescription | null>(null);
-
     const controller = new AppController(untrack(() => stemma_backend_url));
 
-    controller.currentStemmaId.subscribe((s) => (currentStemmaId = s));
-    controller.stemma.subscribe((s) => {
-        stemma = s;
-        stubFamilies = new Map();
-    });
-    controller.ownedStemmas.subscribe((os) => (ownedStemmas = os));
-    controller.stemmaIndex.subscribe((si) => (stemmaIndex = si));
-    controller.highlight.subscribe((hg) => (highlight = hg));
-    controller.pinnedStorage.subscribe((pp) => (pinnedPeople = pp));
-    controller.isWorking.subscribe((iw) => (isWorking = iw));
-    controller.err.subscribe((e) => (error = e));
-    controller.invitationToken.subscribe((tkn) => {
-        if (!tkn) return;
-        shareModal?.close();
-        const link = buildInviteLink(window.location.origin, tkn);
-        inviteLinkModal?.show(link);
-    });
+    const subscriptions = [
+        controller.currentStemmaId.subscribe((s) => (currentStemmaId = s)),
+        controller.stemma.subscribe((s) => {
+            stemma = s;
+            stubFamilies = new Map();
+        }),
+        controller.ownedStemmas.subscribe((os) => (ownedStemmas = os)),
+        controller.stemmaIndex.subscribe((si) => (stemmaIndex = si)),
+        controller.highlight.subscribe((hg) => (highlight = hg)),
+        controller.pinnedStorage.subscribe((pp) => (pinnedPeople = pp)),
+        controller.isWorking.subscribe((iw) => (isWorking = iw)),
+        controller.err.subscribe((e) => (error = e)),
+        controller.invitationToken.subscribe((tkn) => {
+            if (!tkn) return;
+            shareModal?.close();
+            const link = buildInviteLink(window.location.origin, tkn);
+            inviteLinkModal?.show(link);
+        }),
+    ];
 
     const augmentedStemma = $derived.by<Stemma | null>(() => {
         if (!stemma) return null;
@@ -261,7 +257,6 @@
         controller.updateFamily(payload.familyId, parents, children);
     }
 
-    // Auth / token refresh
     let currentToken = $state<string | null>(null);
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     let inflightRefresh: Promise<string> | null = null;
@@ -323,53 +318,46 @@
         stemmaChart?.exportSvg(filename);
     }
 
-    function handlePromptCommit(value: string) {
-        const kind = pendingPromptKind;
-        const target = pendingStemma;
-        pendingPromptKind = null;
-        pendingStemma = null;
-        if (kind === "addStemma") {
-            controller.addStemma(value);
-        } else if (kind === "renameStemma" && target) {
-            controller.renameStemma(target.id, value);
-        } else if (kind === "cloneStemma" && target) {
-            controller.cloneStemma(value, target.id);
-        }
-    }
-
     function openAddStemma() {
-        pendingPromptKind = "addStemma";
-        pendingStemma = null;
         promptModal?.prompt({
             title: $t("stemma.addTitle"),
             label: $t("stemma.nameLabel"),
             confirmLabel: $t("common.add"),
             placeholder: $t("stemma.defaultName"),
             testid: "v2-add-stemma-modal",
+            onaccept: (value) => controller.addStemma(value),
         });
     }
 
     function openRenameStemma(s: StemmaDescription) {
-        pendingPromptKind = "renameStemma";
-        pendingStemma = s;
         promptModal?.prompt({
             title: $t("stemma.renameTitle"),
             label: $t("stemma.nameLabel"),
             confirmLabel: $t("stemma.rename"),
             initial: s.name,
             testid: "v2-rename-stemma-modal",
+            onaccept: (value) => controller.renameStemma(s.id, value),
         });
     }
 
     function openCloneStemma(s: StemmaDescription) {
-        pendingPromptKind = "cloneStemma";
-        pendingStemma = s;
         promptModal?.prompt({
             title: $t("stemma.cloneTitle"),
             label: $t("stemma.nameLabel"),
             confirmLabel: $t("stemma.clone"),
             initial: s.name,
             testid: "v2-clone-stemma-modal",
+            onaccept: (value) => controller.cloneStemma(value, s.id),
+        });
+    }
+
+    function openAddPerson() {
+        promptModal?.prompt({
+            title: $t("v2.addPerson"),
+            label: $t("v2.namePlaceholder"),
+            confirmLabel: $t("common.add"),
+            testid: "v2-name-modal",
+            onaccept: (name) => controller.createOrphanPerson({ type: "CreateNewPerson", name }),
         });
     }
 
@@ -421,16 +409,20 @@
         if (e2eAutoLoginEnabled) {
             e2eMode = true;
             handleSignIn({ id_token: "e2e-user@stemma.local" } as User);
-            return;
-        }
-
-        initializeGoogleAuth(google_client_id).catch((err) => console.error("Google Identity init failed", err));
-
-        if (initialCached) {
-            handleSignIn({ id_token: initialCached.token });
         } else {
-            fetch(`${stemma_backend_url}/warmup`).catch(() => {});
+            initializeGoogleAuth(google_client_id).catch((err) => console.error("Google Identity init failed", err));
+
+            if (initialCached) {
+                handleSignIn({ id_token: initialCached.token });
+            } else {
+                fetch(`${stemma_backend_url}/warmup`).catch(() => {});
+            }
         }
+
+        return () => {
+            for (const unsub of subscriptions) unsub();
+            if (refreshTimer) clearTimeout(refreshTimer);
+        };
     });
 
     const showCanvas = $derived(!isWorking && augmentedStemma && augmentedStemmaIndex && highlight && pinnedPeople);
@@ -457,7 +449,7 @@
             {/if}
 
             {#if showEmpty}
-                <V2EmptyState {editMode} onaddPerson={() => v2NameModal?.prompt()} />
+                <V2EmptyState {editMode} onaddPerson={openAddPerson} />
             {/if}
         </div>
 
@@ -496,7 +488,7 @@
                     {editMode}
                     disabled={isWorking}
                     oneditToggle={() => { editMode = !editMode; }}
-                    onaddPerson={() => v2NameModal?.prompt()}
+                    onaddPerson={openAddPerson}
                 />
             </div>
 
@@ -571,11 +563,6 @@
         {/snippet}
     </V2Sheet>
 
-    <V2NameModal
-        bind:this={v2NameModal}
-        onconfirm={(name) => controller.createOrphanPerson({ type: "CreateNewPerson", name })}
-    />
-
     <V2PersonDetailsModal
         bind:this={personEditModal}
         onpersonUpdated={(p) => controller.savePerson(p.id, p.description, p.pin, p.photoUpload, p.photoRemove)}
@@ -589,7 +576,7 @@
         oninvite={(p) => controller.createInvitationToken(p.personId, p.email)}
     />
     <V2InviteLinkModal bind:this={inviteLinkModal} />
-    <V2PromptModal bind:this={promptModal} oncommit={handlePromptCommit} />
+    <V2PromptModal bind:this={promptModal} />
     <V2ConfirmModal bind:this={confirmModal} />
 {:else}
     <div class="authenticate-bg vh-100">

@@ -338,7 +338,12 @@ class StorageService:
             batch.put_item(
                 Item={"pk": stemma_pk(stemma_id), "sk": person_owner_sk(new_pid, user_id)}
             )
-        return self.stemma(user_id, stemma_id)
+        planned = replace(
+            snapshot,
+            people={**snapshot.people, new_pid: row},
+            person_owners=snapshot.person_owners | {(new_pid, user_id)},
+        )
+        return _describe_stemma(planned, user_id, self._photo_store)
 
     def update_person(
         self, user_id: str, stemma_id: str, person_id: str, description: CreateNewPerson

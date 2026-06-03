@@ -13,7 +13,6 @@
         onclose?: () => void;
         body: Snippet;
         footer?: Snippet;
-        headerActions?: Snippet;
         testid?: string;
     };
 
@@ -26,7 +25,6 @@
         onclose,
         body,
         footer,
-        headerActions,
         testid,
     }: Props = $props();
 
@@ -58,19 +56,14 @@
         {#if title}
             <div class="v2-modal-header">
                 <h6 class="v2-modal-title">{title}</h6>
-                <div class="v2-modal-header-actions">
-                    {#if headerActions}
-                        {@render headerActions()}
-                    {/if}
-                    <button
-                        type="button"
-                        class="v2-modal-close"
-                        aria-label={$t("common.close")}
-                        onclick={close}
-                    >
-                        <i class="bi bi-x-lg"></i>
-                    </button>
-                </div>
+                <button
+                    type="button"
+                    class="v2-modal-close"
+                    aria-label={$t("common.close")}
+                    onclick={close}
+                >
+                    <i class="bi bi-x-lg"></i>
+                </button>
             </div>
         {/if}
 
@@ -145,15 +138,7 @@
         white-space: nowrap;
     }
 
-    .v2-modal-header-actions {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        flex-shrink: 0;
-    }
-
-    .v2-modal-close,
-    :global(.v2-modal-header-actions .header-action-btn) {
+    .v2-modal-close {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -172,11 +157,6 @@
     .v2-modal-close:hover {
         background: #f1f3f5;
         color: var(--v2-text-primary);
-    }
-
-    :global(.v2-modal-header-actions .header-action-btn.danger:hover) {
-        background: #f8d7da;
-        color: #dc3545;
     }
 
     .v2-modal-body {
