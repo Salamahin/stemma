@@ -186,6 +186,30 @@ export const en: Record<string, string> = {
     'stats.families': 'families',
     'stats.depth': 'generations',
     'stats.highlighted': 'highlighted',
+
+    // V2 UI
+    'v2.editToggle': 'Edit',
+    'v2.addPerson': 'Add person',
+    'v2.addFamily': '+ family',
+    'v2.addAncestor': '+ ancestor',
+    'v2.addChild': '+ child',
+    'v2.addSpouse': '+ spouse',
+    'v2.namePlaceholder': 'Name',
+    'v2.emptyStemma': 'Tree is empty',
+    'v2.emptyStemmaCta': 'Add person',
+    'v2.personActions': 'Person actions',
+    'v2.familyActions': 'Family actions',
+    'v2.selectExisting': 'Select existing',
+    'v2.createNew': 'Create new',
+    'v2.stubFamily': 'New family (not saved)',
+    'v2.editMode': 'Edit mode',
+    'v2.signOut': 'Sign out',
+    'v2.about': 'About',
+    'v2.settings': 'Settings',
+    'v2.exportSvg': 'Export SVG',
+    'v2.enterEditMode': 'Enter edit mode',
+    'v2.exitEditMode': 'Exit edit mode',
+    'v2.addPersonFab': 'Add person',
 };
 
 export const ru: Record<string, string> = {
@@ -342,6 +366,30 @@ export const ru: Record<string, string> = {
     'stats.families': 'семей',
     'stats.depth': 'поколений',
     'stats.highlighted': 'подсвечено',
+
+    // V2 UI
+    'v2.editToggle': 'Редактировать',
+    'v2.addPerson': 'Добавить человека',
+    'v2.addFamily': '+ семья',
+    'v2.addAncestor': '+ предок',
+    'v2.addChild': '+ ребенок',
+    'v2.addSpouse': '+ супруг(а)',
+    'v2.namePlaceholder': 'Имя',
+    'v2.emptyStemma': 'Древо пустое',
+    'v2.emptyStemmaCta': 'Добавить человека',
+    'v2.personActions': 'Действия',
+    'v2.familyActions': 'Действия с семьей',
+    'v2.selectExisting': 'Выбрать существующего',
+    'v2.createNew': 'Создать нового',
+    'v2.stubFamily': 'Новая семья (не сохранена)',
+    'v2.editMode': 'Режим редактирования',
+    'v2.signOut': 'Выйти',
+    'v2.about': 'О проекте',
+    'v2.settings': 'Настройки',
+    'v2.exportSvg': 'Скачать SVG',
+    'v2.enterEditMode': 'Включить редактирование',
+    'v2.exitEditMode': 'Выключить редактирование',
+    'v2.addPersonFab': 'Добавить человека',
 };
 
 const dictionaries: Record<Locale, Record<string, string>> = { en, ru };
