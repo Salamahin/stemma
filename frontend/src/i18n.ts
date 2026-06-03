@@ -230,6 +230,7 @@ export const en: Record<string, string> = {
     'v2.removeFamilyMessage': 'Members stay but lose their links through this family.',
     'v2.removePersonTitle': 'Delete {name}?',
     'v2.removePersonMessage': 'Person is removed from the tree along with their family links.',
+    'v2.searchNoResults': 'No people match',
 };
 
 export const ru: Record<string, string> = {
@@ -430,6 +431,7 @@ export const ru: Record<string, string> = {
     'v2.removeFamilyMessage': 'Люди останутся, но потеряют связи через эту семью.',
     'v2.removePersonTitle': 'Удалить {name}?',
     'v2.removePersonMessage': 'Человек будет удалён из дерева вместе с его семейными связями.',
+    'v2.searchNoResults': 'Никто не найден',
 };
 
 const dictionaries: Record<Locale, Record<string, string>> = { en, ru };

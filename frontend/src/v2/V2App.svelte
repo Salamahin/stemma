@@ -15,6 +15,7 @@
     import V2Menu from "./components/V2Menu.svelte";
     import V2Fab from "./components/V2Fab.svelte";
     import V2EditPill from "./components/V2EditPill.svelte";
+    import V2Search from "./components/V2Search.svelte";
     import V2EmptyState from "./components/V2EmptyState.svelte";
     import V2Sheet from "./components/V2Sheet.svelte";
     import V2PersonCard from "./components/V2PersonCard.svelte";
@@ -469,11 +470,18 @@
                 />
             </div>
 
-            {#if editMode}
-                <div class="v2-top-center">
+            <div class="v2-top-center">
+                {#if stemma && stemma.people.length > 0}
+                    <V2Search
+                        people={stemma.people}
+                        disabled={isWorking}
+                        onselect={(id) => stemmaChart?.zoomToNode(id)}
+                    />
+                {/if}
+                {#if editMode}
                     <V2EditPill />
-                </div>
-            {/if}
+                {/if}
+            </div>
 
             <div class="v2-top-right">
                 <V2Menu
@@ -642,8 +650,12 @@
         top: 16px;
         left: 50%;
         transform: translateX(-50%);
-        pointer-events: none;
+        pointer-events: auto;
         z-index: 100;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
     }
 
     .v2-top-right {
