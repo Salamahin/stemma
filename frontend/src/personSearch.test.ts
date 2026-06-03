@@ -73,6 +73,42 @@ describe("searchPeople", () => {
         expect(ids).toEqual(["1"]);
     });
 
+    it("finds Иван when querying Latin Ivan", () => {
+        const ids = searchPeople("Ivan", [
+            person("1", "Иван Иванов"),
+            person("2", "Пётр Сидоров"),
+        ]).map((r) => r.item.id);
+        expect(ids).toContain("1");
+        expect(ids).not.toContain("2");
+    });
+
+    it("finds Latin Ivan when querying Иван", () => {
+        const ids = searchPeople("Иван", [
+            person("1", "Ivan Petrov"),
+            person("2", "John Smith"),
+        ]).map((r) => r.item.id);
+        expect(ids).toContain("1");
+        expect(ids).not.toContain("2");
+    });
+
+    it("matches Юрий via Latin yuriy", () => {
+        const ids = searchPeople("yuriy", [
+            person("1", "Юрий Гагарин"),
+            person("2", "Сергей Королёв"),
+        ]).map((r) => r.item.id);
+        expect(ids).toContain("1");
+        expect(ids).not.toContain("2");
+    });
+
+    it("matches Фёдор via Latin Fedor", () => {
+        const ids = searchPeople("Fedor", [
+            person("1", "Фёдор Достоевский"),
+            person("2", "Лев Толстой"),
+        ]).map((r) => r.item.id);
+        expect(ids).toContain("1");
+        expect(ids).not.toContain("2");
+    });
+
     it("respects the limit", () => {
         const people = Array.from({ length: 20 }, (_, i) =>
             person(String(i), `Иван ${i}`),
