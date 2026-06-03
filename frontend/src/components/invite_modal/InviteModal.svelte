@@ -13,6 +13,7 @@
     import { StemmaIndex } from "../../stemmaIndex";
     import PersonSelector from "../misc/PersonSelector.svelte";
     import { t } from "../../i18n";
+    import { isUnknownPerson, personDisplayName } from "../../personDisplayName";
 
     type Props = {
         stemmaIndex: StemmaIndex;
@@ -31,7 +32,7 @@
     let inviteLink = $state("");
 
     const peopleNames = $derived(
-        stemma ? [...new Set(stemma.people.map((p) => p.name))] : []
+        stemma ? [...new Set(stemma.people.map((p) => p.name).filter((n) => !isUnknownPerson(n)))] : []
     );
 
     const peopleItems = $derived<SelectItem[]>(
@@ -39,7 +40,7 @@
     );
 
     const selectedItem = $derived<SelectItem | null>(
-        selectedPerson ? { label: selectedPerson.name, value: selectedPerson.name } : null
+        selectedPerson ? { label: personDisplayName(selectedPerson.name, $t), value: selectedPerson.name } : null
     );
 
     function nameChanged(newName: string) {

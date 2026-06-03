@@ -133,6 +133,8 @@ export const en: Record<string, string> = {
     'person.photoUploadFailed': 'Photo upload failed. Try again',
     'person.photoAdjustTitle': 'Adjust photo',
     'person.photoAdjustHint': 'Drag to position, use the slider to zoom',
+    'person.unknown': 'Unknown',
+    'person.unknownToggle': 'Unknown person',
 
     // Settings modal
     'settings.title': 'Display settings',
@@ -287,6 +289,8 @@ export const ru: Record<string, string> = {
     'person.photoUploadFailed': 'Не удалось загрузить фото. Попробуйте еще раз',
     'person.photoAdjustTitle': 'Подгонка фото',
     'person.photoAdjustHint': 'Двигайте мышью, масштабируйте ползунком',
+    'person.unknown': 'Неизвестно',
+    'person.unknownToggle': 'Неизвестный',
 
     // Settings modal
     'settings.title': 'Настройки отображения',

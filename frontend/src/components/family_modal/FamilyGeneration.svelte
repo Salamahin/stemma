@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { CreateNewPerson, PersonDescription } from "../../model";
     import { t } from "../../i18n";
+    import { personDisplayName } from "../../personDisplayName";
 
     type Props = {
         selectedPeople?: (PersonDescription | CreateNewPerson)[];
@@ -22,7 +23,7 @@
             {#each selectedPeople as p, i}
                 <tr>
                     <th class="align-middle" scope="row">{i + 1}</th>
-                    <td class="align-middle">{p.name}</td>
+                    <td class="align-middle">{personDisplayName(p.name, $t)}</td>
                     <td class="align-middle">
                         {#if !readOnly}
                             <div class="float-end">

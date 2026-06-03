@@ -23,6 +23,8 @@
     import { NodeLayoutCache } from "../nodeLayoutCache";
     import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
     import { exportChartSvg } from "../svgExport";
+    import { personDisplayName } from "../personDisplayName";
+    import { t } from "../i18n";
 
     type Props = {
         stemma: Stemma;
@@ -84,7 +86,8 @@
                 families = stemma.families.filter((f) => !f.readOnly);
             }
 
-            const [nodes, relations] = makeNodesAndRelations(people, families);
+            const displayPeople = people.map((p) => ({ ...p, name: personDisplayName(p.name, $t) }));
+            const [nodes, relations] = makeNodesAndRelations(displayPeople, families);
             const initialPositions = computeInitialLayout(stemmaIndex, people, families, window.innerWidth, window.innerHeight);
             reconfigureGraph(nodes, relations, initialPositions);
         }
