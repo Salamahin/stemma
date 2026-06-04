@@ -1,6 +1,4 @@
-import { test, expect } from "@playwright/test";
-
-test.describe.configure({ mode: "serial" });
+import { test, expect } from "./_fixtures";
 
 const MOBILE = { width: 390, height: 844 };
 

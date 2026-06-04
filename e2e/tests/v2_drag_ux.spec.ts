@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test } from "./_fixtures";
+import type { Locator, Page } from "@playwright/test";
 
 const TIP = {
   createFamily: /Create family|Создать семью/,
