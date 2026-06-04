@@ -244,10 +244,20 @@ export const en: Record<string, string> = {
     'v2.tray.dragHint': 'Drag onto a person',
     'v2.tray.open': 'Open quick-add tray',
     'v2.tray.close': 'Close quick-add tray',
-    'v2.linkRoleTitle': 'Connect as',
+    'v2.linkRoleTitle': 'Add to family as',
     'v2.linkRoleSpouse': 'Spouse',
     'v2.linkRoleParent': 'Parent',
     'v2.linkRoleChild': 'Child',
+    'v2.dissolveFamily': 'Dissolve',
+    'v2.dissolveFamilyConfirm': 'Dissolve',
+    'v2.tipCreateFamily': 'Create family',
+    'v2.tipCreateSpouse': 'Create spouse',
+    'v2.tipCreateChild': 'Create child',
+    'v2.tipAttachSpouse': 'Attach as spouse',
+    'v2.tipAttachChild': 'Attach as child',
+    'v2.placeholderName': '?',
+    'v2.createChildTitle': 'Create child',
+    'v2.createChildLabel': 'Name',
 };
 
 export const ru: Record<string, string> = {
@@ -462,10 +472,20 @@ export const ru: Record<string, string> = {
     'v2.tray.dragHint': 'Перетащите на человека',
     'v2.tray.open': 'Открыть панель быстрого добавления',
     'v2.tray.close': 'Закрыть панель быстрого добавления',
-    'v2.linkRoleTitle': 'Связать как',
+    'v2.linkRoleTitle': 'Добавить в семью как',
     'v2.linkRoleSpouse': 'Супруг(а)',
     'v2.linkRoleParent': 'Родитель',
     'v2.linkRoleChild': 'Ребёнок',
+    'v2.dissolveFamily': 'Разъединить',
+    'v2.dissolveFamilyConfirm': 'Разъединить',
+    'v2.tipCreateFamily': 'Создать семью',
+    'v2.tipCreateSpouse': 'Создать супруга',
+    'v2.tipCreateChild': 'Создать потомка',
+    'v2.tipAttachSpouse': 'Присоединить супруга',
+    'v2.tipAttachChild': 'Присоединить потомка',
+    'v2.placeholderName': '?',
+    'v2.createChildTitle': 'Создать потомка',
+    'v2.createChildLabel': 'Имя',
 };
 
 const dictionaries: Record<Locale, Record<string, string>> = { en, ru };

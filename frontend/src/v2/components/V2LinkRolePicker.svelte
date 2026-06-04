@@ -1,9 +1,10 @@
 <script lang="ts">
-    import type { LinkRole } from "../../model";
     import { t } from "../../i18n";
 
+    type Role = "parent" | "child";
+
     type Props = {
-        onpick?: (role: LinkRole) => void;
+        onpick?: (role: Role) => void;
         oncancel?: () => void;
     };
 
@@ -12,14 +13,6 @@
 
 <div class="link-role-menu" data-testid="v2-link-role-menu">
     <div class="role-title">{$t("v2.linkRoleTitle")}</div>
-    <button
-        type="button"
-        class="btn btn-outline-primary btn-sm role-btn"
-        onclick={() => onpick?.("spouse")}
-        data-testid="v2-link-role-spouse"
-    >
-        {$t("v2.linkRoleSpouse")}
-    </button>
     <button
         type="button"
         class="btn btn-outline-primary btn-sm role-btn"

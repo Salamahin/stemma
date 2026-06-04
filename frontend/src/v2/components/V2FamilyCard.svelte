@@ -91,7 +91,7 @@
                 onclick={requestRemove}
                 data-testid="v2-remove-family-action"
             >
-                {$t("common.delete")}
+                {$t("v2.dissolveFamily")}
             </button>
         </div>
     {/if}

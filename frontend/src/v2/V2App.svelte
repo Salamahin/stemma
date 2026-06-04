@@ -1,10 +1,9 @@
 <script lang="ts">
-    import { onMount, tick, untrack } from "svelte";
+    import { onMount, untrack } from "svelte";
     import { AppController } from "../appController";
     import type {
         CreateNewPerson,
         FamilyDescription,
-        LinkRole,
         PersonDefinition,
         PersonDescription,
         Stemma,
@@ -25,15 +24,11 @@
     import V2LangSwitcher from "./components/V2LangSwitcher.svelte";
     import V2Menu from "./components/V2Menu.svelte";
     import V2Fab from "./components/V2Fab.svelte";
-    import V2EditPill from "./components/V2EditPill.svelte";
     import V2Search from "./components/V2Search.svelte";
     import V2EmptyState from "./components/V2EmptyState.svelte";
     import V2Sheet from "./components/V2Sheet.svelte";
     import V2FamilyCard from "./components/V2FamilyCard.svelte";
-    import V2PersonGhost, { type PersonGhostAction } from "./components/V2PersonGhost.svelte";
-    import V2FamilyGhost from "./components/V2FamilyGhost.svelte";
     import V2BulkAddTray from "./components/V2BulkAddTray.svelte";
-    import V2LinkRolePicker from "./components/V2LinkRolePicker.svelte";
     import V2AboutModal from "./components/V2AboutModal.svelte";
     import V2SettingsModal from "./components/V2SettingsModal.svelte";
     import V2ShareAccessModal from "./components/V2ShareAccessModal.svelte";
@@ -44,14 +39,12 @@
     import { buildInviteLink } from "../inviteLinkBuilder";
     import { Circle2 } from "svelte-loading-spinners";
     import { denormalizeId, normalizeId } from "../graphTools";
-    import { canAddParentToFamily, type GhostFamilyAction } from "./ghostHelpers";
 
     const PERSON_DRAG_MIME = "application/x-stemma-person";
+    const SVG_NS = "http://www.w3.org/2000/svg";
 
-    type GhostPopoverState =
-        | { kind: "personGhost"; anchorEl: Element; personId: string }
-        | { kind: "familyAdd"; anchorEl: Element; familyId: string; action: GhostFamilyAction }
-        | { kind: "linkRole"; anchorEl: Element; fromPersonId: string; toPersonId: string };
+    type NodeRef = { kind: "person" | "family"; id: string };
+    type SourceRef = { kind: "person"; id: string } | { kind: "family"; id: string } | { kind: "empty" };
 
     type Props = {
         google_client_id: string;
@@ -64,10 +57,23 @@
     const initialCached = e2eAutoLoginEnabled ? null : loadCredential();
     let signedIn = $state(e2eAutoLoginEnabled || initialCached !== null);
 
+    type PendingAdd = { tempId: string; name: string };
+    type PendingFamily = { tempId: string; parents: string[]; children: string[] };
+
     let editMode = $state(false);
     let pendingRemovedPersonIds = $state<Set<string>>(new Set());
     let pendingRemovedFamilyIds = $state<Set<string>>(new Set());
+    let pendingAdds = $state<PendingAdd[]>([]);
+    let pendingFamilies = $state<PendingFamily[]>([]);
     let trayOpen = $state(false);
+
+    function isPendingId(id: string): boolean {
+        return id.startsWith("pending-");
+    }
+
+    function isPendingPersonId(id: string): boolean {
+        return id.startsWith("pending-") && !id.startsWith("pending-family-");
+    }
 
     let ownedStemmas = $state<StemmaDescription[]>([]);
     let currentStemmaId = $state<string | null>(null);
@@ -82,7 +88,7 @@
     let selectedFamilyId = $state<string | null>(null);
     let selectedFamilyEl = $state<Element | null>(null);
     let familySheetOpen = $state(false);
-    let ghostPopover = $state<GhostPopoverState | null>(null);
+    let dragTip = $state<{ text: string; x: number; y: number } | null>(null);
 
     let personEditModal = $state<ReturnType<typeof V2PersonDetailsModal> | null>(null);
     let aboutModal = $state<ReturnType<typeof V2AboutModal> | null>(null);
@@ -104,6 +110,8 @@
             if (s === null || switchedStemma) {
                 pendingRemovedPersonIds = new Set();
                 pendingRemovedFamilyIds = new Set();
+                pendingAdds = [];
+                pendingFamilies = [];
             }
         }),
         controller.ownedStemmas.subscribe((os) => (ownedStemmas = os)),
@@ -120,23 +128,63 @@
         }),
     ];
 
+    function pendingPersonDescription(p: PendingAdd): PersonDescription {
+        return {
+            type: "PersonDescription",
+            id: p.tempId,
+            name: p.name,
+            birthDate: null,
+            deathDate: null,
+            bio: null,
+            readOnly: true,
+            photoUrl: null,
+        };
+    }
+
+    const displayedStemma = $derived.by<Stemma | null>(() => {
+        if (!stemma) return null;
+        if (pendingAdds.length === 0 && pendingFamilies.length === 0) return stemma;
+        return {
+            ...stemma,
+            people: [...stemma.people, ...pendingAdds.map(pendingPersonDescription)],
+            families: [
+                ...stemma.families,
+                ...pendingFamilies.map((pf) => ({
+                    type: "FamilyDescription" as const,
+                    id: pf.tempId,
+                    parents: pf.parents,
+                    children: pf.children,
+                    readOnly: true,
+                })),
+            ],
+        };
+    });
+
+    const displayedStemmaIndex = $derived.by<StemmaIndex | null>(() => {
+        if (!displayedStemma) return null;
+        return new StemmaIndex(displayedStemma);
+    });
+
     const orphanPeople = $derived.by<PersonDescription[]>(() => {
         if (!stemma || !stemmaIndex) return [];
         return stemma.people.filter((p) => stemmaIndex!.relatedFamilies(p.id).length === 0);
     });
 
+
     $effect(() => {
         if (!stemmaChart) return;
         void pendingRemovedPersonIds;
         void pendingRemovedFamilyIds;
-        tick().then(() => applyPendingClasses());
+        void pendingAdds;
+        void pendingFamilies;
+        queueMicrotask(applyPendingClasses);
     });
 
     function applyPendingClasses() {
         const svgEl = document.getElementById("chart");
         if (!svgEl) return;
-        svgEl.querySelectorAll("circle.v2-pending-remove").forEach((el) => {
-            el.classList.remove("v2-pending-remove");
+        svgEl.querySelectorAll("circle.v2-pending-remove, circle.v2-pending-add").forEach((el) => {
+            el.classList.remove("v2-pending-remove", "v2-pending-add");
         });
         const markCircle = (nodeId: string, cls: string) => {
             const el = document.getElementById(nodeId);
@@ -145,154 +193,138 @@
         };
         pendingRemovedPersonIds.forEach((id) => markCircle(normalizeId("person", id), "v2-pending-remove"));
         pendingRemovedFamilyIds.forEach((id) => markCircle(normalizeId("family", id), "v2-pending-remove"));
+        pendingAdds.forEach((p) => markCircle(normalizeId("person", p.tempId), "v2-pending-add"));
+        pendingFamilies.forEach((p) => markCircle(normalizeId("family", p.tempId), "v2-pending-add"));
     }
 
-    type GhostSpec = {
-        x: number;
-        y: number;
-        w: number;
-        h: number;
-        label: string;
-        ariaLabel: string;
-        extraClass: string;
-        testid: string;
-        popoverState: (btn: HTMLButtonElement) => GhostPopoverState;
-    };
+    async function withPendingAdd(name: string, op: () => Promise<unknown>): Promise<void> {
+        const tempId = `pending-${crypto.randomUUID()}`;
+        pendingAdds = [...pendingAdds, { tempId, name }];
+        try {
+            await op();
+        } catch {
+            // surfaced through controller.err
+        } finally {
+            pendingAdds = pendingAdds.filter((p) => p.tempId !== tempId);
+        }
+    }
 
-    const PERSON_GHOST_GEOM = { x: 18, y: -32, w: 28, h: 28 } as const;
-    const FAMILY_GHOST_GEOM: Record<GhostFamilyAction, { y: number; slug: "child" | "parent" }> = {
-        addChild: { y: 14, slug: "child" },
-        addParent: { y: -38, slug: "parent" },
-    };
+    function clientToSvgPoint(svgEl: SVGSVGElement, clientX: number, clientY: number): { x: number; y: number } {
+        const pt = svgEl.createSVGPoint();
+        pt.x = clientX;
+        pt.y = clientY;
+        const mainG = svgEl.querySelector("g.main") as SVGGElement | null;
+        const ctm = mainG?.getScreenCTM();
+        if (!ctm) return { x: clientX, y: clientY };
+        const out = pt.matrixTransform(ctm.inverse());
+        return { x: out.x, y: out.y };
+    }
 
-    type GhostLabels = {
-        addChildLabel: string;
-        addSpouseLabel: string;
-        addChildAria: string;
-        addSpouseAria: string;
-        person: string;
-        dragHint: string;
-    };
+    function nodeCenter(g: SVGGElement): { x: number; y: number } | null {
+        const t = g.getAttribute("transform");
+        if (!t) return null;
+        const match = t.match(/translate\(([-\d.]+)[,\s]+([-\d.]+)\)/);
+        if (!match) return null;
+        return { x: parseFloat(match[1]), y: parseFloat(match[2]) };
+    }
 
-    let mountSeq = 0;
+    function findNodeUnder(x: number, y: number): { ref: NodeRef; el: SVGGElement } | null {
+        const el = document.elementFromPoint(x, y);
+        const g = el?.closest?.("g[id^='person_'], g[id^='family_']") as SVGGElement | null;
+        if (!g) return null;
+        const kind = g.id.startsWith("person_") ? "person" : "family";
+        const id = denormalizeId(g.id);
+        if (kind === "person" && isPendingPersonId(id)) return null;
+        return { ref: { kind, id }, el: g };
+    }
 
-    $effect(() => {
-        const enabled = editMode;
-        const idx = stemmaIndex;
-        void stemmaChart;
-        const labels: GhostLabels = {
-            addChildLabel: $t("v2.addChild"),
-            addSpouseLabel: $t("v2.addSpouse"),
-            addChildAria: $t("v2.familyGhostAddChild"),
-            addSpouseAria: $t("v2.familyGhostAddSpouse"),
-            person: $t("v2.personGhostLabel"),
-            dragHint: $t("v2.tray.dragHint"),
-        };
-        if (!stemmaChart) return;
-        const seq = ++mountSeq;
-        tick().then(() => {
-            if (seq !== mountSeq) return;
-            mountGhosts(enabled, idx, labels);
-        });
-    });
+    function familyHasPerson(family: FamilyDescription, pid: string): boolean {
+        return family.parents.includes(pid) || family.children.includes(pid);
+    }
 
-    function mountGhosts(enabled: boolean, idx: StemmaIndex | null, labels: GhostLabels) {
-        const svgEl = document.getElementById("chart");
-        if (!svgEl) return;
-        const nodes = svgEl.querySelectorAll<SVGGElement>("g[id^='person_'], g[id^='family_'], .v2-ghost-mount, .v2-drag-mount");
-        nodes.forEach((el) => {
-            if (el.classList.contains("v2-ghost-mount") || el.classList.contains("v2-drag-mount")) el.remove();
-        });
-        if (!enabled) return;
-        nodes.forEach((g) => {
-            if (g.classList.contains("v2-ghost-mount") || g.classList.contains("v2-drag-mount")) return;
-            const id = g.id;
-            if (id.startsWith("person_")) {
-                const personId = denormalizeId(id);
-                mountDragHandle(g, personId, labels.dragHint);
-                if ((idx?.relatedFamilies(personId).length ?? 0) > 0) return;
-                mountGhost(g, {
-                    ...PERSON_GHOST_GEOM,
-                    label: "+",
-                    ariaLabel: labels.person,
-                    extraClass: "v2-ghost-person",
-                    testid: `v2-person-ghost-${personId}`,
-                    popoverState: (btn) => ({ kind: "personGhost", anchorEl: btn, personId }),
-                });
-            } else if (id.startsWith("family_")) {
-                const familyId = denormalizeId(id);
-                const family = idx?.family(familyId) ?? null;
-                mountGhost(g, makeFamilyGhostSpec(familyId, "addChild", labels.addChildLabel, labels.addChildAria));
-                if (canAddParentToFamily(family)) {
-                    mountGhost(g, makeFamilyGhostSpec(familyId, "addParent", labels.addSpouseLabel, labels.addSpouseAria));
-                }
-            }
+    function attachPersonToFamily(personId: string, familyId: string, role: "parent" | "child") {
+        if (isPendingId(familyId)) {
+            completeStubFamily(familyId, personId, role);
+            return;
+        }
+        if (!stemmaIndex) return;
+        const family = stemmaIndex.family(familyId);
+        if (!family) return;
+        if (familyHasPerson(family, personId)) return;
+        const existingParents: PersonDefinition[] = family.parents.map((id) => ({ type: "ExistingPerson", id }));
+        const existingChildren: PersonDefinition[] = family.children.map((id) => ({ type: "ExistingPerson", id }));
+        const incoming: PersonDefinition = { type: "ExistingPerson", id: personId };
+        const parents = role === "parent" ? [...existingParents, incoming] : existingParents;
+        const children = role === "child" ? [...existingChildren, incoming] : existingChildren;
+        controller.updateFamily(familyId, parents, children, { silent: true }).catch(() => {});
+    }
+
+    function placeholderPerson(): CreateNewPerson {
+        return { type: "CreateNewPerson", name: $t("v2.placeholderName") };
+    }
+
+    function spawnStubFamily(sourcePersonId: string, svgX: number, svgY: number) {
+        const tempId = `pending-family-${crypto.randomUUID()}`;
+        stemmaChart?.setNodePosition(normalizeId("family", tempId), svgX, svgY);
+        pendingFamilies = [...pendingFamilies, { tempId, parents: [sourcePersonId], children: [] }];
+    }
+
+    function completeStubFamily(stubFamilyId: string, personId: string, role: "parent" | "child") {
+        const stub = pendingFamilies.find((p) => p.tempId === stubFamilyId);
+        if (!stub) return;
+        if (stub.parents.includes(personId) || stub.children.includes(personId)) return;
+        const newParents = role === "parent" ? [...stub.parents, personId] : stub.parents;
+        const newChildren = role === "child" ? [...stub.children, personId] : stub.children;
+        if (newParents.length + newChildren.length >= 2) {
+            pendingFamilies = pendingFamilies.filter((p) => p.tempId !== stubFamilyId);
+            const parents: PersonDefinition[] = newParents.map((id) => ({ type: "ExistingPerson", id }));
+            const children: PersonDefinition[] = newChildren.map((id) => ({ type: "ExistingPerson", id }));
+            controller.createFamily(parents, children, { silent: true }).catch(() => {});
+        } else {
+            pendingFamilies = pendingFamilies.map((p) =>
+                p.tempId === stubFamilyId ? { ...stub, parents: newParents, children: newChildren } : p,
+            );
+        }
+    }
+
+    function createSpouseForFamily(familyId: string) {
+        if (!stemmaIndex) return;
+        const family = stemmaIndex.family(familyId);
+        if (!family) return;
+        const existingParents: PersonDefinition[] = family.parents.map((id) => ({ type: "ExistingPerson", id }));
+        const existingChildren: PersonDefinition[] = family.children.map((id) => ({ type: "ExistingPerson", id }));
+        const newPerson = placeholderPerson();
+        void withPendingAdd(newPerson.name, () =>
+            controller.updateFamily(familyId, [...existingParents, newPerson], existingChildren, { silent: true }),
+        );
+    }
+
+    function openCreateChildPrompt(familyId: string) {
+        promptModal?.prompt({
+            title: $t("v2.createChildTitle"),
+            label: $t("v2.createChildLabel"),
+            confirmLabel: $t("common.add"),
+            testid: "v2-create-child-modal",
+            onaccept: (name) => {
+                if (!stemmaIndex) return;
+                const family = stemmaIndex.family(familyId);
+                if (!family) return;
+                const existingParents: PersonDefinition[] = family.parents.map((id) => ({ type: "ExistingPerson", id }));
+                const existingChildren: PersonDefinition[] = family.children.map((id) => ({ type: "ExistingPerson", id }));
+                const newChild: CreateNewPerson = { type: "CreateNewPerson", name };
+                void withPendingAdd(name, () =>
+                    controller.updateFamily(
+                        familyId,
+                        existingParents,
+                        [...existingChildren, newChild],
+                        { silent: true },
+                    ),
+                );
+            },
         });
     }
 
-    function makeFamilyGhostSpec(familyId: string, action: GhostFamilyAction, label: string, ariaLabel: string): GhostSpec {
-        const geom = FAMILY_GHOST_GEOM[action];
-        return {
-            x: -32, y: geom.y, w: 64, h: 24,
-            label,
-            ariaLabel,
-            extraClass: "v2-ghost-family",
-            testid: `v2-family-ghost-${geom.slug}-${familyId}`,
-            popoverState: (btn) => ({ kind: "familyAdd", anchorEl: btn, familyId, action }),
-        };
-    }
-
-    function mountGhost(g: SVGGElement, spec: GhostSpec) {
-        const fo = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject") as SVGForeignObjectElement;
-        fo.setAttribute("class", "v2-ghost-mount");
-        fo.setAttribute("x", String(spec.x));
-        fo.setAttribute("y", String(spec.y));
-        fo.setAttribute("width", String(spec.w));
-        fo.setAttribute("height", String(spec.h));
-        fo.style.overflow = "visible";
-
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = `v2-ghost-btn ${spec.extraClass}`.trim();
-        btn.textContent = spec.label;
-        btn.setAttribute("aria-label", spec.ariaLabel);
-        btn.setAttribute("data-testid", spec.testid);
-        btn.addEventListener("pointerdown", (e) => e.stopPropagation());
-        btn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            ghostPopover = spec.popoverState(btn);
-        });
-
-        fo.appendChild(btn);
-        g.appendChild(fo);
-    }
-
-    function mountDragHandle(g: SVGGElement, personId: string, dragHint: string) {
-        const fo = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject") as SVGForeignObjectElement;
-        fo.setAttribute("class", "v2-drag-mount");
-        fo.setAttribute("x", "-30");
-        fo.setAttribute("y", "-30");
-        fo.setAttribute("width", "20");
-        fo.setAttribute("height", "20");
-        fo.style.overflow = "visible";
-
-        const handle = document.createElement("div");
-        handle.className = "v2-drag-handle";
-        handle.setAttribute("draggable", "true");
-        handle.setAttribute("data-testid", `v2-drag-handle-${personId}`);
-        handle.title = dragHint;
-        handle.textContent = "⠿";
-        handle.addEventListener("pointerdown", (e) => e.stopPropagation());
-        handle.addEventListener("dragstart", (e) => {
-            if (!e.dataTransfer) return;
-            e.dataTransfer.effectAllowed = "link";
-            e.dataTransfer.setData(PERSON_DRAG_MIME, personId);
-            e.dataTransfer.setData("text/plain", personId);
-        });
-        fo.appendChild(handle);
-        g.appendChild(fo);
-    }
-
+    // HTML5 DnD: tray chip → canvas family target. Tray person becomes spouse (parent).
     $effect(() => {
         if (!stemmaChart) return;
         const svgEl = document.getElementById("chart");
@@ -300,31 +332,26 @@
 
         const onDragOver = (e: DragEvent) => {
             if (!e.dataTransfer || !Array.from(e.dataTransfer.types).includes(PERSON_DRAG_MIME)) return;
-            const g = (e.target as Element | null)?.closest?.("g[id^='person_']") as SVGGElement | null;
+            const g = (e.target as Element | null)?.closest?.("g[id^='family_']") as SVGGElement | null;
             if (!g) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = "link";
             g.classList.add("v2-drop-target");
         };
         const onDragLeave = (e: DragEvent) => {
-            const g = (e.target as Element | null)?.closest?.("g[id^='person_']") as SVGGElement | null;
+            const g = (e.target as Element | null)?.closest?.("g[id^='family_']") as SVGGElement | null;
             g?.classList.remove("v2-drop-target");
         };
         const onDrop = (e: DragEvent) => {
-            const g = (e.target as Element | null)?.closest?.("g[id^='person_']") as SVGGElement | null;
+            const g = (e.target as Element | null)?.closest?.("g[id^='family_']") as SVGGElement | null;
             if (!g || !e.dataTransfer) return;
-            const fromPid = e.dataTransfer.getData(PERSON_DRAG_MIME);
-            const toPid = denormalizeId(g.id);
+            const pid = e.dataTransfer.getData(PERSON_DRAG_MIME);
+            const fid = denormalizeId(g.id);
             g.classList.remove("v2-drop-target");
-            if (!fromPid || !toPid || fromPid === toPid) return;
+            if (!pid || !fid) return;
+            if (isPendingPersonId(pid)) return;
             e.preventDefault();
-            const circle = g.querySelector("circle");
-            ghostPopover = {
-                kind: "linkRole",
-                anchorEl: (circle ?? g) as Element,
-                fromPersonId: fromPid,
-                toPersonId: toPid,
-            };
+            attachPersonToFamily(pid, fid, "parent");
         };
 
         svgEl.addEventListener("dragover", onDragOver);
@@ -337,51 +364,262 @@
         };
     });
 
-    function closeGhostPopover() {
-        ghostPopover = null;
-    }
+    // Canvas pointer gesture: drag person↔family. Empty source/target supported.
+    $effect(() => {
+        if (!editMode || !stemmaChart) return;
+        const svgEl = document.getElementById("chart") as unknown as SVGSVGElement | null;
+        if (!svgEl) return;
 
-    function handlePersonGhostSubmit(payload: { action: PersonGhostAction; name: string }) {
-        if (!ghostPopover || ghostPopover.kind !== "personGhost") return;
-        const anchor: PersonDefinition = { type: "ExistingPerson", id: ghostPopover.personId };
-        const newPerson: CreateNewPerson = { type: "CreateNewPerson", name: payload.name };
-        ghostPopover = null;
-        const parents = payload.action === "addSpouse" ? [anchor, newPerson] : [anchor];
-        const children = payload.action === "addChild" ? [newPerson] : [];
-        controller.createFamily(parents, children, { silent: true }).catch(() => {});
-    }
+        const PERSON_PREVIEW_R = 15;
+        const FAMILY_PREVIEW_R = 7;
 
-    function handleFamilyGhostConfirm(name: string) {
-        if (!ghostPopover || ghostPopover.kind !== "familyAdd") return;
-        const { familyId, action } = ghostPopover;
-        ghostPopover = null;
-        appendNewPersonToFamily(familyId, action, name);
-    }
+        let gesture: {
+            source: SourceRef;
+            sourceCenter: { x: number; y: number };
+            startClientX: number;
+            startClientY: number;
+            active: boolean;
+            sourceGEl: SVGGElement | null;
+            sourceMarker: SVGCircleElement | null;
+            line: SVGLineElement | null;
+            endpointPreview: SVGCircleElement | null;
+            lastTarget: SVGGElement | null;
+        } | null = null;
 
-    function appendNewPersonToFamily(familyId: string, action: GhostFamilyAction, name: string) {
-        if (!stemmaIndex) return;
-        const family = stemmaIndex.family(familyId);
-        const newPerson: CreateNewPerson = { type: "CreateNewPerson", name };
-        const asArgs = (ids: string[]): PersonDefinition[] => ids.map((id) => ({ type: "ExistingPerson", id }));
-        const parents = action === "addParent" ? [...asArgs(family.parents), newPerson] : asArgs(family.parents);
-        const children = action === "addChild" ? [...asArgs(family.children), newPerson] : asArgs(family.children);
-        controller.updateFamily(familyId, parents, children, { silent: true }).catch(() => {});
-    }
+        const clearTargetHighlight = () => {
+            if (gesture?.lastTarget) gesture.lastTarget.classList.remove("v2-drop-target");
+        };
 
-    function handleLinkRolePick(role: LinkRole) {
-        if (!ghostPopover || ghostPopover.kind !== "linkRole") return;
-        const { fromPersonId, toPersonId } = ghostPopover;
-        ghostPopover = null;
-        controller.linkPersons(fromPersonId, toPersonId, role, { silent: true }).catch(() => {});
-    }
+        const removeSvgEl = (el: Element | null) => {
+            if (el && el.parentNode) el.parentNode.removeChild(el);
+        };
+
+        const cleanup = () => {
+            if (!gesture) return;
+            clearTargetHighlight();
+            removeSvgEl(gesture.line);
+            removeSvgEl(gesture.sourceMarker);
+            removeSvgEl(gesture.endpointPreview);
+            gesture.sourceGEl?.classList.remove("v2-gesture-source");
+            gesture = null;
+            document.body.classList.remove("v2-linking");
+            dragTip = null;
+        };
+
+        const targetCompatibility = (
+            source: SourceRef,
+            overInfo: { ref: NodeRef } | null,
+        ): "valid" | "noop" | "create-empty" => {
+            if (source.kind === "person") {
+                if (overInfo?.ref.kind === "family") return "valid";
+                if (!overInfo) return "create-empty";
+                return "noop";
+            }
+            if (source.kind === "family") {
+                if (overInfo?.ref.kind === "person") return "valid";
+                if (!overInfo) return "create-empty";
+                return "noop";
+            }
+            if (source.kind === "empty") {
+                if (overInfo?.ref.kind === "family") return "valid";
+                if (overInfo?.ref.kind === "person") return "valid";
+                return "noop";
+            }
+            return "noop";
+        };
+
+        const onMouseDown = (e: MouseEvent) => {
+            if (e.button !== 0) return;
+            const targetG = (e.target as Element | null)?.closest?.("g[id^='person_'], g[id^='family_']") as SVGGElement | null;
+            let source: SourceRef;
+            let center: { x: number; y: number };
+            let sourceGEl: SVGGElement | null = null;
+            if (targetG) {
+                const kind = targetG.id.startsWith("person_") ? "person" : "family";
+                const sourceId = denormalizeId(targetG.id);
+                if (kind === "person" && isPendingPersonId(sourceId)) return;
+                const c = nodeCenter(targetG);
+                if (!c) return;
+                source = { kind, id: sourceId };
+                center = c;
+                sourceGEl = targetG;
+                stemmaChart?.popHover();
+            } else {
+                source = { kind: "empty" };
+                center = clientToSvgPoint(svgEl, e.clientX, e.clientY);
+            }
+            gesture = {
+                source,
+                sourceCenter: center,
+                startClientX: e.clientX,
+                startClientY: e.clientY,
+                active: false,
+                sourceGEl,
+                sourceMarker: null,
+                line: null,
+                endpointPreview: null,
+                lastTarget: null,
+            };
+            e.stopImmediatePropagation();
+        };
+
+        const computeTipText = (overInfo: { ref: NodeRef } | null, source: SourceRef): string | null => {
+            if (source.kind === "person") {
+                if (!overInfo) return $t("v2.tipCreateFamily");
+                if (overInfo.ref.kind === "family") return $t("v2.tipAttachSpouse");
+                return null;
+            }
+            if (source.kind === "family") {
+                if (!overInfo) return $t("v2.tipCreateChild");
+                if (overInfo.ref.kind === "person") return $t("v2.tipAttachChild");
+                return null;
+            }
+            if (source.kind === "empty") {
+                if (overInfo?.ref.kind === "family") return $t("v2.tipCreateSpouse");
+                if (overInfo?.ref.kind === "person") return $t("v2.tipCreateFamily");
+                return null;
+            }
+            return null;
+        };
+
+        const updateEndpointPreview = (
+            mainG: SVGGElement | null,
+            svgPt: { x: number; y: number },
+            overInfo: { ref: NodeRef } | null,
+        ) => {
+            if (!gesture) return;
+            if (overInfo || gesture.source.kind === "empty") {
+                if (gesture.endpointPreview) {
+                    gesture.endpointPreview.style.display = "none";
+                }
+                return;
+            }
+            const previewKind = gesture.source.kind === "person" ? "family" : "person";
+            const r = previewKind === "person" ? PERSON_PREVIEW_R : FAMILY_PREVIEW_R;
+            if (!gesture.endpointPreview && mainG) {
+                const p = document.createElementNS(SVG_NS, "circle") as SVGCircleElement;
+                p.setAttribute("class", `v2-endpoint-preview v2-endpoint-${previewKind}`);
+                mainG.appendChild(p);
+                gesture.endpointPreview = p;
+            }
+            if (gesture.endpointPreview) {
+                gesture.endpointPreview.style.display = "";
+                gesture.endpointPreview.setAttribute("cx", String(svgPt.x));
+                gesture.endpointPreview.setAttribute("cy", String(svgPt.y));
+                gesture.endpointPreview.setAttribute("r", String(r));
+            }
+        };
+
+        const onMouseMove = (e: MouseEvent) => {
+            if (!gesture) return;
+            const dx = e.clientX - gesture.startClientX;
+            const dy = e.clientY - gesture.startClientY;
+            if (!gesture.active) {
+                if (Math.hypot(dx, dy) <= 6) return;
+                gesture.active = true;
+                document.body.classList.add("v2-linking");
+                const mainG = svgEl.querySelector("g.main") as SVGGElement | null;
+                if (mainG) {
+                    const line = document.createElementNS(SVG_NS, "line") as SVGLineElement;
+                    line.setAttribute("class", "v2-link-line");
+                    line.setAttribute("x1", String(gesture.sourceCenter.x));
+                    line.setAttribute("y1", String(gesture.sourceCenter.y));
+                    line.setAttribute("x2", String(gesture.sourceCenter.x));
+                    line.setAttribute("y2", String(gesture.sourceCenter.y));
+                    mainG.appendChild(line);
+                    gesture.line = line;
+                    if (gesture.source.kind === "empty") {
+                        const marker = document.createElementNS(SVG_NS, "circle") as SVGCircleElement;
+                        marker.setAttribute("class", "v2-empty-source-marker");
+                        marker.setAttribute("cx", String(gesture.sourceCenter.x));
+                        marker.setAttribute("cy", String(gesture.sourceCenter.y));
+                        marker.setAttribute("r", "8");
+                        mainG.appendChild(marker);
+                        gesture.sourceMarker = marker;
+                    }
+                }
+                gesture.sourceGEl?.classList.add("v2-gesture-source");
+            }
+            const svgPt = clientToSvgPoint(svgEl, e.clientX, e.clientY);
+            if (gesture.line) {
+                gesture.line.setAttribute("x2", String(svgPt.x));
+                gesture.line.setAttribute("y2", String(svgPt.y));
+            }
+            const overInfo = findNodeUnder(e.clientX, e.clientY);
+            const overG = overInfo?.el ?? null;
+            const compat = targetCompatibility(gesture.source, overInfo);
+            if (overG !== gesture.lastTarget) {
+                gesture.lastTarget?.classList.remove("v2-drop-target");
+                gesture.lastTarget = null;
+                if (overG && compat === "valid") {
+                    overG.classList.add("v2-drop-target");
+                    gesture.lastTarget = overG;
+                }
+            }
+            const mainG = svgEl.querySelector("g.main") as SVGGElement | null;
+            updateEndpointPreview(mainG, svgPt, overInfo);
+            const tipText = computeTipText(overInfo, gesture.source);
+            dragTip = tipText ? { text: tipText, x: e.clientX, y: e.clientY } : null;
+        };
+
+        const onMouseUp = (e: MouseEvent) => {
+            if (!gesture) return;
+            const wasActive = gesture.active;
+            const source = gesture.source;
+            const startCenter = gesture.sourceCenter;
+            const overInfo = findNodeUnder(e.clientX, e.clientY);
+            cleanup();
+            if (!wasActive) return;
+
+            if (source.kind === "person" && overInfo?.ref.kind === "family") {
+                attachPersonToFamily(source.id, overInfo.ref.id, "parent");
+                return;
+            }
+            if (source.kind === "family" && overInfo?.ref.kind === "person") {
+                attachPersonToFamily(overInfo.ref.id, source.id, "child");
+                return;
+            }
+            if (source.kind === "person" && !overInfo) {
+                const releaseSvg = clientToSvgPoint(svgEl, e.clientX, e.clientY);
+                spawnStubFamily(source.id, releaseSvg.x, releaseSvg.y);
+                return;
+            }
+            if (source.kind === "empty" && overInfo?.ref.kind === "family") {
+                createSpouseForFamily(overInfo.ref.id);
+                return;
+            }
+            if (source.kind === "empty" && overInfo?.ref.kind === "person") {
+                spawnStubFamily(overInfo.ref.id, startCenter.x, startCenter.y);
+                return;
+            }
+            if (source.kind === "family" && !overInfo && !isPendingId(source.id)) {
+                openCreateChildPrompt(source.id);
+                return;
+            }
+        };
+
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") cleanup();
+        };
+
+        svgEl.addEventListener("mousedown", onMouseDown, true);
+        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mouseup", onMouseUp);
+        window.addEventListener("keydown", onKeyDown);
+        return () => {
+            svgEl.removeEventListener("mousedown", onMouseDown, true);
+            window.removeEventListener("mousemove", onMouseMove);
+            window.removeEventListener("mouseup", onMouseUp);
+            window.removeEventListener("keydown", onKeyDown);
+            cleanup();
+        };
+    });
 
     async function handleBulkAdd(names: string[]) {
         for (const name of names) {
-            try {
-                await controller.createOrphanPerson({ type: "CreateNewPerson", name }, { silent: true });
-            } catch {
-                // surfaced through controller.err
-            }
+            await withPendingAdd(name, () =>
+                controller.createOrphanPerson({ type: "CreateNewPerson", name }, { silent: true }),
+            );
         }
     }
 
@@ -392,6 +630,7 @@
 
     function handlePersonSelected(person: PersonDescription) {
         if (pendingRemovedPersonIds.has(person.id)) return;
+        if (isPendingId(person.id)) return;
         personEditModal?.showPersonDetails({
             description: person,
             pin: pinnedPeople?.isPinned(person.id) ?? false,
@@ -412,7 +651,9 @@
     }
 
     function runCreateOrphanPerson(name: string) {
-        controller.createOrphanPerson({ type: "CreateNewPerson", name }, { silent: true }).catch(() => {});
+        void withPendingAdd(name, () =>
+            controller.createOrphanPerson({ type: "CreateNewPerson", name }, { silent: true }),
+        );
     }
 
     function setWith<T>(s: Set<T>, v: T): Set<T> {
@@ -560,7 +801,7 @@
         confirmModal?.ask({
             title: $t("v2.removeFamilyTitle"),
             message: $t("v2.removeFamilyMessage"),
-            confirmLabel: $t("common.delete"),
+            confirmLabel: $t("v2.dissolveFamilyConfirm"),
             danger: true,
             testid: "v2-remove-family-modal",
             onaccept: () => runRemoveFamily(familyId),
@@ -601,23 +842,24 @@
         };
     });
 
-    const showCanvas = $derived(!isWorking && stemma && stemmaIndex && highlight && pinnedPeople);
+    const showCanvas = $derived(!isWorking && displayedStemma && displayedStemmaIndex && highlight && pinnedPeople);
     const showEmpty = $derived(!isWorking && stemma && stemma.people.length === 0);
 </script>
 
 {#if signedIn}
-    <div class="v2-layout">
+    <div class="v2-layout" class:v2-edit-mode={editMode}>
         <div class="v2-canvas-layer">
             {#if showCanvas}
                 <FullStemma
                     bind:this={stemmaChart}
                     hidden={isWorking}
-                    stemma={stemma!}
+                    stemma={displayedStemma!}
                     currentStemmaId={currentStemmaId ?? ""}
-                    stemmaIndex={stemmaIndex!}
+                    stemmaIndex={displayedStemmaIndex!}
                     highlight={highlight!}
                     pinnedPeople={pinnedPeople!}
                     viewMode={ViewMode.ALL}
+                    simulationActive={!editMode}
                     onpersonSelected={handlePersonSelected}
                     onfamilySelected={handleFamilySelected}
                     onhighlightChanged={() => highlightVersion++}
@@ -650,9 +892,6 @@
                         disabled={isWorking}
                         onselect={(id) => stemmaChart?.zoomToNode(id)}
                     />
-                {/if}
-                {#if editMode}
-                    <V2EditPill />
                 {/if}
             </div>
 
@@ -700,6 +939,16 @@
             </div>
         {/if}
 
+        {#if dragTip}
+            <div
+                class="v2-drag-tip"
+                style="left: {dragTip.x + 14}px; top: {dragTip.y + 14}px;"
+                data-testid="v2-drag-tip"
+            >
+                {dragTip.text}
+            </div>
+        {/if}
+
         {#if error}
             <div class="v2-error-bar">
                 <div class="alert alert-danger alert-dismissible fade show mb-0">
@@ -729,33 +978,6 @@
                 onfamilyRemoveRequested={handleFamilyRemoveRequested}
                 onclose={closeFamilySheet}
             />
-        {/snippet}
-    </V2Sheet>
-
-    <V2Sheet
-        open={ghostPopover !== null}
-        anchorEl={ghostPopover?.anchorEl ?? null}
-        onclose={closeGhostPopover}
-        testid="v2-ghost-popover"
-    >
-        {#snippet body()}
-            {#if ghostPopover?.kind === "personGhost"}
-                <V2PersonGhost
-                    onsubmit={handlePersonGhostSubmit}
-                    oncancel={closeGhostPopover}
-                />
-            {:else if ghostPopover?.kind === "familyAdd"}
-                <V2FamilyGhost
-                    action={ghostPopover.action}
-                    onconfirm={handleFamilyGhostConfirm}
-                    oncancel={closeGhostPopover}
-                />
-            {:else if ghostPopover?.kind === "linkRole"}
-                <V2LinkRolePicker
-                    onpick={handleLinkRolePick}
-                    oncancel={closeGhostPopover}
-                />
-            {/if}
         {/snippet}
     </V2Sheet>
 
@@ -929,82 +1151,90 @@
         animation: v2-pending-pulse 1.2s ease-in-out infinite;
     }
 
+    :global(.v2-pending-add) {
+        opacity: 0.45;
+        stroke-dasharray: 4 3;
+        stroke: #0d6efd;
+        animation: v2-pending-pulse 1.2s ease-in-out infinite;
+    }
+
     @keyframes v2-pending-pulse {
         0%, 100% { stroke-opacity: 1; }
         50% { stroke-opacity: 0.35; }
     }
 
-    :global(.v2-ghost-mount), :global(.v2-drag-mount) {
-        pointer-events: auto;
-        overflow: visible;
-    }
-
-    :global(.v2-ghost-btn) {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border: 1px solid rgba(13, 110, 253, 0.55);
-        background: rgba(255, 255, 255, 0.7);
-        color: #0d6efd;
-        font-weight: 600;
-        font-size: 0.78rem;
-        line-height: 1;
-        padding: 0;
-        cursor: pointer;
-        backdrop-filter: blur(2px);
-        transition: opacity 0.1s ease, background-color 0.1s ease, transform 0.1s ease;
-        opacity: 0.55;
-        user-select: none;
-        white-space: nowrap;
-    }
-
-    :global(.v2-ghost-btn:hover) {
-        opacity: 1;
-        background: #fff;
-        transform: scale(1.05);
-    }
-
-    :global(.v2-ghost-btn.v2-ghost-person) {
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        font-size: 1.1rem;
-    }
-
-    :global(.v2-ghost-btn.v2-ghost-family) {
-        height: 20px;
-        padding: 0 8px;
-        border-radius: 10px;
-    }
-
-    :global(.v2-drag-handle) {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 18px;
-        height: 18px;
-        border-radius: 9px;
-        background: rgba(13, 110, 253, 0.15);
-        border: 1px solid rgba(13, 110, 253, 0.4);
-        color: #0d6efd;
-        font-size: 0.85rem;
-        line-height: 1;
-        cursor: grab;
-        opacity: 0.6;
-        user-select: none;
-    }
-
-    :global(.v2-drag-handle:hover) {
-        opacity: 1;
-    }
-
-    :global(.v2-drag-handle:active) {
-        cursor: grabbing;
-    }
-
-    :global(g.v2-drop-target circle) {
+    :global(g.v2-drop-target > circle) {
         stroke: #0d6efd;
         stroke-width: 3px;
         stroke-dasharray: 4 2;
+        filter: drop-shadow(0 0 6px rgba(13, 110, 253, 0.55));
+    }
+
+    :global(g.v2-gesture-source > circle) {
+        stroke: #0d6efd;
+        stroke-width: 2.5px;
+        filter: drop-shadow(0 0 8px rgba(13, 110, 253, 0.65));
+    }
+
+    :global(.v2-empty-source-marker) {
+        fill: rgba(13, 110, 253, 0.08);
+        stroke: #0d6efd;
+        stroke-width: 1.5;
+        stroke-dasharray: 4 3;
+        opacity: 0.7;
+        pointer-events: none;
+    }
+
+    :global(.v2-endpoint-preview) {
+        fill: rgba(13, 110, 253, 0.08);
+        stroke: #0d6efd;
+        stroke-width: 1.5;
+        stroke-dasharray: 4 3;
+        opacity: 0.75;
+        pointer-events: none;
+    }
+
+    :global(.v2-link-line) {
+        stroke: #0d6efd;
+        stroke-width: 2px;
+        stroke-dasharray: 5 4;
+        pointer-events: none;
+        opacity: 0.7;
+    }
+
+    :global(body.v2-linking),
+    :global(body.v2-linking *) {
+        cursor: crosshair !important;
+    }
+
+    .v2-drag-tip {
+        position: fixed;
+        pointer-events: none;
+        background: rgba(13, 110, 253, 0.95);
+        color: #fff;
+        padding: 4px 10px;
+        border-radius: 10px;
+        font-size: 0.82rem;
+        font-weight: 500;
+        white-space: nowrap;
+        z-index: 400;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    .v2-edit-mode :global(g[id^='person_']),
+    .v2-edit-mode :global(g[id^='family_']) {
+        cursor: grab;
+    }
+
+    .v2-edit-mode::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        opacity: 0.06;
+        background-repeat: repeat;
+        background-size: 220px 220px;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'><g fill='%23212529'><g transform='translate(30 40) rotate(20) scale(1.4)'><path d='M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325'/></g><g transform='translate(150 90) rotate(-35) scale(1.6)'><path d='M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325'/></g><g transform='translate(80 170) rotate(75) scale(1.3)'><path d='M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325'/></g></g></svg>");
     }
 </style>
