@@ -22,46 +22,44 @@
         return () => mql.removeEventListener("change", onChange);
     });
 
-    type PopoverPos = { top: number; left: number; placement: "right" | "left" | "below" };
+    type PopoverPos = { top: number; left: number; maxH: number; placement: "right" | "left" | "below" };
 
     const popoverPos = $derived.by<PopoverPos>(() => {
-        if (!open || isMobile || !anchorEl) return { top: 0, left: 0, placement: "right" };
+        if (!open || isMobile || !anchorEl) return { top: 0, left: 0, maxH: 0, placement: "right" };
         const rect = anchorEl.getBoundingClientRect();
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
         const popW = 320;
-        const popH = 300;
         const margin = 12;
+        const popH = Math.min(600, vh - 16);
 
-        const anchorInView =
-            rect.right > 0 && rect.left < window.innerWidth &&
-            rect.bottom > 0 && rect.top < window.innerHeight;
+        const anchorInView = rect.right > 0 && rect.left < vw && rect.bottom > 0 && rect.top < vh;
 
         if (!anchorInView) {
-            const left = Math.max(8, (window.innerWidth - popW) / 2);
-            const top = Math.max(8, (window.innerHeight - popH) / 2);
-            return { top, left, placement: "below" };
+            return {
+                left: Math.max(8, (vw - popW) / 2),
+                top: Math.max(8, (vh - popH) / 2),
+                maxH: popH,
+                placement: "below",
+            };
         }
-
-        const spaceRight = window.innerWidth - rect.right;
-        const spaceLeft = rect.left;
 
         let left: number;
         let placement: "right" | "left" | "below";
-
-        if (spaceRight >= popW + margin) {
+        if (vw - rect.right >= popW + margin) {
             left = rect.right + margin;
             placement = "right";
-        } else if (spaceLeft >= popW + margin) {
+        } else if (rect.left >= popW + margin) {
             left = rect.left - popW - margin;
             placement = "left";
         } else {
-            left = Math.max(8, (window.innerWidth - popW) / 2);
+            left = Math.max(8, (vw - popW) / 2);
             placement = "below";
         }
 
         const centeredTop = rect.top + rect.height / 2 - popH / 2;
-        const top = Math.max(8, Math.min(centeredTop, window.innerHeight - popH - 8));
-
-        return { top, left, placement };
+        const top = Math.max(8, Math.min(centeredTop, vh - popH - 8));
+        return { top, left, maxH: popH, placement };
     });
 
     function handleBackdropClick() {
@@ -93,7 +91,7 @@
         <div class="popover-backdrop" onclick={handleBackdropClick} aria-hidden="true"></div>
         <div
             class="popover-panel"
-            style="top: {popoverPos.top}px; left: {popoverPos.left}px;"
+            style="top: {popoverPos.top}px; left: {popoverPos.left}px; max-height: {popoverPos.maxH}px;"
             data-testid={testid}
             role="dialog"
             aria-modal="true"
@@ -190,7 +188,6 @@
     .popover-panel {
         position: fixed;
         width: 320px;
-        max-height: calc(100vh - 32px);
         display: flex;
         flex-direction: column;
         background: var(--v2-bg-surface);
