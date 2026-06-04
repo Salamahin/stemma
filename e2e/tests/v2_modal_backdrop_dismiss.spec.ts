@@ -145,12 +145,12 @@ test("v2 modal: click inside panel does not close", async ({ page }) => {
   await expect(modal).toBeVisible();
 });
 
-test("v2 invite link modal: backdrop click closes", async ({ page }) => {
+test("v2 share access modal: backdrop click closes", async ({ page }) => {
   await page.setViewportSize(DESKTOP);
   await page.goto("/v2");
   await waitForV2Ready(page);
 
-  // Enter edit mode so the share area is rendered inside the person details modal.
+  // Enter edit mode so the share access entry is rendered inside the person details modal.
   const editFab = page.getByTestId("v2-edit-fab");
   const editOn = await page.getByTestId("v2-add-person-fab").isVisible({ timeout: 500 }).catch(() => false);
   if (!editOn) {
@@ -159,23 +159,18 @@ test("v2 invite link modal: backdrop click closes", async ({ page }) => {
   }
 
   await openFirstPersonModal(page);
-  const personModal = page.getByTestId("v2-person-details-modal");
-  const shareEmailInput = page.getByTestId("v2-share-email");
-  if (!(await shareEmailInput.isVisible({ timeout: 1_500 }).catch(() => false))) {
+  const shareAccessBtn = page.getByTestId("v2-share-access-btn");
+  if (!(await shareAccessBtn.isVisible({ timeout: 1_500 }).catch(() => false))) {
     test.skip(true, "first person in test stack is read-only — no share UI available");
     return;
   }
 
-  await shareEmailInput.fill("guest@example.com");
-  await page.getByTestId("v2-share-generate").click();
-
-  const linkModal = page.getByTestId("v2-invite-link-modal");
-  await expect(linkModal).toBeVisible({ timeout: 10_000 });
+  await shareAccessBtn.click();
+  const shareModal = page.getByTestId("v2-share-access-modal");
+  await expect(shareModal).toBeVisible({ timeout: 5_000 });
 
   await clickBackdrop(page);
-  await expect(linkModal).toBeHidden();
-  // The person details modal is dismissed by V2App when the invite token arrives, so it should also be gone.
-  await expect(personModal).toBeHidden();
+  await expect(shareModal).toBeHidden();
 });
 
 test("v2 person details modal: cropping suppresses backdrop dismiss", async ({ page }) => {
