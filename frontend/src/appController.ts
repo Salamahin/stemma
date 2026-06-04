@@ -7,6 +7,8 @@ import { writable, get } from 'svelte/store';
 import { SettingsStorage } from './settingsStroage';
 import { selectStemmaId } from './appControllerSelection';
 
+export type MutationOptions = { silent?: boolean }
+
 export class AppController {
     private static readonly LAST_STEMMA_KEY = "stemma_last_stemma_id";
     private modelFactory: (endpoint: string, tokenProvider: TokenProvider) => Model;
@@ -91,7 +93,8 @@ export class AppController {
     }
 
     selectStemma(stemmaId: string) {
-        this.isWorking.set(true)
+        const sameStemma = get(this.currentStemmaId) === stemmaId
+        if (!sameStemma) this.isWorking.set(true)
         this.err.set(null)
 
         this.setCurrentStemmaId(stemmaId)
@@ -105,7 +108,7 @@ export class AppController {
                 this.err.set(err)
                 console.error('Err when fetching stemma data: ', err.stack);
             })
-            .finally(() => this.isWorking.set(false))
+            .finally(() => { if (!sameStemma) this.isWorking.set(false) })
     }
 
     removeStemma(stemmaId: string) {
@@ -180,20 +183,20 @@ export class AppController {
             .finally(() => this.isWorking.set(false))
     }
 
-    createOrphanPerson(descr: CreateNewPerson) {
-        this.manipulateStemma((model, stemmaId) => model.createOrphanPerson(stemmaId, descr))
+    createOrphanPerson(descr: CreateNewPerson, options?: MutationOptions) {
+        return this.manipulateStemma((model, stemmaId) => model.createOrphanPerson(stemmaId, descr), options)
     }
 
-    createFamily(parents: PersonDefinition[], children: PersonDefinition[]) {
-        this.manipulateStemma((model, stemmaId) => model.createFamily(stemmaId, parents, children, get(this.stemmaIndex)))
+    createFamily(parents: PersonDefinition[], children: PersonDefinition[], options?: MutationOptions) {
+        return this.manipulateStemma((model, stemmaId) => model.createFamily(stemmaId, parents, children, get(this.stemmaIndex)), options)
     }
 
-    updateFamily(familyId: string, parents: PersonDefinition[], children: PersonDefinition[]) {
-        this.manipulateStemma((model, stemmaId) => model.updateFamily(stemmaId, familyId, parents, children, get(this.stemmaIndex)))
+    updateFamily(familyId: string, parents: PersonDefinition[], children: PersonDefinition[], options?: MutationOptions) {
+        return this.manipulateStemma((model, stemmaId) => model.updateFamily(stemmaId, familyId, parents, children, get(this.stemmaIndex)), options)
     }
 
-    removeFamily(familyId: string) {
-        this.manipulateStemma((model, stemmaId) => model.removeFamily(stemmaId, familyId))
+    removeFamily(familyId: string, options?: MutationOptions) {
+        return this.manipulateStemma((model, stemmaId) => model.removeFamily(stemmaId, familyId), options)
     }
 
     savePerson(personId: string, descr: CreateNewPerson, pin: boolean, photoUpload: Blob | null, photoRemove: boolean) {
@@ -246,8 +249,8 @@ export class AppController {
             .finally(() => this.isWorking.set(false))
     }
 
-    removePerson(personId: string) {
-        this.manipulateStemma((model, stemmaId) => model.removePerson(stemmaId, personId, get(this.stemmaIndex)))
+    removePerson(personId: string, options?: MutationOptions) {
+        return this.manipulateStemma((model, stemmaId) => model.removePerson(stemmaId, personId, get(this.stemmaIndex)), options)
     }
 
     createInvitationToken(personId: string, email: string) {
@@ -257,13 +260,17 @@ export class AppController {
             .then(tkn => this.invitationToken.set(tkn))
     }
 
-    private manipulateStemma(action: (m: Model, currentStemmaId: string) => Promise<Stemma>) {
+    private manipulateStemma(
+        action: (m: Model, currentStemmaId: string) => Promise<Stemma>,
+        options?: MutationOptions,
+    ): Promise<void> {
         let currentStemmaId = get(this.currentStemmaId)
+        const silent = options?.silent ?? false
 
-        this.isWorking.set(true)
+        if (!silent) this.isWorking.set(true)
         this.err.set(null)
 
-        action(this.model, currentStemmaId)
+        return action(this.model, currentStemmaId)
             .then((result) => {
                 this.refreshIndexes(result, currentStemmaId)
                 this.stemma.set(result)
@@ -271,8 +278,9 @@ export class AppController {
             .catch(err => {
                 this.err.set(err)
                 console.error('Err when manipulating stemma data: ', err.stack);
+                throw err
             })
-            .finally(() => this.isWorking.set(false))
+            .finally(() => { if (!silent) this.isWorking.set(false) })
     }
 
 
