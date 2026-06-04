@@ -28,7 +28,7 @@ test("v2 screenshots: populated canvas + person sheet + family stub sheet", asyn
   await expect(personNode).toBeVisible({ timeout: 15_000 });
   await personNode.dispatchEvent("click");
 
-  const personSheet = page.getByTestId("v2-person-sheet");
+  const personSheet = page.getByTestId("v2-person-details-modal");
   await expect(personSheet).toBeVisible();
   await page.waitForTimeout(400);
   await page.screenshot({ path: "test-results/v2-03-person-sheet-edit.png" });
@@ -92,7 +92,7 @@ test("v2 screenshots: bootstrap empty stemma → orphan → stub → real family
 
   // Click anchor → +family stub
   await svg.locator("g[id^='person_']").first().dispatchEvent("click");
-  const personSheet = page.getByTestId("v2-person-sheet");
+  const personSheet = page.getByTestId("v2-person-details-modal");
   await expect(personSheet).toBeVisible();
   await page.getByTestId("v2-add-family-action").dispatchEvent("click");
 

@@ -18,18 +18,15 @@
     import V2Search from "./components/V2Search.svelte";
     import V2EmptyState from "./components/V2EmptyState.svelte";
     import V2Sheet from "./components/V2Sheet.svelte";
-    import V2PersonCard from "./components/V2PersonCard.svelte";
     import V2FamilyCard from "./components/V2FamilyCard.svelte";
     import V2AboutModal from "./components/V2AboutModal.svelte";
     import V2SettingsModal from "./components/V2SettingsModal.svelte";
-    import V2ShareModal from "./components/V2ShareModal.svelte";
     import V2InviteLinkModal from "./components/V2InviteLinkModal.svelte";
     import V2PromptModal from "./components/V2PromptModal.svelte";
     import V2ConfirmModal from "./components/V2ConfirmModal.svelte";
     import V2PersonDetailsModal from "./components/V2PersonDetailsModal.svelte";
     import StatsCard from "../components/stats_card/StatsCard.svelte";
     import { buildInviteLink } from "../inviteLinkBuilder";
-    import { personDisplayName } from "../personDisplayName";
     import { Circle2 } from "svelte-loading-spinners";
 
     type StubEntry = { anchorPersonId: string; anchorRole: "parent" | "child" };
@@ -73,10 +70,6 @@
     let error = $state<Error | null>(null);
     let highlightVersion = $state(0);
 
-    let selectedPerson = $state<PersonDescription | null>(null);
-    let selectedPersonEl = $state<Element | null>(null);
-    let personSheetOpen = $state(false);
-
     let selectedFamilyId = $state<string | null>(null);
     let selectedFamilyStub = $state<StubContext | null>(null);
     let selectedFamilyEl = $state<Element | null>(null);
@@ -85,7 +78,6 @@
     let personEditModal = $state<ReturnType<typeof V2PersonDetailsModal> | null>(null);
     let aboutModal = $state<ReturnType<typeof V2AboutModal> | null>(null);
     let settingsModal = $state<ReturnType<typeof V2SettingsModal> | null>(null);
-    let shareModal = $state<ReturnType<typeof V2ShareModal> | null>(null);
     let inviteLinkModal = $state<ReturnType<typeof V2InviteLinkModal> | null>(null);
     let promptModal = $state<ReturnType<typeof V2PromptModal> | null>(null);
     let confirmModal = $state<ReturnType<typeof V2ConfirmModal> | null>(null);
@@ -107,7 +99,7 @@
         controller.err.subscribe((e) => (error = e)),
         controller.invitationToken.subscribe((tkn) => {
             if (!tkn) return;
-            shareModal?.close();
+            personEditModal?.dismiss();
             const link = buildInviteLink(window.location.origin, tkn);
             inviteLinkModal?.show(link);
         }),
@@ -165,9 +157,10 @@
     }
 
     function handlePersonSelected(person: PersonDescription) {
-        selectedPerson = person;
-        selectedPersonEl = document.getElementById(`person_${person.id}`);
-        personSheetOpen = true;
+        personEditModal?.showPersonDetails({
+            description: person,
+            pin: pinnedPeople?.isPinned(person.id) ?? false,
+        });
     }
 
     function handleFamilySelected(family: FamilyDescription) {
@@ -184,12 +177,6 @@
         familySheetOpen = true;
     }
 
-    function closePersonSheet() {
-        personSheetOpen = false;
-        selectedPerson = null;
-        selectedPersonEl = null;
-    }
-
     function closeFamilySheet() {
         familySheetOpen = false;
         selectedFamilyId = null;
@@ -204,12 +191,6 @@
         selectedFamilyId = null;
         selectedFamilyEl = null;
         familySheetOpen = true;
-    }
-
-    function handlePersonEditRequested(personId: string) {
-        if (!stemmaIndex) return;
-        const p = stemmaIndex.person(personId);
-        personEditModal?.showPersonDetails({ description: p, pin: pinnedPeople?.isPinned(personId) ?? false });
     }
 
     function personArg(payload: FamilyFromStubPayload) {
@@ -399,15 +380,6 @@
         });
     }
 
-    function handleShareRequested(personId: string) {
-        if (!stemmaIndex) return;
-        const p = stemmaIndex.person(personId);
-        shareModal?.show({
-            personId,
-            personName: personDisplayName(p.name, $t),
-        });
-    }
-
     onMount(() => {
         if (e2eAutoLoginEnabled) {
             e2eMode = true;
@@ -532,26 +504,6 @@
     </div>
 
     <V2Sheet
-        open={personSheetOpen}
-        anchorEl={selectedPersonEl}
-        onclose={closePersonSheet}
-        testid="v2-person-sheet"
-    >
-        {#snippet body()}
-            {#if selectedPerson}
-                <V2PersonCard
-                    person={selectedPerson}
-                    {editMode}
-                    onfamilyStubRequested={handleFamilyStubRequested}
-                    onpersonEditRequested={handlePersonEditRequested}
-                    onshareRequested={handleShareRequested}
-                    onclose={closePersonSheet}
-                />
-            {/if}
-        {/snippet}
-    </V2Sheet>
-
-    <V2Sheet
         open={familySheetOpen}
         anchorEl={selectedFamilyEl}
         onclose={closeFamilySheet}
@@ -575,16 +527,15 @@
 
     <V2PersonDetailsModal
         bind:this={personEditModal}
+        {editMode}
         onpersonUpdated={(p) => controller.savePerson(p.id, p.description, p.pin, p.photoUpload, p.photoRemove)}
         onpersonRemoveRequested={handlePersonRemoveRequested}
+        onfamilyStubRequested={handleFamilyStubRequested}
+        onshareInvite={(p) => controller.createInvitationToken(p.personId, p.email)}
     />
 
     <V2AboutModal bind:this={aboutModal} />
     <V2SettingsModal bind:this={settingsModal} />
-    <V2ShareModal
-        bind:this={shareModal}
-        oninvite={(p) => controller.createInvitationToken(p.personId, p.email)}
-    />
     <V2InviteLinkModal bind:this={inviteLinkModal} />
     <V2PromptModal bind:this={promptModal} />
     <V2ConfirmModal bind:this={confirmModal} />
