@@ -7,6 +7,7 @@ from stemma.domain.requests import (
     CreateNewPerson,
     CreateOrphanPersonRequest,
     ExistingPerson,
+    LinkPersonsRequest,
     RequestPhotoUploadUrlRequest,
     SetPersonPhotoRequest,
     UpdatePersonRequest,
@@ -116,6 +117,22 @@ def test_encode_error_with_fields() -> None:
 def test_encode_error_without_fields() -> None:
     assert encode_error(IncompleteFamily()) == {"type": "IncompleteFamily"}
     assert encode_error(InvalidInviteToken()) == {"type": "InvalidInviteToken"}
+
+
+def test_decode_link_persons_request() -> None:
+    payload = {
+        "type": "LinkPersonsRequest",
+        "stemmaId": "s1",
+        "fromPersonId": "p1",
+        "toPersonId": "p2",
+        "role": "spouse",
+    }
+    request = decode_request(payload)
+    assert isinstance(request, LinkPersonsRequest)
+    assert request.stemma_id == "s1"
+    assert request.from_person_id == "p1"
+    assert request.to_person_id == "p2"
+    assert request.role == "spouse"
 
 
 def test_decode_request_photo_upload_url_request() -> None:

@@ -130,6 +130,18 @@ class CreateOrphanPersonRequest:
     type: Literal["CreateOrphanPersonRequest"] = "CreateOrphanPersonRequest"
 
 
+LinkRole = Literal["spouse", "parent", "child"]
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
+class LinkPersonsRequest:
+    stemma_id: str
+    from_person_id: str
+    to_person_id: str
+    role: LinkRole
+    type: Literal["LinkPersonsRequest"] = "LinkPersonsRequest"
+
+
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
 class RequestPhotoUploadUrlRequest:
     stemma_id: str
@@ -161,6 +173,7 @@ Request = Annotated[
     | DeletePersonRequest
     | UpdatePersonRequest
     | CreateOrphanPersonRequest
+    | LinkPersonsRequest
     | RequestPhotoUploadUrlRequest
     | SetPersonPhotoRequest,
     Discriminator("type"),
