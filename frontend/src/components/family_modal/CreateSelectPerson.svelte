@@ -11,10 +11,11 @@
     type Props = {
         stemmaIndex: StemmaIndex;
         stemma: Stemma;
+        hideNamesakes?: boolean;
         onselected?: (person: CreateNewPerson | PersonDescription) => void;
     };
 
-    let { stemmaIndex, stemma, onselected }: Props = $props();
+    let { stemmaIndex, stemma, hideNamesakes = false, onselected }: Props = $props();
 
     let namesakes = $state<(CreateNewPerson | PersonDescription)[]>([]);
     let selectedPerson = $state<CreateNewPerson | PersonDescription>(null);
@@ -49,7 +50,10 @@
     }
 
     function nameChanged(newName: string) {
-        namesakes = [...stemmaIndex.namesakes(newName).filter((p) => !p.readOnly), { type: "CreateNewPerson", name: newName }];
+        const matches = hideNamesakes
+            ? []
+            : stemmaIndex.namesakes(newName).filter((p) => !p.readOnly);
+        namesakes = [...matches, { type: "CreateNewPerson", name: newName }];
     }
 
     export function reset() {

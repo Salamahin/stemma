@@ -23,10 +23,19 @@ test("v2 screenshots: populated canvas + person sheet + family ghost popover", a
   await page.waitForTimeout(300);
   await page.screenshot({ path: "test-results/v2-02-edit-mode-on.png" });
 
+  const addPersonFab = page.getByTestId("v2-add-person-fab");
+  await expect(addPersonFab).toBeVisible({ timeout: 5_000 });
+  await addPersonFab.click();
+  const orphanName = `Orphan${Date.now()}`;
+  const orphanInput = page.getByTestId("v2-name-input");
+  await expect(orphanInput).toBeVisible();
+  await orphanInput.fill(orphanName);
+  await page.getByTestId("v2-name-confirm").click();
+
   const svg = page.locator("svg#chart");
-  const personNode = svg.locator("g[id^='person_']").first();
-  await expect(personNode).toBeVisible({ timeout: 15_000 });
-  const personId = (await personNode.getAttribute("id"))!.replace("person_", "");
+  const orphanGroup = svg.locator("g[id^='person_']").filter({ has: page.locator(`text="${orphanName}"`) }).first();
+  await expect(orphanGroup).toBeVisible({ timeout: 15_000 });
+  const personId = (await orphanGroup.getAttribute("id"))!.replace("person_", "");
 
   const personGhost = page.locator(`[data-testid='v2-person-ghost-${personId}']`);
   await expect(personGhost).toBeVisible({ timeout: 5_000 });

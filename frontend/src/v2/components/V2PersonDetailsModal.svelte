@@ -601,17 +601,6 @@
                         </div>
                     </div>
                 {/if}
-
-                {#if !personReadOnly}
-                    <div class="col-share">
-                        <button
-                            type="button"
-                            class="btn btn-outline-primary"
-                            onclick={requestShareAccess}
-                            data-testid="v2-share-access-btn"
-                        >{$t("v2.shareAccess")}</button>
-                    </div>
-                {/if}
             </div>
         {/if}
     {/snippet}
@@ -633,6 +622,14 @@
                 onclick={remove}
                 data-testid="v2-person-delete"
             >{$t("common.delete")}</button>
+            {#if !personReadOnly}
+                <button
+                    type="button"
+                    class="btn btn-outline-primary"
+                    onclick={requestShareAccess}
+                    data-testid="v2-share-access-btn"
+                >{$t("v2.shareAccess")}</button>
+            {/if}
             <button type="button" class="btn btn-secondary" onclick={close}>{$t("common.cancel")}</button>
             <button
                 type="button"
@@ -642,6 +639,14 @@
                 data-testid="v2-person-save"
             >{$t("common.save")}</button>
         {:else}
+            {#if !personReadOnly}
+                <button
+                    type="button"
+                    class="btn btn-outline-primary me-auto"
+                    onclick={requestShareAccess}
+                    data-testid="v2-share-access-btn"
+                >{$t("v2.shareAccess")}</button>
+            {/if}
             <button type="button" class="btn btn-secondary" onclick={close}>{$t("common.close")}</button>
         {/if}
     {/snippet}
@@ -658,7 +663,6 @@
     .col-fields { grid-column: 2; grid-row: 1; }
     .col-bio { grid-column: 1 / -1; }
     .col-pin { grid-column: 1 / -1; }
-    .col-share { grid-column: 1 / -1; }
 
     @media (max-width: 560px) {
         .grid {

@@ -17,7 +17,7 @@
 
     let selectedPerson = $state<PersonChoice | null>(null);
 
-    const title = $derived(action === "addChild" ? $t("v2.familyGhostAddChild") : $t("v2.familyGhostAddParent"));
+    const title = $derived(action === "addChild" ? $t("v2.familyGhostAddChild") : $t("v2.familyGhostAddSpouse"));
 
     function confirm() {
         if (!selectedPerson) return;
@@ -31,6 +31,7 @@
         <CreateSelectPerson
             {stemmaIndex}
             {stemma}
+            hideNamesakes
             onselected={(p) => { selectedPerson = p; }}
         />
     </div>

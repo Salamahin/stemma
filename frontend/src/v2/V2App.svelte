@@ -171,9 +171,17 @@
     };
 
     const PERSON_GHOST_GEOM = { x: 18, y: -32, w: 28, h: 28 } as const;
-    const FAMILY_GHOST_GEOM: Record<GhostFamilyAction, { y: number; label: string; slug: "child" | "parent" }> = {
-        addChild: { y: 14, label: "+ child", slug: "child" },
-        addParent: { y: -38, label: "+ parent", slug: "parent" },
+    const FAMILY_GHOST_GEOM: Record<GhostFamilyAction, { y: number; slug: "child" | "parent" }> = {
+        addChild: { y: 14, slug: "child" },
+        addParent: { y: -38, slug: "parent" },
+    };
+
+    type GhostLabels = {
+        addChildLabel: string;
+        addSpouseLabel: string;
+        addChildAria: string;
+        addSpouseAria: string;
+        person: string;
     };
 
     let mountSeq = 0;
@@ -182,9 +190,11 @@
         const enabled = editMode;
         const idx = augmentedStemmaIndex;
         void stemmaChart;
-        const labels = {
-            addChild: $t("v2.familyGhostAddChild"),
-            addParent: $t("v2.familyGhostAddParent"),
+        const labels: GhostLabels = {
+            addChildLabel: $t("v2.addChild"),
+            addSpouseLabel: $t("v2.addSpouse"),
+            addChildAria: $t("v2.familyGhostAddChild"),
+            addSpouseAria: $t("v2.familyGhostAddSpouse"),
             person: $t("v2.personGhostLabel"),
         };
         if (!stemmaChart) return;
@@ -198,7 +208,7 @@
     function mountGhosts(
         enabled: boolean,
         idx: StemmaIndex | null,
-        labels: { addChild: string; addParent: string; person: string },
+        labels: GhostLabels,
     ) {
         const svgEl = document.getElementById("chart");
         if (!svgEl) return;
@@ -212,6 +222,7 @@
             const id = g.id;
             if (id.startsWith("person_")) {
                 const personId = denormalizeId(id);
+                if ((idx?.relatedFamilies(personId).length ?? 0) > 0) return;
                 mountGhost(g, {
                     ...PERSON_GHOST_GEOM,
                     label: "+",
@@ -223,19 +234,19 @@
             } else if (id.startsWith("family_")) {
                 const familyId = denormalizeId(id);
                 const family = idx?.family(familyId) ?? null;
-                mountGhost(g, makeFamilyGhostSpec(familyId, "addChild", labels.addChild));
+                mountGhost(g, makeFamilyGhostSpec(familyId, "addChild", labels.addChildLabel, labels.addChildAria));
                 if (canAddParentToFamily(family)) {
-                    mountGhost(g, makeFamilyGhostSpec(familyId, "addParent", labels.addParent));
+                    mountGhost(g, makeFamilyGhostSpec(familyId, "addParent", labels.addSpouseLabel, labels.addSpouseAria));
                 }
             }
         });
     }
 
-    function makeFamilyGhostSpec(familyId: string, action: GhostFamilyAction, ariaLabel: string): GhostSpec {
+    function makeFamilyGhostSpec(familyId: string, action: GhostFamilyAction, label: string, ariaLabel: string): GhostSpec {
         const geom = FAMILY_GHOST_GEOM[action];
         return {
             x: -32, y: geom.y, w: 64, h: 24,
-            label: geom.label,
+            label,
             ariaLabel,
             extraClass: "v2-ghost-family",
             testid: `v2-family-ghost-${geom.slug}-${familyId}`,
