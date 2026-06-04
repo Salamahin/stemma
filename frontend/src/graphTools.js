@@ -56,6 +56,10 @@ let sessionPositions = new Map()
 let cachedStemmaId = null
 let activeLayoutCache = null
 
+export function setSessionPosition(nodeId, x, y) {
+    sessionPositions.set(nodeId, [x, y])
+}
+
 export function resetSessionPositions(stemmaId) {
     if (cachedStemmaId !== stemmaId) {
         sessionPositions = new Map()

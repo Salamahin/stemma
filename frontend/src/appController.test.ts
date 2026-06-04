@@ -206,6 +206,21 @@ describe("AppController", () => {
             expect(get(c.stemma)).toEqual(stemmaB);
         });
 
+        test("linkPersons forwards role and stemma index to the model", async () => {
+            let resolveMut: (s: Stemma) => void;
+            const linkPersons = jest.fn().mockReturnValue(new Promise<Stemma>((r) => { resolveMut = r; }));
+            const model = { linkPersons };
+            const c = makeController(model);
+
+            const p = c.linkPersons("a", "b", "spouse", { silent: true });
+            expect(get(c.isWorking)).toBe(false);
+            expect(linkPersons).toHaveBeenCalledWith(stemmaId, "a", "b", "spouse", expect.any(StemmaIndex));
+
+            resolveMut!(stemmaB);
+            await p;
+            expect(get(c.stemma)).toEqual(stemmaB);
+        });
+
         test("createOrphanPerson without silent toggles isWorking", async () => {
             let resolveMut: (s: Stemma) => void;
             const model = {
