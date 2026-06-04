@@ -39,6 +39,7 @@
     import { buildInviteLink } from "../inviteLinkBuilder";
     import { Circle2 } from "svelte-loading-spinners";
     import { denormalizeId, normalizeId } from "../graphTools";
+    import { arrowPath } from "../graphStyles";
 
     const PERSON_DRAG_MIME = "application/x-stemma-person";
     const SVG_NS = "http://www.w3.org/2000/svg";
@@ -394,6 +395,29 @@
             if (el && el.parentNode) el.parentNode.removeChild(el);
         };
 
+        const ensureArrowMarker = () => {
+            if (svgEl.querySelector("defs > marker#v2-arrow")) return;
+            let defs = svgEl.querySelector("defs") as SVGDefsElement | null;
+            if (!defs) {
+                defs = document.createElementNS(SVG_NS, "defs") as SVGDefsElement;
+                svgEl.insertBefore(defs, svgEl.firstChild);
+            }
+            const marker = document.createElementNS(SVG_NS, "marker");
+            marker.setAttribute("id", "v2-arrow");
+            marker.setAttribute("viewBox", "0 0 10 6");
+            marker.setAttribute("refX", "10");
+            marker.setAttribute("refY", "3");
+            marker.setAttribute("markerWidth", "10");
+            marker.setAttribute("markerHeight", "6");
+            marker.setAttribute("markerUnits", "userSpaceOnUse");
+            marker.setAttribute("orient", "auto");
+            marker.setAttribute("fill", "#0d6efd");
+            const path = document.createElementNS(SVG_NS, "path");
+            path.setAttribute("d", arrowPath);
+            marker.appendChild(path);
+            defs.appendChild(marker);
+        };
+
         const cleanup = () => {
             if (!gesture) return;
             clearTargetHighlight();
@@ -520,12 +544,14 @@
                 document.body.classList.add("v2-linking");
                 const mainG = svgEl.querySelector("g.main") as SVGGElement | null;
                 if (mainG) {
+                    ensureArrowMarker();
                     const line = document.createElementNS(SVG_NS, "line") as SVGLineElement;
                     line.setAttribute("class", "v2-link-line");
                     line.setAttribute("x1", String(gesture.sourceCenter.x));
                     line.setAttribute("y1", String(gesture.sourceCenter.y));
                     line.setAttribute("x2", String(gesture.sourceCenter.x));
                     line.setAttribute("y2", String(gesture.sourceCenter.y));
+                    line.setAttribute("marker-end", "url(#v2-arrow)");
                     mainG.appendChild(line);
                     gesture.line = line;
                     if (gesture.source.kind === "empty") {

@@ -244,3 +244,20 @@ test("v2 Esc cancels gesture before drop", async ({ page }) => {
   await page.mouse.up();
   expect(await familyCount(page)).toBe(baselineFamilies);
 });
+
+test("v2 drag link line renders arrow marker at cursor end", async ({ page }) => {
+  await page.goto("/v2");
+  await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
+  await createFreshStemma(page);
+  await enterEditMode(page);
+  const name = `Olive${Date.now()}`;
+  await addOrphan(page, name);
+  const olive = await nodeByText(page, name);
+  await pressAndDrag(page, olive.cx, olive.cy, olive.cx + 220, olive.cy + 120);
+  const line = page.locator("svg#chart line.v2-link-line");
+  await expect(line).toHaveCount(1, { timeout: 3_000 });
+  await expect(line).toHaveAttribute("marker-end", "url(#v2-arrow)");
+  await expect(page.locator("svg#chart defs marker#v2-arrow")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+});
