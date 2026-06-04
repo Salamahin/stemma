@@ -710,7 +710,7 @@
         top: 16px;
         left: 16px;
         pointer-events: auto;
-        z-index: 100;
+        z-index: 110;
     }
 
     .v2-top-center {
