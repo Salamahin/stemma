@@ -47,14 +47,19 @@ test("v2 screenshots: populated canvas + person sheet + family ghost popover", a
   await page.waitForTimeout(300);
   await page.screenshot({ path: "test-results/v2-03-person-ghost-menu.png" });
 
-  await page.getByTestId("v2-anchor-as-parent").click();
-  const stubFamily = svg.locator("g[id^='family_stub-']").first();
-  await expect(stubFamily).toBeVisible({ timeout: 5_000 });
-  const stubId = (await stubFamily.getAttribute("id"))!.replace("family_", "");
-  await page.waitForTimeout(500);
-  await page.screenshot({ path: "test-results/v2-04-stub-family-on-canvas.png" });
+  await page.getByTestId("v2-person-ghost-add-child").click();
+  const personGhostName = page.getByTestId("v2-person-ghost-name");
+  await expect(personGhostName).toBeVisible({ timeout: 5_000 });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: "test-results/v2-04-person-ghost-name-input.png" });
 
-  const familyChildGhost = page.locator(`[data-testid='v2-family-ghost-child-${stubId}']`);
+  await personGhostName.fill(`Kid${Date.now()}`);
+  await page.getByTestId("v2-person-ghost-confirm").click();
+
+  const realFamily = svg.locator("g[id^='family_']").first();
+  await expect(realFamily).toBeVisible({ timeout: 10_000 });
+  const realFamilyId = (await realFamily.getAttribute("id"))!.replace("family_", "");
+  const familyChildGhost = page.locator(`[data-testid='v2-family-ghost-child-${realFamilyId}']`);
   await expect(familyChildGhost).toBeVisible({ timeout: 5_000 });
   await familyChildGhost.dispatchEvent("click");
   await expect(page.getByTestId("v2-family-ghost-popover")).toBeVisible();
@@ -109,29 +114,15 @@ test("v2 screenshots: bootstrap empty stemma → ghost flow → real family", as
   await personGhost.dispatchEvent("click");
 
   await expect(page.getByTestId("v2-ghost-popover")).toBeVisible();
-  await page.getByTestId("v2-anchor-as-parent").click();
+  await page.getByTestId("v2-person-ghost-add-child").click();
 
-  const stubFamily = svg.locator("g[id^='family_stub-']").first();
-  await expect(stubFamily).toBeVisible({ timeout: 5_000 });
-  const stubId = (await stubFamily.getAttribute("id"))!.replace("family_", "");
-  await page.waitForTimeout(800);
-  await page.screenshot({ path: "test-results/v2-10-stub-on-canvas.png" });
-
-  const familyChildGhost = page.locator(`[data-testid='v2-family-ghost-child-${stubId}']`);
-  await expect(familyChildGhost).toBeVisible({ timeout: 5_000 });
-  await familyChildGhost.dispatchEvent("click");
-  const popover = page.getByTestId("v2-ghost-popover");
-  await expect(popover).toBeVisible();
-  const select = popover.locator(".svelte-select input").first();
-  await expect(select).toBeVisible();
-  await select.fill("Junior");
+  const ghostNameInput = page.getByTestId("v2-person-ghost-name");
+  await expect(ghostNameInput).toBeVisible({ timeout: 5_000 });
   await page.waitForTimeout(300);
-  await page.keyboard.press("Enter");
-  await page.waitForTimeout(300);
+  await page.screenshot({ path: "test-results/v2-10-ghost-name-input.png" });
 
-  const confirmBtn = page.getByTestId("v2-ghost-confirm");
-  await expect(confirmBtn).toBeEnabled({ timeout: 5_000 });
-  await confirmBtn.click();
+  await ghostNameInput.fill("Junior");
+  await page.getByTestId("v2-person-ghost-confirm").click();
 
   await expect(svg.locator("text").filter({ hasText: "Junior" })).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(1500);

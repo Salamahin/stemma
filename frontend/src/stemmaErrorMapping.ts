@@ -29,6 +29,12 @@ export function mapStemmaError<T extends StemmaResponse>(response: T, describePe
             throw new LocalizedError("error.stemmaHasCycles")
         case "UnsupportedPhotoType":
             throw new LocalizedError("error.unsupportedPhotoType")
+        case "AmbiguousLinkTarget":
+            throw new LocalizedError("error.ambiguousLinkTarget", { name: describePerson(response.personId) })
+        case "SpouseLinkAlreadyExists":
+            throw new LocalizedError("error.spouseLinkAlreadyExists")
+        case "TooManyParents":
+            throw new LocalizedError("error.tooManyParents")
         default:
             return response
     }
