@@ -94,7 +94,8 @@ async function pressAndDragFromFamily(page: Page, toX: number, toY: number, inde
   if (!bb) throw new Error("no family bbox");
   const cx = bb.x + bb.width / 2;
   const cy = bb.y + bb.height / 2;
-  await family.evaluate((el, args) => {
+  const dbg = await family.evaluate((el, args) => {
+    const sourceId = el.id;
     el.dispatchEvent(new MouseEvent("mousedown", {
       button: 0,
       clientX: args.cx,
@@ -112,7 +113,19 @@ async function pressAndDragFromFamily(page: Page, toX: number, toY: number, inde
       const t = i / steps;
       fire(sx + (args.tx - sx) * t, sy + (args.ty - sy) * t);
     }
+    const tip = document.querySelector("[data-testid='v2-drag-tip']");
+    const elAt = document.elementFromPoint(args.tx, args.ty);
+    const elAtG = elAt && (elAt as Element).closest("g[id^='person_'], g[id^='family_']");
+    return {
+      sourceId,
+      hasFamilyTransform: el.getAttribute("transform") !== null,
+      svgChartExists: document.getElementById("chart") !== null,
+      hasLinkLine: document.querySelector("line.v2-link-line") !== null,
+      tipText: tip?.textContent ?? null,
+      elAtTargetId: elAtG?.id ?? null,
+    };
   }, { cx, cy, tx: toX, ty: toY });
+  console.log("[pressAndDragFromFamily]", JSON.stringify(dbg));
   await page.waitForTimeout(100);
 }
 
