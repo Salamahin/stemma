@@ -143,6 +143,99 @@ describe("AppController", () => {
         expect(localStorage.getItem("stemma_last_stemma_id")).toBe("b");
     });
 
+    test("selectStemma toggles isWorking when switching to a different stemma", async () => {
+        let resolveFetch: (s: Stemma) => void;
+        const model = {
+            getStemma: jest.fn().mockReturnValue(new Promise<Stemma>((r) => { resolveFetch = r; })),
+        };
+        const controller = new AppController("http://example", () => model as any);
+        (controller as any).model = model;
+        controller.currentStemmaId.set("a");
+
+        controller.selectStemma("b");
+        expect(get(controller.isWorking)).toBe(true);
+
+        resolveFetch!(stemmaB);
+        await drainPromises();
+        expect(get(controller.isWorking)).toBe(false);
+    });
+
+    test("selectStemma does not toggle isWorking when re-fetching the same stemma", async () => {
+        let resolveFetch: (s: Stemma) => void;
+        const model = {
+            getStemma: jest.fn().mockReturnValue(new Promise<Stemma>((r) => { resolveFetch = r; })),
+        };
+        const controller = new AppController("http://example", () => model as any);
+        (controller as any).model = model;
+        controller.currentStemmaId.set("b");
+
+        controller.selectStemma("b");
+        expect(get(controller.isWorking)).toBe(false);
+
+        resolveFetch!(stemmaB);
+        await drainPromises();
+        expect(get(controller.isWorking)).toBe(false);
+        expect(get(controller.stemma)).toEqual(stemmaB);
+    });
+
+    describe("silent mutations", () => {
+        const stemmaId = "s1";
+        const baseStemma: Stemma = { type: "Stemma", people: [], families: [] };
+
+        function makeController(model: any) {
+            const c = new AppController("http://example", () => model as any);
+            (c as any).model = model;
+            c.currentStemmaId.set(stemmaId);
+            c.stemmaIndex.set(new StemmaIndex(baseStemma));
+            return c;
+        }
+
+        test("createOrphanPerson with silent leaves isWorking false and returns a promise", async () => {
+            let resolveMut: (s: Stemma) => void;
+            const model = {
+                createOrphanPerson: jest.fn().mockReturnValue(new Promise<Stemma>((r) => { resolveMut = r; })),
+            };
+            const c = makeController(model);
+
+            const p = c.createOrphanPerson({ type: "CreateNewPerson", name: "x" }, { silent: true });
+            expect(get(c.isWorking)).toBe(false);
+
+            resolveMut!(stemmaB);
+            await p;
+            expect(get(c.isWorking)).toBe(false);
+            expect(get(c.stemma)).toEqual(stemmaB);
+        });
+
+        test("createOrphanPerson without silent toggles isWorking", async () => {
+            let resolveMut: (s: Stemma) => void;
+            const model = {
+                createOrphanPerson: jest.fn().mockReturnValue(new Promise<Stemma>((r) => { resolveMut = r; })),
+            };
+            const c = makeController(model);
+
+            const p = c.createOrphanPerson({ type: "CreateNewPerson", name: "x" });
+            expect(get(c.isWorking)).toBe(true);
+
+            resolveMut!(stemmaB);
+            await p;
+            expect(get(c.isWorking)).toBe(false);
+        });
+
+        test("silent mutation rejection propagates to caller", async () => {
+            const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+            const boom = new Error("boom");
+            const model = {
+                removePerson: jest.fn().mockRejectedValue(boom),
+            };
+            const c = makeController(model);
+
+            await expect(c.removePerson("p1", { silent: true })).rejects.toBe(boom);
+            expect(get(c.err)).toBe(boom);
+            expect(get(c.isWorking)).toBe(false);
+            errSpy.mockRestore();
+        });
+    });
+
     describe("savePerson", () => {
         const stemmaId = "s1";
         const personId = "p1";

@@ -59,6 +59,8 @@
 
     let editMode = $state(false);
     let stubFamilies = $state<Map<string, StubEntry>>(new Map());
+    let pendingRemovedPersonIds = $state<Set<string>>(new Set());
+    let pendingRemovedFamilyIds = $state<Set<string>>(new Set());
 
     let ownedStemmas = $state<StemmaDescription[]>([]);
     let currentStemmaId = $state<string | null>(null);
@@ -85,11 +87,18 @@
 
     const controller = new AppController(untrack(() => stemma_backend_url));
 
+    let lastStemmaIdSeen: string | null = null;
     const subscriptions = [
         controller.currentStemmaId.subscribe((s) => (currentStemmaId = s)),
         controller.stemma.subscribe((s) => {
+            const switchedStemma = currentStemmaId !== lastStemmaIdSeen;
+            lastStemmaIdSeen = currentStemmaId;
             stemma = s;
-            stubFamilies = new Map();
+            if (s === null || switchedStemma) {
+                stubFamilies = new Map();
+                pendingRemovedPersonIds = new Set();
+                pendingRemovedFamilyIds = new Set();
+            }
         }),
         controller.ownedStemmas.subscribe((os) => (ownedStemmas = os)),
         controller.stemmaIndex.subscribe((si) => (stemmaIndex = si)),
@@ -126,13 +135,28 @@
     });
 
     $effect(() => {
-        if (!stemmaChart || !stubFamilies) return;
-        stubFamilies.forEach((_entry, tempId) => {
-            const familyEl = document.getElementById(normalizeId("family", tempId));
-            const circle = familyEl?.querySelector("circle");
-            if (circle) circle.classList.add("stub-family");
-        });
+        if (!stemmaChart) return;
+        void stubFamilies;
+        void pendingRemovedPersonIds;
+        void pendingRemovedFamilyIds;
+        tick().then(() => applyPendingClasses());
     });
+
+    function applyPendingClasses() {
+        const svgEl = document.getElementById("chart");
+        if (!svgEl) return;
+        svgEl.querySelectorAll("circle.v2-pending-remove, circle.stub-family").forEach((el) => {
+            el.classList.remove("v2-pending-remove", "stub-family");
+        });
+        const markCircle = (nodeId: string, cls: string) => {
+            const el = document.getElementById(nodeId);
+            const circle = el?.querySelector("circle");
+            if (circle) circle.classList.add(cls);
+        };
+        stubFamilies.forEach((_entry, tempId) => markCircle(normalizeId("family", tempId), "stub-family"));
+        pendingRemovedPersonIds.forEach((id) => markCircle(normalizeId("person", id), "v2-pending-remove"));
+        pendingRemovedFamilyIds.forEach((id) => markCircle(normalizeId("family", id), "v2-pending-remove"));
+    }
 
     type GhostSpec = {
         x: number;
@@ -277,6 +301,7 @@
     }
 
     function handlePersonSelected(person: PersonDescription) {
+        if (pendingRemovedPersonIds.has(person.id)) return;
         personEditModal?.showPersonDetails({
             description: person,
             pin: pinnedPeople?.isPinned(person.id) ?? false,
@@ -286,6 +311,7 @@
     function handleFamilySelected(family: FamilyDescription) {
         const tempId = family.id;
         if (stubFamilies.has(tempId)) return;
+        if (pendingRemovedFamilyIds.has(tempId)) return;
         selectedFamilyEl = document.getElementById(normalizeId("family", tempId));
         selectedFamilyId = tempId;
         familySheetOpen = true;
@@ -320,11 +346,12 @@
     function handleCreateFamilyFromStub(payload: FamilyFromStubPayload) {
         const anchor: PersonArg = { type: "ExistingPerson", id: payload.anchorPersonId };
         const { parents, children } = STUB_FAMILY_LAYOUT[`${payload.anchorRole}-${payload.action}`](anchor, payloadOther(payload));
-        controller.createFamily(parents, children);
 
         const next = new Map(stubFamilies);
         next.delete(payload.stubId);
         stubFamilies = next;
+
+        controller.createFamily(parents, children, { silent: true }).catch(() => {});
     }
 
     function appendToFamily(familyId: string, action: GhostFamilyAction, person: PersonArg) {
@@ -333,7 +360,39 @@
         const asArgs = (ids: string[]): PersonArg[] => ids.map((id) => ({ type: "ExistingPerson", id }));
         const parents = action === "addParent" ? [...asArgs(family.parents), person] : asArgs(family.parents);
         const children = action === "addChild" ? [...asArgs(family.children), person] : asArgs(family.children);
-        controller.updateFamily(familyId, parents, children);
+        controller.updateFamily(familyId, parents, children, { silent: true }).catch(() => {});
+    }
+
+    function runCreateOrphanPerson(name: string) {
+        controller.createOrphanPerson({ type: "CreateNewPerson", name }, { silent: true }).catch(() => {});
+    }
+
+    function clearPendingRemovedPerson(id: string) {
+        if (!pendingRemovedPersonIds.has(id)) return;
+        const next = new Set(pendingRemovedPersonIds);
+        next.delete(id);
+        pendingRemovedPersonIds = next;
+    }
+
+    function clearPendingRemovedFamily(id: string) {
+        if (!pendingRemovedFamilyIds.has(id)) return;
+        const next = new Set(pendingRemovedFamilyIds);
+        next.delete(id);
+        pendingRemovedFamilyIds = next;
+    }
+
+    function runRemovePerson(personId: string) {
+        pendingRemovedPersonIds = new Set([...pendingRemovedPersonIds, personId]);
+        controller
+            .removePerson(personId, { silent: true })
+            .finally(() => clearPendingRemovedPerson(personId));
+    }
+
+    function runRemoveFamily(familyId: string) {
+        pendingRemovedFamilyIds = new Set([...pendingRemovedFamilyIds, familyId]);
+        controller
+            .removeFamily(familyId, { silent: true })
+            .finally(() => clearPendingRemovedFamily(familyId));
     }
 
     let currentToken = $state<string | null>(null);
@@ -438,7 +497,7 @@
             testid: "v2-name-modal",
             inputTestid: "v2-name-input",
             confirmTestid: "v2-name-confirm",
-            onaccept: (name) => controller.createOrphanPerson({ type: "CreateNewPerson", name }),
+            onaccept: (name) => runCreateOrphanPerson(name),
         });
     }
 
@@ -459,7 +518,7 @@
             confirmLabel: $t("common.delete"),
             danger: true,
             testid: "v2-remove-family-modal",
-            onaccept: () => controller.removeFamily(familyId),
+            onaccept: () => runRemoveFamily(familyId),
         });
     }
 
@@ -471,7 +530,7 @@
             danger: true,
             testid: "v2-remove-person-modal",
             onaccept: () => {
-                controller.removePerson(payload.id);
+                runRemovePerson(payload.id);
                 personEditModal?.dismiss();
             },
         });
@@ -808,6 +867,18 @@
     :global(.stub-family) {
         stroke-dasharray: 6 3;
         stroke: #6c757d;
+    }
+
+    :global(.v2-pending-remove) {
+        stroke-dasharray: 4 4;
+        stroke: #dc3545;
+        opacity: 0.45;
+        animation: v2-pending-pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes v2-pending-pulse {
+        0%, 100% { stroke-opacity: 1; }
+        50% { stroke-opacity: 0.35; }
     }
 
     :global(.v2-ghost-mount) {
