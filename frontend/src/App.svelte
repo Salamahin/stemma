@@ -162,7 +162,8 @@
     onMount(() => {
         if (e2eAutoLoginEnabled) {
             e2eMode = true;
-            handleSignIn({ id_token: "e2e-user@stemma.local" } as User);
+            const override = (window as unknown as { __STEMMA_E2E_USER__?: string }).__STEMMA_E2E_USER__;
+            handleSignIn({ id_token: override || "e2e-user@stemma.local" } as User);
             return;
         }
 

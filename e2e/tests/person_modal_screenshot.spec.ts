@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./_fixtures";
 
 const SAMPLE_PHOTO = "tests/fixtures/sample_photo.jpg";
 
