@@ -108,22 +108,22 @@ test("v2 modals screenshots (mobile)", async ({ page }) => {
     await page.waitForTimeout(300);
   }
 
-  // Person details modal (edit mode) — inline share
+  // Person details modal (edit mode) — share access entry
   await openFirstPersonSheet(page);
   await page.waitForTimeout(300);
   await page.screenshot({ path: "test-results/v2-mobile-m09-person-details-share-empty.png" });
 
-  const shareEmailInput = page.getByTestId("v2-share-email");
-  if (await shareEmailInput.isVisible({ timeout: 1_500 }).catch(() => false)) {
-    await shareEmailInput.fill("guest@example.com");
+  const shareAccessBtn = page.getByTestId("v2-share-access-btn");
+  if (await shareAccessBtn.isVisible({ timeout: 1_500 }).catch(() => false)) {
+    await shareAccessBtn.click();
+    const shareModal = page.getByTestId("v2-share-access-modal");
+    await expect(shareModal).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(200);
-    await page.screenshot({ path: "test-results/v2-mobile-m10-person-details-share-filled.png" });
+    await page.screenshot({ path: "test-results/v2-mobile-m10-share-access-empty.png" });
 
-    await page.getByTestId("v2-share-generate").click();
-    const linkModal = page.getByTestId("v2-invite-link-modal");
-    await expect(linkModal).toBeVisible({ timeout: 10_000 });
-    await page.waitForTimeout(400);
-    await page.screenshot({ path: "test-results/v2-mobile-m11-invite-link.png" });
+    await page.getByTestId("v2-share-access-email").fill("guest@example.com");
+    await page.waitForTimeout(200);
+    await page.screenshot({ path: "test-results/v2-mobile-m11-share-access-filled.png" });
     await closeAnyModal(page);
   } else {
     await closeAnyModal(page);

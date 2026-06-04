@@ -12,6 +12,7 @@
     import Authenticate from "../components/Authenticate.svelte";
     import FullStemma from "../components/FullStemma.svelte";
     import V2Chip from "./components/V2Chip.svelte";
+    import V2LangSwitcher from "./components/V2LangSwitcher.svelte";
     import V2Menu from "./components/V2Menu.svelte";
     import V2Fab from "./components/V2Fab.svelte";
     import V2EditPill from "./components/V2EditPill.svelte";
@@ -23,7 +24,7 @@
     import V2FamilyGhost from "./components/V2FamilyGhost.svelte";
     import V2AboutModal from "./components/V2AboutModal.svelte";
     import V2SettingsModal from "./components/V2SettingsModal.svelte";
-    import V2InviteLinkModal from "./components/V2InviteLinkModal.svelte";
+    import V2ShareAccessModal from "./components/V2ShareAccessModal.svelte";
     import V2PromptModal from "./components/V2PromptModal.svelte";
     import V2ConfirmModal from "./components/V2ConfirmModal.svelte";
     import V2PersonDetailsModal from "./components/V2PersonDetailsModal.svelte";
@@ -77,7 +78,7 @@
     let personEditModal = $state<ReturnType<typeof V2PersonDetailsModal> | null>(null);
     let aboutModal = $state<ReturnType<typeof V2AboutModal> | null>(null);
     let settingsModal = $state<ReturnType<typeof V2SettingsModal> | null>(null);
-    let inviteLinkModal = $state<ReturnType<typeof V2InviteLinkModal> | null>(null);
+    let shareAccessModal = $state<ReturnType<typeof V2ShareAccessModal> | null>(null);
     let promptModal = $state<ReturnType<typeof V2PromptModal> | null>(null);
     let confirmModal = $state<ReturnType<typeof V2ConfirmModal> | null>(null);
     let stemmaChart = $state<ReturnType<typeof FullStemma> | null>(null);
@@ -98,9 +99,9 @@
         controller.err.subscribe((e) => (error = e)),
         controller.invitationToken.subscribe((tkn) => {
             if (!tkn) return;
-            personEditModal?.dismiss();
             const link = buildInviteLink(window.location.origin, tkn);
-            inviteLinkModal?.show(link);
+            void navigator.clipboard?.writeText(link).catch(() => {});
+            shareAccessModal?.dismiss();
         }),
     ];
 
@@ -552,6 +553,7 @@
             </div>
 
             <div class="v2-top-right">
+                <V2LangSwitcher />
                 <V2Menu
                     showSignOut={!e2eAutoLoginEnabled}
                     onabout={() => aboutModal?.show()}
@@ -645,13 +647,15 @@
         {editMode}
         onpersonUpdated={(p) => controller.savePerson(p.id, p.description, p.pin, p.photoUpload, p.photoRemove)}
         onpersonRemoveRequested={handlePersonRemoveRequested}
-        onfamilyStubRequested={handleFamilyStubRequested}
-        onshareInvite={(p) => controller.createInvitationToken(p.personId, p.email)}
+        onshareAccessRequested={(p) => shareAccessModal?.show(p)}
     />
 
     <V2AboutModal bind:this={aboutModal} />
     <V2SettingsModal bind:this={settingsModal} />
-    <V2InviteLinkModal bind:this={inviteLinkModal} />
+    <V2ShareAccessModal
+        bind:this={shareAccessModal}
+        oncreate={(p) => controller.createInvitationToken(p.personId, p.email)}
+    />
     <V2PromptModal bind:this={promptModal} />
     <V2ConfirmModal bind:this={confirmModal} />
 {:else}
@@ -708,7 +712,7 @@
         top: 16px;
         left: 16px;
         pointer-events: auto;
-        z-index: 100;
+        z-index: 110;
     }
 
     .v2-top-center {
@@ -724,12 +728,21 @@
         gap: 8px;
     }
 
+    @media (max-width: 767.98px) {
+        .v2-top-center {
+            top: 72px;
+        }
+    }
+
     .v2-top-right {
         position: absolute;
         top: 16px;
         right: 16px;
         pointer-events: auto;
         z-index: 100;
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
 
     .v2-bottom-right {

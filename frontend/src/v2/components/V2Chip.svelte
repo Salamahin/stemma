@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { StemmaDescription } from "../../model";
-    import { locale, t } from "../../i18n";
+    import { t } from "../../i18n";
 
     type Props = {
         ownedStemmas: StemmaDescription[];
@@ -46,112 +46,91 @@
         dropdownOpen = false;
         onstemmaAddNew?.();
     }
-
-    function handleLangToggle() {
-        locale.set($locale === "en" ? "ru" : "en");
-    }
 </script>
 
 <div class="v2-chip">
-    <div class="stemma-selector">
-        <button
-            type="button"
-            class="stemma-btn"
-            onclick={toggleDropdown}
-            disabled={disabled}
-            aria-expanded={dropdownOpen}
-            data-testid="v2-chip-stemma-btn"
-        >
-            <span class="stemma-name">{currentStemma?.name ?? ""}</span>
-            <i class="bi bi-chevron-down chevron" class:rotated={dropdownOpen}></i>
-        </button>
-        {#if dropdownOpen}
-            <div class="stemma-dropdown" data-testid="v2-chip-dropdown">
-                {#each ownedStemmas as s}
-                    <div
-                        class="stemma-row"
-                        class:active={s.id === currentStemmaId}
-                        role="button"
-                        tabindex="0"
-                        onclick={() => selectStemma(s.id)}
-                        onkeydown={(e) => { if (e.key === "Enter") selectStemma(s.id); }}
-                    >
-                        <span class="row-name">{s.name}</span>
-                        <div
-                            class="row-actions"
-                            onclick={(e) => e.stopPropagation()}
-                            onkeydown={(e) => e.stopPropagation()}
-                            role="toolbar"
-                            tabindex="-1"
-                        >
-                            <button
-                                type="button"
-                                class="row-btn"
-                                aria-label={$t("v2.renameStemma")}
-                                title={$t("v2.renameStemma")}
-                                onclick={(e) => trigger(onstemmaRename, s, e)}
-                                data-testid="v2-chip-rename"
-                            ><i class="bi bi-pencil"></i></button>
-                            <button
-                                type="button"
-                                class="row-btn"
-                                aria-label={$t("v2.cloneStemma")}
-                                title={$t("v2.cloneStemma")}
-                                onclick={(e) => trigger(onstemmaClone, s, e)}
-                                data-testid="v2-chip-clone"
-                            ><i class="bi bi-copy"></i></button>
-                            {#if s.removable && s.id !== currentStemmaId}
-                                <button
-                                    type="button"
-                                    class="row-btn danger"
-                                    aria-label={$t("v2.deleteStemma")}
-                                    title={$t("v2.deleteStemma")}
-                                    onclick={(e) => trigger(onstemmaRemove, s, e)}
-                                    data-testid="v2-chip-remove"
-                                ><i class="bi bi-trash"></i></button>
-                            {:else}
-                                <span class="row-btn placeholder" aria-hidden="true"></span>
-                            {/if}
-                        </div>
-                    </div>
-                {/each}
-                <div class="dropdown-divider"></div>
-                <button
-                    type="button"
-                    class="add-stemma"
-                    onclick={addNew}
-                    data-testid="v2-chip-add-stemma"
-                >
-                    <i class="bi bi-plus-lg"></i> {$t("v2.newStemma")}
-                </button>
-            </div>
-        {/if}
-    </div>
-    <div class="divider"></div>
-
     <button
         type="button"
-        class="lang-btn"
-        aria-label={$t("nav.language")}
-        onclick={handleLangToggle}
+        class="stemma-btn"
+        onclick={toggleDropdown}
+        disabled={disabled}
+        aria-expanded={dropdownOpen}
+        data-testid="v2-chip-stemma-btn"
     >
-        {$locale === "en" ? "RU" : "EN"}
+        <span class="stemma-name">{currentStemma?.name ?? ""}</span>
+        <i class="bi bi-chevron-down chevron" class:rotated={dropdownOpen}></i>
     </button>
+    {#if dropdownOpen}
+        <div class="stemma-dropdown" data-testid="v2-chip-dropdown">
+            {#each ownedStemmas as s}
+                <div
+                    class="stemma-row"
+                    class:active={s.id === currentStemmaId}
+                    role="button"
+                    tabindex="0"
+                    onclick={() => selectStemma(s.id)}
+                    onkeydown={(e) => { if (e.key === "Enter") selectStemma(s.id); }}
+                >
+                    <span class="row-name">{s.name}</span>
+                    <div
+                        class="row-actions"
+                        onclick={(e) => e.stopPropagation()}
+                        onkeydown={(e) => e.stopPropagation()}
+                        role="toolbar"
+                        tabindex="-1"
+                    >
+                        <button
+                            type="button"
+                            class="row-btn"
+                            aria-label={$t("v2.renameStemma")}
+                            title={$t("v2.renameStemma")}
+                            onclick={(e) => trigger(onstemmaRename, s, e)}
+                            data-testid="v2-chip-rename"
+                        ><i class="bi bi-pencil"></i></button>
+                        <button
+                            type="button"
+                            class="row-btn"
+                            aria-label={$t("v2.cloneStemma")}
+                            title={$t("v2.cloneStemma")}
+                            onclick={(e) => trigger(onstemmaClone, s, e)}
+                            data-testid="v2-chip-clone"
+                        ><i class="bi bi-copy"></i></button>
+                        {#if s.removable && s.id !== currentStemmaId}
+                            <button
+                                type="button"
+                                class="row-btn danger"
+                                aria-label={$t("v2.deleteStemma")}
+                                title={$t("v2.deleteStemma")}
+                                onclick={(e) => trigger(onstemmaRemove, s, e)}
+                                data-testid="v2-chip-remove"
+                            ><i class="bi bi-trash"></i></button>
+                        {:else}
+                            <span class="row-btn placeholder" aria-hidden="true"></span>
+                        {/if}
+                    </div>
+                </div>
+            {/each}
+            <div class="dropdown-divider"></div>
+            <button
+                type="button"
+                class="add-stemma"
+                onclick={addNew}
+                data-testid="v2-chip-add-stemma"
+            >
+                <i class="bi bi-plus-lg"></i> {$t("v2.newStemma")}
+            </button>
+        </div>
+    {/if}
 </div>
 
 <style>
     .v2-chip {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
         background: #fff;
         border-radius: 12px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
         padding: 6px 10px;
-        position: relative;
-    }
-
-    .stemma-selector {
         position: relative;
     }
 
@@ -294,25 +273,4 @@
         background: #f1f7ff;
     }
 
-    .divider {
-        width: 1px;
-        height: 16px;
-        background: #dee2e6;
-        margin: 0 2px;
-    }
-
-    .lang-btn {
-        background: none;
-        border: none;
-        padding: 0 4px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        cursor: pointer;
-        color: #6c757d;
-        letter-spacing: 0.05em;
-    }
-
-    .lang-btn:hover {
-        color: #212529;
-    }
 </style>

@@ -31,16 +31,14 @@
         editMode?: boolean;
         onpersonUpdated?: (payload: UpdatePerson) => void;
         onpersonRemoveRequested?: (payload: { id: string; name: string }) => void;
-        onfamilyStubRequested?: (anchorPersonId: string, anchorRole: "parent" | "child") => void;
-        onshareInvite?: (payload: { personId: string; email: string }) => void;
+        onshareAccessRequested?: (payload: { personId: string; name: string }) => void;
     };
 
     let {
         editMode = false,
         onpersonUpdated,
         onpersonRemoveRequested,
-        onfamilyStubRequested,
-        onshareInvite,
+        onshareAccessRequested,
     }: Props = $props();
 
     let open = $state(false);
@@ -56,7 +54,6 @@
     let bio = $state("");
     let id = $state("");
     let personReadOnly = $state(false);
-    let shareEmail = $state("");
     const editingAllowed = $derived(editMode && !personReadOnly);
     const readOnly = $derived(!editingAllowed);
     let photoUrl = $state<string | null>(null);
@@ -182,7 +179,6 @@
         bio = p.description.bio ?? "";
         pinned = p.pin;
         personReadOnly = p.description.readOnly ?? false;
-        shareEmail = "";
         bioTab = "preview";
         originalPhotoUrl = p.description.photoUrl ?? null;
         photoUrl = originalPhotoUrl;
@@ -233,29 +229,12 @@
         onpersonRemoveRequested?.({ id, name: displayName });
     }
 
-    function requestDescendantFamily() {
+    function requestShareAccess() {
+        if (!id) return;
         const personId = id;
+        const personName = displayName;
         close();
-        onfamilyStubRequested?.(personId, "parent");
-    }
-
-    function requestAncestorFamily() {
-        const personId = id;
-        close();
-        onfamilyStubRequested?.(personId, "child");
-    }
-
-    function submitShare() {
-        const email = shareEmail.trim();
-        if (!email || !id) return;
-        onshareInvite?.({ personId: id, email });
-    }
-
-    function handleShareKeydown(e: KeyboardEvent) {
-        if (e.key === "Enter") {
-            e.preventDefault();
-            submitShare();
-        }
+        onshareAccessRequested?.({ personId, name: personName });
     }
 
     function resetPendingPhoto() {
@@ -621,43 +600,16 @@
                             <label class="form-check-label" for="v2-person-pin">{$t("person.pin")}</label>
                         </div>
                     </div>
-                    <div class="col-family-actions">
-                        <button
-                            type="button"
-                            class="btn btn-outline-primary btn-sm"
-                            onclick={requestDescendantFamily}
-                            data-testid="v2-add-family-action"
-                        >{$t("v2.addFamily")}</button>
-                        <button
-                            type="button"
-                            class="btn btn-outline-primary btn-sm"
-                            onclick={requestAncestorFamily}
-                        >{$t("v2.addAncestor")}</button>
-                    </div>
                 {/if}
 
                 {#if !personReadOnly}
                     <div class="col-share">
-                        <span class="field-label">{$t("v2.shareTitle", { name: displayName })}</span>
-                        <div class="share-row">
-                            <input
-                                id="v2-share-email"
-                                type="email"
-                                class="form-control"
-                                placeholder="name@gmail.com"
-                                bind:value={shareEmail}
-                                onkeydown={handleShareKeydown}
-                                data-testid="v2-share-email"
-                            />
-                            <button
-                                type="button"
-                                class="btn btn-primary"
-                                disabled={!shareEmail.trim()}
-                                onclick={submitShare}
-                                data-testid="v2-share-generate"
-                            >{$t("v2.shareGenerate")}</button>
-                        </div>
-                        <p class="hint">{$t("v2.shareEmailHint")}</p>
+                        <button
+                            type="button"
+                            class="btn btn-outline-primary"
+                            onclick={requestShareAccess}
+                            data-testid="v2-share-access-btn"
+                        >{$t("v2.shareAccess")}</button>
                     </div>
                 {/if}
             </div>
@@ -706,24 +658,7 @@
     .col-fields { grid-column: 2; grid-row: 1; }
     .col-bio { grid-column: 1 / -1; }
     .col-pin { grid-column: 1 / -1; }
-    .col-family-actions {
-        grid-column: 1 / -1;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
     .col-share { grid-column: 1 / -1; }
-
-    .share-row {
-        display: flex;
-        gap: 8px;
-        align-items: stretch;
-    }
-
-    .share-row .form-control {
-        flex: 1 1 auto;
-        min-width: 0;
-    }
 
     @media (max-width: 560px) {
         .grid {
@@ -944,8 +879,4 @@
         text-align: center;
     }
 
-    .col-share .hint {
-        margin-top: 6px;
-        text-align: left;
-    }
 </style>
