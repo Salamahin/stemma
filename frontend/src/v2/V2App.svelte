@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, untrack } from "svelte";
+    import { onMount, tick, untrack } from "svelte";
     import { AppController } from "../appController";
     import type { Stemma, FamilyDescription, PersonDescription, StemmaDescription, User, TokenProvider, CreateNewPerson } from "../model";
     import { StemmaIndex } from "../stemmaIndex";
@@ -19,6 +19,8 @@
     import V2EmptyState from "./components/V2EmptyState.svelte";
     import V2Sheet from "./components/V2Sheet.svelte";
     import V2FamilyCard from "./components/V2FamilyCard.svelte";
+    import V2PersonGhost from "./components/V2PersonGhost.svelte";
+    import V2FamilyGhost from "./components/V2FamilyGhost.svelte";
     import V2AboutModal from "./components/V2AboutModal.svelte";
     import V2SettingsModal from "./components/V2SettingsModal.svelte";
     import V2InviteLinkModal from "./components/V2InviteLinkModal.svelte";
@@ -28,23 +30,20 @@
     import StatsCard from "../components/stats_card/StatsCard.svelte";
     import { buildInviteLink } from "../inviteLinkBuilder";
     import { Circle2 } from "svelte-loading-spinners";
+    import { denormalizeId, normalizeId } from "../graphTools";
+    import {
+        buildStubPayload,
+        canAddParentToFamily,
+        type FamilyFromStubPayload,
+        type GhostFamilyAction,
+        type PersonArg,
+    } from "./ghostHelpers";
 
     type StubEntry = { anchorPersonId: string; anchorRole: "parent" | "child" };
 
-    type StubContext = {
-        stubId: string;
-        anchorPersonId: string;
-        anchorRole: "parent" | "child";
-    };
-
-    type FamilyFromStubPayload = {
-        stubId: string;
-        anchorPersonId: string;
-        anchorRole: "parent" | "child";
-        action: "addChild" | "addSpouse";
-        newPerson?: CreateNewPerson;
-        existingPersonId?: string;
-    };
+    type GhostPopoverState =
+        | { kind: "personRole"; anchorEl: Element; personId: string }
+        | { kind: "familyAdd"; anchorEl: Element; familyId: string; action: GhostFamilyAction };
 
     type Props = {
         google_client_id: string;
@@ -71,9 +70,9 @@
     let highlightVersion = $state(0);
 
     let selectedFamilyId = $state<string | null>(null);
-    let selectedFamilyStub = $state<StubContext | null>(null);
     let selectedFamilyEl = $state<Element | null>(null);
     let familySheetOpen = $state(false);
+    let ghostPopover = $state<GhostPopoverState | null>(null);
 
     let personEditModal = $state<ReturnType<typeof V2PersonDetailsModal> | null>(null);
     let aboutModal = $state<ReturnType<typeof V2AboutModal> | null>(null);
@@ -128,28 +127,148 @@
     $effect(() => {
         if (!stemmaChart || !stubFamilies) return;
         stubFamilies.forEach((_entry, tempId) => {
-            const familyEl = document.getElementById(`family_${tempId}`);
-            if (familyEl) {
-                const circle = familyEl.querySelector("circle");
-                if (circle) {
-                    circle.classList.add("stub-family");
-                    circle.setAttribute("r", "14");
-                }
-                if (!familyEl.querySelector(".stub-plus")) {
-                    const plusText = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                    plusText.setAttribute("class", "stub-plus");
-                    plusText.setAttribute("text-anchor", "middle");
-                    plusText.setAttribute("dominant-baseline", "central");
-                    plusText.setAttribute("font-size", "14");
-                    plusText.setAttribute("font-weight", "bold");
-                    plusText.setAttribute("fill", "#6c757d");
-                    plusText.setAttribute("pointer-events", "none");
-                    plusText.textContent = "+";
-                    familyEl.appendChild(plusText);
+            const familyEl = document.getElementById(normalizeId("family", tempId));
+            const circle = familyEl?.querySelector("circle");
+            if (circle) circle.classList.add("stub-family");
+        });
+    });
+
+    type GhostSpec = {
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+        label: string;
+        ariaLabel: string;
+        extraClass: string;
+        testid: string;
+        popoverState: (btn: HTMLButtonElement) => GhostPopoverState;
+    };
+
+    const PERSON_GHOST_GEOM = { x: 18, y: -32, w: 28, h: 28 } as const;
+    const FAMILY_GHOST_GEOM: Record<GhostFamilyAction, { y: number; label: string; slug: "child" | "parent" }> = {
+        addChild: { y: 14, label: "+ child", slug: "child" },
+        addParent: { y: -38, label: "+ parent", slug: "parent" },
+    };
+
+    let mountSeq = 0;
+
+    $effect(() => {
+        const enabled = editMode;
+        const idx = augmentedStemmaIndex;
+        void stemmaChart;
+        const labels = {
+            addChild: $t("v2.familyGhostAddChild"),
+            addParent: $t("v2.familyGhostAddParent"),
+            person: $t("v2.personGhostLabel"),
+        };
+        if (!stemmaChart) return;
+        const seq = ++mountSeq;
+        tick().then(() => {
+            if (seq !== mountSeq) return;
+            mountGhosts(enabled, idx, labels);
+        });
+    });
+
+    function mountGhosts(
+        enabled: boolean,
+        idx: StemmaIndex | null,
+        labels: { addChild: string; addParent: string; person: string },
+    ) {
+        const svgEl = document.getElementById("chart");
+        if (!svgEl) return;
+        const nodes = svgEl.querySelectorAll<SVGGElement>("g[id^='person_'], g[id^='family_'], .v2-ghost-mount");
+        nodes.forEach((el) => {
+            if (el.classList.contains("v2-ghost-mount")) el.remove();
+        });
+        if (!enabled) return;
+        nodes.forEach((g) => {
+            if (g.classList.contains("v2-ghost-mount")) return;
+            const id = g.id;
+            if (id.startsWith("person_")) {
+                const personId = denormalizeId(id);
+                mountGhost(g, {
+                    ...PERSON_GHOST_GEOM,
+                    label: "+",
+                    ariaLabel: labels.person,
+                    extraClass: "v2-ghost-person",
+                    testid: `v2-person-ghost-${personId}`,
+                    popoverState: (btn) => ({ kind: "personRole", anchorEl: btn, personId }),
+                });
+            } else if (id.startsWith("family_")) {
+                const familyId = denormalizeId(id);
+                const family = idx?.family(familyId) ?? null;
+                mountGhost(g, makeFamilyGhostSpec(familyId, "addChild", labels.addChild));
+                if (canAddParentToFamily(family)) {
+                    mountGhost(g, makeFamilyGhostSpec(familyId, "addParent", labels.addParent));
                 }
             }
         });
-    });
+    }
+
+    function makeFamilyGhostSpec(familyId: string, action: GhostFamilyAction, ariaLabel: string): GhostSpec {
+        const geom = FAMILY_GHOST_GEOM[action];
+        return {
+            x: -32, y: geom.y, w: 64, h: 24,
+            label: geom.label,
+            ariaLabel,
+            extraClass: "v2-ghost-family",
+            testid: `v2-family-ghost-${geom.slug}-${familyId}`,
+            popoverState: (btn) => ({ kind: "familyAdd", anchorEl: btn, familyId, action }),
+        };
+    }
+
+    function mountGhost(g: SVGGElement, spec: GhostSpec) {
+        const fo = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject") as SVGForeignObjectElement;
+        fo.setAttribute("class", "v2-ghost-mount");
+        fo.setAttribute("x", String(spec.x));
+        fo.setAttribute("y", String(spec.y));
+        fo.setAttribute("width", String(spec.w));
+        fo.setAttribute("height", String(spec.h));
+        fo.style.overflow = "visible";
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `v2-ghost-btn ${spec.extraClass}`.trim();
+        btn.textContent = spec.label;
+        btn.setAttribute("aria-label", spec.ariaLabel);
+        btn.setAttribute("data-testid", spec.testid);
+        btn.addEventListener("pointerdown", (e) => e.stopPropagation());
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            ghostPopover = spec.popoverState(btn);
+        });
+
+        fo.appendChild(btn);
+        g.appendChild(fo);
+    }
+
+    function closeGhostPopover() {
+        ghostPopover = null;
+    }
+
+    function handleGhostPersonPick(role: "parent" | "child") {
+        if (!ghostPopover || ghostPopover.kind !== "personRole") return;
+        const personId = ghostPopover.personId;
+        ghostPopover = null;
+        handleFamilyStubRequested(personId, role);
+    }
+
+    function handleGhostFamilyConfirm(arg: PersonArg) {
+        if (!ghostPopover || ghostPopover.kind !== "familyAdd") return;
+        const { familyId, action } = ghostPopover;
+        const stub = stubFamilies.get(familyId);
+        ghostPopover = null;
+        if (stub) {
+            handleCreateFamilyFromStub(buildStubPayload(
+                { stubId: familyId, anchorPersonId: stub.anchorPersonId, anchorRole: stub.anchorRole },
+                action,
+                arg,
+            ));
+        } else {
+            appendToFamily(familyId, action, arg);
+        }
+    }
 
     function errorMessage(err: Error): string {
         if (err instanceof LocalizedError) return $t(err.key, err.params);
@@ -165,78 +284,55 @@
 
     function handleFamilySelected(family: FamilyDescription) {
         const tempId = family.id;
-        const stub = stubFamilies.get(tempId);
-        selectedFamilyEl = document.getElementById(`family_${tempId}`);
-        if (stub) {
-            selectedFamilyStub = { stubId: tempId, anchorPersonId: stub.anchorPersonId, anchorRole: stub.anchorRole };
-            selectedFamilyId = null;
-        } else {
-            selectedFamilyStub = null;
-            selectedFamilyId = tempId;
-        }
+        if (stubFamilies.has(tempId)) return;
+        selectedFamilyEl = document.getElementById(normalizeId("family", tempId));
+        selectedFamilyId = tempId;
         familySheetOpen = true;
     }
 
     function closeFamilySheet() {
         familySheetOpen = false;
         selectedFamilyId = null;
-        selectedFamilyStub = null;
         selectedFamilyEl = null;
     }
 
     function handleFamilyStubRequested(anchorPersonId: string, anchorRole: "parent" | "child") {
         const tempId = "stub-" + crypto.randomUUID();
         stubFamilies = new Map([...stubFamilies, [tempId, { anchorPersonId, anchorRole }]]);
-        selectedFamilyStub = { stubId: tempId, anchorPersonId, anchorRole };
-        selectedFamilyId = null;
-        selectedFamilyEl = null;
-        familySheetOpen = true;
     }
 
-    function personArg(payload: FamilyFromStubPayload) {
-        if (payload.existingPersonId) return { type: "ExistingPerson" as const, id: payload.existingPersonId };
-        return payload.newPerson!;
+    type FamilyMembers = { parents: PersonArg[]; children: PersonArg[] };
+
+    const STUB_FAMILY_LAYOUT: Record<`${"parent" | "child"}-${GhostFamilyAction}`, (a: PersonArg, o: PersonArg) => FamilyMembers> = {
+        "parent-addChild": (a, o) => ({ parents: [a], children: [o] }),
+        "parent-addParent": (a, o) => ({ parents: [a, o], children: [] }),
+        "child-addChild": (a, o) => ({ parents: [], children: [a, o] }),
+        "child-addParent": (a, o) => ({ parents: [o], children: [a] }),
+    };
+
+    function payloadOther(payload: FamilyFromStubPayload): PersonArg {
+        return payload.existingPersonId
+            ? { type: "ExistingPerson", id: payload.existingPersonId }
+            : payload.newPerson!;
     }
 
     function handleCreateFamilyFromStub(payload: FamilyFromStubPayload) {
-        const anchor = { type: "ExistingPerson" as const, id: payload.anchorPersonId };
-        const other = personArg(payload);
-
-        if (payload.anchorRole === "parent" && payload.action === "addChild") {
-            controller.createFamily([anchor], [other]);
-        } else if (payload.anchorRole === "parent" && payload.action === "addSpouse") {
-            controller.createFamily([anchor, other], []);
-        } else if (payload.anchorRole === "child" && payload.action === "addSpouse") {
-            controller.createFamily([other], [anchor]);
-        } else {
-            controller.createFamily([], [anchor, other]);
-        }
+        const anchor: PersonArg = { type: "ExistingPerson", id: payload.anchorPersonId };
+        const { parents, children } = STUB_FAMILY_LAYOUT[`${payload.anchorRole}-${payload.action}`](anchor, payloadOther(payload));
+        controller.createFamily(parents, children);
 
         const next = new Map(stubFamilies);
         next.delete(payload.stubId);
         stubFamilies = next;
     }
 
-    function handleCreateChildInFamily(payload: { familyId: string; person: CreateNewPerson | { type: "ExistingPerson"; id: string } }) {
+    function appendToFamily(familyId: string, action: GhostFamilyAction, person: PersonArg) {
         if (!stemmaIndex) return;
-        const family = stemmaIndex.family(payload.familyId);
-        const parents = family.parents.map((id) => ({ type: "ExistingPerson" as const, id }));
-        const children = [
-            ...family.children.map((id) => ({ type: "ExistingPerson" as const, id })),
-            payload.person,
-        ];
-        controller.updateFamily(payload.familyId, parents, children);
-    }
-
-    function handleCreateSpouseInFamily(payload: { familyId: string; person: CreateNewPerson | { type: "ExistingPerson"; id: string } }) {
-        if (!stemmaIndex) return;
-        const family = stemmaIndex.family(payload.familyId);
-        const parents = [
-            ...family.parents.map((id) => ({ type: "ExistingPerson" as const, id })),
-            payload.person,
-        ];
-        const children = family.children.map((id) => ({ type: "ExistingPerson" as const, id }));
-        controller.updateFamily(payload.familyId, parents, children);
+        const family = stemmaIndex.family(familyId);
+        const asArgs = (ids: string[]): PersonArg[] => ids.map((id) => ({ type: "ExistingPerson", id }));
+        const parents = action === "addParent" ? [...asArgs(family.parents), person] : asArgs(family.parents);
+        const children = action === "addChild" ? [...asArgs(family.children), person] : asArgs(family.children);
+        controller.updateFamily(familyId, parents, children);
     }
 
     let currentToken = $state<string | null>(null);
@@ -511,17 +607,36 @@
     >
         {#snippet body()}
             <V2FamilyCard
-                stemma={stemma ?? { type: "Stemma", people: [], families: [] }}
                 stemmaIndex={stemmaIndex}
                 {editMode}
                 familyId={selectedFamilyId}
-                stubCtx={selectedFamilyStub}
-                oncreateFamilyFromStub={handleCreateFamilyFromStub}
-                oncreateChildInFamily={handleCreateChildInFamily}
-                oncreateSpouseInFamily={handleCreateSpouseInFamily}
                 onfamilyRemoveRequested={handleFamilyRemoveRequested}
                 onclose={closeFamilySheet}
             />
+        {/snippet}
+    </V2Sheet>
+
+    <V2Sheet
+        open={ghostPopover !== null}
+        anchorEl={ghostPopover?.anchorEl ?? null}
+        onclose={closeGhostPopover}
+        testid="v2-ghost-popover"
+    >
+        {#snippet body()}
+            {#if ghostPopover?.kind === "personRole"}
+                <V2PersonGhost
+                    onpick={handleGhostPersonPick}
+                    oncancel={closeGhostPopover}
+                />
+            {:else if ghostPopover?.kind === "familyAdd" && stemma && stemmaIndex}
+                <V2FamilyGhost
+                    action={ghostPopover.action}
+                    stemma={stemma}
+                    stemmaIndex={stemmaIndex}
+                    onconfirm={handleGhostFamilyConfirm}
+                    oncancel={closeGhostPopover}
+                />
+            {/if}
         {/snippet}
     </V2Sheet>
 
@@ -680,5 +795,48 @@
     :global(.stub-family) {
         stroke-dasharray: 6 3;
         stroke: #6c757d;
+    }
+
+    :global(.v2-ghost-mount) {
+        pointer-events: auto;
+        overflow: visible;
+    }
+
+    :global(.v2-ghost-btn) {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(13, 110, 253, 0.55);
+        background: rgba(255, 255, 255, 0.7);
+        color: #0d6efd;
+        font-weight: 600;
+        font-size: 0.78rem;
+        line-height: 1;
+        padding: 0;
+        cursor: pointer;
+        backdrop-filter: blur(2px);
+        transition: opacity 0.1s ease, background-color 0.1s ease, transform 0.1s ease;
+        opacity: 0.55;
+        user-select: none;
+        white-space: nowrap;
+    }
+
+    :global(.v2-ghost-btn:hover) {
+        opacity: 1;
+        background: #fff;
+        transform: scale(1.05);
+    }
+
+    :global(.v2-ghost-btn.v2-ghost-person) {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        font-size: 1.1rem;
+    }
+
+    :global(.v2-ghost-btn.v2-ghost-family) {
+        height: 20px;
+        padding: 0 8px;
+        border-radius: 10px;
     }
 </style>
