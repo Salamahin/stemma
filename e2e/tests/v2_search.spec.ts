@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./_fixtures";
 
 test("v2 search: find person, focus tree, handle no-match", async ({ page }) => {
   await page.goto("/v2");

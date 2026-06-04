@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./_fixtures";
 import { waitForFirstLoginSeeded } from "./_seeded";
 
 test("relationship arrows are rendered on a populated stemma", async ({ page }) => {

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./_fixtures";
 
 test("loads app with e2e auth bypass", async ({ page }) => {
   await page.goto("/");

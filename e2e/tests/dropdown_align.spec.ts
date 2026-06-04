@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./_fixtures";
 import { SEEDED_STEMMA_COUNT, waitForFirstLoginSeeded } from "./_seeded";
 
 const NAMES = ["A", "A very long stemma name that should ellipsize quite far", "Middle"];

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./_fixtures";
 
 test("v2 ghost flow: orphan person → person ghost → stub family → family ghost → backend create", async ({ page }) => {
   await page.goto("/v2");
