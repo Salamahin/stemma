@@ -81,6 +81,32 @@ async function pressAndDrag(page: Page, fromX: number, fromY: number, toX: numbe
   await page.waitForTimeout(100);
 }
 
+// Coord-based mousedown picks whichever SVG element is topmost at (cx, cy).
+// When a person g overlaps the family g (force-sim layout in CI), source detection
+// resolves to the person instead of the family. Dispatching mousedown directly on
+// the family locator pins e.target to the family g regardless of z-order.
+async function pressAndDragFromFamily(page: Page, toX: number, toY: number, index = 0) {
+  const family = page.locator("svg#chart g[id^='family_']").nth(index);
+  await expect(family).toBeVisible({ timeout: 10_000 });
+  const bb = await family.locator("circle").boundingBox();
+  if (!bb) throw new Error("no family bbox");
+  const cx = bb.x + bb.width / 2;
+  const cy = bb.y + bb.height / 2;
+  await page.mouse.move(cx, cy);
+  await family.evaluate((el, args) => {
+    el.dispatchEvent(new MouseEvent("mousedown", {
+      button: 0,
+      clientX: args.cx,
+      clientY: args.cy,
+      bubbles: true,
+      cancelable: true,
+    }));
+  }, { cx, cy });
+  await page.mouse.move(cx + 30, cy + 30, { steps: 4 });
+  await page.mouse.move(toX, toY, { steps: 12 });
+  await page.waitForTimeout(100);
+}
+
 async function expectTip(page: Page, re: RegExp) {
   const tip = page.getByTestId("v2-drag-tip");
   await expect(tip).toBeVisible({ timeout: 5_000 });
@@ -146,8 +172,7 @@ test.describe("v2 drag tooltips", () => {
     // Stub completion fires backend createFamily; wait for response (2s artificial delay) + layout settle
     await page.waitForTimeout(3_000);
     const eve = await nodeByText(page, c);
-    const fc2 = await familyCenter(page);
-    await pressAndDrag(page, fc2.cx, fc2.cy, eve.cx, eve.cy);
+    await pressAndDragFromFamily(page, eve.cx, eve.cy);
     await expectTip(page, TIP.attachChild);
     await page.keyboard.press("Escape");
     await page.mouse.up();
@@ -168,7 +193,7 @@ test.describe("v2 drag tooltips", () => {
     await page.mouse.up();
     await page.waitForTimeout(3_000);
     const fc2 = await familyCenter(page);
-    await pressAndDrag(page, fc2.cx, fc2.cy, fc2.cx + 250, fc2.cy + 200);
+    await pressAndDragFromFamily(page, fc2.cx + 250, fc2.cy + 200);
     await expectTip(page, TIP.createChild);
     await page.keyboard.press("Escape");
     await page.mouse.up();
