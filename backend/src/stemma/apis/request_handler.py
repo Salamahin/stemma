@@ -12,6 +12,7 @@ from stemma.domain.requests import (
     DeletePersonRequest,
     DeleteStemmaRequest,
     GetStemmaRequest,
+    LinkPersonsRequest,
     ListDescribeStemmasRequest,
     RenameStemmaRequest,
     Request,
@@ -76,6 +77,8 @@ class RequestHandler:
                 return self._update_person(user, request)
             case CreateOrphanPersonRequest():
                 return self._create_orphan_person(user, request)
+            case LinkPersonsRequest():
+                return self._link_persons(user, request)
             case CloneStemmaRequest():
                 return self._clone_stemma(user, request)
             case RenameStemmaRequest():
@@ -143,6 +146,15 @@ class RequestHandler:
     def _create_orphan_person(self, user: User, request: CreateOrphanPersonRequest) -> Stemma:
         return self._storage.create_orphan_person(
             user.user_id, request.stemma_id, request.person_descr
+        )
+
+    def _link_persons(self, user: User, request: LinkPersonsRequest) -> Stemma:
+        return self._storage.link_persons(
+            user.user_id,
+            request.stemma_id,
+            request.from_person_id,
+            request.to_person_id,
+            request.role,
         )
 
     def _create_invitation_token(

@@ -91,6 +91,24 @@ class UnsupportedPhotoType(StemmaError):
     type: Literal["UnsupportedPhotoType"] = "UnsupportedPhotoType"
 
 
+@dataclass(config=DOMAIN_CONFIG)
+class AmbiguousLinkTarget(StemmaError):
+    person_id: str
+    type: Literal["AmbiguousLinkTarget"] = "AmbiguousLinkTarget"
+
+
+@dataclass(config=DOMAIN_CONFIG)
+class SpouseLinkAlreadyExists(StemmaError):
+    family_id: str
+    type: Literal["SpouseLinkAlreadyExists"] = "SpouseLinkAlreadyExists"
+
+
+@dataclass(config=DOMAIN_CONFIG)
+class TooManyParents(StemmaError):
+    family_id: str
+    type: Literal["TooManyParents"] = "TooManyParents"
+
+
 StemmaErrorUnion = Annotated[
     UnknownError
     | RequestDeserializationProblem
@@ -105,6 +123,9 @@ StemmaErrorUnion = Annotated[
     | InvalidInviteToken
     | ForeignInviteToken
     | StemmaHasCycles
-    | UnsupportedPhotoType,
+    | UnsupportedPhotoType
+    | AmbiguousLinkTarget
+    | SpouseLinkAlreadyExists
+    | TooManyParents,
     Discriminator("type"),
 ]

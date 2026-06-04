@@ -11,14 +11,23 @@ from stemma.domain.errors import (
     AccessToFamilyDenied,
     AccessToPersonDenied,
     AccessToStemmaDenied,
+    AmbiguousLinkTarget,
     ChildAlreadyBelongsToFamily,
     DuplicatedIds,
     IncompleteFamily,
     IsNotTheOnlyStemmaOwner,
     NoSuchPersonId,
+    SpouseLinkAlreadyExists,
     StemmaHasCycles,
+    TooManyParents,
 )
-from stemma.domain.requests import CreateFamily, CreateNewPerson, ExistingPerson, PersonDefinition
+from stemma.domain.requests import (
+    CreateFamily,
+    CreateNewPerson,
+    ExistingPerson,
+    LinkRole,
+    PersonDefinition,
+)
 from stemma.domain.responses import FamilyDescription, PersonDescription, Stemma, StemmaDescription
 from stemma.domain.user import User
 from stemma.seed.kings_of_europe import SeedStemma
@@ -275,6 +284,32 @@ class StorageService:
         snapshot = self._load_snapshot(stemma_id)
         self._require_family_access(snapshot, user_id, family_id)
         self._delete_family(stemma_id, family_id, snapshot.family_owners)
+
+    def link_persons(
+        self, user_id: str, stemma_id: str, from_person_id: str, to_person_id: str, role: LinkRole
+    ) -> Stemma:
+        snapshot = self._load_snapshot(stemma_id)
+        self._require_stemma_access(snapshot, user_id)
+        for pid in (from_person_id, to_person_id):
+            if pid not in snapshot.people:
+                raise NoSuchPersonId(id=pid)
+            if (pid, user_id) not in snapshot.person_owners:
+                raise AccessToPersonDenied(person_id=pid)
+
+        if role == "spouse":
+            target_family_id, family = _plan_spouse_link(from_person_id, to_person_id, snapshot)
+        elif role == "child":
+            target_family_id, family = _plan_child_link(from_person_id, to_person_id, snapshot)
+        else:
+            target_family_id, family = _plan_parent_link(from_person_id, to_person_id, snapshot)
+
+        if target_family_id is not None:
+            self._require_family_access(snapshot, user_id, target_family_id)
+
+        stemma, _ = self._apply_family_change(
+            snapshot, user_id, target_family_id=target_family_id, family=family
+        )
+        return stemma
 
     # ---------- people ----------
 
@@ -697,6 +732,72 @@ def _find_family_with_existing_parents(
         if set(fam.parents) == target:
             return fam.id
     return None
+
+
+def _plan_spouse_link(
+    from_pid: str, to_pid: str, snapshot: _StemmaSnapshot
+) -> tuple[str | None, CreateFamily]:
+    for fam in snapshot.families.values():
+        if set(fam.parents) == {from_pid, to_pid}:
+            raise SpouseLinkAlreadyExists(family_id=fam.id)
+    family = CreateFamily(
+        parent1=ExistingPerson(id=from_pid),
+        parent2=ExistingPerson(id=to_pid),
+        children=[],
+    )
+    return None, family
+
+
+def _plan_child_link(
+    from_pid: str, to_pid: str, snapshot: _StemmaSnapshot
+) -> tuple[str | None, CreateFamily]:
+    family_ids = [f.id for f in snapshot.families.values() if from_pid in f.parents]
+    if len(family_ids) > 1:
+        raise AmbiguousLinkTarget(person_id=from_pid)
+    if not family_ids:
+        family = CreateFamily(
+            parent1=ExistingPerson(id=from_pid),
+            parent2=None,
+            children=[ExistingPerson(id=to_pid)],
+        )
+        return None, family
+    existing = snapshot.families[family_ids[0]]
+    parents_def: list[PersonDefinition] = [ExistingPerson(id=p) for p in existing.parents]
+    children_def: list[PersonDefinition] = [ExistingPerson(id=c) for c in existing.children]
+    children_def.append(ExistingPerson(id=to_pid))
+    family = CreateFamily(
+        parent1=parents_def[0] if parents_def else None,
+        parent2=parents_def[1] if len(parents_def) > 1 else None,
+        children=children_def,
+    )
+    return existing.id, family
+
+
+def _plan_parent_link(
+    from_pid: str, to_pid: str, snapshot: _StemmaSnapshot
+) -> tuple[str | None, CreateFamily]:
+    family_ids = [f.id for f in snapshot.families.values() if from_pid in f.children]
+    if len(family_ids) > 1:
+        raise AmbiguousLinkTarget(person_id=from_pid)
+    if not family_ids:
+        family = CreateFamily(
+            parent1=ExistingPerson(id=to_pid),
+            parent2=None,
+            children=[ExistingPerson(id=from_pid)],
+        )
+        return None, family
+    existing = snapshot.families[family_ids[0]]
+    if len(existing.parents) >= 2:
+        raise TooManyParents(family_id=existing.id)
+    parents_def: list[PersonDefinition] = [ExistingPerson(id=p) for p in existing.parents]
+    parents_def.append(ExistingPerson(id=to_pid))
+    children_def: list[PersonDefinition] = [ExistingPerson(id=c) for c in existing.children]
+    family = CreateFamily(
+        parent1=parents_def[0],
+        parent2=parents_def[1] if len(parents_def) > 1 else None,
+        children=children_def,
+    )
+    return existing.id, family
 
 
 def _make_person_row(pid: str, definition: CreateNewPerson) -> _PersonRow:
