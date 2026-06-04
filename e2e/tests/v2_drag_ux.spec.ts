@@ -83,8 +83,10 @@ async function pressAndDrag(page: Page, fromX: number, fromY: number, toX: numbe
 
 // Coord-based mousedown picks whichever SVG element is topmost at (cx, cy).
 // When a person g overlaps the family g (force-sim layout in CI), source detection
-// resolves to the person instead of the family. Dispatching mousedown directly on
-// the family locator pins e.target to the family g regardless of z-order.
+// resolves to the person instead of the family. Dispatch mousedown directly on
+// the family locator so e.target is the family g regardless of z-order, then drive
+// the rest of the drag with synthetic DOM events to avoid any CDP cursor-sync gap
+// between the synthetic mousedown and the real mouse.move calls.
 async function pressAndDragFromFamily(page: Page, toX: number, toY: number, index = 0) {
   const family = page.locator("svg#chart g[id^='family_']").nth(index);
   await expect(family).toBeVisible({ timeout: 10_000 });
@@ -92,7 +94,6 @@ async function pressAndDragFromFamily(page: Page, toX: number, toY: number, inde
   if (!bb) throw new Error("no family bbox");
   const cx = bb.x + bb.width / 2;
   const cy = bb.y + bb.height / 2;
-  await page.mouse.move(cx, cy);
   await family.evaluate((el, args) => {
     el.dispatchEvent(new MouseEvent("mousedown", {
       button: 0,
@@ -101,9 +102,17 @@ async function pressAndDragFromFamily(page: Page, toX: number, toY: number, inde
       bubbles: true,
       cancelable: true,
     }));
-  }, { cx, cy });
-  await page.mouse.move(cx + 30, cy + 30, { steps: 4 });
-  await page.mouse.move(toX, toY, { steps: 12 });
+    const fire = (x: number, y: number) =>
+      window.dispatchEvent(new MouseEvent("mousemove", { clientX: x, clientY: y, bubbles: true, cancelable: true }));
+    fire(args.cx + 30, args.cy + 30);
+    const steps = 12;
+    const sx = args.cx + 30;
+    const sy = args.cy + 30;
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      fire(sx + (args.tx - sx) * t, sy + (args.ty - sy) * t);
+    }
+  }, { cx, cy, tx: toX, ty: toY });
   await page.waitForTimeout(100);
 }
 
