@@ -32,20 +32,19 @@ async function enterEditMode(page: Page) {
   await expect(page.locator(".v2-edit-mode")).toHaveCount(1);
 }
 
-async function waitForBackend(page: Page) {
-  await expect(page.locator("circle.v2-pending-add")).toHaveCount(0, { timeout: 15_000 });
-}
-
 async function addOrphan(page: Page, name: string) {
   await page.getByTestId("v2-add-person-fab").click();
   const nameInput = page.getByTestId("v2-name-input");
   await expect(nameInput).toBeVisible();
   await nameInput.fill(name);
   await page.getByTestId("v2-name-confirm").click();
-  await waitForBackend(page);
-  await expect(page.locator("svg#chart text").filter({ hasText: name }).first()).toBeVisible({
-    timeout: 10_000,
-  });
+  // Wait for the backend-committed g (real id, not "pending-*") to appear.
+  // toHaveCount(0) on the optimistic class races: it passes before the class lands.
+  const committed = page
+    .locator("svg#chart g[id^='person_']:not([id*='pending-'])")
+    .filter({ has: page.locator(`text="${name}"`) })
+    .first();
+  await expect(committed).toBeVisible({ timeout: 15_000 });
 }
 
 type NodeRef = { id: string; locator: Locator; cx: number; cy: number };
@@ -82,33 +81,9 @@ async function pressAndDrag(page: Page, fromX: number, fromY: number, toX: numbe
   await page.waitForTimeout(100);
 }
 
-// V2App's gesture handler reads the drag source from `e.target.closest("g[id^='person_']...")`
-// at mousedown, and resolves the drop target via `document.elementFromPoint` during
-// mousemove/mouseup. Under CI load the force-simulation layout often places freshly-
-// attached persons overlapping the family circle, so coord-based hit-testing returns
-// the wrong element (person instead of family, or vice versa). To make these tests
-// deterministic, set `pointer-events: none` on every person g that we don't want to be
-// the hit-target, drive the gesture with real Playwright mouse events (CDP, isTrusted),
-// then restore.
-async function setPersonsInteractive(page: Page, exceptPersonId: string | null) {
-  await page.evaluate((kept) => {
-    document.querySelectorAll("svg#chart g[id^='person_']").forEach((g) => {
-      (g as SVGElement).style.pointerEvents = kept && g.id === `person_${kept}` ? "" : "none";
-    });
-  }, exceptPersonId);
-}
-
-async function restorePersons(page: Page) {
-  await page.evaluate(() => {
-    document.querySelectorAll("svg#chart g[id^='person_']").forEach((g) => {
-      (g as SVGElement).style.pointerEvents = "";
-    });
-  });
-}
-
 async function pressAndDragFromFamily(
   page: Page,
-  to: { cx: number; cy: number; id?: string },
+  to: { cx: number; cy: number },
   index = 0,
 ) {
   const family = page.locator("svg#chart g[id^='family_']").nth(index);
@@ -117,33 +92,23 @@ async function pressAndDragFromFamily(
   if (!bb) throw new Error("no family bbox");
   const cx = bb.x + bb.width / 2;
   const cy = bb.y + bb.height / 2;
-  await setPersonsInteractive(page, to.id ?? null);
-  try {
-    await page.mouse.move(cx, cy);
-    await page.mouse.down();
-    await page.mouse.move(cx + 30, cy + 30, { steps: 4 });
-    await page.mouse.move(to.cx, to.cy, { steps: 12 });
-    await page.waitForTimeout(100);
-  } finally {
-    await restorePersons(page);
-  }
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx + 30, cy + 30, { steps: 4 });
+  await page.mouse.move(to.cx, to.cy, { steps: 12 });
+  await page.waitForTimeout(100);
 }
 
 async function dropPersonOnFamily(
   page: Page,
-  from: { cx: number; cy: number; id: string },
+  from: { cx: number; cy: number },
   fc: { cx: number; cy: number },
 ) {
-  await setPersonsInteractive(page, from.id);
-  try {
-    await page.mouse.move(from.cx, from.cy);
-    await page.mouse.down();
-    await page.mouse.move(from.cx + 30, from.cy + 30, { steps: 4 });
-    await page.mouse.move(fc.cx, fc.cy, { steps: 12 });
-    await page.mouse.up();
-  } finally {
-    await restorePersons(page);
-  }
+  await page.mouse.move(from.cx, from.cy);
+  await page.mouse.down();
+  await page.mouse.move(from.cx + 30, from.cy + 30, { steps: 4 });
+  await page.mouse.move(fc.cx, fc.cy, { steps: 12 });
+  await page.mouse.up();
 }
 
 // After dropping a second person onto a stub family, V2App removes the pending
@@ -262,15 +227,8 @@ test.describe("v2 drag tooltips", () => {
     const vp = page.viewportSize();
     const startX = vp ? vp.width - 80 : fc2.cx + 300;
     const startY = vp ? Math.floor(vp.height / 2) : fc2.cy;
-    // Persons may overlap the family after force-layout settles; suppress
-    // their hit-testing so the drag end-point resolves to the family g.
-    await setPersonsInteractive(page, null);
-    try {
-      await pressAndDrag(page, startX, startY, fc2.cx, fc2.cy);
-      await expectTip(page, TIP.createSpouse);
-    } finally {
-      await restorePersons(page);
-    }
+    await pressAndDrag(page, startX, startY, fc2.cx, fc2.cy);
+    await expectTip(page, TIP.createSpouse);
     await page.keyboard.press("Escape");
     await page.mouse.up();
   });
