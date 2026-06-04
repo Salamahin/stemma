@@ -12,6 +12,7 @@
     import Authenticate from "../components/Authenticate.svelte";
     import FullStemma from "../components/FullStemma.svelte";
     import V2Chip from "./components/V2Chip.svelte";
+    import V2LangSwitcher from "./components/V2LangSwitcher.svelte";
     import V2Menu from "./components/V2Menu.svelte";
     import V2Fab from "./components/V2Fab.svelte";
     import V2EditPill from "./components/V2EditPill.svelte";
@@ -552,6 +553,7 @@
             </div>
 
             <div class="v2-top-right">
+                <V2LangSwitcher />
                 <V2Menu
                     showSignOut={!e2eAutoLoginEnabled}
                     onabout={() => aboutModal?.show()}
@@ -724,12 +726,21 @@
         gap: 8px;
     }
 
+    @media (max-width: 767.98px) {
+        .v2-top-center {
+            top: 72px;
+        }
+    }
+
     .v2-top-right {
         position: absolute;
         top: 16px;
         right: 16px;
         pointer-events: auto;
         z-index: 100;
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
 
     .v2-bottom-right {
