@@ -367,32 +367,29 @@
         controller.createOrphanPerson({ type: "CreateNewPerson", name }, { silent: true }).catch(() => {});
     }
 
-    function clearPendingRemovedPerson(id: string) {
-        if (!pendingRemovedPersonIds.has(id)) return;
-        const next = new Set(pendingRemovedPersonIds);
-        next.delete(id);
-        pendingRemovedPersonIds = next;
+    function setWith<T>(s: Set<T>, v: T): Set<T> {
+        return s.has(v) ? s : new Set([...s, v]);
     }
 
-    function clearPendingRemovedFamily(id: string) {
-        if (!pendingRemovedFamilyIds.has(id)) return;
-        const next = new Set(pendingRemovedFamilyIds);
-        next.delete(id);
-        pendingRemovedFamilyIds = next;
+    function setWithout<T>(s: Set<T>, v: T): Set<T> {
+        if (!s.has(v)) return s;
+        const next = new Set(s);
+        next.delete(v);
+        return next;
     }
 
     function runRemovePerson(personId: string) {
-        pendingRemovedPersonIds = new Set([...pendingRemovedPersonIds, personId]);
+        pendingRemovedPersonIds = setWith(pendingRemovedPersonIds, personId);
         controller
             .removePerson(personId, { silent: true })
-            .finally(() => clearPendingRemovedPerson(personId));
+            .finally(() => { pendingRemovedPersonIds = setWithout(pendingRemovedPersonIds, personId); });
     }
 
     function runRemoveFamily(familyId: string) {
-        pendingRemovedFamilyIds = new Set([...pendingRemovedFamilyIds, familyId]);
+        pendingRemovedFamilyIds = setWith(pendingRemovedFamilyIds, familyId);
         controller
             .removeFamily(familyId, { silent: true })
-            .finally(() => clearPendingRemovedFamily(familyId));
+            .finally(() => { pendingRemovedFamilyIds = setWithout(pendingRemovedFamilyIds, familyId); });
     }
 
     let currentToken = $state<string | null>(null);
