@@ -48,7 +48,7 @@ test("v2 bootstrap: orphan person → stub family → child creates real family"
   // Click the anchor person node to open person sheet (dispatchEvent bypasses stability check for animated SVG)
   await svg.locator("g[id^='person_']").filter({ has: page.locator(`text="${anchorName}"`) }).first().dispatchEvent("click");
 
-  const personSheet = page.getByTestId("v2-person-sheet");
+  const personSheet = page.getByTestId("v2-person-details-modal");
   await expect(personSheet).toBeVisible();
 
   // Click + family

@@ -28,11 +28,20 @@
     import V2Modal from "./V2Modal.svelte";
 
     type Props = {
+        editMode?: boolean;
         onpersonUpdated?: (payload: UpdatePerson) => void;
         onpersonRemoveRequested?: (payload: { id: string; name: string }) => void;
+        onfamilyStubRequested?: (anchorPersonId: string, anchorRole: "parent" | "child") => void;
+        onshareInvite?: (payload: { personId: string; email: string }) => void;
     };
 
-    let { onpersonUpdated, onpersonRemoveRequested }: Props = $props();
+    let {
+        editMode = false,
+        onpersonUpdated,
+        onpersonRemoveRequested,
+        onfamilyStubRequested,
+        onshareInvite,
+    }: Props = $props();
 
     let open = $state(false);
     let birthInputEl = $state<HTMLInputElement | null>(null);
@@ -46,7 +55,10 @@
     let deathDate = $state<Date | null>(null);
     let bio = $state("");
     let id = $state("");
-    let readOnly = $state(false);
+    let personReadOnly = $state(false);
+    let shareEmail = $state("");
+    const editingAllowed = $derived(editMode && !personReadOnly);
+    const readOnly = $derived(!editingAllowed);
     let photoUrl = $state<string | null>(null);
     let photoErrString = $state<string | null>(null);
     let originalPhotoUrl: string | null = null;
@@ -72,6 +84,7 @@
 
     let bioTab = $state<"edit" | "preview">("preview");
     const bioHtml = $derived(renderBioMarkdown(bio));
+    const displayName = $derived(unknown ? $t("person.unknown") : name);
 
     const saveDisabled = $derived(birthDateErrString != null || deathDateErrString != null);
 
@@ -168,7 +181,8 @@
         deathDate = p.description.deathDate ? new Date(p.description.deathDate) : null;
         bio = p.description.bio ?? "";
         pinned = p.pin;
-        readOnly = p.description.readOnly ?? false;
+        personReadOnly = p.description.readOnly ?? false;
+        shareEmail = "";
         bioTab = "preview";
         originalPhotoUrl = p.description.photoUrl ?? null;
         photoUrl = originalPhotoUrl;
@@ -216,7 +230,32 @@
     }
 
     function remove() {
-        onpersonRemoveRequested?.({ id, name: unknown ? $t("person.unknown") : name });
+        onpersonRemoveRequested?.({ id, name: displayName });
+    }
+
+    function requestDescendantFamily() {
+        const personId = id;
+        close();
+        onfamilyStubRequested?.(personId, "parent");
+    }
+
+    function requestAncestorFamily() {
+        const personId = id;
+        close();
+        onfamilyStubRequested?.(personId, "child");
+    }
+
+    function submitShare() {
+        const email = shareEmail.trim();
+        if (!email || !id) return;
+        onshareInvite?.({ personId: id, email });
+    }
+
+    function handleShareKeydown(e: KeyboardEvent) {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            submitShare();
+        }
     }
 
     function resetPendingPhoto() {
@@ -570,17 +609,57 @@
                     {/if}
                 </div>
 
-                <div class="col-pin">
-                    <div class="form-check form-switch">
-                        <input
-                            class="form-check-input"
-                            type="checkbox"
-                            id="v2-person-pin"
-                            bind:checked={pinned}
-                        />
-                        <label class="form-check-label" for="v2-person-pin">{$t("person.pin")}</label>
+                {#if editingAllowed}
+                    <div class="col-pin">
+                        <div class="form-check form-switch">
+                            <input
+                                class="form-check-input"
+                                type="checkbox"
+                                id="v2-person-pin"
+                                bind:checked={pinned}
+                            />
+                            <label class="form-check-label" for="v2-person-pin">{$t("person.pin")}</label>
+                        </div>
                     </div>
-                </div>
+                    <div class="col-family-actions">
+                        <button
+                            type="button"
+                            class="btn btn-outline-primary btn-sm"
+                            onclick={requestDescendantFamily}
+                            data-testid="v2-add-family-action"
+                        >{$t("v2.addFamily")}</button>
+                        <button
+                            type="button"
+                            class="btn btn-outline-primary btn-sm"
+                            onclick={requestAncestorFamily}
+                        >{$t("v2.addAncestor")}</button>
+                    </div>
+                {/if}
+
+                {#if !personReadOnly}
+                    <div class="col-share">
+                        <span class="field-label">{$t("v2.shareTitle", { name: displayName })}</span>
+                        <div class="share-row">
+                            <input
+                                id="v2-share-email"
+                                type="email"
+                                class="form-control"
+                                placeholder="name@gmail.com"
+                                bind:value={shareEmail}
+                                onkeydown={handleShareKeydown}
+                                data-testid="v2-share-email"
+                            />
+                            <button
+                                type="button"
+                                class="btn btn-primary"
+                                disabled={!shareEmail.trim()}
+                                onclick={submitShare}
+                                data-testid="v2-share-generate"
+                            >{$t("v2.shareGenerate")}</button>
+                        </div>
+                        <p class="hint">{$t("v2.shareEmailHint")}</p>
+                    </div>
+                {/if}
             </div>
         {/if}
     {/snippet}
@@ -595,15 +674,13 @@
                 onclick={confirmCrop}
                 data-testid="v2-person-crop-save"
             >{$t("common.save")}</button>
-        {:else}
-            {#if !readOnly}
-                <button
-                    type="button"
-                    class="btn btn-danger me-auto"
-                    onclick={remove}
-                    data-testid="v2-person-delete"
-                >{$t("common.delete")}</button>
-            {/if}
+        {:else if editingAllowed}
+            <button
+                type="button"
+                class="btn btn-danger me-auto"
+                onclick={remove}
+                data-testid="v2-person-delete"
+            >{$t("common.delete")}</button>
             <button type="button" class="btn btn-secondary" onclick={close}>{$t("common.cancel")}</button>
             <button
                 type="button"
@@ -612,6 +689,8 @@
                 onclick={save}
                 data-testid="v2-person-save"
             >{$t("common.save")}</button>
+        {:else}
+            <button type="button" class="btn btn-secondary" onclick={close}>{$t("common.close")}</button>
         {/if}
     {/snippet}
 </V2Modal>
@@ -627,6 +706,24 @@
     .col-fields { grid-column: 2; grid-row: 1; }
     .col-bio { grid-column: 1 / -1; }
     .col-pin { grid-column: 1 / -1; }
+    .col-family-actions {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .col-share { grid-column: 1 / -1; }
+
+    .share-row {
+        display: flex;
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    .share-row .form-control {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
 
     @media (max-width: 560px) {
         .grid {
@@ -845,5 +942,10 @@
         color: var(--v2-text-muted);
         font-size: var(--v2-fs-hint);
         text-align: center;
+    }
+
+    .col-share .hint {
+        margin-top: 6px;
+        text-align: left;
     }
 </style>

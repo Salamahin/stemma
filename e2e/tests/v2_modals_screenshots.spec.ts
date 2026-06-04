@@ -25,7 +25,7 @@ async function openFirstPersonSheet(page: import("@playwright/test").Page) {
   const node = svg.locator("g[id^='person_']").first();
   await expect(node).toBeVisible({ timeout: 10_000 });
   await node.dispatchEvent("click");
-  await expect(page.getByTestId("v2-person-sheet")).toBeVisible();
+  await expect(page.getByTestId("v2-person-details-modal")).toBeVisible();
 }
 
 test("v2 modals screenshots", async ({ page }) => {
@@ -94,22 +94,30 @@ test("v2 modals screenshots", async ({ page }) => {
     await closeAnyModal(page);
   }
 
-  // Person sheet (no edit mode) → Share button visible if editable
+  // Person details modal (view mode) — modal opens directly on click
   await openFirstPersonSheet(page);
   await page.waitForTimeout(300);
-  await page.screenshot({ path: "test-results/v2-m08-person-sheet.png" });
+  await page.screenshot({ path: "test-results/v2-m08-person-details-view.png" });
+  await closeAnyModal(page);
 
-  // Click share from person sheet (if visible)
-  const shareBtn = page.getByTestId("v2-share-action");
-  if (await shareBtn.isVisible({ timeout: 1_500 }).catch(() => false)) {
-    await shareBtn.click();
-    await expect(page.getByTestId("v2-share-modal")).toBeVisible();
+  // Enter edit mode
+  const editFab = page.getByTestId("v2-edit-fab");
+  const isEditOn = (await page.locator("[data-testid='v2-add-person-fab']").isVisible({ timeout: 500 }).catch(() => false));
+  if (!isEditOn) {
+    await editFab.click();
     await page.waitForTimeout(300);
-    await page.screenshot({ path: "test-results/v2-m09-share-empty.png" });
+  }
 
-    await page.getByTestId("v2-share-email").fill("guest@example.com");
+  // Person details modal (edit mode) — inline share area
+  await openFirstPersonSheet(page);
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: "test-results/v2-m09-person-details-share-empty.png" });
+
+  const shareEmailInput = page.getByTestId("v2-share-email");
+  if (await shareEmailInput.isVisible({ timeout: 1_500 }).catch(() => false)) {
+    await shareEmailInput.fill("guest@example.com");
     await page.waitForTimeout(200);
-    await page.screenshot({ path: "test-results/v2-m10-share-filled.png" });
+    await page.screenshot({ path: "test-results/v2-m10-person-details-share-filled.png" });
 
     await page.getByTestId("v2-share-generate").click();
     const linkModal = page.getByTestId("v2-invite-link-modal");
@@ -119,15 +127,6 @@ test("v2 modals screenshots", async ({ page }) => {
     await closeAnyModal(page);
   } else {
     await closeAnyModal(page);
-  }
-
-  // Person details modal (edit mode)
-  const editFab = page.getByTestId("v2-edit-fab");
-  // Ensure edit mode on
-  const isEditOn = (await page.locator("[data-testid='v2-add-person-fab']").isVisible({ timeout: 500 }).catch(() => false));
-  if (!isEditOn) {
-    await editFab.click();
-    await page.waitForTimeout(300);
   }
 
   // Family sheet with delete (edit mode)
@@ -150,9 +149,6 @@ test("v2 modals screenshots", async ({ page }) => {
   }
 
   await openFirstPersonSheet(page);
-  const editPencil = page.locator("[data-testid='v2-person-sheet'] .bi-pencil").first();
-  await editPencil.click();
-  await expect(page.getByTestId("v2-person-details-modal")).toBeVisible({ timeout: 5_000 });
   await page.waitForTimeout(400);
   await page.screenshot({ path: "test-results/v2-m12-person-details.png" });
 
