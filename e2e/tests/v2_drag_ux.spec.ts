@@ -81,52 +81,77 @@ async function pressAndDrag(page: Page, fromX: number, fromY: number, toX: numbe
   await page.waitForTimeout(100);
 }
 
-// Coord-based mousedown picks whichever SVG element is topmost at (cx, cy).
-// When a person g overlaps the family g (force-sim layout in CI), source detection
-// resolves to the person instead of the family. Dispatch mousedown directly on
-// the family locator so e.target is the family g regardless of z-order, then drive
-// the rest of the drag with synthetic DOM events to avoid any CDP cursor-sync gap
-// between the synthetic mousedown and the real mouse.move calls.
-async function pressAndDragFromFamily(page: Page, toX: number, toY: number, index = 0) {
+// V2App's gesture handler reads the drag source from `e.target.closest("g[id^='person_']...")`
+// at mousedown, and resolves the drop target via `document.elementFromPoint` during
+// mousemove/mouseup. Under CI load the force-simulation layout often places freshly-
+// attached persons overlapping the family circle, so coord-based hit-testing returns
+// the wrong element (person instead of family, or vice versa). To make these tests
+// deterministic, set `pointer-events: none` on every person g that we don't want to be
+// the hit-target, drive the gesture with real Playwright mouse events (CDP, isTrusted),
+// then restore.
+async function setPersonsInteractive(page: Page, exceptPersonId: string | null) {
+  await page.evaluate((kept) => {
+    document.querySelectorAll("svg#chart g[id^='person_']").forEach((g) => {
+      (g as SVGElement).style.pointerEvents = kept && g.id === `person_${kept}` ? "" : "none";
+    });
+  }, exceptPersonId);
+}
+
+async function restorePersons(page: Page) {
+  await page.evaluate(() => {
+    document.querySelectorAll("svg#chart g[id^='person_']").forEach((g) => {
+      (g as SVGElement).style.pointerEvents = "";
+    });
+  });
+}
+
+async function pressAndDragFromFamily(
+  page: Page,
+  to: { cx: number; cy: number; id?: string },
+  index = 0,
+) {
   const family = page.locator("svg#chart g[id^='family_']").nth(index);
   await expect(family).toBeVisible({ timeout: 10_000 });
   const bb = await family.locator("circle").boundingBox();
   if (!bb) throw new Error("no family bbox");
   const cx = bb.x + bb.width / 2;
   const cy = bb.y + bb.height / 2;
-  const dbg = await family.evaluate((el, args) => {
-    const sourceId = el.id;
-    el.dispatchEvent(new MouseEvent("mousedown", {
-      button: 0,
-      clientX: args.cx,
-      clientY: args.cy,
-      bubbles: true,
-      cancelable: true,
-    }));
-    const fire = (x: number, y: number) =>
-      window.dispatchEvent(new MouseEvent("mousemove", { clientX: x, clientY: y, bubbles: true, cancelable: true }));
-    fire(args.cx + 30, args.cy + 30);
-    const steps = 12;
-    const sx = args.cx + 30;
-    const sy = args.cy + 30;
-    for (let i = 1; i <= steps; i++) {
-      const t = i / steps;
-      fire(sx + (args.tx - sx) * t, sy + (args.ty - sy) * t);
-    }
-    const tip = document.querySelector("[data-testid='v2-drag-tip']");
-    const elAt = document.elementFromPoint(args.tx, args.ty);
-    const elAtG = elAt && (elAt as Element).closest("g[id^='person_'], g[id^='family_']");
-    return {
-      sourceId,
-      hasFamilyTransform: el.getAttribute("transform") !== null,
-      svgChartExists: document.getElementById("chart") !== null,
-      hasLinkLine: document.querySelector("line.v2-link-line") !== null,
-      tipText: tip?.textContent ?? null,
-      elAtTargetId: elAtG?.id ?? null,
-    };
-  }, { cx, cy, tx: toX, ty: toY });
-  console.log("[pressAndDragFromFamily]", JSON.stringify(dbg));
-  await page.waitForTimeout(100);
+  await setPersonsInteractive(page, to.id ?? null);
+  try {
+    await page.mouse.move(cx, cy);
+    await page.mouse.down();
+    await page.mouse.move(cx + 30, cy + 30, { steps: 4 });
+    await page.mouse.move(to.cx, to.cy, { steps: 12 });
+    await page.waitForTimeout(100);
+  } finally {
+    await restorePersons(page);
+  }
+}
+
+async function dropPersonOnFamily(
+  page: Page,
+  from: { cx: number; cy: number; id: string },
+  fc: { cx: number; cy: number },
+) {
+  await setPersonsInteractive(page, from.id);
+  try {
+    await page.mouse.move(from.cx, from.cy);
+    await page.mouse.down();
+    await page.mouse.move(from.cx + 30, from.cy + 30, { steps: 4 });
+    await page.mouse.move(fc.cx, fc.cy, { steps: 12 });
+    await page.mouse.up();
+  } finally {
+    await restorePersons(page);
+  }
+}
+
+// After dropping a second person onto a stub family, V2App removes the pending
+// family locally and calls createFamily on the backend (2-second artificial
+// delay in the dev REST server). Wait for the real family g to appear so we
+// don't read coordinates from a stub that's about to be replaced.
+async function waitForRealFamily(page: Page) {
+  await expect(page.locator("svg#chart g[id^='family_pending-']")).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.locator("svg#chart g[id^='family_']")).toHaveCount(1, { timeout: 15_000 });
 }
 
 async function expectTip(page: Page, re: RegExp) {
@@ -189,12 +214,10 @@ test.describe("v2 drag tooltips", () => {
     await expect(page.locator("svg#chart g[id^='family_']")).toHaveCount(1, { timeout: 5_000 });
     const dan = await nodeByText(page, b);
     const fc = await familyCenter(page);
-    await pressAndDrag(page, dan.cx, dan.cy, fc.cx, fc.cy);
-    await page.mouse.up();
-    // Stub completion fires backend createFamily; wait for response (2s artificial delay) + layout settle
-    await page.waitForTimeout(3_000);
+    await dropPersonOnFamily(page, dan, fc);
+    await waitForRealFamily(page);
     const eve = await nodeByText(page, c);
-    await pressAndDragFromFamily(page, eve.cx, eve.cy);
+    await pressAndDragFromFamily(page, eve);
     await expectTip(page, TIP.attachChild);
     await page.keyboard.press("Escape");
     await page.mouse.up();
@@ -211,11 +234,10 @@ test.describe("v2 drag tooltips", () => {
     await page.mouse.up();
     const gina = await nodeByText(page, b);
     const fc = await familyCenter(page);
-    await pressAndDrag(page, gina.cx, gina.cy, fc.cx, fc.cy);
-    await page.mouse.up();
-    await page.waitForTimeout(3_000);
+    await dropPersonOnFamily(page, gina, fc);
+    await waitForRealFamily(page);
     const fc2 = await familyCenter(page);
-    await pressAndDragFromFamily(page, fc2.cx + 250, fc2.cy + 200);
+    await pressAndDragFromFamily(page, { cx: fc2.cx + 250, cy: fc2.cy + 200 });
     await expectTip(page, TIP.createChild);
     await page.keyboard.press("Escape");
     await page.mouse.up();
@@ -232,16 +254,22 @@ test.describe("v2 drag tooltips", () => {
     await page.mouse.up();
     const ida = await nodeByText(page, b);
     const fc = await familyCenter(page);
-    await pressAndDrag(page, ida.cx, ida.cy, fc.cx, fc.cy);
-    await page.mouse.up();
-    await page.waitForTimeout(3_000);
+    await dropPersonOnFamily(page, ida, fc);
+    await waitForRealFamily(page);
     const fc2 = await familyCenter(page);
     // Start far from any node in known-empty svg area
     const vp = page.viewportSize();
     const startX = vp ? vp.width - 80 : fc2.cx + 300;
     const startY = vp ? Math.floor(vp.height / 2) : fc2.cy;
-    await pressAndDrag(page, startX, startY, fc2.cx, fc2.cy);
-    await expectTip(page, TIP.createSpouse);
+    // Persons may overlap the family after force-layout settles; suppress
+    // their hit-testing so the drag end-point resolves to the family g.
+    await setPersonsInteractive(page, null);
+    try {
+      await pressAndDrag(page, startX, startY, fc2.cx, fc2.cy);
+      await expectTip(page, TIP.createSpouse);
+    } finally {
+      await restorePersons(page);
+    }
     await page.keyboard.press("Escape");
     await page.mouse.up();
   });
