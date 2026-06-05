@@ -259,6 +259,7 @@ export const en: Record<string, string> = {
     'v2.tipAttachChild': 'Attach as child',
     'v2.createSpouseTitle': 'Add spouse',
     'v2.createChildTitle': 'Add child',
+    'v2.createParentTitle': 'Add parent',
     'v2.panModeOn': 'Pan canvas',
     'v2.panModeOff': 'Exit pan mode',
 };
@@ -490,6 +491,7 @@ export const ru: Record<string, string> = {
     'v2.tipAttachChild': 'Присоединить потомка',
     'v2.createSpouseTitle': 'Добавить супруга',
     'v2.createChildTitle': 'Добавить потомка',
+    'v2.createParentTitle': 'Добавить родителя',
     'v2.panModeOn': 'Перемещать холст',
     'v2.panModeOff': 'Выйти из режима перемещения',
 };

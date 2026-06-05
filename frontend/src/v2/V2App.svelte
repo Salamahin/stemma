@@ -264,10 +264,6 @@
         role: "parent" | "child",
         pinAt?: { x: number; y: number },
     ) {
-        if (isPendingId(familyId)) {
-            completeStubFamily(familyId, personId, role);
-            return;
-        }
         if (!stemmaIndex) return;
         const family = stemmaIndex.family(familyId);
         if (!family) return;
@@ -283,37 +279,50 @@
         controller.updateFamily(familyId, parents, children, { silent: true }).catch(() => {});
     }
 
-    function spawnStubFamily(sourcePersonId: string, svgX: number, svgY: number) {
-        const tempId = `pending-family-${crypto.randomUUID()}`;
-        stemmaChart?.setNodePosition(normalizeId("family", tempId), svgX, svgY);
-        pendingFamilies = [...pendingFamilies, { tempId, parents: [sourcePersonId], children: [], x: svgX, y: svgY }];
-    }
-
-    function completeStubFamily(stubFamilyId: string, personId: string, role: "parent" | "child") {
-        const stub = pendingFamilies.find((p) => p.tempId === stubFamilyId);
-        if (!stub) return;
-        if (stub.parents.includes(personId) || stub.children.includes(personId)) return;
-        const newParents = role === "parent" ? [...stub.parents, personId] : stub.parents;
-        const newChildren = role === "child" ? [...stub.children, personId] : stub.children;
-        if (newParents.length + newChildren.length >= 2) {
-            const pos = stub.x != null && stub.y != null ? { x: stub.x, y: stub.y } : null;
-            pendingFamilies = pendingFamilies.filter((p) => p.tempId !== stubFamilyId);
-            const parents: PersonDefinition[] = newParents.map((id) => ({ type: "ExistingPerson", id }));
-            const children: PersonDefinition[] = newChildren.map((id) => ({ type: "ExistingPerson", id }));
-            controller
-                .createFamily(parents, children, { silent: true })
-                .then((result) => {
-                    if (!pos) return;
-                    result.newFamilyIds.forEach((id) =>
-                        stemmaChart?.setNodePosition(normalizeId("family", id), pos.x, pos.y),
-                    );
-                })
-                .catch(() => {});
-        } else {
-            pendingFamilies = pendingFamilies.map((p) =>
-                p.tempId === stubFamilyId ? { ...stub, parents: newParents, children: newChildren } : p,
-            );
-        }
+    function createPersonAsCounterpart(
+        existingPersonId: string,
+        newPersonRole: "parent" | "child",
+        title: string,
+        pinAt: { x: number; y: number },
+    ) {
+        personEditModal?.showCreatePerson({
+            title,
+            oncreate: ({ description, pin, photoUpload }) => {
+                const tempPersonId = `pending-${crypto.randomUUID()}`;
+                const tempFamilyId = `pending-family-${crypto.randomUUID()}`;
+                const tempParents = newPersonRole === "parent" ? [tempPersonId] : [existingPersonId];
+                const tempChildren = newPersonRole === "child" ? [tempPersonId] : [existingPersonId];
+                pendingAdds = [...pendingAdds, { tempId: tempPersonId, name: description.name }];
+                pendingFamilies = [
+                    ...pendingFamilies,
+                    { tempId: tempFamilyId, parents: tempParents, children: tempChildren, x: pinAt.x, y: pinAt.y },
+                ];
+                stemmaChart?.setNodePosition(normalizeId("person", tempPersonId), pinAt.x, pinAt.y);
+                stemmaChart?.setNodePosition(normalizeId("family", tempFamilyId), pinAt.x, pinAt.y);
+                const existingRef: PersonDefinition = { type: "ExistingPerson", id: existingPersonId };
+                const parents: PersonDefinition[] = newPersonRole === "parent" ? [description] : [existingRef];
+                const children: PersonDefinition[] = newPersonRole === "child" ? [description] : [existingRef];
+                controller
+                    .createFamily(parents, children, { silent: true })
+                    .then((result) => {
+                        const newPersonId = result.newPersonIds[0];
+                        if (newPersonId) {
+                            stemmaChart?.setNodePosition(normalizeId("person", newPersonId), pinAt.x, pinAt.y);
+                            if (photoUpload || pin) {
+                                controller.savePerson(newPersonId, description, pin, photoUpload, false);
+                            }
+                        }
+                        result.newFamilyIds.forEach((id) =>
+                            stemmaChart?.setNodePosition(normalizeId("family", id), pinAt.x, pinAt.y),
+                        );
+                    })
+                    .catch(() => {})
+                    .finally(() => {
+                        pendingAdds = pendingAdds.filter((p) => p.tempId !== tempPersonId);
+                        pendingFamilies = pendingFamilies.filter((p) => p.tempId !== tempFamilyId);
+                    });
+            },
+        });
     }
 
     function createPersonInFamily(
@@ -649,7 +658,7 @@
             }
             if (source.kind === "person" && !overInfo) {
                 const releaseSvg = clientToSvgPoint(svgEl, e.clientX, e.clientY);
-                spawnStubFamily(source.id, releaseSvg.x, releaseSvg.y);
+                createPersonAsCounterpart(source.id, "child", $t("v2.createChildTitle"), releaseSvg);
                 return;
             }
             if (source.kind === "empty" && overInfo?.ref.kind === "family") {
@@ -657,7 +666,7 @@
                 return;
             }
             if (source.kind === "empty" && overInfo?.ref.kind === "person") {
-                spawnStubFamily(overInfo.ref.id, startCenter.x, startCenter.y);
+                createPersonAsCounterpart(overInfo.ref.id, "parent", $t("v2.createParentTitle"), startCenter);
                 return;
             }
             if (source.kind === "family" && !overInfo && !isPendingId(source.id)) {
@@ -822,12 +831,6 @@
         selectedFamilyEl = null;
     }
 
-    function runCreateOrphanPerson(name: string) {
-        void withPendingAdd(name, () =>
-            controller.createOrphanPerson({ type: "CreateNewPerson", name }, { silent: true }),
-        );
-    }
-
     function setWith<T>(s: Set<T>, v: T): Set<T> {
         return s.has(v) ? s : new Set([...s, v]);
     }
@@ -948,14 +951,21 @@
     }
 
     function openAddPerson() {
-        promptModal?.prompt({
+        personEditModal?.showCreatePerson({
             title: $t("v2.addPerson"),
-            label: $t("v2.namePlaceholder"),
-            confirmLabel: $t("common.add"),
-            testid: "v2-name-modal",
-            inputTestid: "v2-name-input",
-            confirmTestid: "v2-name-confirm",
-            onaccept: (name) => runCreateOrphanPerson(name),
+            oncreate: ({ description, pin, photoUpload }) => {
+                void withPendingAdd(
+                    description.name,
+                    () => controller.createOrphanPerson(description, { silent: true }),
+                    undefined,
+                    (newPersonIds) => {
+                        const newId = newPersonIds[0];
+                        if (newId && (photoUpload || pin)) {
+                            controller.savePerson(newId, description, pin, photoUpload, false);
+                        }
+                    },
+                );
+            },
         });
     }
 
