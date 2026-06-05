@@ -338,6 +338,102 @@ test("v2 Esc cancels gesture before drop", async ({ page }) => {
   expect(await familyCount(page)).toBe(baselineFamilies);
 });
 
+async function expectNoOpDrag(
+  page: Page,
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+) {
+  const baselineFamilies = await familyCount(page);
+  await pressAndDrag(page, startX, startY, endX, endY);
+  // Tooltip must be hidden while hovering an invalid target.
+  const tip = page.getByTestId("v2-drag-tip");
+  await expect(tip).toBeHidden({ timeout: 1_500 });
+  // No SVG group should be marked as a valid drop target.
+  await expect(page.locator("svg#chart .v2-drop-target")).toHaveCount(0);
+  await page.mouse.up();
+  // No detail/create modal should open on release.
+  await expect(page.getByTestId("v2-person-details-modal")).toHaveCount(0);
+  // Family count unchanged.
+  expect(await familyCount(page)).toBe(baselineFamilies);
+}
+
+test("v2 person → person drag is a no-op (no tip, no modal, no DB change)", async ({ page }) => {
+  await page.goto("/v2");
+  await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
+  await createFreshStemma(page);
+  await enterEditMode(page);
+  const ts = Date.now();
+  const a = `Alpha${ts}`;
+  const b = `Bravo${ts}`;
+  await addOrphan(page, a);
+  await addOrphan(page, b);
+  const alpha = await nodeByText(page, a);
+  const bravo = await nodeByText(page, b);
+  await expectNoOpDrag(page, alpha.cx, alpha.cy, bravo.cx, bravo.cy);
+});
+
+test("v2 family → family drag is a no-op (no tip, no modal, no DB change)", async ({ page }) => {
+  await page.goto("/v2");
+  await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
+  await createFreshStemma(page);
+  await enterEditMode(page);
+  const ts = Date.now();
+  // Seed family #1 around personA.
+  const personA = `Cleo${ts}`;
+  const childA = `CleoChild${ts}`;
+  await addOrphan(page, personA);
+  const cleo = await nodeByText(page, personA);
+  await seedFamilyForPerson(page, cleo, childA);
+  // Seed family #2 around personB, well separated horizontally.
+  const personB = `Dion${ts}`;
+  const childB = `DionChild${ts}`;
+  await page.getByTestId("v2-add-person-fab").click();
+  await page.getByTestId("v2-person-name-input").fill(personB);
+  await page.getByTestId("v2-person-create").click();
+  const dionCommitted = page
+    .locator("svg#chart g[id^='person_']:not([id*='pending-'])")
+    .filter({ has: page.locator(`text="${personB}"`) })
+    .first();
+  await expect(dionCommitted).toBeVisible({ timeout: 15_000 });
+  const dion = await nodeByText(page, personB);
+  // Gesture 4 again — adds a second family with dion as child.
+  await pressAndDrag(page, dion.cx + 280, dion.cy, dion.cx, dion.cy);
+  await page.mouse.up();
+  await fillCreatePersonModal(page, childB);
+  await expect(page.locator("svg#chart g[id^='family_pending-']")).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.locator("svg#chart g[id^='family_']")).toHaveCount(2, { timeout: 15_000 });
+  const f0 = await familyCenter(page, 0);
+  const f1 = await familyCenter(page, 1);
+  // Drag from family 0 to family 1.
+  const baselineFamilies = await familyCount(page);
+  await pressAndDrag(page, f0.cx, f0.cy, f1.cx, f1.cy);
+  const tip = page.getByTestId("v2-drag-tip");
+  await expect(tip).toBeHidden({ timeout: 1_500 });
+  await expect(page.locator("svg#chart .v2-drop-target")).toHaveCount(0);
+  await page.mouse.up();
+  await expect(page.getByTestId("v2-person-details-modal")).toHaveCount(0);
+  expect(await familyCount(page)).toBe(baselineFamilies);
+});
+
+test("v2 empty → empty drag is a no-op (no tip, no modal, no DB change)", async ({ page }) => {
+  await page.goto("/v2");
+  await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
+  await createFreshStemma(page);
+  await enterEditMode(page);
+  // Add an orphan just so the chart has a node and a stable empty region.
+  const name = `Solo${Date.now()}`;
+  await addOrphan(page, name);
+  const solo = await nodeByText(page, name);
+  // Drag from one empty point to another, well clear of `solo`.
+  const startX = solo.cx + 320;
+  const startY = solo.cy + 220;
+  const endX = solo.cx - 320;
+  const endY = solo.cy + 220;
+  await expectNoOpDrag(page, startX, startY, endX, endY);
+});
+
 test("v2 drag link line renders arrow marker at cursor end", async ({ page }) => {
   await page.goto("/v2");
   await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
