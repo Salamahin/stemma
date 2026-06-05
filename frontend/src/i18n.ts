@@ -47,6 +47,7 @@ export const en: Record<string, string> = {
     // Common buttons
     'common.cancel': 'Cancel',
     'common.save': 'Save',
+    'common.create': 'Create',
     'common.delete': 'Delete',
     'common.add': 'Add',
     'common.back': 'Back',
@@ -256,9 +257,8 @@ export const en: Record<string, string> = {
     'v2.tipCreateChild': 'Create child',
     'v2.tipAttachSpouse': 'Attach as spouse',
     'v2.tipAttachChild': 'Attach as child',
-    'v2.placeholderName': '?',
-    'v2.createChildTitle': 'Create child',
-    'v2.createChildLabel': 'Name',
+    'v2.createSpouseTitle': 'Add spouse',
+    'v2.createChildTitle': 'Add child',
     'v2.panModeOn': 'Pan canvas',
     'v2.panModeOff': 'Exit pan mode',
 };
@@ -278,6 +278,7 @@ export const ru: Record<string, string> = {
     // Common buttons
     'common.cancel': 'Отмена',
     'common.save': 'Сохранить',
+    'common.create': 'Создать',
     'common.delete': 'Удалить',
     'common.add': 'Добавить',
     'common.back': 'Назад',
@@ -487,9 +488,8 @@ export const ru: Record<string, string> = {
     'v2.tipCreateChild': 'Создать потомка',
     'v2.tipAttachSpouse': 'Присоединить супруга',
     'v2.tipAttachChild': 'Присоединить потомка',
-    'v2.placeholderName': '?',
-    'v2.createChildTitle': 'Создать потомка',
-    'v2.createChildLabel': 'Имя',
+    'v2.createSpouseTitle': 'Добавить супруга',
+    'v2.createChildTitle': 'Добавить потомка',
     'v2.panModeOn': 'Перемещать холст',
     'v2.panModeOff': 'Выйти из режима перемещения',
 };

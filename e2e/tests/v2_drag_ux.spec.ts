@@ -246,6 +246,75 @@ test.describe("v2 drag tooltips", () => {
   });
 });
 
+test("v2 family→empty release opens person details modal and creates child", async ({ page }) => {
+  await page.goto("/v2");
+  await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
+  await createFreshStemma(page);
+  await enterEditMode(page);
+  const ts = Date.now();
+  const a = `Pat${ts}`;
+  const b = `Quinn${ts}`;
+  const child = `Rita${ts}`;
+  await addOrphan(page, a);
+  await addOrphan(page, b);
+  const pat = await nodeByText(page, a);
+  await pressAndDrag(page, pat.cx, pat.cy, pat.cx + 280, pat.cy);
+  await page.mouse.up();
+  const quinn = await nodeByText(page, b);
+  const fc = await familyCenter(page);
+  await dropPersonOnFamily(page, quinn, fc);
+  await waitForRealFamily(page);
+  const fc2 = await familyCenter(page);
+  await pressAndDragFromFamily(page, { cx: fc2.cx + 250, cy: fc2.cy + 200 });
+  await page.mouse.up();
+  const modal = page.getByTestId("v2-person-details-modal");
+  await expect(modal).toBeVisible({ timeout: 5_000 });
+  const nameInput = page.getByTestId("v2-person-name-input");
+  await nameInput.fill(child);
+  await page.getByTestId("v2-person-create").click();
+  const committed = page
+    .locator("svg#chart g[id^='person_']:not([id*='pending-'])")
+    .filter({ has: page.locator(`text="${child}"`) })
+    .first();
+  await expect(committed).toBeVisible({ timeout: 15_000 });
+});
+
+test("v2 empty→family release opens person details modal and creates spouse", async ({ page }) => {
+  await page.goto("/v2");
+  await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
+  await createFreshStemma(page);
+  await enterEditMode(page);
+  const ts = Date.now();
+  const a = `Sam${ts}`;
+  const b = `Tess${ts}`;
+  const spouse = `Uma${ts}`;
+  await addOrphan(page, a);
+  await addOrphan(page, b);
+  const sam = await nodeByText(page, a);
+  await pressAndDrag(page, sam.cx, sam.cy, sam.cx + 280, sam.cy);
+  await page.mouse.up();
+  const tess = await nodeByText(page, b);
+  await pressAndDragFromFamily(page, { cx: tess.cx, cy: tess.cy });
+  await page.mouse.up();
+  await waitForRealFamily(page);
+  const fc2 = await familyCenter(page);
+  const vp = page.viewportSize();
+  const startX = vp ? vp.width - 80 : fc2.cx + 300;
+  const startY = vp ? Math.floor(vp.height / 2) : fc2.cy;
+  await pressAndDrag(page, startX, startY, fc2.cx, fc2.cy);
+  await page.mouse.up();
+  const modal = page.getByTestId("v2-person-details-modal");
+  await expect(modal).toBeVisible({ timeout: 5_000 });
+  const nameInput = page.getByTestId("v2-person-name-input");
+  await nameInput.fill(spouse);
+  await page.getByTestId("v2-person-create").click();
+  const committed = page
+    .locator("svg#chart g[id^='person_']:not([id*='pending-'])")
+    .filter({ has: page.locator(`text="${spouse}"`) })
+    .first();
+  await expect(committed).toBeVisible({ timeout: 15_000 });
+});
+
 test("v2 person→empty release creates stub family", async ({ page }) => {
   await page.goto("/v2");
   await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });

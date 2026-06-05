@@ -27,6 +27,18 @@
     } from "../../components/person_details_modal/PersonDetailsModal.svelte";
     import V2Modal from "./V2Modal.svelte";
 
+    export type CreatePersonPayload = {
+        description: {
+            type: "CreateNewPerson";
+            name: string;
+            birthDate: string | null;
+            deathDate: string | null;
+            bio: string;
+        };
+        pin: boolean;
+        photoUpload: Blob | null;
+    };
+
     type Props = {
         editMode?: boolean;
         onpersonUpdated?: (payload: UpdatePerson) => void;
@@ -42,6 +54,10 @@
     }: Props = $props();
 
     let open = $state(false);
+    let mode = $state<"view" | "create">("view");
+    let createTitle = $state<string | null>(null);
+    let activeCreateCallback: ((payload: CreatePersonPayload) => void) | null = null;
+    const isCreate = $derived(mode === "create");
     let birthInputEl = $state<HTMLInputElement | null>(null);
     let deathInputEl = $state<HTMLInputElement | null>(null);
     let photoFileInputEl = $state<HTMLInputElement | null>(null);
@@ -54,7 +70,7 @@
     let bio = $state("");
     let id = $state("");
     let personReadOnly = $state(false);
-    const editingAllowed = $derived(editMode && !personReadOnly);
+    const editingAllowed = $derived(isCreate || (editMode && !personReadOnly));
     const readOnly = $derived(!editingAllowed);
     let photoUrl = $state<string | null>(null);
     let photoErrString = $state<string | null>(null);
@@ -171,6 +187,8 @@
     }
 
     export function showPersonDetails(p: ShowPerson) {
+        mode = "view";
+        createTitle = null;
         id = p.description.id;
         name = p.description.name;
         unknown = isUnknownPerson(p.description.name);
@@ -199,8 +217,40 @@
         });
     }
 
+    export function showCreatePerson(opts: { title?: string; oncreate: (payload: CreatePersonPayload) => void }) {
+        mode = "create";
+        createTitle = opts.title ?? null;
+        activeCreateCallback = opts.oncreate;
+        id = "";
+        name = "";
+        unknown = false;
+        birthDate = null;
+        deathDate = null;
+        bio = "";
+        pinned = false;
+        personReadOnly = false;
+        bioTab = "edit";
+        originalPhotoUrl = null;
+        photoUrl = null;
+        photoErrString = null;
+        if (photoFileInputEl) photoFileInputEl.value = "";
+        resetCropState();
+        resetPendingPhoto();
+
+        birthDateErrString = null;
+        deathDateErrString = null;
+
+        open = true;
+
+        queueMicrotask(() => {
+            if (birthInputEl) birthInputEl.value = "";
+            if (deathInputEl) deathInputEl.value = "";
+        });
+    }
+
     function close() {
         open = false;
+        activeCreateCallback = null;
     }
 
     export function dismiss() {
@@ -209,19 +259,30 @@
 
     function save() {
         if (saveDisabled) return;
-        onpersonUpdated?.({
-            id,
-            description: {
-                type: "CreateNewPerson",
-                name: unknown ? "" : name,
-                birthDate: dateToIsoLocalTime(birthDate),
-                deathDate: dateToIsoLocalTime(deathDate),
-                bio,
-            },
-            pin: pinned,
-            photoUpload: pendingPhotoBlob,
-            photoRemove: pendingPhotoRemove,
-        });
+        const description = {
+            type: "CreateNewPerson" as const,
+            name: unknown ? "" : name,
+            birthDate: dateToIsoLocalTime(birthDate),
+            deathDate: dateToIsoLocalTime(deathDate),
+            bio,
+        };
+        if (mode === "create") {
+            const cb = activeCreateCallback;
+            activeCreateCallback = null;
+            cb?.({
+                description,
+                pin: pinned,
+                photoUpload: pendingPhotoBlob,
+            });
+        } else {
+            onpersonUpdated?.({
+                id,
+                description,
+                pin: pinned,
+                photoUpload: pendingPhotoBlob,
+                photoRemove: pendingPhotoRemove,
+            });
+        }
         close();
     }
 
@@ -405,7 +466,7 @@
 
 <V2Modal
     {open}
-    title={cropping ? $t("person.photoAdjustTitle") : $t("person.title")}
+    title={cropping ? $t("person.photoAdjustTitle") : isCreate ? (createTitle ?? $t("v2.addPerson")) : $t("person.title")}
     size="lg"
     scroll
     dismissOnBackdrop={!cropping}
@@ -615,6 +676,15 @@
                 onclick={confirmCrop}
                 data-testid="v2-person-crop-save"
             >{$t("common.save")}</button>
+        {:else if isCreate}
+            <button type="button" class="btn btn-secondary" onclick={close}>{$t("common.cancel")}</button>
+            <button
+                type="button"
+                class="btn btn-primary"
+                disabled={saveDisabled}
+                onclick={save}
+                data-testid="v2-person-create"
+            >{$t("common.create")}</button>
         {:else if editingAllowed}
             <button
                 type="button"
