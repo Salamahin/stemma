@@ -2,7 +2,6 @@ import { expect, test } from "./_fixtures";
 import type { Locator, Page } from "@playwright/test";
 
 const TIP = {
-  createFamily: /Create family|Создать семью/,
   createSpouse: /Create spouse|Создать супруга/,
   createChild: /Create child|Создать потомка/,
   attachSpouse: /Attach as spouse|Присоединить супруга/,
@@ -55,14 +54,14 @@ async function fillCreatePersonModal(page: Page, name: string) {
 async function seedFamilyForPerson(
   page: Page,
   person: { cx: number; cy: number },
-  parentName: string,
+  spouseName: string,
 ) {
-  // Gesture 4 (empty → person): creates a family with the new person as parent
-  // and the dragged-onto person as child. Leaves the spouse slot open so
-  // downstream "attach spouse" / "create spouse" tests have room.
-  await pressAndDrag(page, person.cx + 280, person.cy, person.cx, person.cy);
+  // Gesture 3 (person → empty): creates a family where the dragged person and
+  // the new modal person are both parents (no children). Empty→person is a
+  // no-op (#180), so this is the only drag-based path to seed a family.
+  await pressAndDrag(page, person.cx, person.cy, person.cx + 280, person.cy + 80);
   await page.mouse.up();
-  await fillCreatePersonModal(page, parentName);
+  await fillCreatePersonModal(page, spouseName);
   await waitForRealFamily(page);
 }
 
@@ -149,22 +148,10 @@ test.describe("v2 drag tooltips", () => {
     await page.mouse.up();
   });
 
-  test("person → family tooltip: Attach as spouse", async ({ page }) => {
-    const ts = Date.now();
-    const a = `Anna${ts}`;
-    const b = `Boris${ts}`;
-    const c = `AnnaChild${ts}`;
-    await addOrphan(page, a);
-    await addOrphan(page, b);
-    const anna = await nodeByText(page, a);
-    await seedFamilyForPerson(page, anna, c);
-    const boris = await nodeByText(page, b);
-    const fc = await familyCenter(page);
-    await pressAndDrag(page, boris.cx, boris.cy, fc.cx, fc.cy);
-    await expectTip(page, TIP.attachSpouse);
-    await page.keyboard.press("Escape");
-    await page.mouse.up();
-  });
+  // person → family attach-as-spouse tooltip is not exercised: the only
+  // drag-buildable family already has two parents (gesture 3 fills both
+  // slots), so canAddParent fails and the family becomes v2-drop-disallowed
+  // — pointer-events: none, no tip. Coverage moves to a unit test if needed.
 
   test("family → person tooltip: Attach as child", async ({ page }) => {
     const ts = Date.now();
@@ -213,17 +200,6 @@ test.describe("v2 drag tooltips", () => {
     await page.mouse.up();
   });
 
-  test("empty → person tooltip: Create family", async ({ page }) => {
-    const name = `Jack${Date.now()}`;
-    await addOrphan(page, name);
-    const jack = await nodeByText(page, name);
-    const startX = jack.cx + 280;
-    const startY = jack.cy + 150;
-    await pressAndDrag(page, startX, startY, jack.cx, jack.cy);
-    await expectTip(page, TIP.createFamily);
-    await page.keyboard.press("Escape");
-    await page.mouse.up();
-  });
 });
 
 test("v2 family→empty release opens person details modal and creates child", async ({ page }) => {
@@ -249,32 +225,6 @@ test("v2 family→empty release opens person details modal and creates child", a
   await expect(committed).toBeVisible({ timeout: 15_000 });
 });
 
-test("v2 empty→family release opens person details modal and creates spouse", async ({ page }) => {
-  await page.goto("/v2");
-  await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
-  await createFreshStemma(page);
-  await enterEditMode(page);
-  const ts = Date.now();
-  const a = `Sam${ts}`;
-  const seed = `SamChild${ts}`;
-  const spouse = `Uma${ts}`;
-  await addOrphan(page, a);
-  const sam = await nodeByText(page, a);
-  await seedFamilyForPerson(page, sam, seed);
-  const fc2 = await familyCenter(page);
-  const vp = page.viewportSize();
-  const startX = vp ? vp.width - 80 : fc2.cx + 300;
-  const startY = vp ? Math.floor(vp.height / 2) : fc2.cy;
-  await pressAndDrag(page, startX, startY, fc2.cx, fc2.cy);
-  await page.mouse.up();
-  await fillCreatePersonModal(page, spouse);
-  const committed = page
-    .locator("svg#chart g[id^='person_']:not([id*='pending-'])")
-    .filter({ has: page.locator(`text="${spouse}"`) })
-    .first();
-  await expect(committed).toBeVisible({ timeout: 15_000 });
-});
-
 test("v2 person→empty release opens person details modal and creates spouse", async ({ page }) => {
   await page.goto("/v2");
   await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
@@ -296,27 +246,18 @@ test("v2 person→empty release opens person details modal and creates spouse", 
   await expect(committed).toBeVisible({ timeout: 15_000 });
 });
 
-test("v2 empty→person release opens person details modal and creates parent", async ({ page }) => {
+test("v2 empty→person release is a no-op (#180)", async ({ page }) => {
   await page.goto("/v2");
   await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
   await createFreshStemma(page);
   await enterEditMode(page);
   const name = `Noel${Date.now()}`;
-  const parent = `NoelParent${Date.now()}`;
   await addOrphan(page, name);
   expect(await familyCount(page)).toBe(0);
   const noel = await nodeByText(page, name);
   const startX = noel.cx + 280;
   const startY = noel.cy + 150;
-  await pressAndDrag(page, startX, startY, noel.cx, noel.cy);
-  await page.mouse.up();
-  await fillCreatePersonModal(page, parent);
-  await waitForRealFamily(page);
-  const committed = page
-    .locator("svg#chart g[id^='person_']:not([id*='pending-'])")
-    .filter({ has: page.locator(`text="${parent}"`) })
-    .first();
-  await expect(committed).toBeVisible({ timeout: 15_000 });
+  await expectNoOpDrag(page, startX, startY, noel.cx, noel.cy);
 });
 
 test("v2 Esc cancels gesture before drop", async ({ page }) => {
@@ -398,8 +339,8 @@ test("v2 family → family drag is a no-op (no tip, no modal, no DB change)", as
     .first();
   await expect(dionCommitted).toBeVisible({ timeout: 15_000 });
   const dion = await nodeByText(page, personB);
-  // Gesture 4 again — adds a second family with dion as child.
-  await pressAndDrag(page, dion.cx + 280, dion.cy, dion.cx, dion.cy);
+  // Gesture 3 (person → empty) — second family with dion + childB as parents.
+  await pressAndDrag(page, dion.cx, dion.cy, dion.cx + 280, dion.cy + 80);
   await page.mouse.up();
   await fillCreatePersonModal(page, childB);
   await expect(page.locator("svg#chart g[id^='family_pending-']")).toHaveCount(0, { timeout: 15_000 });
