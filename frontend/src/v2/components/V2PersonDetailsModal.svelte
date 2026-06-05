@@ -25,7 +25,14 @@
         ShowPerson,
         UpdatePerson,
     } from "../../components/person_details_modal/PersonDetailsModal.svelte";
+    import type { CreateNewPerson } from "../../model";
     import V2Modal from "./V2Modal.svelte";
+
+    export type CreatePersonPayload = {
+        description: CreateNewPerson;
+        pin: boolean;
+        photoUpload: Blob | null;
+    };
 
     type Props = {
         editMode?: boolean;
@@ -42,6 +49,10 @@
     }: Props = $props();
 
     let open = $state(false);
+    let mode = $state<"view" | "create">("view");
+    let createTitle = $state<string | null>(null);
+    let activeCreateCallback: ((payload: CreatePersonPayload) => void) | null = null;
+    const isCreate = $derived(mode === "create");
     let birthInputEl = $state<HTMLInputElement | null>(null);
     let deathInputEl = $state<HTMLInputElement | null>(null);
     let photoFileInputEl = $state<HTMLInputElement | null>(null);
@@ -54,7 +65,7 @@
     let bio = $state("");
     let id = $state("");
     let personReadOnly = $state(false);
-    const editingAllowed = $derived(editMode && !personReadOnly);
+    const editingAllowed = $derived(isCreate || (editMode && !personReadOnly));
     const readOnly = $derived(!editingAllowed);
     let photoUrl = $state<string | null>(null);
     let photoErrString = $state<string | null>(null);
@@ -170,37 +181,49 @@
         }
     }
 
-    export function showPersonDetails(p: ShowPerson) {
-        id = p.description.id;
-        name = p.description.name;
-        unknown = isUnknownPerson(p.description.name);
-        birthDate = p.description.birthDate ? new Date(p.description.birthDate) : null;
-        deathDate = p.description.deathDate ? new Date(p.description.deathDate) : null;
-        bio = p.description.bio ?? "";
-        pinned = p.pin;
-        personReadOnly = p.description.readOnly ?? false;
-        bioTab = "preview";
-        originalPhotoUrl = p.description.photoUrl ?? null;
+    function resetFormState(p: ShowPerson | null) {
+        id = p?.description.id ?? "";
+        name = p?.description.name ?? "";
+        unknown = p ? isUnknownPerson(p.description.name) : false;
+        birthDate = p?.description.birthDate ? new Date(p.description.birthDate) : null;
+        deathDate = p?.description.deathDate ? new Date(p.description.deathDate) : null;
+        bio = p?.description.bio ?? "";
+        pinned = p?.pin ?? false;
+        personReadOnly = p?.description.readOnly ?? false;
+        bioTab = p ? "preview" : "edit";
+        originalPhotoUrl = p?.description.photoUrl ?? null;
         photoUrl = originalPhotoUrl;
         photoErrString = null;
         if (photoFileInputEl) photoFileInputEl.value = "";
         resetCropState();
         resetPendingPhoto();
-
         birthDateErrString = null;
         deathDateErrString = null;
-
-        open = true;
-
-        // Sync the imask inputs once they exist
         queueMicrotask(() => {
             if (birthInputEl) birthInputEl.value = dateToMaskedDateStr(birthDate) ?? "";
             if (deathInputEl) deathInputEl.value = dateToMaskedDateStr(deathDate) ?? "";
         });
     }
 
+    export function showPersonDetails(p: ShowPerson) {
+        mode = "view";
+        createTitle = null;
+        resetFormState(p);
+        open = true;
+    }
+
+    export function showCreatePerson(opts: { title?: string; oncreate: (payload: CreatePersonPayload) => void }) {
+        mode = "create";
+        createTitle = opts.title ?? null;
+        activeCreateCallback = opts.oncreate;
+        resetFormState(null);
+        open = true;
+    }
+
     function close() {
         open = false;
+        activeCreateCallback = null;
+        resetPendingPhoto();
     }
 
     export function dismiss() {
@@ -209,19 +232,30 @@
 
     function save() {
         if (saveDisabled) return;
-        onpersonUpdated?.({
-            id,
-            description: {
-                type: "CreateNewPerson",
-                name: unknown ? "" : name,
-                birthDate: dateToIsoLocalTime(birthDate),
-                deathDate: dateToIsoLocalTime(deathDate),
-                bio,
-            },
-            pin: pinned,
-            photoUpload: pendingPhotoBlob,
-            photoRemove: pendingPhotoRemove,
-        });
+        const description = {
+            type: "CreateNewPerson" as const,
+            name: unknown ? "" : name,
+            birthDate: dateToIsoLocalTime(birthDate),
+            deathDate: dateToIsoLocalTime(deathDate),
+            bio,
+        };
+        if (mode === "create") {
+            const cb = activeCreateCallback;
+            activeCreateCallback = null;
+            cb?.({
+                description,
+                pin: pinned,
+                photoUpload: pendingPhotoBlob,
+            });
+        } else {
+            onpersonUpdated?.({
+                id,
+                description,
+                pin: pinned,
+                photoUpload: pendingPhotoBlob,
+                photoRemove: pendingPhotoRemove,
+            });
+        }
         close();
     }
 
@@ -405,7 +439,7 @@
 
 <V2Modal
     {open}
-    title={cropping ? $t("person.photoAdjustTitle") : $t("person.title")}
+    title={cropping ? $t("person.photoAdjustTitle") : isCreate ? (createTitle ?? $t("v2.addPerson")) : $t("person.title")}
     size="lg"
     scroll
     dismissOnBackdrop={!cropping}
@@ -615,6 +649,15 @@
                 onclick={confirmCrop}
                 data-testid="v2-person-crop-save"
             >{$t("common.save")}</button>
+        {:else if isCreate}
+            <button type="button" class="btn btn-secondary" onclick={close}>{$t("common.cancel")}</button>
+            <button
+                type="button"
+                class="btn btn-primary"
+                disabled={saveDisabled}
+                onclick={save}
+                data-testid="v2-person-create"
+            >{$t("common.create")}</button>
         {:else if editingAllowed}
             <button
                 type="button"

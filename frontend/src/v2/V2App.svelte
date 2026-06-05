@@ -2,7 +2,6 @@
     import { onMount, untrack } from "svelte";
     import { AppController, type MutationResult } from "../appController";
     import type {
-        CreateNewPerson,
         FamilyDescription,
         PersonDefinition,
         PersonDescription,
@@ -205,6 +204,7 @@
         name: string,
         op: () => Promise<MutationResult>,
         pinAt?: { x: number; y: number },
+        afterCommit?: (newPersonIds: string[]) => void,
     ): Promise<void> {
         const tempId = `pending-${crypto.randomUUID()}`;
         pendingAdds = [...pendingAdds, { tempId, name }];
@@ -216,6 +216,7 @@
                     stemmaChart?.setNodePosition(normalizeId("person", id), pinAt.x, pinAt.y),
                 );
             }
+            afterCommit?.(result.newPersonIds);
         } catch {
             // surfaced through controller.err
         } finally {
@@ -281,10 +282,6 @@
         controller.updateFamily(familyId, parents, children, { silent: true }).catch(() => {});
     }
 
-    function placeholderPerson(): CreateNewPerson {
-        return { type: "CreateNewPerson", name: $t("v2.placeholderName") };
-    }
-
     function spawnStubFamily(sourcePersonId: string, svgX: number, svgY: number) {
         const tempId = `pending-family-${crypto.randomUUID()}`;
         stemmaChart?.setNodePosition(normalizeId("family", tempId), svgX, svgY);
@@ -318,44 +315,32 @@
         }
     }
 
-    function createSpouseForFamily(familyId: string, pinAt?: { x: number; y: number }) {
-        if (!stemmaIndex) return;
-        const family = stemmaIndex.family(familyId);
-        if (!family) return;
-        const existingParents: PersonDefinition[] = family.parents.map((id) => ({ type: "ExistingPerson", id }));
-        const existingChildren: PersonDefinition[] = family.children.map((id) => ({ type: "ExistingPerson", id }));
-        const newPerson = placeholderPerson();
-        void withPendingAdd(
-            newPerson.name,
-            () =>
-                controller.updateFamily(familyId, [...existingParents, newPerson], existingChildren, { silent: true }),
-            pinAt,
-        );
-    }
-
-    function openCreateChildPrompt(familyId: string, pinAt?: { x: number; y: number }) {
-        promptModal?.prompt({
-            title: $t("v2.createChildTitle"),
-            label: $t("v2.createChildLabel"),
-            confirmLabel: $t("common.add"),
-            testid: "v2-create-child-modal",
-            onaccept: (name) => {
-                if (!stemmaIndex) return;
-                const family = stemmaIndex.family(familyId);
+    function createPersonInFamily(
+        familyId: string,
+        role: "parent" | "child",
+        title: string,
+        pinAt?: { x: number; y: number },
+    ) {
+        if (!stemmaIndex?.family(familyId)) return;
+        personEditModal?.showCreatePerson({
+            title,
+            oncreate: ({ description, pin, photoUpload }) => {
+                const family = stemmaIndex?.family(familyId);
                 if (!family) return;
                 const existingParents: PersonDefinition[] = family.parents.map((id) => ({ type: "ExistingPerson", id }));
                 const existingChildren: PersonDefinition[] = family.children.map((id) => ({ type: "ExistingPerson", id }));
-                const newChild: CreateNewPerson = { type: "CreateNewPerson", name };
+                const parents = role === "parent" ? [...existingParents, description] : existingParents;
+                const children = role === "child" ? [...existingChildren, description] : existingChildren;
                 void withPendingAdd(
-                    name,
-                    () =>
-                        controller.updateFamily(
-                            familyId,
-                            existingParents,
-                            [...existingChildren, newChild],
-                            { silent: true },
-                        ),
+                    description.name,
+                    () => controller.updateFamily(familyId, parents, children, { silent: true }),
                     pinAt,
+                    (newPersonIds) => {
+                        const newId = newPersonIds[0];
+                        if (newId && (photoUpload || pin)) {
+                            controller.savePerson(newId, description, pin, photoUpload, false);
+                        }
+                    },
                 );
             },
         });
@@ -654,7 +639,7 @@
                 return;
             }
             if (source.kind === "empty" && overInfo?.ref.kind === "family") {
-                createSpouseForFamily(overInfo.ref.id, startCenter);
+                createPersonInFamily(overInfo.ref.id, "parent", $t("v2.createSpouseTitle"), startCenter);
                 return;
             }
             if (source.kind === "empty" && overInfo?.ref.kind === "person") {
@@ -663,7 +648,7 @@
             }
             if (source.kind === "family" && !overInfo && !isPendingId(source.id)) {
                 const releaseSvg = clientToSvgPoint(svgEl, e.clientX, e.clientY);
-                openCreateChildPrompt(source.id, releaseSvg);
+                createPersonInFamily(source.id, "child", $t("v2.createChildTitle"), releaseSvg);
                 return;
             }
         };
