@@ -8,6 +8,7 @@ import { SettingsStorage } from './settingsStroage';
 import { selectStemmaId } from './appControllerSelection';
 
 export type MutationOptions = { silent?: boolean }
+export type MutationResult = { newPersonIds: string[]; newFamilyIds: string[] }
 
 export class AppController {
     private static readonly LAST_STEMMA_KEY = "stemma_last_stemma_id";
@@ -270,9 +271,13 @@ export class AppController {
     private manipulateStemma(
         action: (m: Model, currentStemmaId: string) => Promise<Stemma>,
         options?: MutationOptions,
-    ): Promise<void> {
+    ): Promise<MutationResult> {
         let currentStemmaId = get(this.currentStemmaId)
         const silent = options?.silent ?? false
+
+        const prevStemma = get(this.stemma)
+        const prevPersonIds = new Set((prevStemma?.people ?? []).map((p) => p.id))
+        const prevFamilyIds = new Set((prevStemma?.families ?? []).map((f) => f.id))
 
         if (!silent) this.isWorking.set(true)
         this.err.set(null)
@@ -281,6 +286,10 @@ export class AppController {
             .then((result) => {
                 this.refreshIndexes(result, currentStemmaId)
                 this.stemma.set(result)
+                return {
+                    newPersonIds: result.people.filter((p) => !prevPersonIds.has(p.id)).map((p) => p.id),
+                    newFamilyIds: result.families.filter((f) => !prevFamilyIds.has(f.id)).map((f) => f.id),
+                }
             })
             .catch(err => {
                 this.err.set(err)
