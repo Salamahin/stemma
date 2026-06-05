@@ -207,7 +207,7 @@
         pinAt?: { x: number; y: number },
         afterCommit?: (newPersonIds: string[]) => void,
     ): Promise<void> {
-        const tempId = `pending-${crypto.randomUUID()}`;
+        const tempId = newPendingPersonId();
         pendingAdds = [...pendingAdds, { tempId, name }];
         if (pinAt) stemmaChart?.setNodePosition(normalizeId("person", tempId), pinAt.x, pinAt.y);
         try {
@@ -223,6 +223,14 @@
         } finally {
             pendingAdds = pendingAdds.filter((p) => p.tempId !== tempId);
         }
+    }
+
+    function newPendingPersonId(): string {
+        return `pending-${crypto.randomUUID()}`;
+    }
+
+    function newPendingFamilyId(): string {
+        return `pending-family-${crypto.randomUUID()}`;
     }
 
     function clientToSvgPoint(svgEl: SVGSVGElement, clientX: number, clientY: number): { x: number; y: number } {
@@ -279,64 +287,46 @@
         controller.updateFamily(familyId, parents, children, { silent: true }).catch(() => {});
     }
 
-    function counterpartFamilyShape<T>(
-        role: "parent" | "child" | "spouse",
-        existing: T,
-        incoming: T,
-    ): { parents: T[]; children: T[] } {
-        switch (role) {
-            case "spouse":
-                return { parents: [existing, incoming], children: [] };
-            case "parent":
-                return { parents: [incoming], children: [existing] };
-            case "child":
-                return { parents: [existing], children: [incoming] };
-        }
-    }
-
-    function createPersonAsCounterpart(
+    function createSpouseForPerson(
         existingPersonId: string,
-        newPersonRole: "parent" | "child" | "spouse",
+        existingCenter: { x: number; y: number },
         title: string,
-        pinAt: { x: number; y: number },
+        dropAt: { x: number; y: number },
     ) {
+        // Family marker goes at the midpoint between the existing person and the
+        // drop point so it doesn't overlap the new spouse circle.
+        const familyAt = { x: (existingCenter.x + dropAt.x) / 2, y: (existingCenter.y + dropAt.y) / 2 };
         personEditModal?.showCreatePerson({
             title,
             oncreate: ({ description, pin, photoUpload }) => {
-                const tempPersonId = `pending-${crypto.randomUUID()}`;
-                const tempFamilyId = `pending-family-${crypto.randomUUID()}`;
-                const tempShape = counterpartFamilyShape(newPersonRole, existingPersonId, tempPersonId);
+                const tempPersonId = newPendingPersonId();
+                const tempFamilyId = newPendingFamilyId();
                 pendingAdds = [...pendingAdds, { tempId: tempPersonId, name: description.name }];
                 pendingFamilies = [
                     ...pendingFamilies,
                     {
                         tempId: tempFamilyId,
-                        parents: tempShape.parents,
-                        children: tempShape.children,
-                        x: pinAt.x,
-                        y: pinAt.y,
+                        parents: [existingPersonId, tempPersonId],
+                        children: [],
+                        x: familyAt.x,
+                        y: familyAt.y,
                     },
                 ];
-                stemmaChart?.setNodePosition(normalizeId("person", tempPersonId), pinAt.x, pinAt.y);
-                stemmaChart?.setNodePosition(normalizeId("family", tempFamilyId), pinAt.x, pinAt.y);
+                stemmaChart?.setNodePosition(normalizeId("person", tempPersonId), dropAt.x, dropAt.y);
+                stemmaChart?.setNodePosition(normalizeId("family", tempFamilyId), familyAt.x, familyAt.y);
                 const existingRef: PersonDefinition = { type: "ExistingPerson", id: existingPersonId };
-                const { parents, children } = counterpartFamilyShape<PersonDefinition>(
-                    newPersonRole,
-                    existingRef,
-                    description,
-                );
                 controller
-                    .createFamily(parents, children, { silent: true })
+                    .createFamily([existingRef, description], [], { silent: true })
                     .then((result) => {
                         const newPersonId = result.newPersonIds[0];
                         if (newPersonId) {
-                            stemmaChart?.setNodePosition(normalizeId("person", newPersonId), pinAt.x, pinAt.y);
+                            stemmaChart?.setNodePosition(normalizeId("person", newPersonId), dropAt.x, dropAt.y);
                             if (photoUpload || pin) {
                                 controller.savePerson(newPersonId, description, pin, photoUpload, false);
                             }
                         }
                         result.newFamilyIds.forEach((id) =>
-                            stemmaChart?.setNodePosition(normalizeId("family", id), pinAt.x, pinAt.y),
+                            stemmaChart?.setNodePosition(normalizeId("family", id), familyAt.x, familyAt.y),
                         );
                     })
                     .catch(() => {})
@@ -510,7 +500,6 @@
             }
             if (source.kind === "empty") {
                 if (overInfo?.ref.kind === "family") return "valid";
-                if (overInfo?.ref.kind === "person") return "valid";
                 return "noop";
             }
             return "noop";
@@ -573,7 +562,6 @@
             }
             if (source.kind === "empty") {
                 if (overInfo?.ref.kind === "family") return $t("v2.tipCreateSpouse");
-                if (overInfo?.ref.kind === "person") return $t("v2.tipCreateFamily");
                 return null;
             }
             return null;
@@ -681,15 +669,11 @@
             }
             if (source.kind === "person" && !overInfo) {
                 const releaseSvg = clientToSvgPoint(svgEl, e.clientX, e.clientY);
-                createPersonAsCounterpart(source.id, "spouse", $t("v2.createSpouseTitle"), releaseSvg);
+                createSpouseForPerson(source.id, startCenter, $t("v2.createSpouseTitle"), releaseSvg);
                 return;
             }
             if (source.kind === "empty" && overInfo?.ref.kind === "family") {
                 createPersonInFamily(overInfo.ref.id, "parent", $t("v2.createSpouseTitle"), startCenter);
-                return;
-            }
-            if (source.kind === "empty" && overInfo?.ref.kind === "person") {
-                createPersonAsCounterpart(overInfo.ref.id, "parent", $t("v2.createParentTitle"), startCenter);
                 return;
             }
             if (source.kind === "family" && !overInfo && !isPendingId(source.id)) {
@@ -704,6 +688,16 @@
         };
 
         const onCancel = () => cleanup();
+        // d3.drag attaches a pointerdown listener to each node g and restarts
+        // the force simulation on press, which would scramble pinned positions
+        // mid-gesture. Swallow pointerdown at the svg root in edit mode so the
+        // d3 handler never sees it; V2's mousedown listener handles the gesture.
+        const onPointerDown = (e: PointerEvent) => {
+            if (e.button !== 0) return;
+            if (panActive) return;
+            e.stopImmediatePropagation();
+        };
+        svgEl.addEventListener("pointerdown", onPointerDown, true);
         svgEl.addEventListener("mousedown", onMouseDown, true);
         window.addEventListener("mousemove", onMouseMove);
         window.addEventListener("mouseup", onMouseUp);
@@ -711,6 +705,7 @@
         window.addEventListener("contextmenu", onCancel);
         window.addEventListener("blur", onCancel);
         return () => {
+            svgEl.removeEventListener("pointerdown", onPointerDown, true);
             svgEl.removeEventListener("mousedown", onMouseDown, true);
             window.removeEventListener("mousemove", onMouseMove);
             window.removeEventListener("mouseup", onMouseUp);
