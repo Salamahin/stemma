@@ -23,6 +23,8 @@ type FamilyMembers = {
 }
 
 
+export type AddCheck = { ok: true } | { ok: false, reason: "twoParents" | "alreadyMember" | "cycle" | "unknownFamily" }
+
 export class StemmaIndex {
     private _parentToChildren: Map<string, DirectedFamilyDescription[]>
     private _childToParents: Map<string, DirectedFamilyDescription[]>
@@ -34,6 +36,8 @@ export class StemmaIndex {
     private _namesakes: Map<string, string[]>
     private _lineage: Map<string, Generation>
     private _maxGeneration: number
+    private _descendantFamiliesOfPerson: Map<string, Set<string>>
+    private _descendantPeopleOfFamily: Map<string, Set<string>>
 
     private groupByKey<K, V>(array: Array<readonly [K, V]>) {
         return array.reduce((store, item) => {
@@ -67,6 +71,43 @@ export class StemmaIndex {
         this._people = new Map(stemma.people.map(p => [p.id, p]))
         this._lineage = new Map(stemma.people.map(p => [p.id, this.buildLineage(p)]))
         this._maxGeneration = Math.max(...[...this._lineage.values()].map(p => p.generation));
+
+        const dependeesByPerson = new Map(
+            stemma.people.map(p => [p.id, this.computeLineage(p.id, this._parentToChildren)])
+        )
+        this._descendantFamiliesOfPerson = new Map(
+            stemma.people.map(p => [p.id, new Set(dependeesByPerson.get(p.id)!.families)])
+        )
+        this._descendantPeopleOfFamily = new Map(
+            stemma.families.map(f => {
+                const peopleSet = new Set<string>()
+                for (const child of f.children ?? []) {
+                    peopleSet.add(child)
+                    const childDesc = dependeesByPerson.get(child)
+                    if (childDesc) for (const rel of childDesc.relativies) peopleSet.add(rel)
+                }
+                return [f.id, peopleSet]
+            })
+        )
+    }
+
+    canAddParent(familyId: string, personId: string): AddCheck {
+        const family = this._families.get(familyId)
+        if (!family) return { ok: false, reason: "unknownFamily" }
+        if ((family.parents?.length ?? 0) >= 2) return { ok: false, reason: "twoParents" }
+        if (family.parents?.includes(personId)) return { ok: false, reason: "alreadyMember" }
+        if (family.children?.includes(personId)) return { ok: false, reason: "alreadyMember" }
+        if (this._descendantPeopleOfFamily.get(familyId)?.has(personId)) return { ok: false, reason: "cycle" }
+        return { ok: true }
+    }
+
+    canAddChild(familyId: string, personId: string): AddCheck {
+        const family = this._families.get(familyId)
+        if (!family) return { ok: false, reason: "unknownFamily" }
+        if (family.children?.includes(personId)) return { ok: false, reason: "alreadyMember" }
+        if (family.parents?.includes(personId)) return { ok: false, reason: "alreadyMember" }
+        if (this._descendantFamiliesOfPerson.get(personId)?.has(familyId)) return { ok: false, reason: "cycle" }
+        return { ok: true }
     }
 
     private computeLineage(personId: string, relation: Map<string, DirectedFamilyDescription[]>) {
