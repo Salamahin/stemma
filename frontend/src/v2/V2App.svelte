@@ -484,6 +484,10 @@
                 endpointPreview: null,
                 lastTarget: null,
             };
+            // Prevent native text selection / drag of svg labels — selection
+            // can hijack the gesture (mouseup replaced by dragend) and
+            // visually litters the chart with highlighted text.
+            e.preventDefault();
             e.stopImmediatePropagation();
         };
 
@@ -1065,6 +1069,15 @@
     :global(.v2-canvas-layer #chart) {
         min-height: 100vh;
         padding: 0 !important;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-user-drag: none;
+    }
+
+    :global(.v2-canvas-layer #chart text) {
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-user-drag: none;
     }
 
     .v2-chrome {
