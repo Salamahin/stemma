@@ -62,6 +62,9 @@
     type PendingFamily = { tempId: string; parents: string[]; children: string[] };
 
     let editMode = $state(false);
+    let panMode = $state(false);
+    let spacePan = $state(false);
+    const panActive = $derived(editMode && (panMode || spacePan));
     let pendingRemovedPersonIds = $state<Set<string>>(new Set());
     let pendingRemovedFamilyIds = $state<Set<string>>(new Set());
     let pendingAdds = $state<PendingAdd[]>([]);
@@ -454,6 +457,7 @@
 
         const onMouseDown = (e: MouseEvent) => {
             if (e.button !== 0) return;
+            if (panActive) return;
             const targetG = (e.target as Element | null)?.closest?.("g[id^='person_'], g[id^='family_']") as SVGGElement | null;
             let source: SourceRef;
             let center: { x: number; y: number };
@@ -642,6 +646,56 @@
             window.removeEventListener("mouseup", onMouseUp);
             window.removeEventListener("keydown", onKeyDown);
             cleanup();
+        };
+    });
+
+    $effect(() => {
+        if (!editMode) {
+            panMode = false;
+            spacePan = false;
+        }
+    });
+
+    $effect(() => {
+        if (!editMode) return;
+        const isTypingTarget = (t: EventTarget | null): boolean => {
+            if (!(t instanceof HTMLElement)) return false;
+            const tag = t.tagName;
+            return tag === "INPUT" || tag === "TEXTAREA" || t.isContentEditable;
+        };
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.code !== "Space" || e.repeat) return;
+            if (isTypingTarget(e.target)) return;
+            spacePan = true;
+            e.preventDefault();
+        };
+        const onKeyUp = (e: KeyboardEvent) => {
+            if (e.code !== "Space") return;
+            spacePan = false;
+        };
+        window.addEventListener("keydown", onKeyDown);
+        window.addEventListener("keyup", onKeyUp);
+        return () => {
+            window.removeEventListener("keydown", onKeyDown);
+            window.removeEventListener("keyup", onKeyUp);
+            spacePan = false;
+        };
+    });
+
+    $effect(() => {
+        if (!panActive) {
+            document.body.classList.remove("v2-pan-armed", "v2-pan-dragging");
+            return;
+        }
+        document.body.classList.add("v2-pan-armed");
+        const onDown = () => document.body.classList.add("v2-pan-dragging");
+        const onUp = () => document.body.classList.remove("v2-pan-dragging");
+        window.addEventListener("mousedown", onDown);
+        window.addEventListener("mouseup", onUp);
+        return () => {
+            window.removeEventListener("mousedown", onDown);
+            window.removeEventListener("mouseup", onUp);
+            document.body.classList.remove("v2-pan-armed", "v2-pan-dragging");
         };
     });
 
@@ -950,8 +1004,10 @@
             <div class="v2-bottom-right">
                 <V2Fab
                     {editMode}
+                    {panMode}
                     disabled={isWorking}
                     oneditToggle={() => { editMode = !editMode; }}
+                    onpanToggle={() => { panMode = !panMode; }}
                     onaddPerson={openAddPerson}
                 />
             </div>
@@ -1255,6 +1311,16 @@
     :global(body.v2-linking),
     :global(body.v2-linking *) {
         cursor: crosshair !important;
+    }
+
+    :global(body.v2-pan-armed),
+    :global(body.v2-pan-armed *) {
+        cursor: grab !important;
+    }
+
+    :global(body.v2-pan-dragging),
+    :global(body.v2-pan-dragging *) {
+        cursor: grabbing !important;
     }
 
     .v2-drag-tip {

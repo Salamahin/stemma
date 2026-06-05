@@ -259,6 +259,8 @@ export const en: Record<string, string> = {
     'v2.placeholderName': '?',
     'v2.createChildTitle': 'Create child',
     'v2.createChildLabel': 'Name',
+    'v2.panModeOn': 'Pan canvas',
+    'v2.panModeOff': 'Exit pan mode',
 };
 
 export const ru: Record<string, string> = {
@@ -488,6 +490,8 @@ export const ru: Record<string, string> = {
     'v2.placeholderName': '?',
     'v2.createChildTitle': 'Создать потомка',
     'v2.createChildLabel': 'Имя',
+    'v2.panModeOn': 'Перемещать холст',
+    'v2.panModeOff': 'Выйти из режима перемещения',
 };
 
 const dictionaries: Record<Locale, Record<string, string>> = { en, ru };
