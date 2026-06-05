@@ -279,9 +279,24 @@
         controller.updateFamily(familyId, parents, children, { silent: true }).catch(() => {});
     }
 
+    function counterpartFamilyShape<T>(
+        role: "parent" | "child" | "spouse",
+        existing: T,
+        incoming: T,
+    ): { parents: T[]; children: T[] } {
+        switch (role) {
+            case "spouse":
+                return { parents: [existing, incoming], children: [] };
+            case "parent":
+                return { parents: [incoming], children: [existing] };
+            case "child":
+                return { parents: [existing], children: [incoming] };
+        }
+    }
+
     function createPersonAsCounterpart(
         existingPersonId: string,
-        newPersonRole: "parent" | "child",
+        newPersonRole: "parent" | "child" | "spouse",
         title: string,
         pinAt: { x: number; y: number },
     ) {
@@ -290,18 +305,26 @@
             oncreate: ({ description, pin, photoUpload }) => {
                 const tempPersonId = `pending-${crypto.randomUUID()}`;
                 const tempFamilyId = `pending-family-${crypto.randomUUID()}`;
-                const tempParents = newPersonRole === "parent" ? [tempPersonId] : [existingPersonId];
-                const tempChildren = newPersonRole === "child" ? [tempPersonId] : [existingPersonId];
+                const tempShape = counterpartFamilyShape(newPersonRole, existingPersonId, tempPersonId);
                 pendingAdds = [...pendingAdds, { tempId: tempPersonId, name: description.name }];
                 pendingFamilies = [
                     ...pendingFamilies,
-                    { tempId: tempFamilyId, parents: tempParents, children: tempChildren, x: pinAt.x, y: pinAt.y },
+                    {
+                        tempId: tempFamilyId,
+                        parents: tempShape.parents,
+                        children: tempShape.children,
+                        x: pinAt.x,
+                        y: pinAt.y,
+                    },
                 ];
                 stemmaChart?.setNodePosition(normalizeId("person", tempPersonId), pinAt.x, pinAt.y);
                 stemmaChart?.setNodePosition(normalizeId("family", tempFamilyId), pinAt.x, pinAt.y);
                 const existingRef: PersonDefinition = { type: "ExistingPerson", id: existingPersonId };
-                const parents: PersonDefinition[] = newPersonRole === "parent" ? [description] : [existingRef];
-                const children: PersonDefinition[] = newPersonRole === "child" ? [description] : [existingRef];
+                const { parents, children } = counterpartFamilyShape<PersonDefinition>(
+                    newPersonRole,
+                    existingRef,
+                    description,
+                );
                 controller
                     .createFamily(parents, children, { silent: true })
                     .then((result) => {
@@ -539,7 +562,7 @@
 
         const computeTipText = (overInfo: { ref: NodeRef } | null, source: SourceRef): string | null => {
             if (source.kind === "person") {
-                if (!overInfo) return $t("v2.tipCreateFamily");
+                if (!overInfo) return $t("v2.tipCreateSpouse");
                 if (overInfo.ref.kind === "family") return $t("v2.tipAttachSpouse");
                 return null;
             }
@@ -658,7 +681,7 @@
             }
             if (source.kind === "person" && !overInfo) {
                 const releaseSvg = clientToSvgPoint(svgEl, e.clientX, e.clientY);
-                createPersonAsCounterpart(source.id, "child", $t("v2.createChildTitle"), releaseSvg);
+                createPersonAsCounterpart(source.id, "spouse", $t("v2.createSpouseTitle"), releaseSvg);
                 return;
             }
             if (source.kind === "empty" && overInfo?.ref.kind === "family") {
