@@ -233,6 +233,15 @@
 
         if (fullyCached) simulation.alphaTarget(0).alpha(0);
         if (!simulationActive) {
+            // Sim inactive (edit mode): pin every node that already had a known
+            // position so the 80-tick settle only lays out genuinely new nodes,
+            // leaving existing positions stable across data changes.
+            d3.select("g.main").selectAll<SVGGElement, any>("g").each((d: any) => {
+                if (d && d.hadKnownPosition && d.x != null && d.y != null) {
+                    d.fx = d.x;
+                    d.fy = d.y;
+                }
+            });
             simulation.tick(80);
             applyManualPositions();
             simulation.alphaTarget(0).stop();
