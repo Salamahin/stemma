@@ -13,10 +13,10 @@ test("v2 search: find person, focus tree, handle no-match", async ({ page }) => 
     // Add one person so search is populated.
     await editFab.click();
     await page.getByTestId("v2-add-person-fab").click();
-    const nameInput = page.getByTestId("v2-name-input");
+    const nameInput = page.getByTestId("v2-person-name-input");
     await expect(nameInput).toBeVisible();
     await nameInput.fill("Searchable");
-    await page.getByTestId("v2-name-confirm").click();
+    await page.getByTestId("v2-person-create").click();
     await expect(svg).toBeVisible({ timeout: 15_000 });
     await expect(svg.locator("text").filter({ hasText: "Searchable" })).toBeVisible({ timeout: 15_000 });
   }
