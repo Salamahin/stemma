@@ -1,7 +1,7 @@
 import { StemmaIndex } from "./stemmaIndex"
 import { get } from "svelte/store";
 import { LocalizedError, t } from "./i18n";
-import { sanitizeRequestPayload } from "./requestSanitizer";
+import { PERSON_PRESERVE_KEYS, sanitizeRequestPayload } from "./requestSanitizer";
 import { mapStemmaError } from "./stemmaErrorMapping";
 import { buildInviteLink } from "./inviteLinkBuilder";
 
@@ -167,9 +167,9 @@ export class Model {
 
     private makeFamily(parents: PersonDefinition[], children: PersonDefinition[]): CreateFamily {
         return {
-            parent1: parents.length > 0 ? sanitizeRequestPayload(parents[0]) as PersonDefinition : null,
-            parent2: parents.length > 1 ? sanitizeRequestPayload(parents[1]) as PersonDefinition : null,
-            children: children.map(c => sanitizeRequestPayload(c) as PersonDefinition),
+            parent1: parents.length > 0 ? sanitizeRequestPayload(parents[0], PERSON_PRESERVE_KEYS) as PersonDefinition : null,
+            parent2: parents.length > 1 ? sanitizeRequestPayload(parents[1], PERSON_PRESERVE_KEYS) as PersonDefinition : null,
+            children: children.map(c => sanitizeRequestPayload(c, PERSON_PRESERVE_KEYS) as PersonDefinition),
         }
     }
 
@@ -213,7 +213,7 @@ export class Model {
 
     async updatePerson(stemmaId: string, personId: string, descr: CreateNewPerson, stemmaIndex: StemmaIndex): Promise<Stemma> {
         return this.send<Stemma>(
-            { type: "UpdatePersonRequest", stemmaId, personId, personDescr: sanitizeRequestPayload(descr) as CreateNewPerson },
+            { type: "UpdatePersonRequest", stemmaId, personId, personDescr: sanitizeRequestPayload(descr, PERSON_PRESERVE_KEYS) as CreateNewPerson },
             stemmaIndex,
         )
     }
@@ -235,7 +235,7 @@ export class Model {
 
     async createOrphanPerson(stemmaId: string, descr: CreateNewPerson): Promise<Stemma> {
         return this.send<Stemma>(
-            { type: "CreateOrphanPersonRequest", stemmaId, personDescr: sanitizeRequestPayload(descr) as CreateNewPerson },
+            { type: "CreateOrphanPersonRequest", stemmaId, personDescr: sanitizeRequestPayload(descr, PERSON_PRESERVE_KEYS) as CreateNewPerson },
             null,
         )
     }
