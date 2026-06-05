@@ -442,6 +442,7 @@
         };
 
         const cleanup = () => {
+            document.body.classList.remove("v2-linking");
             if (!gesture) return;
             clearTargetHighlight();
             removeSvgEl(gesture.line);
@@ -449,7 +450,6 @@
             removeSvgEl(gesture.endpointPreview);
             gesture.sourceGEl?.classList.remove("v2-gesture-source");
             gesture = null;
-            document.body.classList.remove("v2-linking");
             dragTip = null;
             activeGestureSource = null;
         };
@@ -517,6 +517,10 @@
                 endpointPreview: null,
                 lastTarget: null,
             };
+            // Apply linking cursor + selection lock immediately so that
+            // browsers don't latch the I-beam from the initial mousedown
+            // over an SVG text label for the rest of the drag.
+            document.body.classList.add("v2-linking");
             // Prevent native text selection / drag of svg labels — selection
             // can hijack the gesture (mouseup replaced by dragend) and
             // visually litters the chart with highlighted text.
@@ -579,7 +583,6 @@
                 if (Math.hypot(dx, dy) <= 6) return;
                 gesture.active = true;
                 activeGestureSource = gesture.source;
-                document.body.classList.add("v2-linking");
                 const mainG = svgEl.querySelector("g.main") as SVGGElement | null;
                 if (mainG) {
                     ensureArrowMarker();
@@ -668,15 +671,20 @@
             if (e.key === "Escape") cleanup();
         };
 
+        const onCancel = () => cleanup();
         svgEl.addEventListener("mousedown", onMouseDown, true);
         window.addEventListener("mousemove", onMouseMove);
         window.addEventListener("mouseup", onMouseUp);
         window.addEventListener("keydown", onKeyDown);
+        window.addEventListener("contextmenu", onCancel);
+        window.addEventListener("blur", onCancel);
         return () => {
             svgEl.removeEventListener("mousedown", onMouseDown, true);
             window.removeEventListener("mousemove", onMouseMove);
             window.removeEventListener("mouseup", onMouseUp);
             window.removeEventListener("keydown", onKeyDown);
+            window.removeEventListener("contextmenu", onCancel);
+            window.removeEventListener("blur", onCancel);
             cleanup();
         };
     });
@@ -1406,6 +1414,8 @@
     :global(body.v2-linking),
     :global(body.v2-linking *) {
         cursor: crosshair !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
     }
 
     :global(body.v2-pan-armed),
