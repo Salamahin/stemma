@@ -3,16 +3,30 @@
 
     type Props = {
         editMode: boolean;
+        panMode: boolean;
         disabled: boolean;
         oneditToggle?: () => void;
+        onpanToggle?: () => void;
         onaddPerson?: () => void;
     };
 
-    let { editMode, disabled, oneditToggle, onaddPerson }: Props = $props();
+    let { editMode, panMode, disabled, oneditToggle, onpanToggle, onaddPerson }: Props = $props();
 </script>
 
 <div class="v2-fab-cluster">
     {#if editMode}
+        <button
+            type="button"
+            class="fab fab-secondary"
+            class:active={panMode}
+            aria-label={panMode ? $t("v2.panModeOff") : $t("v2.panModeOn")}
+            aria-pressed={panMode}
+            disabled={disabled}
+            onclick={() => onpanToggle?.()}
+            data-testid="v2-pan-fab"
+        >
+            <i class="bi bi-arrows-move"></i>
+        </button>
         <button
             type="button"
             class="fab fab-secondary"
@@ -97,6 +111,16 @@
 
     .fab-secondary:not(:disabled):hover {
         box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+    }
+
+    .fab-secondary.active {
+        background: #495057;
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(73, 80, 87, 0.4);
+    }
+
+    .fab-secondary.active:not(:disabled):hover {
+        box-shadow: 0 6px 18px rgba(73, 80, 87, 0.5);
     }
 
     @media (max-width: 767.98px) {
