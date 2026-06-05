@@ -92,6 +92,7 @@
     let selectedFamilyEl = $state<Element | null>(null);
     let familySheetOpen = $state(false);
     let dragTip = $state<{ text: string; x: number; y: number } | null>(null);
+    let activeGestureSource = $state<SourceRef | null>(null);
 
     let personEditModal = $state<ReturnType<typeof V2PersonDetailsModal> | null>(null);
     let aboutModal = $state<ReturnType<typeof V2AboutModal> | null>(null);
@@ -450,6 +451,7 @@
             gesture = null;
             document.body.classList.remove("v2-linking");
             dragTip = null;
+            activeGestureSource = null;
         };
 
         const targetCompatibility = (
@@ -457,12 +459,20 @@
             overInfo: { ref: NodeRef } | null,
         ): "valid" | "noop" | "create-empty" => {
             if (source.kind === "person") {
-                if (overInfo?.ref.kind === "family") return "valid";
+                if (overInfo?.ref.kind === "family") {
+                    if (isPendingId(overInfo.ref.id)) return "valid";
+                    const c = displayedStemmaIndex?.canAddParent(overInfo.ref.id, source.id);
+                    return c?.ok ? "valid" : "noop";
+                }
                 if (!overInfo) return "create-empty";
                 return "noop";
             }
             if (source.kind === "family") {
-                if (overInfo?.ref.kind === "person") return "valid";
+                if (overInfo?.ref.kind === "person") {
+                    if (isPendingId(source.id)) return "valid";
+                    const c = displayedStemmaIndex?.canAddChild(source.id, overInfo.ref.id);
+                    return c?.ok ? "valid" : "noop";
+                }
                 if (!overInfo) return "create-empty";
                 return "noop";
             }
@@ -568,6 +578,7 @@
             if (!gesture.active) {
                 if (Math.hypot(dx, dy) <= 6) return;
                 gesture.active = true;
+                activeGestureSource = gesture.source;
                 document.body.classList.add("v2-linking");
                 const mainG = svgEl.querySelector("g.main") as SVGGElement | null;
                 if (mainG) {
@@ -667,6 +678,47 @@
             window.removeEventListener("mouseup", onMouseUp);
             window.removeEventListener("keydown", onKeyDown);
             cleanup();
+        };
+    });
+
+    function classifyForDrop(src: SourceRef, g: Element): "v2-drop-allowed" | "v2-drop-disallowed" | null {
+        const id = denormalizeId(g.id);
+        const kind: "person" | "family" = g.id.startsWith("person_") ? "person" : "family";
+        if (kind === "person" && isPendingPersonId(id)) return null;
+        if (src.kind === "person") {
+            if (kind !== "family") return null;
+            if (isPendingId(id)) return "v2-drop-allowed";
+            const c = displayedStemmaIndex?.canAddParent(id, src.id);
+            if (!c) return null;
+            return c.ok ? "v2-drop-allowed" : "v2-drop-disallowed";
+        }
+        if (src.kind === "family") {
+            if (kind !== "person") return null;
+            if (src.id === id) return null;
+            if (isPendingId(src.id)) return "v2-drop-allowed";
+            const c = displayedStemmaIndex?.canAddChild(src.id, id);
+            if (!c) return null;
+            return c.ok ? "v2-drop-allowed" : "v2-drop-disallowed";
+        }
+        return null;
+    }
+
+    $effect(() => {
+        const src = activeGestureSource;
+        if (!src || src.kind === "empty") return;
+        void displayedStemmaIndex;
+        void pendingFamilies;
+        const svgEl = document.getElementById("chart");
+        if (!svgEl) return;
+        svgEl.querySelectorAll("g[id^='person_'], g[id^='family_']").forEach((g) => {
+            g.classList.remove("v2-drop-allowed", "v2-drop-disallowed");
+            const cls = classifyForDrop(src, g);
+            if (cls) g.classList.add(cls);
+        });
+        return () => {
+            svgEl.querySelectorAll("g.v2-drop-allowed, g.v2-drop-disallowed").forEach((g) => {
+                g.classList.remove("v2-drop-allowed", "v2-drop-disallowed");
+            });
         };
     });
 
@@ -1288,6 +1340,21 @@
     @keyframes v2-pending-pulse {
         0%, 100% { stroke-opacity: 1; }
         50% { stroke-opacity: 0.35; }
+    }
+
+    :global(g.v2-drop-disallowed) {
+        opacity: 0.3;
+        filter: saturate(0.2);
+        pointer-events: none;
+    }
+
+    :global(g.v2-drop-allowed > circle) {
+        animation: v2-drop-allowed-pulse 1.8s ease-in-out infinite;
+    }
+
+    @keyframes v2-drop-allowed-pulse {
+        0%, 100% { stroke-opacity: 1; }
+        50% { stroke-opacity: 0.45; }
     }
 
     :global(g.v2-drop-target > circle) {

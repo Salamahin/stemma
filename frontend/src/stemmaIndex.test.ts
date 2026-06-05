@@ -108,6 +108,52 @@ test("calculates max generation", () => {
     expect(maxGeneration).toEqual(4)
 })
 
+describe("canAddParent / canAddChild", () => {
+    const jjIndex = () => new StemmaIndex(jjFamily)
+
+    test("canAddParent rejects when family already has two parents", () => {
+        // family 1: parents [jane, john] — full
+        expect(jjIndex().canAddParent("1", joseph)).toEqual({ ok: false, reason: "twoParents" })
+    })
+
+    test("canAddParent allows adding a parent to a single-parent family", () => {
+        // family 3: parents [july] — has room
+        expect(jjIndex().canAddParent("3", john)).toEqual({ ok: true })
+    })
+
+    test("canAddParent rejects if person is already a member of the family", () => {
+        // family 3 (parents [july], children [jake]) — july would be duplicate parent, jake duplicate child
+        expect(jjIndex().canAddParent("3", july)).toEqual({ ok: false, reason: "alreadyMember" })
+        expect(jjIndex().canAddParent("3", jake)).toEqual({ ok: false, reason: "alreadyMember" })
+    })
+
+    test("canAddParent rejects when person is a descendant of the family (cycle)", () => {
+        // family 5: parents [joseph], children [july]; jeff is descendant of family 5 via july→jake→james→jeff
+        expect(jjIndex().canAddParent("5", jeff)).toEqual({ ok: false, reason: "cycle" })
+    })
+
+    test("canAddChild rejects if person already in family", () => {
+        // family 1 has jane as parent, josh as child
+        expect(jjIndex().canAddChild("1", jane)).toEqual({ ok: false, reason: "alreadyMember" })
+        expect(jjIndex().canAddChild("1", josh)).toEqual({ ok: false, reason: "alreadyMember" })
+    })
+
+    test("canAddChild rejects when family is a descendant of the person (cycle)", () => {
+        // family 4 (parents [james], children [jeff]) is descendant of joseph (joseph→f5→july→f3→jake→f2→james→f4)
+        expect(jjIndex().canAddChild("4", joseph)).toEqual({ ok: false, reason: "cycle" })
+    })
+
+    test("canAddChild allows valid addition", () => {
+        // family 4: parents [james], children [jeff]; josh has no descendant families
+        expect(jjIndex().canAddChild("4", josh)).toEqual({ ok: true })
+    })
+
+    test("returns unknownFamily for missing id", () => {
+        expect(jjIndex().canAddParent("zzz", jane)).toEqual({ ok: false, reason: "unknownFamily" })
+        expect(jjIndex().canAddChild("zzz", jane)).toEqual({ ok: false, reason: "unknownFamily" })
+    })
+})
+
 test("lineage skips empty families", () => {
     let mashaFamily = stemma({
         families: [
