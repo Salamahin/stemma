@@ -737,6 +737,13 @@
             return tag === "INPUT" || tag === "TEXTAREA" || t.isContentEditable;
         };
         const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                if (isTypingTarget(e.target)) return;
+                if (panMode && !activeGestureSource && !document.querySelector(".v2-modal-panel")) {
+                    panMode = false;
+                }
+                return;
+            }
             if (e.code !== "Space" || e.repeat) return;
             if (isTypingTarget(e.target)) return;
             spacePan = true;
