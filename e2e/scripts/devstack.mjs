@@ -114,6 +114,7 @@ async function main() {
         INVITE_SECRET: "e2e-secret",
         STEMMA_TABLE_NAME: tableName,
         STEMMA_AUTO_CREATE_TABLE: "1",
+        STEMMA_REQUEST_DELAY_SECONDS: "0",
         DYNAMODB_ENDPOINT_URL: `http://127.0.0.1:${dynamoPort}`,
         AWS_ACCESS_KEY_ID: "local",
         AWS_SECRET_ACCESS_KEY: "local",

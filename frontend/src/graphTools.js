@@ -56,6 +56,10 @@ let sessionPositions = new Map()
 let cachedStemmaId = null
 let activeLayoutCache = null
 
+export function setSessionPosition(nodeId, x, y) {
+    sessionPositions.set(nodeId, [x, y])
+}
+
 export function resetSessionPositions(stemmaId) {
     if (cachedStemmaId !== stemmaId) {
         sessionPositions = new Map()
@@ -211,19 +215,30 @@ export function mergeData(svg, nodes, relations, width, height, initialPositions
     nodes.forEach(n => {
         let pos;
         let vel;
+        // n.hadKnownPosition: this node's position came from a stable source
+        // (pinned/cache/session) — i.e. it existed in the layout before this
+        // merge. Callers in edit mode use this to pin existing nodes so the
+        // subsequent sim.tick() places only new nodes instead of drifting
+        // the whole graph on every data change.
+        n.hadKnownPosition = false;
         if (!ignoreCache) {
             if (n.type === "person" && pinnedPeople) {
                 const personId = denormalizeId(n.id);
                 const pinned = pinnedPeople.getPosition(personId);
-                if (pinned) pos = pinned;
+                if (pinned) {
+                    pos = pinned;
+                    n.hadKnownPosition = true;
+                }
             }
             if (!pos && activeLayoutCache && activeLayoutCache.has(n.id)) {
                 const cached = activeLayoutCache.get(n.id);
                 pos = [cached.x, cached.y];
                 vel = [cached.vx, cached.vy];
+                n.hadKnownPosition = true;
             }
             if (!pos && sessionPositions.has(n.id)) {
                 pos = sessionPositions.get(n.id);
+                n.hadKnownPosition = true;
             }
             if (!pos && initialPositions && initialPositions.has(n.id)) {
                 pos = initialPositions.get(n.id);

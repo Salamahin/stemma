@@ -42,6 +42,8 @@ export type RenameStemmaRequest = { type: "RenameStemmaRequest", stemmaId: strin
 export type RequestPhotoUploadUrlRequest = { type: "RequestPhotoUploadUrlRequest", stemmaId: string, personId: string, contentType: string }
 export type SetPersonPhotoRequest = { type: "SetPersonPhotoRequest", stemmaId: string, personId: string, photoKey: string | null }
 export type CreateOrphanPersonRequest = { type: "CreateOrphanPersonRequest", stemmaId: string, personDescr: CreateNewPerson }
+export type LinkRole = "spouse" | "parent" | "child"
+export type LinkPersonsRequest = { type: "LinkPersonsRequest", stemmaId: string, fromPersonId: string, toPersonId: string, role: LinkRole }
 
 type Request =
     | CreateFamilyRequest
@@ -60,6 +62,7 @@ type Request =
     | RequestPhotoUploadUrlRequest
     | SetPersonPhotoRequest
     | CreateOrphanPersonRequest
+    | LinkPersonsRequest
 
 
 //responses
@@ -88,6 +91,9 @@ export type IsNotTheOnlyStemmaOwner = { type: "IsNotTheOnlyStemmaOwner", stemmaI
 export type InvalidInviteToken = { type: "InvalidInviteToken" }
 export type ForeignInviteToken = { type: "ForeignInviteToken" }
 export type StemmaHasCycles = { type: "StemmaHasCycles" }
+export type AmbiguousLinkTarget = { type: "AmbiguousLinkTarget", personId: string }
+export type SpouseLinkAlreadyExists = { type: "SpouseLinkAlreadyExists", familyId: string }
+export type TooManyParents = { type: "TooManyParents", familyId: string }
 
 export type StemmaResponse =
     | FamilyDescription
@@ -113,6 +119,9 @@ export type StemmaResponse =
     | ForeignInviteToken
     | StemmaHasCycles
     | UnsupportedPhotoType
+    | AmbiguousLinkTarget
+    | SpouseLinkAlreadyExists
+    | TooManyParents
 
 //aux
 export type User = { id_token: string }
@@ -228,6 +237,13 @@ export class Model {
         return this.send<Stemma>(
             { type: "CreateOrphanPersonRequest", stemmaId, personDescr: sanitizeRequestPayload(descr) as CreateNewPerson },
             null,
+        )
+    }
+
+    async linkPersons(stemmaId: string, fromPersonId: string, toPersonId: string, role: LinkRole, stemmaIndex: StemmaIndex): Promise<Stemma> {
+        return this.send<Stemma>(
+            { type: "LinkPersonsRequest", stemmaId, fromPersonId, toPersonId, role },
+            stemmaIndex,
         )
     }
 

@@ -1,6 +1,6 @@
 import { HiglightLineages } from './highlight';
 import { Model } from './model';
-import type { CreateNewPerson, PersonDefinition, Stemma, StemmaDescription, TokenProvider } from './model';
+import type { CreateNewPerson, LinkRole, PersonDefinition, Stemma, StemmaDescription, TokenProvider } from './model';
 import { PinnedPeopleStorage } from './pinnedPeopleStorage';
 import { StemmaIndex } from './stemmaIndex';
 import { writable, get } from 'svelte/store';
@@ -185,6 +185,13 @@ export class AppController {
 
     createOrphanPerson(descr: CreateNewPerson, options?: MutationOptions) {
         return this.manipulateStemma((model, stemmaId) => model.createOrphanPerson(stemmaId, descr), options)
+    }
+
+    linkPersons(fromPersonId: string, toPersonId: string, role: LinkRole, options?: MutationOptions) {
+        return this.manipulateStemma(
+            (model, stemmaId) => model.linkPersons(stemmaId, fromPersonId, toPersonId, role, get(this.stemmaIndex)),
+            options,
+        )
     }
 
     createFamily(parents: PersonDefinition[], children: PersonDefinition[], options?: MutationOptions) {

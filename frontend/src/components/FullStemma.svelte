@@ -10,6 +10,7 @@
         configureSimulation,
         resetSessionPositions,
         setActiveLayoutCache,
+        setSessionPosition,
         initChart,
         makeDrag,
         makeNodesAndRelations,
@@ -34,6 +35,7 @@
         pinnedPeople: PinnedPeopleStorage;
         hidden: boolean;
         viewMode: ViewMode;
+        simulationActive?: boolean;
         onpersonSelected?: (person: any) => void;
         onfamilySelected?: (family: any) => void;
         onhighlightChanged?: () => void;
@@ -47,6 +49,7 @@
         pinnedPeople,
         hidden,
         viewMode,
+        simulationActive = true,
         onpersonSelected,
         onfamilySelected,
         onhighlightChanged,
@@ -132,13 +135,14 @@
         d3.select("g.main")
             .selectAll("g")
             .each((d) => {
-                if (!d.fixed) {
+                if (!d.fixed && simulationActive) {
                     d.fx = null;
                     d.fy = null;
                 }
             });
 
-        simulation.alphaTarget(0.1).restart();
+        if (simulationActive) simulation.alphaTarget(0.1).restart();
+        else simulation.alphaTarget(0).stop();
     }
 
     const zoomHandler = d3.zoom().on("zoom", (e) => {
@@ -149,6 +153,56 @@
         if (!svg) return;
         const node = svg.node() as SVGSVGElement | null;
         if (node) exportChartSvg(node, filename);
+    }
+
+    export function setSimulationActive(active: boolean) {
+        if (!simulation) return;
+        if (active) simulation.alphaTarget(0.1).restart();
+        else simulation.alphaTarget(0).stop();
+    }
+
+    function applyManualPositions() {
+        if (!svg) return;
+        svg.select("g.main").selectAll("g").attr("transform", (d: any) => {
+            if (d && d.x != null && d.y != null) return `translate(${d.x},${d.y})`;
+            return null;
+        });
+        svg.selectAll("line")
+            .attr("x1", (d: any) => d.source?.x ?? 0)
+            .attr("y1", (d: any) => d.source?.y ?? 0)
+            .attr("x2", (d: any) => d.target?.x ?? 0)
+            .attr("y2", (d: any) => d.target?.y ?? 0);
+    }
+
+    $effect(() => {
+        if (!simulation) return;
+        if (simulationActive) {
+            d3.select("g.main").selectAll<SVGGElement, any>("g").each((d: any) => {
+                if (d && !d.fixed) {
+                    d.fx = null;
+                    d.fy = null;
+                }
+            });
+            simulation.alphaTarget(0.1).restart();
+        } else {
+            d3.select("g.main").selectAll<SVGGElement, any>("g").each((d: any) => {
+                if (d && d.x != null && d.y != null) {
+                    d.fx = d.x;
+                    d.fy = d.y;
+                }
+            });
+            simulation.alphaTarget(0).stop();
+        }
+    });
+
+    export function setNodePosition(nodeId: string, x: number, y: number) {
+        setSessionPosition(nodeId, x, y);
+    }
+
+    export function popHover() {
+        if (!highlight || !svg) return;
+        highlight.pop();
+        renderFullStemma();
     }
 
     export function zoomToNode(id: string) {
@@ -178,6 +232,20 @@
         mergeData(svg, nodes, relations, window.innerWidth, window.innerHeight, initialPositions, pinnedPeople);
 
         if (fullyCached) simulation.alphaTarget(0).alpha(0);
+        if (!simulationActive) {
+            // Sim inactive (edit mode): pin every node that already had a known
+            // position so the 80-tick settle only lays out genuinely new nodes,
+            // leaving existing positions stable across data changes.
+            d3.select("g.main").selectAll<SVGGElement, any>("g").each((d: any) => {
+                if (d && d.hadKnownPosition && d.x != null && d.y != null) {
+                    d.fx = d.x;
+                    d.fy = d.y;
+                }
+            });
+            simulation.tick(80);
+            applyManualPositions();
+            simulation.alphaTarget(0).stop();
+        }
 
         svg.select("g.main")
             .selectAll("g")
@@ -186,6 +254,7 @@
                     pendingMouseLeave = false;
                     return;
                 }
+                if (document.body.classList.contains("v2-linking")) return;
                 if (node.type == "person") {
                     highlight.pushPerson(denormalizeId(node.id));
                     renderFullStemma();
@@ -205,6 +274,7 @@
                     pendingMouseLeave = true;
                     return;
                 }
+                if (document.body.classList.contains("v2-linking")) return;
                 highlight.pop();
                 renderFullStemma();
                 onhighlightChanged?.();
