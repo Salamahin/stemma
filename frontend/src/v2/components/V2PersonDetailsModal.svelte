@@ -25,16 +25,11 @@
         ShowPerson,
         UpdatePerson,
     } from "../../components/person_details_modal/PersonDetailsModal.svelte";
+    import type { CreateNewPerson } from "../../model";
     import V2Modal from "./V2Modal.svelte";
 
     export type CreatePersonPayload = {
-        description: {
-            type: "CreateNewPerson";
-            name: string;
-            birthDate: string | null;
-            deathDate: string | null;
-            bio: string;
-        };
+        description: CreateNewPerson;
         pin: boolean;
         photoUpload: Blob | null;
     };
@@ -186,71 +181,49 @@
         }
     }
 
-    export function showPersonDetails(p: ShowPerson) {
-        mode = "view";
-        createTitle = null;
-        id = p.description.id;
-        name = p.description.name;
-        unknown = isUnknownPerson(p.description.name);
-        birthDate = p.description.birthDate ? new Date(p.description.birthDate) : null;
-        deathDate = p.description.deathDate ? new Date(p.description.deathDate) : null;
-        bio = p.description.bio ?? "";
-        pinned = p.pin;
-        personReadOnly = p.description.readOnly ?? false;
-        bioTab = "preview";
-        originalPhotoUrl = p.description.photoUrl ?? null;
+    function resetFormState(p: ShowPerson | null) {
+        id = p?.description.id ?? "";
+        name = p?.description.name ?? "";
+        unknown = p ? isUnknownPerson(p.description.name) : false;
+        birthDate = p?.description.birthDate ? new Date(p.description.birthDate) : null;
+        deathDate = p?.description.deathDate ? new Date(p.description.deathDate) : null;
+        bio = p?.description.bio ?? "";
+        pinned = p?.pin ?? false;
+        personReadOnly = p?.description.readOnly ?? false;
+        bioTab = p ? "preview" : "edit";
+        originalPhotoUrl = p?.description.photoUrl ?? null;
         photoUrl = originalPhotoUrl;
         photoErrString = null;
         if (photoFileInputEl) photoFileInputEl.value = "";
         resetCropState();
         resetPendingPhoto();
-
         birthDateErrString = null;
         deathDateErrString = null;
-
-        open = true;
-
-        // Sync the imask inputs once they exist
         queueMicrotask(() => {
             if (birthInputEl) birthInputEl.value = dateToMaskedDateStr(birthDate) ?? "";
             if (deathInputEl) deathInputEl.value = dateToMaskedDateStr(deathDate) ?? "";
         });
     }
 
+    export function showPersonDetails(p: ShowPerson) {
+        mode = "view";
+        createTitle = null;
+        resetFormState(p);
+        open = true;
+    }
+
     export function showCreatePerson(opts: { title?: string; oncreate: (payload: CreatePersonPayload) => void }) {
         mode = "create";
         createTitle = opts.title ?? null;
         activeCreateCallback = opts.oncreate;
-        id = "";
-        name = "";
-        unknown = false;
-        birthDate = null;
-        deathDate = null;
-        bio = "";
-        pinned = false;
-        personReadOnly = false;
-        bioTab = "edit";
-        originalPhotoUrl = null;
-        photoUrl = null;
-        photoErrString = null;
-        if (photoFileInputEl) photoFileInputEl.value = "";
-        resetCropState();
-        resetPendingPhoto();
-
-        birthDateErrString = null;
-        deathDateErrString = null;
-
+        resetFormState(null);
         open = true;
-
-        queueMicrotask(() => {
-            if (birthInputEl) birthInputEl.value = "";
-            if (deathInputEl) deathInputEl.value = "";
-        });
     }
 
     function close() {
         open = false;
         activeCreateCallback = null;
+        resetPendingPhoto();
     }
 
     export function dismiss() {

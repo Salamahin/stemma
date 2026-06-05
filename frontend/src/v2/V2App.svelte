@@ -2,7 +2,6 @@
     import { onMount, untrack } from "svelte";
     import { AppController, type MutationResult } from "../appController";
     import type {
-        CreateNewPerson,
         FamilyDescription,
         PersonDefinition,
         PersonDescription,
@@ -322,31 +321,24 @@
         title: string,
         pinAt?: { x: number; y: number },
     ) {
-        if (!stemmaIndex) return;
-        const family = stemmaIndex.family(familyId);
-        if (!family) return;
-        const existingParents: PersonDefinition[] = family.parents.map((id) => ({ type: "ExistingPerson", id }));
-        const existingChildren: PersonDefinition[] = family.children.map((id) => ({ type: "ExistingPerson", id }));
+        if (!stemmaIndex?.family(familyId)) return;
         personEditModal?.showCreatePerson({
             title,
             oncreate: ({ description, pin, photoUpload }) => {
-                const newPerson: CreateNewPerson = {
-                    type: "CreateNewPerson",
-                    name: description.name,
-                    ...(description.birthDate ? { birthDate: description.birthDate } : {}),
-                    ...(description.deathDate ? { deathDate: description.deathDate } : {}),
-                    ...(description.bio ? { bio: description.bio } : {}),
-                };
-                const parents = role === "parent" ? [...existingParents, newPerson] : existingParents;
-                const children = role === "child" ? [...existingChildren, newPerson] : existingChildren;
+                const family = stemmaIndex?.family(familyId);
+                if (!family) return;
+                const existingParents: PersonDefinition[] = family.parents.map((id) => ({ type: "ExistingPerson", id }));
+                const existingChildren: PersonDefinition[] = family.children.map((id) => ({ type: "ExistingPerson", id }));
+                const parents = role === "parent" ? [...existingParents, description] : existingParents;
+                const children = role === "child" ? [...existingChildren, description] : existingChildren;
                 void withPendingAdd(
-                    newPerson.name,
+                    description.name,
                     () => controller.updateFamily(familyId, parents, children, { silent: true }),
                     pinAt,
                     (newPersonIds) => {
                         const newId = newPersonIds[0];
                         if (newId && (photoUpload || pin)) {
-                            controller.savePerson(newId, newPerson, pin, photoUpload, false);
+                            controller.savePerson(newId, description, pin, photoUpload, false);
                         }
                     },
                 );
