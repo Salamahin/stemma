@@ -559,9 +559,7 @@
             return "noop";
         };
 
-        const onMouseDown = (e: MouseEvent) => {
-            if (e.button !== 0) return;
-            if (panActive) return;
+        const onPointerStart = (e: PointerEvent) => {
             const targetG = (e.target as Element | null)?.closest?.("g[id^='person_'], g[id^='family_']") as SVGGElement | null;
             let source: SourceRef;
             let center: { x: number; y: number };
@@ -592,15 +590,8 @@
                 endpointPreview: null,
                 lastTarget: null,
             };
-            // Apply linking cursor + selection lock immediately so that
-            // browsers don't latch the I-beam from the initial mousedown
-            // over an SVG text label for the rest of the drag.
             document.body.classList.add("v2-linking");
-            // Prevent native text selection / drag of svg labels — selection
-            // can hijack the gesture (mouseup replaced by dragend) and
-            // visually litters the chart with highlighted text.
             e.preventDefault();
-            e.stopImmediatePropagation();
         };
 
         const computeTipText = (overInfo: { ref: NodeRef } | null, source: SourceRef): string | null => {
@@ -663,7 +654,7 @@
             }
         };
 
-        const onMouseMove = (e: MouseEvent) => {
+        const onPointerMove = (e: PointerEvent) => {
             if (!gesture) return;
             const dx = e.clientX - gesture.startClientX;
             const dy = e.clientY - gesture.startClientY;
@@ -717,7 +708,7 @@
             dragTip = tipText ? { text: tipText, x: e.clientX, y: e.clientY } : null;
         };
 
-        const onMouseUp = (e: MouseEvent) => {
+        const onPointerEnd = (e: PointerEvent) => {
             if (!gesture) return;
             const wasActive = gesture.active;
             const source = gesture.source;
@@ -763,25 +754,28 @@
         const onCancel = () => cleanup();
         // d3.drag attaches a pointerdown listener to each node g and restarts
         // the force simulation on press, which would scramble pinned positions
-        // mid-gesture. Swallow pointerdown at the svg root in edit mode so the
-        // d3 handler never sees it; V2's mousedown listener handles the gesture.
-        const onPointerDown = (e: PointerEvent) => {
-            if (e.button !== 0) return;
+        // mid-gesture. Capturing pointerdown at the svg root and stopping
+        // propagation prevents the d3 handler from ever seeing it, and the
+        // same handler starts V2's linking gesture. Single path covers mouse,
+        // pen, and touch.
+        const onPointerDownCapture = (e: PointerEvent) => {
             if (panActive) return;
+            if (e.pointerType === "mouse" && e.button !== 0) return;
             e.stopImmediatePropagation();
+            onPointerStart(e);
         };
-        svgEl.addEventListener("pointerdown", onPointerDown, true);
-        svgEl.addEventListener("mousedown", onMouseDown, true);
-        window.addEventListener("mousemove", onMouseMove);
-        window.addEventListener("mouseup", onMouseUp);
+        svgEl.addEventListener("pointerdown", onPointerDownCapture, true);
+        window.addEventListener("pointermove", onPointerMove);
+        window.addEventListener("pointerup", onPointerEnd);
+        window.addEventListener("pointercancel", onCancel);
         window.addEventListener("keydown", onKeyDown);
         window.addEventListener("contextmenu", onCancel);
         window.addEventListener("blur", onCancel);
         return () => {
-            svgEl.removeEventListener("pointerdown", onPointerDown, true);
-            svgEl.removeEventListener("mousedown", onMouseDown, true);
-            window.removeEventListener("mousemove", onMouseMove);
-            window.removeEventListener("mouseup", onMouseUp);
+            svgEl.removeEventListener("pointerdown", onPointerDownCapture, true);
+            window.removeEventListener("pointermove", onPointerMove);
+            window.removeEventListener("pointerup", onPointerEnd);
+            window.removeEventListener("pointercancel", onCancel);
             window.removeEventListener("keydown", onKeyDown);
             window.removeEventListener("contextmenu", onCancel);
             window.removeEventListener("blur", onCancel);
@@ -842,10 +836,13 @@
     });
 
     $effect(() => {
-        if (!editMode) {
-            panMode = false;
-            spacePan = false;
-        }
+        if (editMode) return;
+        panMode = false;
+        spacePan = false;
+        untrack(() => {
+            const filtered = pendingFamilies.filter((p) => p.parents.length + p.children.length >= 2);
+            if (filtered.length !== pendingFamilies.length) pendingFamilies = filtered;
+        });
     });
 
     $effect(() => {
@@ -1338,6 +1335,10 @@
         user-select: none;
         -webkit-user-select: none;
         -webkit-user-drag: none;
+    }
+
+    :global(.v2-edit-mode .v2-canvas-layer #chart) {
+        touch-action: none;
     }
 
     :global(.v2-canvas-layer #chart text) {

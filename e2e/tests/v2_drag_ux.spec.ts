@@ -210,6 +210,23 @@ test("v2 empty→person drag onto person that already has 2 parents is blocked",
   expect(await familyCount(page)).toBe(familiesBefore);
 });
 
+test("v2 exiting edit mode purges single-member pending families", async ({ page }) => {
+  await page.goto("/v2");
+  await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
+  await createFreshStemma(page);
+  await enterEditMode(page);
+  const name = `Rhea${Date.now()}`;
+  await addOrphan(page, name);
+  const rhea = await nodeByText(page, name);
+  await pressAndDrag(page, rhea.cx, rhea.cy, rhea.cx + 280, rhea.cy + 80);
+  await page.mouse.up();
+  await expect(page.locator("svg#chart g[id^='family_pending-family-']")).toHaveCount(1, { timeout: 3_000 });
+  await page.getByTestId("v2-edit-fab").click();
+  await expect(page.locator(".v2-edit-mode")).toHaveCount(0);
+  await expect(page.locator("svg#chart g[id^='family_pending-family-']")).toHaveCount(0, { timeout: 3_000 });
+  expect(await familyCount(page)).toBe(0);
+});
+
 test("v2 drag link line renders arrow marker at cursor end", async ({ page }) => {
   await page.goto("/v2");
   await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
