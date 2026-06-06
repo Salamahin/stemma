@@ -86,6 +86,14 @@
         return pendingFamilies.find((f) => f.tempId === id);
     }
 
+    function parentCountOf(personId: string): number {
+        if (!displayedStemmaIndex) return 0;
+        return displayedStemmaIndex
+            .relatedFamilies(personId)
+            .filter((f) => f.children.includes(personId))
+            .reduce((sum, f) => sum + f.parents.length, 0);
+    }
+
     let ownedStemmas = $state<StemmaDescription[]>([]);
     let currentStemmaId = $state<string | null>(null);
     let stemma = $state<Stemma | null>(null);
@@ -542,7 +550,10 @@
             }
             if (source.kind === "empty") {
                 if (overInfo?.ref.kind === "family") return "valid";
-                if (overInfo?.ref.kind === "person") return "valid";
+                if (overInfo?.ref.kind === "person") {
+                    if (parentCountOf(overInfo.ref.id) >= 2) return "noop";
+                    return "valid";
+                }
                 return "noop";
             }
             return "noop";
@@ -702,7 +713,7 @@
             }
             const mainG = svgEl.querySelector("g.main") as SVGGElement | null;
             updateEndpointPreview(mainG, svgPt, overInfo);
-            const tipText = computeTipText(overInfo, gesture.source);
+            const tipText = compat === "noop" ? null : computeTipText(overInfo, gesture.source);
             dragTip = tipText ? { text: tipText, x: e.clientX, y: e.clientY } : null;
         };
 
@@ -739,6 +750,7 @@
                 return;
             }
             if (source.kind === "empty" && overInfo?.ref.kind === "person") {
+                if (parentCountOf(overInfo.ref.id) >= 2) return;
                 createPendingFamilyForPerson(overInfo.ref.id, "child", startCenter);
                 return;
             }

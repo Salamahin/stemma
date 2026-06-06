@@ -168,6 +168,48 @@ test("v2 dragging second person onto pending family promotes it to real family",
   await expect(page.locator("svg#chart g[id^='family_']:not([id*='pending-'])")).toHaveCount(1, { timeout: 10_000 });
 });
 
+test("v2 empty→person drag onto person that already has 2 parents is blocked", async ({ page }) => {
+  await page.goto("/v2");
+  await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
+  await createFreshStemma(page);
+  await enterEditMode(page);
+  const ts = Date.now();
+  const dad = `Dad${ts}`;
+  const mom = `Mom${ts}`;
+  const kid = `Kid${ts}`;
+  await addOrphan(page, dad);
+  await addOrphan(page, mom);
+  await addOrphan(page, kid);
+  const dadNode = await nodeByText(page, dad);
+  await pressAndDrag(page, dadNode.cx, dadNode.cy, dadNode.cx + 260, dadNode.cy + 80);
+  await page.mouse.up();
+  const pending = page.locator("svg#chart g[id^='family_pending-family-']").first();
+  await expect(pending).toBeVisible({ timeout: 3_000 });
+  const pendingBb = await pending.locator("circle").boundingBox();
+  if (!pendingBb) throw new Error("no pending family bbox");
+  const momNode = await nodeByText(page, mom);
+  await pressAndDrag(page, momNode.cx, momNode.cy, pendingBb.x + pendingBb.width / 2, pendingBb.y + pendingBb.height / 2);
+  await page.mouse.up();
+  const realFam = page.locator("svg#chart g[id^='family_']:not([id*='pending-'])").first();
+  await expect(realFam).toBeVisible({ timeout: 10_000 });
+  const realBb = await realFam.locator("circle").boundingBox();
+  if (!realBb) throw new Error("no real family bbox");
+  const kidNode = await nodeByText(page, kid);
+  await pressAndDrag(page, realBb.x + realBb.width / 2, realBb.y + realBb.height / 2, kidNode.cx, kidNode.cy);
+  await page.mouse.up();
+  await page.waitForTimeout(1_000);
+  const familiesBefore = await familyCount(page);
+  const kidNode2 = await nodeByText(page, kid);
+  const startX = kidNode2.cx + 220;
+  const startY = kidNode2.cy + 140;
+  await pressAndDrag(page, startX, startY, kidNode2.cx, kidNode2.cy);
+  const tip = page.getByTestId("v2-drag-tip");
+  await expect(tip).toBeHidden({ timeout: 1_500 });
+  await expect(page.locator("svg#chart .v2-drop-target")).toHaveCount(0);
+  await page.mouse.up();
+  expect(await familyCount(page)).toBe(familiesBefore);
+});
+
 test("v2 drag link line renders arrow marker at cursor end", async ({ page }) => {
   await page.goto("/v2");
   await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
