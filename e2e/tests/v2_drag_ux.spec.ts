@@ -110,7 +110,7 @@ test("v2 empty → empty drag is a no-op (no tip, no modal, no DB change)", asyn
   await expectNoOpDrag(page, startX, startY, endX, endY);
 });
 
-test("v2 person→empty release is a no-op (#179)", async ({ page }) => {
+test("v2 person→empty release creates a pending family (silent, no modal)", async ({ page }) => {
   await page.goto("/v2");
   await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
   await createFreshStemma(page);
@@ -119,10 +119,14 @@ test("v2 person→empty release is a no-op (#179)", async ({ page }) => {
   await addOrphan(page, name);
   expect(await familyCount(page)).toBe(0);
   const mira = await nodeByText(page, name);
-  await expectNoOpDrag(page, mira.cx, mira.cy, mira.cx + 280, mira.cy + 80);
+  await pressAndDrag(page, mira.cx, mira.cy, mira.cx + 280, mira.cy + 80);
+  await page.mouse.up();
+  await expect(page.getByTestId("v2-person-details-modal")).toHaveCount(0);
+  await expect(page.locator("svg#chart g[id^='family_pending-family-']")).toHaveCount(1, { timeout: 3_000 });
+  expect(await familyCount(page)).toBe(1);
 });
 
-test("v2 empty→person release is a no-op (#180)", async ({ page }) => {
+test("v2 empty→person release creates a pending family (silent, no modal)", async ({ page }) => {
   await page.goto("/v2");
   await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
   await createFreshStemma(page);
@@ -133,7 +137,35 @@ test("v2 empty→person release is a no-op (#180)", async ({ page }) => {
   const noel = await nodeByText(page, name);
   const startX = noel.cx + 280;
   const startY = noel.cy + 150;
-  await expectNoOpDrag(page, startX, startY, noel.cx, noel.cy);
+  await pressAndDrag(page, startX, startY, noel.cx, noel.cy);
+  await page.mouse.up();
+  await expect(page.getByTestId("v2-person-details-modal")).toHaveCount(0);
+  await expect(page.locator("svg#chart g[id^='family_pending-family-']")).toHaveCount(1, { timeout: 3_000 });
+  expect(await familyCount(page)).toBe(1);
+});
+
+test("v2 dragging second person onto pending family promotes it to real family", async ({ page }) => {
+  await page.goto("/v2");
+  await expect(page.locator("[data-testid='v2-empty-state'], svg#chart")).toBeVisible({ timeout: 30_000 });
+  await createFreshStemma(page);
+  await enterEditMode(page);
+  const ts = Date.now();
+  const a = `Pia${ts}`;
+  const b = `Quinn${ts}`;
+  await addOrphan(page, a);
+  await addOrphan(page, b);
+  const pia = await nodeByText(page, a);
+  await pressAndDrag(page, pia.cx, pia.cy, pia.cx + 280, pia.cy + 80);
+  await page.mouse.up();
+  const pendingFam = page.locator("svg#chart g[id^='family_pending-family-']").first();
+  await expect(pendingFam).toBeVisible({ timeout: 3_000 });
+  const pendingBb = await pendingFam.locator("circle").boundingBox();
+  if (!pendingBb) throw new Error("no pending family bbox");
+  const quinn = await nodeByText(page, b);
+  await pressAndDrag(page, quinn.cx, quinn.cy, pendingBb.x + pendingBb.width / 2, pendingBb.y + pendingBb.height / 2);
+  await page.mouse.up();
+  await expect(page.locator("svg#chart g[id^='family_pending-family-']")).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.locator("svg#chart g[id^='family_']:not([id*='pending-'])")).toHaveCount(1, { timeout: 10_000 });
 });
 
 test("v2 drag link line renders arrow marker at cursor end", async ({ page }) => {

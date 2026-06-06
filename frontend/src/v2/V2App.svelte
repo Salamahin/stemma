@@ -58,6 +58,7 @@
     let signedIn = $state(e2eAutoLoginEnabled || initialCached !== null);
 
     type PendingAdd = { tempId: string; name: string };
+    type PendingFamily = { tempId: string; parents: string[]; children: string[]; x?: number; y?: number };
 
     let editMode = $state(false);
     let panMode = $state(false);
@@ -66,10 +67,23 @@
     let pendingRemovedPersonIds = $state<Set<string>>(new Set());
     let pendingRemovedFamilyIds = $state<Set<string>>(new Set());
     let pendingAdds = $state<PendingAdd[]>([]);
+    let pendingFamilies = $state<PendingFamily[]>([]);
     let trayOpen = $state(false);
 
     function isPendingId(id: string): boolean {
         return id.startsWith("pending-");
+    }
+
+    function isPendingFamilyId(id: string): boolean {
+        return id.startsWith("pending-family-");
+    }
+
+    function isPendingPersonId(id: string): boolean {
+        return isPendingId(id) && !isPendingFamilyId(id);
+    }
+
+    function findPendingFamily(id: string): PendingFamily | undefined {
+        return pendingFamilies.find((f) => f.tempId === id);
     }
 
     let ownedStemmas = $state<StemmaDescription[]>([]);
@@ -109,6 +123,7 @@
                 pendingRemovedPersonIds = new Set();
                 pendingRemovedFamilyIds = new Set();
                 pendingAdds = [];
+                pendingFamilies = [];
             }
         }),
         controller.ownedStemmas.subscribe((os) => (ownedStemmas = os)),
@@ -140,10 +155,20 @@
 
     const displayedStemma = $derived.by<Stemma | null>(() => {
         if (!stemma) return null;
-        if (pendingAdds.length === 0) return stemma;
+        if (pendingAdds.length === 0 && pendingFamilies.length === 0) return stemma;
         return {
             ...stemma,
             people: [...stemma.people, ...pendingAdds.map(pendingPersonDescription)],
+            families: [
+                ...stemma.families,
+                ...pendingFamilies.map((pf) => ({
+                    type: "FamilyDescription" as const,
+                    id: pf.tempId,
+                    parents: pf.parents,
+                    children: pf.children,
+                    readOnly: true,
+                })),
+            ],
         };
     });
 
@@ -163,6 +188,7 @@
         void pendingRemovedPersonIds;
         void pendingRemovedFamilyIds;
         void pendingAdds;
+        void pendingFamilies;
         queueMicrotask(applyPendingClasses);
     });
 
@@ -180,6 +206,7 @@
         pendingRemovedPersonIds.forEach((id) => markCircle(normalizeId("person", id), "v2-pending-remove"));
         pendingRemovedFamilyIds.forEach((id) => markCircle(normalizeId("family", id), "v2-pending-remove"));
         pendingAdds.forEach((p) => markCircle(normalizeId("person", p.tempId), "v2-pending-add"));
+        pendingFamilies.forEach((p) => markCircle(normalizeId("family", p.tempId), "v2-pending-add"));
     }
 
     async function withPendingAdd(
@@ -208,6 +235,56 @@
 
     function newPendingPersonId(): string {
         return `pending-${crypto.randomUUID()}`;
+    }
+
+    function newPendingFamilyId(): string {
+        return `pending-family-${crypto.randomUUID()}`;
+    }
+
+    function createPendingFamilyForPerson(
+        personId: string,
+        role: "parent" | "child",
+        familyAt: { x: number; y: number },
+    ): void {
+        const tempId = newPendingFamilyId();
+        const entry: PendingFamily = {
+            tempId,
+            parents: role === "parent" ? [personId] : [],
+            children: role === "child" ? [personId] : [],
+            x: familyAt.x,
+            y: familyAt.y,
+        };
+        pendingFamilies = [...pendingFamilies, entry];
+        queueMicrotask(() => {
+            stemmaChart?.setNodePosition(normalizeId("family", tempId), familyAt.x, familyAt.y);
+        });
+    }
+
+    function composeFamilyMembers(
+        parentIds: string[],
+        childIds: string[],
+        incoming: PersonDefinition,
+        role: "parent" | "child",
+    ): { parents: PersonDefinition[]; children: PersonDefinition[] } {
+        const parentDefs: PersonDefinition[] = parentIds.map((id) => ({ type: "ExistingPerson", id }));
+        const childDefs: PersonDefinition[] = childIds.map((id) => ({ type: "ExistingPerson", id }));
+        return {
+            parents: role === "parent" ? [...parentDefs, incoming] : parentDefs,
+            children: role === "child" ? [...childDefs, incoming] : childDefs,
+        };
+    }
+
+    function promotePendingFamily(
+        pending: PendingFamily,
+        incoming: PersonDefinition,
+        role: "parent" | "child",
+    ): Promise<MutationResult> {
+        const { parents, children } = composeFamilyMembers(pending.parents, pending.children, incoming, role);
+        return controller.createFamily(parents, children, { silent: true });
+    }
+
+    function clearPendingFamily(tempId: string): void {
+        pendingFamilies = pendingFamilies.filter((p) => p.tempId !== tempId);
     }
 
     function clientToSvgPoint(svgEl: SVGSVGElement, clientX: number, clientY: number): { x: number; y: number } {
@@ -249,6 +326,24 @@
         role: "parent" | "child",
         pinAt?: { x: number; y: number },
     ) {
+        const pending = findPendingFamily(familyId);
+        if (pending) {
+            if (pending.parents.includes(personId) || pending.children.includes(personId)) return;
+            if (pinAt) {
+                stemmaChart?.setNodePosition(normalizeId("person", personId), pinAt.x, pinAt.y);
+            }
+            const incoming: PersonDefinition = { type: "ExistingPerson", id: personId };
+            promotePendingFamily(pending, incoming, role)
+                .then((result) => {
+                    clearPendingFamily(familyId);
+                    const newFid = result.newFamilyIds[0];
+                    if (newFid && pending.x !== undefined && pending.y !== undefined) {
+                        stemmaChart?.setNodePosition(normalizeId("family", newFid), pending.x, pending.y);
+                    }
+                })
+                .catch(() => {});
+            return;
+        }
         if (!stemmaIndex) return;
         const family = stemmaIndex.family(familyId);
         if (!family) return;
@@ -256,11 +351,8 @@
         if (pinAt) {
             stemmaChart?.setNodePosition(normalizeId("person", personId), pinAt.x, pinAt.y);
         }
-        const existingParents: PersonDefinition[] = family.parents.map((id) => ({ type: "ExistingPerson", id }));
-        const existingChildren: PersonDefinition[] = family.children.map((id) => ({ type: "ExistingPerson", id }));
         const incoming: PersonDefinition = { type: "ExistingPerson", id: personId };
-        const parents = role === "parent" ? [...existingParents, incoming] : existingParents;
-        const children = role === "child" ? [...existingChildren, incoming] : existingChildren;
+        const { parents, children } = composeFamilyMembers(family.parents, family.children, incoming, role);
         controller.updateFamily(familyId, parents, children, { silent: true }).catch(() => {});
     }
 
@@ -270,16 +362,29 @@
         title: string,
         pinAt?: { x: number; y: number },
     ) {
-        if (!stemmaIndex?.family(familyId)) return;
+        const pending = findPendingFamily(familyId);
+        if (!pending && !stemmaIndex?.family(familyId)) return;
         personEditModal?.showCreatePerson({
             title,
             oncreate: ({ description, pin, photoUpload }) => {
+                if (pending) {
+                    void withPendingAdd(
+                        description.name,
+                        () => promotePendingFamily(pending, description, role),
+                        pinAt,
+                        (newPersonIds) => {
+                            clearPendingFamily(familyId);
+                            const newId = newPersonIds[0];
+                            if (newId && (photoUpload || pin)) {
+                                controller.savePerson(newId, description, pin, photoUpload, false);
+                            }
+                        },
+                    );
+                    return;
+                }
                 const family = stemmaIndex?.family(familyId);
                 if (!family) return;
-                const existingParents: PersonDefinition[] = family.parents.map((id) => ({ type: "ExistingPerson", id }));
-                const existingChildren: PersonDefinition[] = family.children.map((id) => ({ type: "ExistingPerson", id }));
-                const parents = role === "parent" ? [...existingParents, description] : existingParents;
-                const children = role === "child" ? [...existingChildren, description] : existingChildren;
+                const { parents, children } = composeFamilyMembers(family.parents, family.children, description, role);
                 void withPendingAdd(
                     description.name,
                     () => controller.updateFamily(familyId, parents, children, { silent: true }),
@@ -343,6 +448,7 @@
         if (!svgEl) return;
 
         const PERSON_PREVIEW_R = 15;
+        const FAMILY_PREVIEW_R = 7;
 
         let gesture: {
             source: SourceRef;
@@ -407,15 +513,27 @@
         ): "valid" | "noop" | "create-empty" => {
             if (source.kind === "person") {
                 if (overInfo?.ref.kind === "family") {
-                    if (isPendingId(overInfo.ref.id)) return "valid";
+                    if (isPendingFamilyId(overInfo.ref.id)) {
+                        const pending = findPendingFamily(overInfo.ref.id);
+                        if (!pending) return "noop";
+                        if (pending.parents.includes(source.id) || pending.children.includes(source.id)) return "noop";
+                        return "valid";
+                    }
                     const c = displayedStemmaIndex?.canAddParent(overInfo.ref.id, source.id);
                     return c?.ok ? "valid" : "noop";
                 }
+                if (!overInfo) return "create-empty";
                 return "noop";
             }
             if (source.kind === "family") {
                 if (overInfo?.ref.kind === "person") {
-                    if (isPendingId(source.id)) return "valid";
+                    if (isPendingFamilyId(source.id)) {
+                        const pending = findPendingFamily(source.id);
+                        if (!pending) return "noop";
+                        if (pending.parents.includes(overInfo.ref.id) || pending.children.includes(overInfo.ref.id))
+                            return "noop";
+                        return "valid";
+                    }
                     const c = displayedStemmaIndex?.canAddChild(source.id, overInfo.ref.id);
                     return c?.ok ? "valid" : "noop";
                 }
@@ -424,6 +542,7 @@
             }
             if (source.kind === "empty") {
                 if (overInfo?.ref.kind === "family") return "valid";
+                if (overInfo?.ref.kind === "person") return "valid";
                 return "noop";
             }
             return "noop";
@@ -439,7 +558,7 @@
             if (targetG) {
                 const kind = targetG.id.startsWith("person_") ? "person" : "family";
                 const sourceId = denormalizeId(targetG.id);
-                if (kind === "person" && isPendingId(sourceId)) return;
+                if (kind === "person" && isPendingPersonId(sourceId)) return;
                 const c = nodeCenter(targetG);
                 if (!c) return;
                 source = { kind, id: sourceId };
@@ -476,6 +595,7 @@
         const computeTipText = (overInfo: { ref: NodeRef } | null, source: SourceRef): string | null => {
             if (source.kind === "person") {
                 if (overInfo?.ref.kind === "family") return $t("v2.tipAttachSpouse");
+                if (!overInfo) return $t("v2.tipCreateFamily");
                 return null;
             }
             if (source.kind === "family") {
@@ -485,6 +605,7 @@
             }
             if (source.kind === "empty") {
                 if (overInfo?.ref.kind === "family") return $t("v2.tipCreateSpouse");
+                if (overInfo?.ref.kind === "person") return $t("v2.tipCreateFamily");
                 return null;
             }
             return null;
@@ -496,17 +617,30 @@
             overInfo: { ref: NodeRef } | null,
         ) => {
             if (!gesture) return;
-            if (overInfo || gesture.source.kind !== "family") {
-                if (gesture.endpointPreview) {
-                    gesture.endpointPreview.style.display = "none";
-                }
+            const src = gesture.source;
+            const hidePreview = () => {
+                if (gesture?.endpointPreview) gesture.endpointPreview.style.display = "none";
+            };
+            let previewKind: "person" | "family" | null = null;
+            if (!overInfo) {
+                if (src.kind === "family") previewKind = "person";
+                else if (src.kind === "person") previewKind = "family";
+            } else if (overInfo.ref.kind === "person" && src.kind === "empty") {
+                previewKind = "family";
+            }
+            if (!previewKind) {
+                hidePreview();
                 return;
             }
-            const previewKind = "person";
-            const r = PERSON_PREVIEW_R;
+            const r = previewKind === "person" ? PERSON_PREVIEW_R : FAMILY_PREVIEW_R;
+            const previewClass = `v2-endpoint-preview v2-endpoint-${previewKind}`;
+            if (gesture.endpointPreview && gesture.endpointPreview.getAttribute("class") !== previewClass) {
+                gesture.endpointPreview.parentNode?.removeChild(gesture.endpointPreview);
+                gesture.endpointPreview = null;
+            }
             if (!gesture.endpointPreview && mainG) {
                 const p = document.createElementNS(SVG_NS, "circle") as SVGCircleElement;
-                p.setAttribute("class", `v2-endpoint-preview v2-endpoint-${previewKind}`);
+                p.setAttribute("class", previewClass);
                 mainG.appendChild(p);
                 gesture.endpointPreview = p;
             }
@@ -594,9 +728,27 @@
                 createPersonInFamily(overInfo.ref.id, "parent", $t("v2.createSpouseTitle"), startCenter);
                 return;
             }
-            if (source.kind === "family" && !overInfo && !isPendingId(source.id)) {
+            if (source.kind === "family" && !overInfo) {
                 const releaseSvg = clientToSvgPoint(svgEl, e.clientX, e.clientY);
                 createPersonInFamily(source.id, "child", $t("v2.createChildTitle"), releaseSvg);
+                return;
+            }
+            if (source.kind === "person" && !overInfo) {
+                const releaseSvg = clientToSvgPoint(svgEl, e.clientX, e.clientY);
+                const familyAt = {
+                    x: (startCenter.x + releaseSvg.x) / 2,
+                    y: (startCenter.y + releaseSvg.y) / 2,
+                };
+                createPendingFamilyForPerson(source.id, "parent", familyAt);
+                return;
+            }
+            if (source.kind === "empty" && overInfo?.ref.kind === "person") {
+                const tgtCenter = nodeCenter(overInfo.el) ?? startCenter;
+                const familyAt = {
+                    x: (startCenter.x + tgtCenter.x) / 2,
+                    y: (startCenter.y + tgtCenter.y) / 2,
+                };
+                createPendingFamilyForPerson(overInfo.ref.id, "child", familyAt);
                 return;
             }
         };
@@ -637,10 +789,16 @@
     function classifyForDrop(src: SourceRef, g: Element): "v2-drop-allowed" | "v2-drop-disallowed" | null {
         const id = denormalizeId(g.id);
         const kind: "person" | "family" = g.id.startsWith("person_") ? "person" : "family";
-        if (kind === "person" && isPendingId(id)) return null;
+        if (kind === "person" && isPendingPersonId(id)) return null;
         if (src.kind === "person") {
             if (kind !== "family") return null;
-            if (isPendingId(id)) return "v2-drop-allowed";
+            if (isPendingFamilyId(id)) {
+                const pending = findPendingFamily(id);
+                if (!pending) return null;
+                return pending.parents.includes(src.id) || pending.children.includes(src.id)
+                    ? "v2-drop-disallowed"
+                    : "v2-drop-allowed";
+            }
             const c = displayedStemmaIndex?.canAddParent(id, src.id);
             if (!c) return null;
             return c.ok ? "v2-drop-allowed" : "v2-drop-disallowed";
@@ -648,7 +806,13 @@
         if (src.kind === "family") {
             if (kind !== "person") return null;
             if (src.id === id) return null;
-            if (isPendingId(src.id)) return "v2-drop-allowed";
+            if (isPendingFamilyId(src.id)) {
+                const pending = findPendingFamily(src.id);
+                if (!pending) return null;
+                return pending.parents.includes(id) || pending.children.includes(id)
+                    ? "v2-drop-disallowed"
+                    : "v2-drop-allowed";
+            }
             const c = displayedStemmaIndex?.canAddChild(src.id, id);
             if (!c) return null;
             return c.ok ? "v2-drop-allowed" : "v2-drop-disallowed";
