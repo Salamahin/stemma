@@ -735,20 +735,11 @@
             }
             if (source.kind === "person" && !overInfo) {
                 const releaseSvg = clientToSvgPoint(svgEl, e.clientX, e.clientY);
-                const familyAt = {
-                    x: (startCenter.x + releaseSvg.x) / 2,
-                    y: (startCenter.y + releaseSvg.y) / 2,
-                };
-                createPendingFamilyForPerson(source.id, "parent", familyAt);
+                createPendingFamilyForPerson(source.id, "parent", releaseSvg);
                 return;
             }
             if (source.kind === "empty" && overInfo?.ref.kind === "person") {
-                const tgtCenter = nodeCenter(overInfo.el) ?? startCenter;
-                const familyAt = {
-                    x: (startCenter.x + tgtCenter.x) / 2,
-                    y: (startCenter.y + tgtCenter.y) / 2,
-                };
-                createPendingFamilyForPerson(overInfo.ref.id, "child", familyAt);
+                createPendingFamilyForPerson(overInfo.ref.id, "child", startCenter);
                 return;
             }
         };
