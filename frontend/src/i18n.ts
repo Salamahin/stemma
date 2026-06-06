@@ -441,7 +441,7 @@ export const ru: Record<string, string> = {
     'v2.createNew': 'Создать нового',
     'v2.stubFamily': 'Новая семья (не сохранена)',
     'v2.editMode': 'Режим редактирования',
-    'v2.editModeBanner': 'РЕЖИМ ПРАВКИ',
+    'v2.editModeBanner': 'ПРАВКА',
     'v2.signOut': 'Выйти',
     'v2.about': 'О проекте',
     'v2.settings': 'Настройки',
