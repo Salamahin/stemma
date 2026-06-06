@@ -324,7 +324,7 @@
         return { ref: { kind, id }, el: g };
     }
 
-    function familyHasPerson(family: FamilyDescription, pid: string): boolean {
+    function familyHasPerson(family: { parents: string[]; children: string[] }, pid: string): boolean {
         return family.parents.includes(pid) || family.children.includes(pid);
     }
 
@@ -336,7 +336,7 @@
     ) {
         const pending = findPendingFamily(familyId);
         if (pending) {
-            if (pending.parents.includes(personId) || pending.children.includes(personId)) return;
+            if (familyHasPerson(pending, personId)) return;
             if (pinAt) {
                 stemmaChart?.setNodePosition(normalizeId("person", personId), pinAt.x, pinAt.y);
             }
