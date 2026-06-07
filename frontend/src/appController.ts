@@ -115,10 +115,27 @@ export class AppController {
     removeStemma(stemmaId: string) {
         this.isWorking.set(true)
         this.err.set(null)
+        const wasCurrent = get(this.currentStemmaId) === stemmaId
         this.model
             .removeStemma(stemmaId)
             .then((result) => {
                 this.ownedStemmas.set(result.stemmas)
+                if (!wasCurrent) return
+                if (result.stemmas.length === 0) {
+                    this.stemma.set(null)
+                    this.stemmaIndex.set(null)
+                    this.pinnedStorage.set(null)
+                    this.highlight.set(null)
+                    this.settingsStorage.set(null)
+                    this.setCurrentStemmaId(null)
+                    return
+                }
+                const nextId = selectStemmaId(result.stemmas, this.loadLastStemmaId(), null)
+                return this.model.getStemma(nextId).then((next) => {
+                    this.refreshIndexes(next, nextId)
+                    this.setCurrentStemmaId(nextId)
+                    this.stemma.set(next)
+                })
             })
             .catch(err => {
                 this.err.set(err)
