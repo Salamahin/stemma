@@ -95,7 +95,7 @@
                             onclick={(e) => trigger(onstemmaClone, s, e)}
                             data-testid="v2-chip-clone"
                         ><i class="bi bi-copy"></i></button>
-                        {#if s.removable && s.id !== currentStemmaId}
+                        {#if s.removable}
                             <button
                                 type="button"
                                 class="row-btn danger"
