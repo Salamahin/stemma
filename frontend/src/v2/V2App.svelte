@@ -94,6 +94,26 @@
             .reduce((sum, f) => sum + f.parents.length, 0);
     }
 
+    function personNameOf(personId: string): string {
+        return displayedStemmaIndex?.person(personId)?.name || "?";
+    }
+
+    function familyParentNames(familyId: string): string[] {
+        const f = displayedStemmaIndex?.family(familyId);
+        if (!f) return [];
+        return f.parents.map((p) => personNameOf(p));
+    }
+
+    function joinNames(names: string[]): string {
+        if (names.length === 0) return "?";
+        if (names.length === 1) return names[0];
+        return names.join($t("v2.namesJoin"));
+    }
+
+    function familyLabel(familyId: string): string {
+        return joinNames(familyParentNames(familyId));
+    }
+
     let ownedStemmas = $state<StemmaDescription[]>([]);
     let currentStemmaId = $state<string | null>(null);
     let stemma = $state<Stemma | null>(null);
@@ -596,18 +616,36 @@
 
         const computeTipText = (overInfo: { ref: NodeRef } | null, source: SourceRef): string | null => {
             if (source.kind === "person") {
-                if (overInfo?.ref.kind === "family") return $t("v2.tipAttachSpouse");
-                if (!overInfo) return $t("v2.tipCreateFamily");
+                if (overInfo?.ref.kind === "family") {
+                    return $t("v2.tipIsSpouse", {
+                        person: personNameOf(source.id),
+                        family: familyLabel(overInfo.ref.id),
+                    });
+                }
+                if (!overInfo) return $t("v2.tipPersonHasSpouse", { name: personNameOf(source.id) });
                 return null;
             }
             if (source.kind === "family") {
-                if (!overInfo) return $t("v2.tipCreateChild");
-                if (overInfo.ref.kind === "person") return $t("v2.tipAttachChild");
+                if (!overInfo) {
+                    const parents = familyParentNames(source.id);
+                    if (parents.length > 1) return $t("v2.tipParentsHaveChildren", { names: joinNames(parents) });
+                    return $t("v2.tipParentHasChildren", { name: joinNames(parents) });
+                }
+                if (overInfo.ref.kind === "person") {
+                    return $t("v2.tipIsChild", {
+                        person: personNameOf(overInfo.ref.id),
+                        family: familyLabel(source.id),
+                    });
+                }
                 return null;
             }
             if (source.kind === "empty") {
-                if (overInfo?.ref.kind === "family") return $t("v2.tipCreateSpouse");
-                if (overInfo?.ref.kind === "person") return $t("v2.tipCreateFamily");
+                if (overInfo?.ref.kind === "family") {
+                    return $t("v2.tipPersonHasSpouse", { name: familyLabel(overInfo.ref.id) });
+                }
+                if (overInfo?.ref.kind === "person") {
+                    return $t("v2.tipPersonHasParents", { name: personNameOf(overInfo.ref.id) });
+                }
                 return null;
             }
             return null;
@@ -727,12 +765,14 @@
                 return;
             }
             if (source.kind === "empty" && overInfo?.ref.kind === "family") {
-                createPersonInFamily(overInfo.ref.id, "parent", $t("v2.createSpouseTitle"), startCenter);
+                const title = $t("v2.createSpouseTitleOf", { name: familyLabel(overInfo.ref.id) });
+                createPersonInFamily(overInfo.ref.id, "parent", title, startCenter);
                 return;
             }
             if (source.kind === "family" && !overInfo) {
                 const releaseSvg = clientToSvgPoint(svgEl, e.clientX, e.clientY);
-                createPersonInFamily(source.id, "child", $t("v2.createChildTitle"), releaseSvg);
+                const title = $t("v2.createChildTitleOf", { names: familyLabel(source.id) });
+                createPersonInFamily(source.id, "child", title, releaseSvg);
                 return;
             }
             if (source.kind === "person" && !overInfo) {
@@ -1550,7 +1590,8 @@
         border-radius: 10px;
         font-size: 0.82rem;
         font-weight: 500;
-        white-space: nowrap;
+        max-width: min(320px, 80vw);
+        overflow-wrap: anywhere;
         z-index: 400;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     }
