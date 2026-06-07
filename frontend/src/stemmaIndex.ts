@@ -23,7 +23,7 @@ type FamilyMembers = {
 }
 
 
-export type AddCheck = { ok: true } | { ok: false, reason: "twoParents" | "alreadyMember" | "cycle" | "unknownFamily" }
+export type AddCheck = { ok: true } | { ok: false, reason: "twoParents" | "alreadyMember" | "cycle" | "unknownFamily" | "alreadyChild" }
 
 export class StemmaIndex {
     private _parentToChildren: Map<string, DirectedFamilyDescription[]>
@@ -107,7 +107,12 @@ export class StemmaIndex {
         if (family.children?.includes(personId)) return { ok: false, reason: "alreadyMember" }
         if (family.parents?.includes(personId)) return { ok: false, reason: "alreadyMember" }
         if (this._descendantFamiliesOfPerson.get(personId)?.has(familyId)) return { ok: false, reason: "cycle" }
+        if (this.hasParentFamily(personId)) return { ok: false, reason: "alreadyChild" }
         return { ok: true }
+    }
+
+    hasParentFamily(personId: string): boolean {
+        return this._childToParents.has(personId)
     }
 
     private computeLineage(personId: string, relation: Map<string, DirectedFamilyDescription[]>) {
