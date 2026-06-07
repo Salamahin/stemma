@@ -143,9 +143,35 @@ describe("canAddParent / canAddChild", () => {
         expect(jjIndex().canAddChild("4", joseph)).toEqual({ ok: false, reason: "cycle" })
     })
 
-    test("canAddChild allows valid addition", () => {
-        // family 4: parents [james], children [jeff]; josh has no descendant families
-        expect(jjIndex().canAddChild("4", josh)).toEqual({ ok: true })
+    test("canAddChild rejects when person already has a parent family", () => {
+        // jill is already a child of family 1; adding her as child of family 5 must be rejected
+        expect(jjIndex().canAddChild("5", jill)).toEqual({ ok: false, reason: "alreadyChild" })
+    })
+
+    test("canAddChild allows addition when person is parentless and not a descendant", () => {
+        // Custom stemma: alice is unrelated, no parent family; add as child of bob+carol's family
+        const alice = "a"
+        const bob = "b"
+        const carol = "c"
+        const fixture = stemma({
+            people: [
+                person({ id: alice, name: "alice", readOnly: false }),
+                person({ id: bob, name: "bob", readOnly: false }),
+                person({ id: carol, name: "carol", readOnly: false }),
+            ],
+            families: [
+                family({ id: "1", parents: [bob, carol], children: [], readOnly: false }),
+            ],
+        })
+        expect(new StemmaIndex(fixture).canAddChild("1", alice)).toEqual({ ok: true })
+    })
+
+    test("hasParentFamily returns true only when person is a child in a non-empty family", () => {
+        const idx = jjIndex()
+        expect(idx.hasParentFamily(jane)).toBe(false) // jane is only a parent
+        expect(idx.hasParentFamily(josh)).toBe(true)  // child of f1
+        expect(idx.hasParentFamily(jill)).toBe(true)  // child of f1
+        expect(idx.hasParentFamily(joseph)).toBe(false) // only parent of f5
     })
 
     test("returns unknownFamily for missing id", () => {

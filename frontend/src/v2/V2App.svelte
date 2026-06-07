@@ -86,14 +86,6 @@
         return pendingFamilies.find((f) => f.tempId === id);
     }
 
-    function parentCountOf(personId: string): number {
-        if (!displayedStemmaIndex) return 0;
-        return displayedStemmaIndex
-            .relatedFamilies(personId)
-            .filter((f) => f.children.includes(personId))
-            .reduce((sum, f) => sum + f.parents.length, 0);
-    }
-
     function personNameOf(personId: string): string {
         return displayedStemmaIndex?.person(personId)?.name || "?";
     }
@@ -569,6 +561,7 @@
                         if (!pending) return "noop";
                         if (pending.parents.includes(overInfo.ref.id) || pending.children.includes(overInfo.ref.id))
                             return "noop";
+                        if (displayedStemmaIndex?.hasParentFamily(overInfo.ref.id)) return "noop";
                         return "valid";
                     }
                     const c = displayedStemmaIndex?.canAddChild(source.id, overInfo.ref.id);
@@ -580,7 +573,7 @@
             if (source.kind === "empty") {
                 if (overInfo?.ref.kind === "family") return "valid";
                 if (overInfo?.ref.kind === "person") {
-                    if (parentCountOf(overInfo.ref.id) >= 2) return "noop";
+                    if (displayedStemmaIndex?.hasParentFamily(overInfo.ref.id)) return "noop";
                     return "valid";
                 }
                 return "noop";
@@ -799,7 +792,7 @@
                 return;
             }
             if (source.kind === "empty" && overInfo?.ref.kind === "person") {
-                if (parentCountOf(overInfo.ref.id) >= 2) return;
+                if (displayedStemmaIndex?.hasParentFamily(overInfo.ref.id)) return;
                 createPendingFamilyForPerson(overInfo.ref.id, "child", startCenter);
                 return;
             }
@@ -864,9 +857,9 @@
             if (isPendingFamilyId(src.id)) {
                 const pending = findPendingFamily(src.id);
                 if (!pending) return null;
-                return pending.parents.includes(id) || pending.children.includes(id)
-                    ? "v2-drop-disallowed"
-                    : "v2-drop-allowed";
+                if (pending.parents.includes(id) || pending.children.includes(id)) return "v2-drop-disallowed";
+                if (displayedStemmaIndex?.hasParentFamily(id)) return "v2-drop-disallowed";
+                return "v2-drop-allowed";
             }
             const c = displayedStemmaIndex?.canAddChild(src.id, id);
             if (!c) return null;
