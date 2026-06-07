@@ -1383,6 +1383,7 @@
         position: relative;
         width: 100vw;
         height: 100vh;
+        height: 100dvh;
         overflow: hidden;
         background: #f8f9fa;
     }
@@ -1394,6 +1395,7 @@
 
     :global(.v2-canvas-layer #chart) {
         min-height: 100vh;
+        min-height: 100dvh;
         padding: 0 !important;
         user-select: none;
         -webkit-user-select: none;
@@ -1456,16 +1458,16 @@
 
     .v2-bottom-right {
         position: absolute;
-        bottom: 24px;
-        right: 20px;
+        bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+        right: calc(20px + env(safe-area-inset-right, 0px));
         pointer-events: auto;
         z-index: 100;
     }
 
     .v2-bottom-left {
         position: absolute;
-        bottom: 16px;
-        left: 16px;
+        bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+        left: calc(16px + env(safe-area-inset-left, 0px));
         pointer-events: auto;
         z-index: 100;
     }
