@@ -818,7 +818,15 @@
             e.stopImmediatePropagation();
             onPointerStart(e);
         };
+        // touchstart fires before pointerdown, so d3.zoom would start a pan in parallel
+        // with the link gesture; swallow single-finger touch, let pinch through.
+        const onTouchStartCapture = (e: TouchEvent) => {
+            if (panActive) return;
+            if (e.touches.length !== 1) return;
+            e.stopPropagation();
+        };
         svgEl.addEventListener("pointerdown", onPointerDownCapture, true);
+        svgEl.addEventListener("touchstart", onTouchStartCapture, true);
         window.addEventListener("pointermove", onPointerMove);
         window.addEventListener("pointerup", onPointerEnd);
         window.addEventListener("pointercancel", onCancel);
@@ -827,6 +835,7 @@
         window.addEventListener("blur", onCancel);
         return () => {
             svgEl.removeEventListener("pointerdown", onPointerDownCapture, true);
+            svgEl.removeEventListener("touchstart", onTouchStartCapture, true);
             window.removeEventListener("pointermove", onPointerMove);
             window.removeEventListener("pointerup", onPointerEnd);
             window.removeEventListener("pointercancel", onCancel);
