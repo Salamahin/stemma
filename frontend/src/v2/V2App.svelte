@@ -244,7 +244,7 @@
         name: string,
         op: () => Promise<MutationResult>,
         pinAt?: { x: number; y: number },
-        afterCommit?: (newPersonIds: string[]) => void,
+        afterCommit?: (result: MutationResult) => void,
     ): Promise<void> {
         const tempId = newPendingPersonId();
         pendingAdds = [...pendingAdds, { tempId, name }];
@@ -256,7 +256,7 @@
                     stemmaChart?.setNodePosition(normalizeId("person", id), pinAt.x, pinAt.y),
                 );
             }
-            afterCommit?.(result.newPersonIds);
+            afterCommit?.(result);
         } catch {
             // surfaced through controller.err
         } finally {
@@ -316,6 +316,11 @@
         pendingFamilies = pendingFamilies.filter((p) => p.tempId !== tempId);
     }
 
+    function pinPromotedFamily(pending: PendingFamily, newFid: string | undefined): void {
+        if (!newFid || pending.x === undefined || pending.y === undefined) return;
+        stemmaChart?.setNodePosition(normalizeId("family", newFid), pending.x, pending.y);
+    }
+
     function clientToSvgPoint(svgEl: SVGSVGElement, clientX: number, clientY: number): { x: number; y: number } {
         const pt = svgEl.createSVGPoint();
         pt.x = clientX;
@@ -365,10 +370,7 @@
             promotePendingFamily(pending, incoming, role)
                 .then((result) => {
                     clearPendingFamily(familyId);
-                    const newFid = result.newFamilyIds[0];
-                    if (newFid && pending.x !== undefined && pending.y !== undefined) {
-                        stemmaChart?.setNodePosition(normalizeId("family", newFid), pending.x, pending.y);
-                    }
+                    pinPromotedFamily(pending, result.newFamilyIds[0]);
                 })
                 .catch(() => {});
             return;
@@ -401,9 +403,10 @@
                         description.name,
                         () => promotePendingFamily(pending, description, role),
                         pinAt,
-                        (newPersonIds) => {
+                        (result) => {
                             clearPendingFamily(familyId);
-                            const newId = newPersonIds[0];
+                            pinPromotedFamily(pending, result.newFamilyIds[0]);
+                            const newId = result.newPersonIds[0];
                             if (newId && (photoUpload || pin)) {
                                 controller.savePerson(newId, description, pin, photoUpload, false);
                             }
@@ -418,8 +421,8 @@
                     description.name,
                     () => controller.updateFamily(familyId, parents, children, { silent: true }),
                     pinAt,
-                    (newPersonIds) => {
-                        const newId = newPersonIds[0];
+                    (result) => {
+                        const newId = result.newPersonIds[0];
                         if (newId && (photoUpload || pin)) {
                             controller.savePerson(newId, description, pin, photoUpload, false);
                         }
@@ -1108,8 +1111,8 @@
                     description.name,
                     () => controller.createOrphanPerson(description, { silent: true }),
                     undefined,
-                    (newPersonIds) => {
-                        const newId = newPersonIds[0];
+                    (result) => {
+                        const newId = result.newPersonIds[0];
                         if (newId && (photoUpload || pin)) {
                             controller.savePerson(newId, description, pin, photoUpload, false);
                         }
