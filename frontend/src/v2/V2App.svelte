@@ -100,18 +100,29 @@
 
     function familyParentNames(familyId: string): string[] {
         const f = displayedStemmaIndex?.family(familyId);
-        if (!f) return [];
-        return f.parents.map((p) => personNameOf(p));
+        return f ? f.parents.map(personNameOf) : [];
+    }
+
+    function familyChildrenNames(familyId: string): string[] {
+        const f = displayedStemmaIndex?.family(familyId);
+        return f ? f.children.map(personNameOf) : [];
     }
 
     function joinNames(names: string[]): string {
         if (names.length === 0) return "?";
         if (names.length === 1) return names[0];
-        return names.join($t("v2.namesJoin"));
+        const conj = $t("v2.namesJoin");
+        if (names.length === 2) return names.join(conj);
+        const sep = $t("v2.namesSeparator");
+        return names.slice(0, -1).join(sep) + conj + names[names.length - 1];
     }
 
-    function familyLabel(familyId: string): string {
-        return joinNames(familyParentNames(familyId));
+    type FamilyAnchor = { names: string[]; via: "parents" | "children" };
+
+    function familyAnchor(familyId: string): FamilyAnchor {
+        const parents = familyParentNames(familyId);
+        if (parents.length > 0) return { names: parents, via: "parents" };
+        return { names: familyChildrenNames(familyId), via: "children" };
     }
 
     let ownedStemmas = $state<StemmaDescription[]>([]);
@@ -282,10 +293,8 @@
             x: familyAt.x,
             y: familyAt.y,
         };
+        stemmaChart?.setNodePosition(normalizeId("family", tempId), familyAt.x, familyAt.y);
         pendingFamilies = [...pendingFamilies, entry];
-        queueMicrotask(() => {
-            stemmaChart?.setNodePosition(normalizeId("family", tempId), familyAt.x, familyAt.y);
-        });
     }
 
     function composeFamilyMembers(
@@ -617,10 +626,10 @@
         const computeTipText = (overInfo: { ref: NodeRef } | null, source: SourceRef): string | null => {
             if (source.kind === "person") {
                 if (overInfo?.ref.kind === "family") {
-                    return $t("v2.tipIsSpouse", {
-                        person: personNameOf(source.id),
-                        family: familyLabel(overInfo.ref.id),
-                    });
+                    const anchor = familyAnchor(overInfo.ref.id);
+                    const key = anchor.via === "parents" ? "v2.tipIsSpouse" : "v2.tipIsParent";
+                    const param = anchor.via === "parents" ? "family" : "names";
+                    return $t(key, { person: personNameOf(source.id), [param]: joinNames(anchor.names) });
                 }
                 if (!overInfo) return $t("v2.tipPersonHasSpouse", { name: personNameOf(source.id) });
                 return null;
@@ -634,14 +643,20 @@
                 if (overInfo.ref.kind === "person") {
                     return $t("v2.tipIsChild", {
                         person: personNameOf(overInfo.ref.id),
-                        family: familyLabel(source.id),
+                        family: joinNames(familyParentNames(source.id)),
                     });
                 }
                 return null;
             }
             if (source.kind === "empty") {
                 if (overInfo?.ref.kind === "family") {
-                    return $t("v2.tipPersonHasSpouse", { name: familyLabel(overInfo.ref.id) });
+                    const anchor = familyAnchor(overInfo.ref.id);
+                    if (anchor.via === "parents") {
+                        return $t("v2.tipPersonHasSpouse", { name: joinNames(anchor.names) });
+                    }
+                    const key = anchor.names.length > 1 ? "v2.tipChildrenHaveParent" : "v2.tipChildHasParent";
+                    const param = anchor.names.length > 1 ? "names" : "name";
+                    return $t(key, { [param]: joinNames(anchor.names) });
                 }
                 if (overInfo?.ref.kind === "person") {
                     return $t("v2.tipPersonHasParents", { name: personNameOf(overInfo.ref.id) });
@@ -765,13 +780,16 @@
                 return;
             }
             if (source.kind === "empty" && overInfo?.ref.kind === "family") {
-                const title = $t("v2.createSpouseTitleOf", { name: familyLabel(overInfo.ref.id) });
+                const anchor = familyAnchor(overInfo.ref.id);
+                const title = anchor.via === "parents"
+                    ? $t("v2.createSpouseTitleOf", { name: joinNames(anchor.names) })
+                    : $t("v2.createParentTitleOf", { names: joinNames(anchor.names) });
                 createPersonInFamily(overInfo.ref.id, "parent", title, startCenter);
                 return;
             }
             if (source.kind === "family" && !overInfo) {
                 const releaseSvg = clientToSvgPoint(svgEl, e.clientX, e.clientY);
-                const title = $t("v2.createChildTitleOf", { names: familyLabel(source.id) });
+                const title = $t("v2.createChildTitleOf", { names: joinNames(familyParentNames(source.id)) });
                 createPersonInFamily(source.id, "child", title, releaseSvg);
                 return;
             }
