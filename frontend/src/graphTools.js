@@ -90,19 +90,20 @@ export function configureSimulation(svg, nodes, relations, width, height) {
     sim.on("tick", () => {
         svg.select("g.main")
             .selectAll("g")
-            .filter((d) => d != null)
-            .attr("transform", (d) => {
-                sessionPositions.set(d.id, [d.x, d.y])
-                if (activeLayoutCache) activeLayoutCache.set(d.id, d.x, d.y, d.vx ?? 0, d.vy ?? 0)
-                return "translate(" + d.x + "," + d.y + ")"
+            .each(function (d) {
+                if (!d) return;
+                sessionPositions.set(d.id, [d.x, d.y]);
+                if (activeLayoutCache) activeLayoutCache.set(d.id, d.x, d.y, d.vx ?? 0, d.vy ?? 0);
+                this.setAttribute("transform", `translate(${d.x},${d.y})`);
             });
 
-        svg.selectAll("line")
-            .filter((d) => d != null)
-            .attr("x1", (d) => d.source.x)
-            .attr("y1", (d) => d.source.y)
-            .attr("x2", (d) => d.target.x)
-            .attr("y2", (d) => d.target.y);
+        svg.selectAll("line").each(function (d) {
+            if (!d) return;
+            this.setAttribute("x1", d.source.x);
+            this.setAttribute("y1", d.source.y);
+            this.setAttribute("x2", d.target.x);
+            this.setAttribute("y2", d.target.y);
+        });
     });
 
     sim.on("end", () => {

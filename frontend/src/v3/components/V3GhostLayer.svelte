@@ -126,23 +126,24 @@
             isGhost: boolean;
         };
 
+        type NeighborEntry = { sim: SimNode; el: SVGGElement; datum: any };
         const realSimNodes: SimNode[] = [];
-        const neighborDatumById = new Map<string, any>();
-        d3.select("g.main").selectAll<SVGGElement, any>("g").each((d: any) => {
-            if (d && d.x != null && d.y != null) {
-                const isNeighbor = neighborDomIds.has(d.id);
-                if (isNeighbor) neighborDatumById.set(d.id, d);
-                realSimNodes.push({
-                    id: d.id,
-                    x: d.x,
-                    y: d.y,
-                    fx: isNeighbor ? null : d.x,
-                    fy: isNeighbor ? null : d.y,
-                    seedX: d.x,
-                    seedY: d.y,
-                    isGhost: false,
-                });
-            }
+        const neighborEntries = new Map<string, NeighborEntry>();
+        d3.select("g.main").selectAll<SVGGElement, any>("g").each(function (this: SVGGElement, d: any) {
+            if (!d || d.x == null || d.y == null) return;
+            const isNeighbor = neighborDomIds.has(d.id);
+            const sim: SimNode = {
+                id: d.id,
+                x: d.x,
+                y: d.y,
+                fx: isNeighbor ? null : d.x,
+                fy: isNeighbor ? null : d.y,
+                seedX: d.x,
+                seedY: d.y,
+                isGhost: false,
+            };
+            realSimNodes.push(sim);
+            if (isNeighbor) neighborEntries.set(d.id, { sim, el: this, datum: d });
         });
         const realSimNodeById = new Map(realSimNodes.map((n) => [n.id, n]));
 
@@ -204,102 +205,74 @@
             return g;
         };
 
-        type FamilyAnchor = { simNode: SimNode | null; getPos: () => { x: number; y: number } };
+        type Pos = { x: number; y: number };
+        type FamilyAnchor = { simNode: SimNode | null; el: SVGGElement | null; getPos: () => Pos };
         const familyAnchors = new Map<string, FamilyAnchor>();
 
         for (const f of layout.families) {
             const fx = origin.x + f.dx;
             const fy = origin.y + f.dy;
-            makeGhostFamilyEl(f.id, fx, fy);
-            const sim: SimNode = {
-                id: f.id,
-                x: fx,
-                y: fy,
-                seedX: fx,
-                seedY: fy,
-                isGhost: true,
-            };
-            familyAnchors.set(f.id, { simNode: sim, getPos: () => ({ x: sim.x, y: sim.y }) });
+            const el = makeGhostFamilyEl(f.id, fx, fy);
+            const sim: SimNode = { id: f.id, x: fx, y: fy, seedX: fx, seedY: fy, isGhost: true };
+            familyAnchors.set(f.id, { simNode: sim, el, getPos: () => ({ x: sim.x, y: sim.y }) });
         }
         // Focused real family acts as the anchor for a child-ghost in focused-family case.
         if (focusedId.kind === "family") {
             const focusSim = focusDomId ? realSimNodeById.get(focusDomId) : null;
             familyAnchors.set(FOCUSED_FAMILY_REF, {
                 simNode: null,
+                el: null,
                 getPos: () => (focusSim ? { x: focusSim.x, y: focusSim.y } : origin),
             });
         }
 
-        type PersonEntry = { plan: GhostPersonPlan; sim: SimNode };
+        type PersonEntry = { plan: GhostPersonPlan; sim: SimNode; el: SVGGElement };
         const personEntries: PersonEntry[] = [];
 
         for (const p of layout.persons) {
             const px = origin.x + p.dx;
             const py = origin.y + p.dy;
             const el = makeGhostPersonEl(p.id, px, py, p.labelKey);
-            const sim: SimNode = {
-                id: p.id,
-                x: px,
-                y: py,
-                seedX: px,
-                seedY: py,
-                isGhost: true,
-            };
-            personEntries.push({ plan: p, sim });
+            const sim: SimNode = { id: p.id, x: px, y: py, seedX: px, seedY: py, isGhost: true };
+            personEntries.push({ plan: p, sim, el });
             const capturedKind = p.kind;
             const capturedFocused = focusedId;
-            el.addEventListener("pointerup", (e: PointerEvent) => {
-                e.stopPropagation();
+            el.addEventListener("pointerup", (ev: PointerEvent) => {
+                ev.stopPropagation();
                 onghostClick(capturedKind, capturedFocused, { x: sim.x, y: sim.y });
             });
         }
 
-        type EdgeEntry = {
-            line: SVGLineElement;
-            getA: () => { x: number; y: number };
-            getB: () => { x: number; y: number };
-        };
+        type EdgeEntry = { line: SVGLineElement; getA: () => Pos; getB: () => Pos };
         const edges: EdgeEntry[] = [];
 
-        // Anchor edges: focused ↔ ghost family.
-        const focusPos = () => {
+        const focusPos = (): Pos => {
             const sim = focusDomId ? realSimNodeById.get(focusDomId) : null;
             return sim ? { x: sim.x, y: sim.y } : origin;
         };
+        const ARROW_FAMILY = `url(#${GHOST_ARROW_FAMILY_ID})`;
+        const ARROW_PERSON = `url(#${GHOST_ARROW_PERSON_ID})`;
+
+        const addEdge = (source: () => Pos, target: () => Pos, pointsTo: "family" | "person"): void => {
+            const s = source();
+            const t = target();
+            const line = makeLine(s.x, s.y, t.x, t.y, pointsTo === "family" ? ARROW_FAMILY : ARROW_PERSON);
+            edges.push({ line, getA: source, getB: target });
+        };
+
         for (const a of layout.anchorEdges) {
             const anchor = familyAnchors.get(a.familyId);
             if (!anchor) continue;
-            const fromFocused = a.focusedRole === "parent";
-            const marker = fromFocused
-                ? `url(#${GHOST_ARROW_FAMILY_ID})`
-                : `url(#${GHOST_ARROW_PERSON_ID})`;
-            const a0 = fromFocused ? focusPos() : anchor.getPos();
-            const b0 = fromFocused ? anchor.getPos() : focusPos();
-            const line = makeLine(a0.x, a0.y, b0.x, b0.y, marker);
-            edges.push({
-                line,
-                getA: fromFocused ? focusPos : anchor.getPos,
-                getB: fromFocused ? anchor.getPos : focusPos,
-            });
+            if (a.focusedRole === "parent") addEdge(focusPos, anchor.getPos, "family");
+            else addEdge(anchor.getPos, focusPos, "person");
         }
 
-        // Person ↔ family edges.
         for (const e of personEntries) {
             const anchor = familyAnchors.get(e.plan.familyId);
             if (!anchor) continue;
-            const fromPerson = e.plan.role === "parent";
-            const marker = fromPerson
-                ? `url(#${GHOST_ARROW_FAMILY_ID})`
-                : `url(#${GHOST_ARROW_PERSON_ID})`;
             const personPos = () => ({ x: e.sim.x, y: e.sim.y });
-            const a0 = fromPerson ? personPos() : anchor.getPos();
-            const b0 = fromPerson ? anchor.getPos() : personPos();
-            const line = makeLine(a0.x, a0.y, b0.x, b0.y, marker);
-            edges.push({
-                line,
-                getA: fromPerson ? personPos : anchor.getPos,
-                getB: fromPerson ? anchor.getPos : personPos,
-            });
+            if (e.plan.role === "parent") addEdge(personPos, anchor.getPos, "family");
+            else addEdge(anchor.getPos, personPos, "person");
         }
 
         let fadeInCancelled = false;
@@ -341,13 +314,8 @@
             .alphaDecay(0.02)
             .velocityDecay(0.6);
 
-        const neighborSimNodeById = new Map<string, SimNode>();
-        for (const n of realSimNodes) {
-            if (neighborDomIds.has(n.id)) neighborSimNodeById.set(n.id, n);
-        }
-
-        let lastPositions: Array<{ x: number; y: number }> = [];
-        const positionsEqual = (a: Array<{ x: number; y: number }>, b: Array<{ x: number; y: number }>): boolean => {
+        let lastPositions: Pos[] = [];
+        const positionsEqual = (a: Pos[], b: Pos[]): boolean => {
             if (a.length !== b.length) return false;
             for (let i = 0; i < a.length; i++) {
                 if (a[i].x !== b[i].x || a[i].y !== b[i].y) return false;
@@ -356,26 +324,20 @@
         };
 
         ghostSim.on("tick", () => {
-            for (const [domId, simNode] of neighborSimNodeById) {
-                const gEl = mainG.querySelector(`#${CSS.escape(domId)}`) as SVGGElement | null;
-                if (gEl) gEl.setAttribute("transform", `translate(${simNode.x},${simNode.y})`);
-                const datum = neighborDatumById.get(domId);
-                if (datum) {
-                    datum.x = simNode.x;
-                    datum.y = simNode.y;
-                }
+            for (const { sim, el, datum } of neighborEntries.values()) {
+                el.setAttribute("transform", `translate(${sim.x},${sim.y})`);
+                datum.x = sim.x;
+                datum.y = sim.y;
             }
 
-            const next: Array<{ x: number; y: number }> = [];
-            for (const [id, anchor] of familyAnchors) {
-                if (!anchor.simNode) continue;
-                const fEl = mainG.querySelector(`#${CSS.escape(id)}`) as SVGGElement | null;
-                if (fEl) fEl.setAttribute("transform", `translate(${anchor.simNode.x},${anchor.simNode.y})`);
+            const next: Pos[] = [];
+            for (const anchor of familyAnchors.values()) {
+                if (!anchor.simNode || !anchor.el) continue;
+                anchor.el.setAttribute("transform", `translate(${anchor.simNode.x},${anchor.simNode.y})`);
                 next.push({ x: anchor.simNode.x, y: anchor.simNode.y });
             }
             for (const e of personEntries) {
-                const pEl = mainG.querySelector(`#${CSS.escape(e.plan.id)}`) as SVGGElement | null;
-                if (pEl) pEl.setAttribute("transform", `translate(${e.sim.x},${e.sim.y})`);
+                e.el.setAttribute("transform", `translate(${e.sim.x},${e.sim.y})`);
                 next.push({ x: e.sim.x, y: e.sim.y });
             }
             for (const edge of edges) {
