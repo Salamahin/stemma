@@ -246,6 +246,7 @@
                     pinnedPeople={pinnedPeople!}
                     viewMode={ViewMode.ALL}
                     simulationActive={!editMode}
+                    hoverHighlight={!editMode}
                     onpersonSelected={handlePersonSelected}
                     onfamilySelected={handleFamilySelected}
                     onhighlightChanged={() => highlightVersion++}

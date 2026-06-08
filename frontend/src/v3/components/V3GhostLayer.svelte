@@ -371,27 +371,18 @@
             onpositionsChange([]);
             fadeOutAndRemove(allGhostEls);
 
-            // Snap freed neighbors back to their pre-focus positions then
-            // release them so the main sim can resume.
-            const SNAP_BACK_MS = 250;
+            // Hard-snap synchronously: a deferred snap-back would let the next
+            // focus snapshot stale mid-animation coordinates.
             d3.select("g.main").selectAll<SVGGElement, any>("g").each((d: any) => {
                 if (!d) return;
                 const snap = positionSnapshot.get(d.id);
                 if (neighborDomIds.has(d.id) && snap) {
-                    d.fx = snap.x;
-                    d.fy = snap.y;
+                    d.x = snap.x;
+                    d.y = snap.y;
+                    d.fx = null;
+                    d.fy = null;
                     const gEl = mainG.querySelector(`#${CSS.escape(d.id)}`) as SVGGElement | null;
-                    if (gEl) {
-                        gEl.style.transition = `transform ${SNAP_BACK_MS}ms ease-out`;
-                        gEl.setAttribute("transform", `translate(${snap.x},${snap.y})`);
-                    }
-                    setTimeout(() => {
-                        d.x = snap.x;
-                        d.y = snap.y;
-                        d.fx = null;
-                        d.fy = null;
-                        if (gEl) gEl.style.transition = "";
-                    }, SNAP_BACK_MS);
+                    if (gEl) gEl.setAttribute("transform", `translate(${snap.x},${snap.y})`);
                 } else {
                     d.fx = null;
                     d.fy = null;
