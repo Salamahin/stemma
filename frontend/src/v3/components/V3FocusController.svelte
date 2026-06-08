@@ -3,10 +3,12 @@
         FOCUS_RADIUS_SVG,
         MOUSE_LEAVE_DEBOUNCE_MS,
         nearestNodeWithinRadius,
+        cursorNearGhost,
         type FocusedId,
     } from "../focusGesture";
     import { isPendingId } from "../pendingState";
     import { clientToSvgPoint } from "../v3DomGeometry";
+    import { personR } from "../../graphStyles";
 
 
     type Props = {
@@ -43,10 +45,7 @@
             const svgPt = clientToSvgPoint(svgEl as unknown as SVGSVGElement, e.clientX, e.clientY);
             const next = nearestNodeWithinRadius(mainG, svgPt.x, svgPt.y, FOCUS_RADIUS_SVG, isPendingId);
             if (!next) {
-                const nearGhost = ghostSimPositions.some(
-                    (p) => Math.hypot(p.x - svgPt.x, p.y - svgPt.y) <= FOCUS_RADIUS_SVG,
-                );
-                if (nearGhost) {
+                if (cursorNearGhost(ghostSimPositions, svgPt.x, svgPt.y, personR)) {
                     cancelLeave();
                     return;
                 }
