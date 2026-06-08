@@ -1,6 +1,7 @@
 <script lang="ts">
     import {
         FOCUS_RADIUS_SVG,
+        GHOST_HOVER_RADIUS_SVG,
         MOUSE_LEAVE_DEBOUNCE_MS,
         nearestNodeWithinRadius,
         cursorNearGhost,
@@ -8,7 +9,6 @@
     } from "../focusGesture";
     import { isPendingId } from "../pendingState";
     import { clientToSvgPoint } from "../v3DomGeometry";
-    import { personR } from "../../graphStyles";
 
 
     type Props = {
@@ -45,7 +45,7 @@
             const svgPt = clientToSvgPoint(svgEl as unknown as SVGSVGElement, e.clientX, e.clientY);
             const next = nearestNodeWithinRadius(mainG, svgPt.x, svgPt.y, FOCUS_RADIUS_SVG, isPendingId);
             if (!next) {
-                if (cursorNearGhost(ghostSimPositions, svgPt.x, svgPt.y, personR)) {
+                if (cursorNearGhost(ghostSimPositions, svgPt.x, svgPt.y, GHOST_HOVER_RADIUS_SVG)) {
                     cancelLeave();
                     return;
                 }

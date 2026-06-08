@@ -117,7 +117,7 @@ describe("deriveGhostLayout — focused person with parent family", () => {
 });
 
 describe("deriveGhostLayout — focused person with existing spouse-families", () => {
-    it("emits one child ghost per existing spouse-family instead of in the east family", () => {
+    it("keeps a single child ghost in the east family regardless of existing families", () => {
         const stemma: Stemma = {
             type: "Stemma",
             people: [
@@ -133,11 +133,8 @@ describe("deriveGhostLayout — focused person with existing spouse-families", (
         const index = new StemmaIndex(stemma);
         const layout = deriveGhostLayout({ kind: "person", id: "p1" }, index);
         const childPlans = layout.persons.filter((p) => p.kind === "child");
-        expect(childPlans).toHaveLength(2);
-        const refs = childPlans.map((p) => p.familyId).sort();
-        expect(refs).toEqual([existingFamilyRef("fA"), existingFamilyRef("fB")].sort());
-        // None of the child ghosts hang off the east ghost family.
-        expect(childPlans.every((p) => !p.familyId.startsWith("ghost-family"))).toBe(true);
+        expect(childPlans).toHaveLength(1);
+        expect(childPlans[0].familyId).toBe("ghost-family-east");
     });
 });
 
