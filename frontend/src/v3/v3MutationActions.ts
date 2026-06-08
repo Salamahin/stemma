@@ -212,12 +212,19 @@ export class V3MutationActions {
         kind: GhostKind,
         focused: FocusedId | null,
         ghostPos: { x: number; y: number },
+        existingFamilyId?: string,
     ): void {
         if (!focused) return;
 
         // Family-focused child ghost — material family already exists; create a child into it.
         if (kind === "child" && focused.kind === "family") {
             this.createPersonInFamily(focused.id, "child", this.t("v3.addChild"), ghostPos);
+            return;
+        }
+
+        // Person-focused child ghost with an existing spouse-family — add sibling into that family.
+        if (kind === "child" && focused.kind === "person" && existingFamilyId) {
+            this.createPersonInFamily(existingFamilyId, "child", this.t("v3.addChild"), ghostPos);
             return;
         }
 
