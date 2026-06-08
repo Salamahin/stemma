@@ -533,21 +533,32 @@
 <style>
     :global(g.v3-ghost) {
         opacity: 0.6;
-        cursor: default;
+        cursor: pointer;
+        pointer-events: all;
         transition: opacity 200ms ease;
     }
 
+    :global(g.v3-ghost:hover) {
+        opacity: 0.9;
+    }
+
     :global(g.v3-ghost > circle) {
-        fill: none;
+        fill: transparent;
         stroke: #6c757d;
         stroke-width: 1.5px;
         stroke-dasharray: 5 3;
-        pointer-events: none;
+    }
+
+    :global(g.v3-ghost:hover > circle) {
+        stroke: #0d6efd;
     }
 
     :global(g.v3-ghost .v3-ghost-label) {
         fill: #6c757d;
-        pointer-events: none;
+    }
+
+    :global(g.v3-ghost:hover .v3-ghost-label) {
+        fill: #0d6efd;
     }
 
     :global(line.v3-ghost-edge) {
