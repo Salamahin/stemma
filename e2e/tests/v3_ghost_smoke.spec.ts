@@ -74,6 +74,62 @@ test("v3 hover in edit mode reveals ghost nodes; moving away clears them", async
   await expect(ghosts).toHaveCount(0, { timeout: 3_000 });
 });
 
+test("v3 orphan ghost layout: shared east family for spouse+child, parent family above", async ({ page }) => {
+  await page.goto("/v3");
+  await expect(page.getByTestId("v3-chip-stemma-btn")).toBeVisible({ timeout: 30_000 });
+  await createFreshStemma(page);
+  await enterEditMode(page);
+  const name = `Layout${Date.now()}`;
+  await addOrphan(page, name);
+  await page.waitForTimeout(500);
+
+  const group = page
+    .locator("svg#chart g[id^='person_']:not([id*='pending-'])")
+    .filter({ has: page.locator(`text="${name}"`) })
+    .first();
+  const circle = group.locator("circle").first();
+  await circle.hover({ force: true });
+  await page.waitForTimeout(400);
+
+  // Exactly two ghost family nodes: one shared east, one parent.
+  const families = page.locator("svg#chart g.v3-ghost-family");
+  await expect(families).toHaveCount(2, { timeout: 5_000 });
+  await expect(page.locator("svg#chart #ghost-family-east")).toHaveCount(1);
+  await expect(page.locator("svg#chart #ghost-family-parent")).toHaveCount(1);
+
+  // Three ghost persons: spouse, child, parent.
+  await expect(page.locator("svg#chart #ghost-person-spouse")).toHaveCount(1);
+  await expect(page.locator("svg#chart #ghost-person-child")).toHaveCount(1);
+  await expect(page.locator("svg#chart #ghost-person-parent")).toHaveCount(1);
+
+  const readTranslate = async (id: string) =>
+    await page.locator(`svg#chart [id="${id}"]`).evaluate((el) => {
+      const t = el.getAttribute("transform") ?? "";
+      const m = t.match(/translate\(([-\d.]+)[,\s]+([-\d.]+)\)/);
+      return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]) } : null;
+    });
+
+  const focusId = await group.evaluate((el) => el.getAttribute("id"));
+  const focusPos = await readTranslate(focusId!);
+  const eastFam = await readTranslate("ghost-family-east");
+  const spouse = await readTranslate("ghost-person-spouse");
+  const child = await readTranslate("ghost-person-child");
+  const parentFam = await readTranslate("ghost-family-parent");
+  const parent = await readTranslate("ghost-person-parent");
+
+  expect(focusPos && eastFam && spouse && child && parentFam && parent).toBeTruthy();
+
+  // East family east of focused; spouse east of east family; child below east family.
+  expect(eastFam!.x).toBeGreaterThan(focusPos!.x);
+  expect(spouse!.x).toBeGreaterThan(eastFam!.x);
+  expect(Math.abs(spouse!.y - focusPos!.y)).toBeLessThan(5);
+  expect(child!.y).toBeGreaterThan(eastFam!.y);
+
+  // Parent family above focused; parent ghost above parent family.
+  expect(parentFam!.y).toBeLessThan(focusPos!.y);
+  expect(parent!.y).toBeLessThan(parentFam!.y);
+});
+
 test("v3 no ghosts in view mode", async ({ page }) => {
   await page.goto("/v3");
   await expect(page.getByTestId("v3-chip-stemma-btn")).toBeVisible({ timeout: 30_000 });
