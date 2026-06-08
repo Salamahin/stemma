@@ -17,6 +17,23 @@ export const TAP_MAX_MOVE_PX = 10;
 export const FOCUS_RADIUS_SVG = 150;
 
 /**
+ * Returns true when the cursor position is within `hitRadius` SVG user-space
+ * units of any ghost position.
+ *
+ * Using the ghost's rendered node radius as `hitRadius` ensures the focus zone
+ * exactly covers the ghost's visual circle and closes the traversal gap between
+ * the real-node focus radius and the ghost seed distance.
+ */
+export function cursorNearGhost(
+    positions: ReadonlyArray<{ x: number; y: number }>,
+    cursorSvgX: number,
+    cursorSvgY: number,
+    hitRadius: number,
+): boolean {
+    return positions.some((p) => Math.hypot(p.x - cursorSvgX, p.y - cursorSvgY) <= hitRadius);
+}
+
+/**
  * Returns true when a pointerup event qualifies as a short tap (no drag, no
  * long press). All inputs are the raw numbers so this function is pure and
  * trivially testable.
