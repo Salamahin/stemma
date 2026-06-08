@@ -1,4 +1,5 @@
 <script lang="ts">
+    import * as d3 from "d3";
     import { normalizeId } from "../../graphTools";
     import {
         personR,
@@ -14,6 +15,7 @@
     import {
         deriveGhostLayout,
         FOCUSED_FAMILY_REF,
+        immediateNeighborIds,
         realFamilyIdFromRef,
         type GhostKind,
     } from "../ghostHelpers";
@@ -42,6 +44,7 @@
     const GHOST_COLOR = "#6c757d";
     const GHOST_ARROW_TO_FAMILY_ID = "v3-ghost-arrow-to-family";
     const GHOST_ARROW_TO_PERSON_ID = "v3-ghost-arrow-to-person";
+    const GHOST_COLLIDE_RADIUS = 36;
 
     let fadingOutGhostEls: Element[] = [];
 
@@ -240,10 +243,94 @@
 
         onpositionsChange([...familyAnchor.values(), ...personPos.values()]);
 
+        // One-way physics: ghosts are frozen at their planned positions but
+        // their collision circles push 1-hop real neighbours aside so existing
+        // nodes don't sit on top of the affordances. Real non-neighbour nodes
+        // stay pinned at their current positions.
+        type SimNode = {
+            id: string;
+            x: number;
+            y: number;
+            fx?: number | null;
+            fy?: number | null;
+            isGhost: boolean;
+            el?: SVGGElement | null;
+            datum?: any;
+        };
+
+        const neighborDomIds = new Set(
+            immediateNeighborIds(focusedId, stemmaIndex).map((n) => normalizeId(n.kind, n.id)),
+        );
+        const positionSnapshot = new Map<string, { x: number; y: number }>();
+        const simNodes: SimNode[] = [];
+        const neighborSims: SimNode[] = [];
+
+        d3.select("g.main").selectAll<SVGGElement, any>("g").each(function (this: SVGGElement, d: any) {
+            if (!d || d.x == null || d.y == null) return;
+            positionSnapshot.set(d.id, { x: d.x, y: d.y });
+            const isNeighbor = neighborDomIds.has(d.id);
+            const sim: SimNode = {
+                id: d.id,
+                x: d.x,
+                y: d.y,
+                fx: isNeighbor ? null : d.x,
+                fy: isNeighbor ? null : d.y,
+                isGhost: false,
+                el: this,
+                datum: d,
+            };
+            simNodes.push(sim);
+            if (isNeighbor) neighborSims.push(sim);
+        });
+
+        // Ghost sim nodes: frozen at the static plan positions.
+        for (const f of layout.families) {
+            const pos = familyAnchor.get(f.id);
+            if (!pos) continue;
+            simNodes.push({ id: f.id, x: pos.x, y: pos.y, fx: pos.x, fy: pos.y, isGhost: true });
+        }
+        for (const p of layout.persons) {
+            const pos = personPos.get(p.id);
+            if (!pos) continue;
+            simNodes.push({ id: p.id, x: pos.x, y: pos.y, fx: pos.x, fy: pos.y, isGhost: true });
+        }
+
+        const sim = d3
+            .forceSimulation<SimNode>(simNodes)
+            .force("collide", d3.forceCollide<SimNode>().radius(GHOST_COLLIDE_RADIUS).strength(0.9))
+            .alphaDecay(0.04)
+            .velocityDecay(0.5);
+
+        sim.on("tick", () => {
+            for (const n of neighborSims) {
+                if (!n.el) continue;
+                n.el.setAttribute("transform", `translate(${n.x},${n.y})`);
+                if (n.datum) {
+                    n.datum.x = n.x;
+                    n.datum.y = n.y;
+                }
+            }
+        });
+
         return () => {
             fadeInCancelled = true;
+            sim.stop();
             onpositionsChange([]);
             fadeOutAndRemove(allGhostEls);
+
+            // Hard-snap neighbours back to their pre-focus positions
+            // synchronously so the next focus snapshot doesn't pick up
+            // mid-physics coordinates. Datum fx/fy is left as FullStemma set
+            // it — edit mode keeps every real node pinned anyway.
+            for (const n of neighborSims) {
+                const snap = positionSnapshot.get(n.id);
+                if (!snap) continue;
+                if (n.datum) {
+                    n.datum.x = snap.x;
+                    n.datum.y = snap.y;
+                }
+                if (n.el) n.el.setAttribute("transform", `translate(${snap.x},${snap.y})`);
+            }
         };
     });
 </script>
