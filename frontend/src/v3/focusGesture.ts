@@ -17,6 +17,14 @@ export const TAP_MAX_MOVE_PX = 10;
 export const FOCUS_RADIUS_SVG = 150;
 
 /**
+ * Hit radius for the "cursor still near a ghost" check that keeps the focused
+ * node from blurring while the user is moving toward a ghost. Larger than the
+ * ghost circle radius so the dashed circle plus its label sit inside the zone
+ * and small cursor jitters between ghosts don't drop the focus.
+ */
+export const GHOST_HOVER_RADIUS_SVG = 60;
+
+/**
  * Returns true when the cursor position is within `hitRadius` SVG user-space
  * units of any ghost position.
  *

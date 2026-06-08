@@ -194,8 +194,12 @@ export function makeDrag(svg, simulation, pinnedPeople, onDragStart, onDragEnd) 
         return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
     }
 
-    svg.select("g.main").selectAll("g").call(drag());
+    svg.select("g.main").selectAll(D3_NODE_SELECTOR).call(drag());
 }
+
+export const PERSON_PREFIX = "person_";
+export const FAMILY_PREFIX = "family_";
+const D3_NODE_SELECTOR = `g[id^='${PERSON_PREFIX}'], g[id^='${FAMILY_PREFIX}']`;
 
 export function normalizeId(suffix, id) {
     return `${suffix}_${id}`
@@ -206,8 +210,11 @@ export function denormalizeId(id) {
 }
 
 export function mergeData(svg, nodes, relations, width, height, initialPositions, pinnedPeople, ignoreCache) {
+    // Foreign DOM (v3 ghost edges/nodes, drag link-lines) lives in g.main too.
+    // selectAll must match only d3-bound elements or the join's keyFn dereferences
+    // `undefined` and exit.remove() wipes the decorations.
     svg.select("g.main")
-        .selectAll("line")
+        .selectAll("line:not([class])")
         .data(relations, (r) => r.id)
         .join(
             (enter) => enter.append("line").lower(),
@@ -260,7 +267,7 @@ export function mergeData(svg, nodes, relations, width, height, initialPositions
     })
 
     svg.select("g.main")
-        .selectAll("g")
+        .selectAll(D3_NODE_SELECTOR)
         .data(nodes, (n) => n.id)
         .join(
             (enter) => {
@@ -277,7 +284,7 @@ export function mergeData(svg, nodes, relations, width, height, initialPositions
                     .filter(n => n.type == "family")
                     .append("g")
                     .attr("id", n => n.id)
-                    .append("circle")
+                    .append("circle");
             },
             (update) => {
                 update.select("text").text((node) => node.name);

@@ -48,7 +48,7 @@ export type GhostLayout = {
 };
 
 const LABEL_KEYS: Record<GhostKind, string> = {
-    spouse: "v3.addAnotherSpouse",
+    spouse: "v3.addSpouse",
     parent: "v3.addParent",
     child: "v3.addChild",
 };
@@ -62,6 +62,54 @@ export function realFamilyIdFromRef(familyRef: string): string | null {
     return familyRef.slice(EXISTING_FAMILY_PREFIX.length);
 }
 
+export type NeighborRef = { kind: "person" | "family"; id: string };
+
+/**
+ * 1-hop neighbors of the focused entity. The ghost-layer sim leaves these
+ * unfrozen so ghost circles can push them aside via collision force. The
+ * focused node itself is excluded — it is frozen separately.
+ */
+export function immediateNeighborIds(
+    focusedId: FocusedId,
+    stemmaIndex: StemmaIndex,
+): readonly NeighborRef[] {
+    const seen = new Set<string>();
+    const refs: NeighborRef[] = [];
+
+    const addPerson = (id: string) => {
+        if (!seen.has(id) && id !== focusedId.id) {
+            seen.add(id);
+            refs.push({ kind: "person", id });
+        }
+    };
+    const addFamily = (id: string) => {
+        if (!seen.has(id) && id !== focusedId.id) {
+            seen.add(id);
+            refs.push({ kind: "family", id });
+        }
+    };
+
+    if (focusedId.kind === "person") {
+        for (const f of stemmaIndex.relatedFamilies(focusedId.id)) {
+            addFamily(f.id);
+            for (const pid of f.parents) addPerson(pid);
+            for (const pid of f.children) addPerson(pid);
+        }
+        return refs;
+    }
+
+    if (focusedId.kind === "family") {
+        const f = stemmaIndex.family(focusedId.id);
+        if (f) {
+            for (const pid of f.parents) addPerson(pid);
+            for (const pid of f.children) addPerson(pid);
+        }
+        return refs;
+    }
+
+    return refs;
+}
+
 export function deriveGhostLayout(
     focusedId: FocusedId | null,
     stemmaIndex: StemmaIndex,
@@ -73,9 +121,10 @@ export function deriveGhostLayout(
         const persons: GhostPersonPlan[] = [];
         const anchorEdges: GhostAnchorEdge[] = [];
 
-        // Shared east-side ghost family — "add another spouse" hangs off it; if
-        // the focused person has no existing spouse-family, "add child" also
-        // hangs off this same family.
+        // Shared east-side ghost family hosts both "add another spouse" and
+        // "add child". Click on the child slot creates a new family with the
+        // focused person as the sole parent; users wanting to extend an
+        // existing spouse-family use the drag gesture or the family card.
         const eastFamily: GhostFamilyPlan = { id: "ghost-family-east", dx: 100, dy: 0 };
         families.push(eastFamily);
         anchorEdges.push({ familyId: eastFamily.id, focusedRole: "parent" });
@@ -88,31 +137,15 @@ export function deriveGhostLayout(
             dx: 200,
             dy: 0,
         });
-
-        const spouseFamilies = stemmaIndex.spouseFamilyIds(focusedId.id);
-        if (spouseFamilies.length === 0) {
-            persons.push({
-                id: "ghost-person-child",
-                kind: "child",
-                labelKey: LABEL_KEYS.child,
-                familyId: eastFamily.id,
-                role: "child",
-                dx: 100,
-                dy: 100,
-            });
-        } else {
-            spouseFamilies.forEach((realFamilyId, i) => {
-                persons.push({
-                    id: `ghost-person-child-${i}`,
-                    kind: "child",
-                    labelKey: LABEL_KEYS.child,
-                    familyId: existingFamilyRef(realFamilyId),
-                    role: "child",
-                    dx: 0,
-                    dy: 100,
-                });
-            });
-        }
+        persons.push({
+            id: "ghost-person-child",
+            kind: "child",
+            labelKey: LABEL_KEYS.child,
+            familyId: eastFamily.id,
+            role: "child",
+            dx: 100,
+            dy: 100,
+        });
 
         if (!stemmaIndex.hasParentFamily(focusedId.id)) {
             const parentFamily: GhostFamilyPlan = { id: "ghost-family-parent", dx: 0, dy: -100 };
