@@ -36,6 +36,7 @@
         hidden: boolean;
         viewMode: ViewMode;
         simulationActive?: boolean;
+        hoverHighlight?: boolean;
         onpersonSelected?: (person: any) => void;
         onfamilySelected?: (family: any) => void;
         onhighlightChanged?: () => void;
@@ -50,6 +51,7 @@
         hidden,
         viewMode,
         simulationActive = true,
+        hoverHighlight = true,
         onpersonSelected,
         onfamilySelected,
         onhighlightChanged,
@@ -255,6 +257,7 @@
                     return;
                 }
                 if (document.body.classList.contains("v2-linking")) return;
+                if (!hoverHighlight) return;
                 if (node.type == "person") {
                     highlight.pushPerson(denormalizeId(node.id));
                     renderFullStemma();
@@ -271,10 +274,11 @@
             })
             .on("mouseleave", (_event: any, _node: any) => {
                 if (isDragging) {
-                    pendingMouseLeave = true;
+                    if (hoverHighlight) pendingMouseLeave = true;
                     return;
                 }
                 if (document.body.classList.contains("v2-linking")) return;
+                if (!hoverHighlight) return;
                 highlight.pop();
                 renderFullStemma();
                 onhighlightChanged?.();
