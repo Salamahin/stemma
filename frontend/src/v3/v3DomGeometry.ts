@@ -1,7 +1,3 @@
-/**
- * Pure DOM/SVG geometry helpers for the v3 canvas.
- */
-
 import { denormalizeId } from "../graphTools";
 import { isPendingId } from "./pendingState";
 

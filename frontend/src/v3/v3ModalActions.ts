@@ -1,9 +1,3 @@
-/**
- * Wraps the modal-driven flows in v3 (add/rename/clone/remove stemma,
- * add person, remove person, remove family). The modal refs are read
- * lazily through getter closures so V3App can wire them in before they mount.
- */
-
 import { get } from "svelte/store";
 import type { AppController } from "../appController";
 import type { CreateNewPerson, StemmaDescription } from "../model";

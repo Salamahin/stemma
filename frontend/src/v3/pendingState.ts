@@ -1,11 +1,8 @@
-/**
- * Pure types and helpers for v3 pending (front-end-only, not yet persisted)
- * person additions and pending family records.
- */
-
 import type { PersonDefinition, PersonDescription } from "../model";
 
 export type PendingAdd = { tempId: string; name: string };
+export type FamilyRole = "parent" | "child";
+export type Ref<T> = { get(): T; set(v: T): void };
 export type PendingFamily = {
     tempId: string;
     parents: string[];
@@ -51,7 +48,7 @@ export function composeFamilyMembers(
     parentIds: string[],
     childIds: string[],
     incoming: PersonDefinition,
-    role: "parent" | "child",
+    role: FamilyRole,
 ): { parents: PersonDefinition[]; children: PersonDefinition[] } {
     const parentDefs: PersonDefinition[] = parentIds.map((id) => ({ type: "ExistingPerson", id }));
     const childDefs: PersonDefinition[] = childIds.map((id) => ({ type: "ExistingPerson", id }));

@@ -1,12 +1,3 @@
-/**
- * v3 pending state + mutation actions that bridge ghost/drag affordances
- * and the backend through `AppController`.
- *
- * Reactive state (pending adds, pending families, removed sets) lives in
- * `V3App.svelte` as `$state`.  This class accesses it through getter/setter
- * refs passed in the constructor so the component owns the reactivity edge.
- */
-
 import { get } from "svelte/store";
 import { AppController, type MutationResult } from "../appController";
 import type { CreateNewPerson, PersonDefinition } from "../model";
@@ -18,8 +9,10 @@ import {
     familyHasPerson,
     newPendingFamilyId,
     newPendingPersonId,
+    type FamilyRole,
     type PendingAdd,
     type PendingFamily,
+    type Ref,
 } from "./pendingState";
 import type { FocusedId } from "./focusGesture";
 import type { GhostKind } from "./ghostHelpers";
@@ -40,8 +33,6 @@ type PersonModalRef = {
         oncreate: (args: CreatePersonArgs) => void;
     }) => void;
 } | null;
-
-export type Ref<T> = { get(): T; set(v: T): void };
 
 type Deps = {
     controller: AppController;
@@ -85,7 +76,8 @@ export class V3MutationActions {
         afterCommit?: (result: MutationResult) => void,
     ): Promise<void> {
         const tempId = newPendingPersonId();
-        this.deps.addsRef.set([...this.deps.addsRef.get(), { tempId, name }]);
+        const current = this.deps.addsRef.get();
+        this.deps.addsRef.set([...current, { tempId, name }]);
         const chart = this.deps.getStemmaChart();
         if (pinAt) chart?.setNodePosition(normalizeId("person", tempId), pinAt.x, pinAt.y);
         try {
@@ -105,7 +97,7 @@ export class V3MutationActions {
 
     createPendingFamilyForPerson(
         personId: string,
-        role: "parent" | "child",
+        role: FamilyRole,
         familyAt: { x: number; y: number },
     ): PendingFamily {
         const tempId = newPendingFamilyId();
@@ -124,7 +116,7 @@ export class V3MutationActions {
     promotePendingFamily(
         pending: PendingFamily,
         incoming: PersonDefinition,
-        role: "parent" | "child",
+        role: FamilyRole,
     ): Promise<MutationResult> {
         const { parents, children } = composeFamilyMembers(pending.parents, pending.children, incoming, role);
         return this.deps.controller.createFamily(parents, children, { silent: true });
@@ -142,7 +134,7 @@ export class V3MutationActions {
     attachPersonToFamily(
         personId: string,
         familyId: string,
-        role: "parent" | "child",
+        role: FamilyRole,
         pinAt?: { x: number; y: number },
     ): void {
         const pending = this.findFamily(familyId);
@@ -172,7 +164,7 @@ export class V3MutationActions {
 
     createPersonInFamily(
         familyId: string,
-        role: "parent" | "child",
+        role: FamilyRole,
         title: string,
         pinAt?: { x: number; y: number },
     ): void {
@@ -223,42 +215,43 @@ export class V3MutationActions {
     ): void {
         if (!focused) return;
 
+        // Family-focused child ghost — material family already exists; create a child into it.
         if (kind === "child" && focused.kind === "family") {
             this.createPersonInFamily(focused.id, "child", this.t("v3.addChild"), ghostPos);
             return;
         }
 
-        const startBranchFromPerson = (
-            personId: string,
-            titleKey: string,
-            pendingRole: "parent" | "child",
-            promoteRole: "parent" | "child",
-        ) => {
-            this.deps.getPersonEditModal()?.showCreatePerson({
-                title: this.t(titleKey),
-                oncreate: ({ description, pin, photoUpload }) => {
-                    const pending = this.createPendingFamilyForPerson(personId, pendingRole, ghostPos);
-                    void this.withPendingAdd(
-                        description.name,
-                        () => this.promotePendingFamily(pending, description, promoteRole),
-                        ghostPos,
-                        (result) => {
-                            this.clearPendingFamily(pending.tempId);
-                            this.pinPromotedFamily(pending, result.newFamilyIds[0]);
-                            const newId = result.newPersonIds[0];
-                            if (newId && (photoUpload || pin)) {
-                                this.deps.controller.savePerson(newId, description, pin, photoUpload, false);
-                            }
-                        },
-                    );
-                },
-            });
-        };
-
         if (focused.kind !== "person") return;
-        if (kind === "child") startBranchFromPerson(focused.id, "v3.addChild", "parent", "child");
-        else if (kind === "spouse") startBranchFromPerson(focused.id, "v3.addAnotherSpouse", "parent", "parent");
-        else if (kind === "parent") startBranchFromPerson(focused.id, "v3.addParent", "child", "parent");
+        const spec = BRANCH_FROM_PERSON[kind];
+        this.startBranchFromPerson(focused.id, spec.titleKey, spec.pending, spec.promote, ghostPos);
+    }
+
+    private startBranchFromPerson(
+        personId: string,
+        titleKey: string,
+        pendingRole: FamilyRole,
+        promoteRole: FamilyRole,
+        ghostPos: { x: number; y: number },
+    ): void {
+        this.deps.getPersonEditModal()?.showCreatePerson({
+            title: this.t(titleKey),
+            oncreate: ({ description, pin, photoUpload }) => {
+                const pending = this.createPendingFamilyForPerson(personId, pendingRole, ghostPos);
+                void this.withPendingAdd(
+                    description.name,
+                    () => this.promotePendingFamily(pending, description, promoteRole),
+                    ghostPos,
+                    (result) => {
+                        this.clearPendingFamily(pending.tempId);
+                        this.pinPromotedFamily(pending, result.newFamilyIds[0]);
+                        const newId = result.newPersonIds[0];
+                        if (newId && (photoUpload || pin)) {
+                            this.deps.controller.savePerson(newId, description, pin, photoUpload, false);
+                        }
+                    },
+                );
+            },
+        });
     }
 
     runRemovePerson(personId: string): void {
@@ -279,6 +272,12 @@ export class V3MutationActions {
             });
     }
 }
+
+const BRANCH_FROM_PERSON: Record<GhostKind, { titleKey: string; pending: FamilyRole; promote: FamilyRole }> = {
+    spouse: { titleKey: "v3.addAnotherSpouse", pending: "parent", promote: "parent" },
+    parent: { titleKey: "v3.addParent", pending: "child", promote: "parent" },
+    child: { titleKey: "v3.addChild", pending: "parent", promote: "child" },
+};
 
 function setWith<T>(s: Set<T>, v: T): Set<T> {
     return s.has(v) ? s : new Set([...s, v]);

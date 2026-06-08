@@ -66,9 +66,10 @@
 
         const onMouseLeave = (_e: MouseEvent) => {
             cancelLeave();
+            if (focusedId === null) return;
             leaveTimer = setTimeout(() => {
                 leaveTimer = null;
-                onfocusChange(null);
+                if (focusedId !== null) onfocusChange(null);
             }, MOUSE_LEAVE_DEBOUNCE_MS);
         };
 

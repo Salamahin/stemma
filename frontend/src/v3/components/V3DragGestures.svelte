@@ -8,6 +8,7 @@
         isPendingFamilyId,
         isPendingId,
         isPendingPersonId,
+        type FamilyRole,
         type PendingFamily,
     } from "../pendingState";
     import {
@@ -30,21 +31,20 @@
         onattachPersonToFamily: (
             personId: string,
             familyId: string,
-            role: "parent" | "child",
+            role: FamilyRole,
             pinAt?: { x: number; y: number },
         ) => void;
         oncreatePersonInFamily: (
             familyId: string,
-            role: "parent" | "child",
+            role: FamilyRole,
             title: string,
             pinAt?: { x: number; y: number },
         ) => void;
         oncreatePendingFamily: (
             personId: string,
-            role: "parent" | "child",
+            role: FamilyRole,
             familyAt: { x: number; y: number },
         ) => void;
-        onactiveGestureSource: (src: SourceRef | null) => void;
         onshortTapFocus: (f: FocusedId | null) => void;
         onclearFocus: () => void;
         onclosePanMode: () => void;
@@ -62,7 +62,6 @@
         onattachPersonToFamily,
         oncreatePersonInFamily,
         oncreatePendingFamily,
-        onactiveGestureSource,
         onshortTapFocus,
         onclearFocus,
         onclosePanMode,
@@ -140,10 +139,6 @@
         return null;
     }
 
-    function setActiveGestureSource(src: SourceRef | null): void {
-        activeGestureSource = src;
-        onactiveGestureSource(src);
-    }
 
     // HTML5 DnD: tray chip → canvas family target. Tray person becomes spouse (parent).
     $effect(() => {
@@ -250,7 +245,7 @@
             gesture.sourceGEl?.classList.remove("v3-gesture-source");
             gesture = null;
             dragTip = null;
-            setActiveGestureSource(null);
+            activeGestureSource = null;
         };
 
         const targetCompatibility = (
@@ -425,7 +420,7 @@
             if (!gesture.active) {
                 if (Math.hypot(dx, dy) <= 6) return;
                 gesture.active = true;
-                setActiveGestureSource(gesture.source);
+                activeGestureSource = gesture.source;
                 const mainG = svgEl.querySelector("g.main") as SVGGElement | null;
                 if (mainG) {
                     ensureArrowMarker();
@@ -575,10 +570,10 @@
         };
     });
 
-    // Highlight compatible drop targets while a gesture is in progress.
     $effect(() => {
         const src = activeGestureSource;
         if (!src || src.kind === "empty") return;
+        // Read so the effect tracks index rebuilds (pending add/remove etc).
         void displayedStemmaIndex;
         const svgEl = document.getElementById("chart");
         if (!svgEl) return;
@@ -594,7 +589,6 @@
         };
     });
 
-    // Body cursor while pan is armed / actively dragging.
     $effect(() => {
         if (!panActive) {
             document.body.classList.remove("v3-pan-armed", "v3-pan-dragging");
@@ -612,7 +606,6 @@
         };
     });
 
-    // Edit-mode keyboard: Escape closes pan, Space toggles momentary pan.
     $effect(() => {
         if (!editMode) return;
         const isTypingTarget = (target: EventTarget | null): boolean => {

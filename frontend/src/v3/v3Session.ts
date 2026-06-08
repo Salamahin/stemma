@@ -1,16 +1,7 @@
-/**
- * Owns the v3 Google OAuth session lifecycle: cached credential, refresh
- * timer, in-flight refresh promise, and the e2e auto-login override.
- *
- * `signedIn` reactivity lives in `V3App.svelte` as `$state`; this class
- * mutates it through a setter ref so the component owns the reactivity edge.
- */
-
 import { clearCredential, loadCredential, msUntilRefresh, saveCredential } from "../credentialStorage";
 import { refreshCredential } from "../googleAuth";
 import type { TokenProvider, User } from "../model";
-
-import type { Ref } from "./v3MutationActions";
+import type { Ref } from "./pendingState";
 
 type Listeners = {
     onSignIn: (token: string) => void;

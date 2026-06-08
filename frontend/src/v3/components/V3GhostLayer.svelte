@@ -6,6 +6,7 @@
     import type { StemmaIndex } from "../../stemmaIndex";
     import type { FocusedId } from "../focusGesture";
     import { deriveGhostBranches, immediateNeighborIds, type GhostKind } from "../ghostHelpers";
+    import { nodeCenter } from "../v3DomGeometry";
 
     type Props = {
         focusedId: FocusedId | null;
@@ -39,19 +40,6 @@
         }, GHOST_FADE_MS);
     }
 
-    function nodeCenterOf(g: SVGGElement): { x: number; y: number } | null {
-        const transform = g.getAttribute("transform");
-        if (!transform) return null;
-        const match = transform.match(/translate\(([-\d.]+)[,\s]+([-\d.]+)\)/);
-        if (!match) return null;
-        return { x: parseFloat(match[1]), y: parseFloat(match[2]) };
-    }
-
-    // Ghost nodes: render dashed affordance placeholders and run a d3 force
-    // simulation so they settle in empty space without overlapping real nodes.
-    // Each focused-person branch renders an intermediate ghost family node and
-    // an endpoint ghost person node. Focused-family branches render only a
-    // ghost person (the family already exists).
     $effect(() => {
         // Read stemmaChartReady first so Svelte tracks it. Without this, the
         // effect exits early on first mount before the SVG is in the DOM
@@ -104,7 +92,7 @@
         const focusEl = focusDomId
             ? (mainG.querySelector(`#${CSS.escape(focusDomId)}`) as SVGGElement | null)
             : null;
-        const origin = focusEl ? nodeCenterOf(focusEl) : null;
+        const origin = focusEl ? nodeCenter(focusEl) : null;
 
         const labels = $t;
 
@@ -321,6 +309,18 @@
             }
         }
 
+        let lastPositions: Array<{ x: number; y: number }> = [];
+        const positionsEqual = (
+            a: Array<{ x: number; y: number }>,
+            b: Array<{ x: number; y: number }>,
+        ): boolean => {
+            if (a.length !== b.length) return false;
+            for (let i = 0; i < a.length; i++) {
+                if (a[i].x !== b[i].x || a[i].y !== b[i].y) return false;
+            }
+            return true;
+        };
+
         ghostSim.on("tick", () => {
             for (const [domId, simNode] of neighborSimNodeById) {
                 const gEl = mainG.querySelector(`#${CSS.escape(domId)}`) as SVGGElement | null;
@@ -359,7 +359,10 @@
                     edgeFocusToFamily.setAttribute("y2", String(personSimNode.y));
                 }
             }
-            onpositionsChange(nextPositions);
+            if (!positionsEqual(nextPositions, lastPositions)) {
+                lastPositions = nextPositions;
+                onpositionsChange(nextPositions);
+            }
         });
 
         return () => {

@@ -41,8 +41,6 @@
     import { V3Session } from "./v3Session";
     import type { PendingAdd, PendingFamily } from "./pendingState";
 
-    type SourceRef = { kind: "person"; id: string } | { kind: "family"; id: string } | { kind: "empty" };
-
     type Props = { google_client_id: string; stemma_backend_url: string };
     let { google_client_id, stemma_backend_url }: Props = $props();
 
@@ -65,7 +63,6 @@
     let selectedFamilyId = $state<string | null>(null);
     let selectedFamilyEl = $state<Element | null>(null);
     let familySheetOpen = $state(false);
-    let activeGestureSource = $state<SourceRef | null>(null);
     let focusedId = $state<FocusedId | null>(null);
     let ghostSimPositions = $state<Array<{ x: number; y: number }>>([]);
 
@@ -285,7 +282,6 @@
             onattachPersonToFamily={(personId, familyId, role, pinAt) => actions.attachPersonToFamily(personId, familyId, role, pinAt)}
             oncreatePersonInFamily={(familyId, role, title, pinAt) => actions.createPersonInFamily(familyId, role, title, pinAt)}
             oncreatePendingFamily={(personId, role, familyAt) => { actions.createPendingFamilyForPerson(personId, role, familyAt); }}
-            onactiveGestureSource={(src) => (activeGestureSource = src)}
             onshortTapFocus={(f) => (focusedId = f)}
             onclearFocus={() => (focusedId = null)}
             onclosePanMode={() => (panMode = false)}
