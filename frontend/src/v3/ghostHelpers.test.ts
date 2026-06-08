@@ -1,4 +1,4 @@
-import { deriveGhosts, deriveGhostBranches, immediateNeighborIds } from "./ghostHelpers";
+import { deriveGhostLayout, immediateNeighborIds, FOCUSED_FAMILY_REF } from "./ghostHelpers";
 import type { Stemma } from "../model";
 import { StemmaIndex } from "../stemmaIndex";
 
@@ -17,232 +17,133 @@ function makeStemma(overrides: Partial<Stemma> = {}): Stemma {
     };
 }
 
-// ---------------------------------------------------------------------------
-// deriveGhosts (legacy API — kept for backward compat)
-// ---------------------------------------------------------------------------
-
-describe("deriveGhosts — no focus", () => {
-    it("returns empty list when focusedId is null", () => {
+describe("deriveGhostLayout — no focus", () => {
+    it("returns empty layout when focusedId is null", () => {
         const index = new StemmaIndex(makeStemma());
-        expect(deriveGhosts(null, index)).toHaveLength(0);
+        const layout = deriveGhostLayout(null, index);
+        expect(layout.families).toHaveLength(0);
+        expect(layout.persons).toHaveLength(0);
+        expect(layout.anchorEdges).toHaveLength(0);
     });
 });
 
-describe("deriveGhosts — focused person with parent family", () => {
-    it("returns only a spouse ghost when person already has a parent family", () => {
-        const index = new StemmaIndex(makeStemma());
-        // p3 is a child in f1, so it already has a parent family
-        const ghosts = deriveGhosts({ kind: "person", id: "p3" }, index);
-        expect(ghosts).toHaveLength(1);
-        expect(ghosts[0].kind).toBe("spouse");
-        expect(ghosts[0].id).toBe("ghost-spouse");
-        expect(ghosts[0].labelKey).toBe("v3.addAnotherSpouse");
-    });
-});
-
-describe("deriveGhosts — focused person without parent family", () => {
-    it("returns spouse and parent ghosts when person has no parent family", () => {
+describe("deriveGhostLayout — focused person without parent family", () => {
+    it("returns shared east family + parent family, three ghost persons", () => {
         const index = new StemmaIndex(makeStemma());
         // p1 is a parent in f1, not a child of any family
-        const ghosts = deriveGhosts({ kind: "person", id: "p1" }, index);
-        expect(ghosts).toHaveLength(2);
-        const kinds = ghosts.map((g) => g.kind);
-        expect(kinds).toContain("spouse");
-        expect(kinds).toContain("parent");
+        const layout = deriveGhostLayout({ kind: "person", id: "p1" }, index);
+        expect(layout.families).toHaveLength(2);
+        expect(layout.persons).toHaveLength(3);
+        expect(layout.anchorEdges).toHaveLength(2);
+        const kinds = layout.persons.map((p) => p.kind).sort();
+        expect(kinds).toEqual(["child", "parent", "spouse"]);
     });
 
-    it("assigns correct label keys", () => {
+    it("shared east family hosts both spouse and child ghosts", () => {
         const index = new StemmaIndex(makeStemma());
-        const ghosts = deriveGhosts({ kind: "person", id: "p1" }, index);
-        const byKind = Object.fromEntries(ghosts.map((g) => [g.kind, g]));
-        expect(byKind["spouse"].labelKey).toBe("v3.addAnotherSpouse");
-        expect(byKind["parent"].labelKey).toBe("v3.addParent");
+        const layout = deriveGhostLayout({ kind: "person", id: "p1" }, index);
+        const spouse = layout.persons.find((p) => p.kind === "spouse")!;
+        const child = layout.persons.find((p) => p.kind === "child")!;
+        expect(spouse.familyId).toBe(child.familyId);
     });
 
-    it("assigns stable dom ids", () => {
+    it("parent ghost attaches to a separate parent family", () => {
         const index = new StemmaIndex(makeStemma());
-        const ghosts = deriveGhosts({ kind: "person", id: "p1" }, index);
-        const ids = ghosts.map((g) => g.id);
-        expect(ids).toContain("ghost-spouse");
-        expect(ids).toContain("ghost-parent");
+        const layout = deriveGhostLayout({ kind: "person", id: "p1" }, index);
+        const parent = layout.persons.find((p) => p.kind === "parent")!;
+        const spouse = layout.persons.find((p) => p.kind === "spouse")!;
+        expect(parent.familyId).not.toBe(spouse.familyId);
     });
 
-    it("applies non-zero seed offsets for parent (upward)", () => {
+    it("anchor edges: focused acts as parent of east family, child of parent family", () => {
         const index = new StemmaIndex(makeStemma());
-        const ghosts = deriveGhosts({ kind: "person", id: "p1" }, index);
-        const parent = ghosts.find((g) => g.kind === "parent")!;
-        expect(parent.dy).toBeLessThan(0);
+        const layout = deriveGhostLayout({ kind: "person", id: "p1" }, index);
+        const byFamily = Object.fromEntries(layout.anchorEdges.map((e) => [e.familyId, e.focusedRole]));
+        const eastFamilyId = layout.persons.find((p) => p.kind === "spouse")!.familyId;
+        const parentFamilyId = layout.persons.find((p) => p.kind === "parent")!.familyId;
+        expect(byFamily[eastFamilyId]).toBe("parent");
+        expect(byFamily[parentFamilyId]).toBe("child");
     });
 
-    it("applies non-zero seed offset for spouse (rightward)", () => {
+    it("spouse is incoming parent (role=parent); child is outgoing child (role=child)", () => {
         const index = new StemmaIndex(makeStemma());
-        const ghosts = deriveGhosts({ kind: "person", id: "p1" }, index);
-        const spouse = ghosts.find((g) => g.kind === "spouse")!;
-        expect(spouse.dx).toBeGreaterThan(0);
+        const layout = deriveGhostLayout({ kind: "person", id: "p1" }, index);
+        const spouse = layout.persons.find((p) => p.kind === "spouse")!;
+        const child = layout.persons.find((p) => p.kind === "child")!;
+        expect(spouse.role).toBe("parent");
+        expect(child.role).toBe("child");
     });
-});
 
-describe("deriveGhosts — focused family", () => {
-    it("returns only a child ghost for a focused family", () => {
+    it("offset directions: east-shared family is east of focused, parent family above", () => {
         const index = new StemmaIndex(makeStemma());
-        const ghosts = deriveGhosts({ kind: "family", id: "f1" }, index);
-        expect(ghosts).toHaveLength(1);
-        expect(ghosts[0].kind).toBe("child");
-        expect(ghosts[0].id).toBe("ghost-child");
-        expect(ghosts[0].labelKey).toBe("v3.addChild");
-    });
-
-    it("applies non-zero seed offset for child (downward)", () => {
-        const index = new StemmaIndex(makeStemma());
-        const ghosts = deriveGhosts({ kind: "family", id: "f1" }, index);
-        expect(ghosts[0].dy).toBeGreaterThan(0);
-    });
-});
-
-describe("deriveGhosts — isolated person (no families)", () => {
-    it("returns spouse and parent ghosts for person with no family connections", () => {
-        const isolatedStemma: Stemma = {
-            type: "Stemma",
-            people: [{ type: "PersonDescription", id: "lone", name: "Lone", readOnly: false }],
-            families: [],
-        };
-        const index = new StemmaIndex(isolatedStemma);
-        const ghosts = deriveGhosts({ kind: "person", id: "lone" }, index);
-        expect(ghosts).toHaveLength(2);
-        expect(ghosts.map((g) => g.kind)).toContain("spouse");
-        expect(ghosts.map((g) => g.kind)).toContain("parent");
-    });
-});
-
-// ---------------------------------------------------------------------------
-// deriveGhostBranches — new branch-based API
-// ---------------------------------------------------------------------------
-
-describe("deriveGhostBranches — no focus", () => {
-    it("returns empty list when focusedId is null", () => {
-        const index = new StemmaIndex(makeStemma());
-        expect(deriveGhostBranches(null, index)).toHaveLength(0);
-    });
-});
-
-describe("deriveGhostBranches — focused person without parent family", () => {
-    it("returns 3 branches: spouse, parent, child", () => {
-        const index = new StemmaIndex(makeStemma());
-        const branches = deriveGhostBranches({ kind: "person", id: "p1" }, index);
-        expect(branches).toHaveLength(3);
-        const kinds = branches.map((b) => b.kind);
-        expect(kinds).toContain("spouse");
-        expect(kinds).toContain("parent");
-        expect(kinds).toContain("child");
-    });
-
-    it("each branch has a ghost family id", () => {
-        const index = new StemmaIndex(makeStemma());
-        const branches = deriveGhostBranches({ kind: "person", id: "p1" }, index);
-        for (const branch of branches) {
-            expect(branch.familyId).not.toBeNull();
-        }
-    });
-
-    it("spouse branch offsets are rightward", () => {
-        const index = new StemmaIndex(makeStemma());
-        const branches = deriveGhostBranches({ kind: "person", id: "p1" }, index);
-        const spouse = branches.find((b) => b.kind === "spouse")!;
-        expect(spouse.familyDx).toBeGreaterThan(0);
-        expect(spouse.personDx).toBeGreaterThan(0);
-        expect(spouse.personDx).toBeGreaterThan(spouse.familyDx);
-    });
-
-    it("parent branch offsets are upward", () => {
-        const index = new StemmaIndex(makeStemma());
-        const branches = deriveGhostBranches({ kind: "person", id: "p1" }, index);
-        const parent = branches.find((b) => b.kind === "parent")!;
-        expect(parent.familyDy).toBeLessThan(0);
-        expect(parent.personDy).toBeLessThan(0);
-        expect(parent.personDy).toBeLessThan(parent.familyDy);
-    });
-
-    it("child branch offsets are downward", () => {
-        const index = new StemmaIndex(makeStemma());
-        const branches = deriveGhostBranches({ kind: "person", id: "p1" }, index);
-        const child = branches.find((b) => b.kind === "child")!;
-        expect(child.familyDy).toBeGreaterThan(0);
-        expect(child.personDy).toBeGreaterThan(0);
-        expect(child.personDy).toBeGreaterThan(child.familyDy);
+        const layout = deriveGhostLayout({ kind: "person", id: "p1" }, index);
+        const east = layout.families.find((f) => f.id === layout.persons.find((p) => p.kind === "spouse")!.familyId)!;
+        expect(east.dx).toBeGreaterThan(0);
+        expect(east.dy).toBe(0);
+        const parentFam = layout.families.find((f) => f.id === layout.persons.find((p) => p.kind === "parent")!.familyId)!;
+        expect(parentFam.dy).toBeLessThan(0);
     });
 
     it("assigns distinct stable DOM ids", () => {
         const index = new StemmaIndex(makeStemma());
-        const branches = deriveGhostBranches({ kind: "person", id: "p1" }, index);
-        const allIds = branches.flatMap((b) => [b.familyId, b.personId]).filter(Boolean);
-        const unique = new Set(allIds);
-        expect(unique.size).toBe(allIds.length);
+        const layout = deriveGhostLayout({ kind: "person", id: "p1" }, index);
+        const ids = [...layout.families.map((f) => f.id), ...layout.persons.map((p) => p.id)];
+        expect(new Set(ids).size).toBe(ids.length);
     });
 
     it("assigns correct label keys", () => {
         const index = new StemmaIndex(makeStemma());
-        const branches = deriveGhostBranches({ kind: "person", id: "p1" }, index);
-        const byKind = Object.fromEntries(branches.map((b) => [b.kind, b]));
-        expect(byKind["spouse"].labelKey).toBe("v3.addAnotherSpouse");
-        expect(byKind["parent"].labelKey).toBe("v3.addParent");
-        expect(byKind["child"].labelKey).toBe("v3.addChild");
+        const layout = deriveGhostLayout({ kind: "person", id: "p1" }, index);
+        const byKind = Object.fromEntries(layout.persons.map((p) => [p.kind, p.labelKey]));
+        expect(byKind["spouse"]).toBe("v3.addAnotherSpouse");
+        expect(byKind["parent"]).toBe("v3.addParent");
+        expect(byKind["child"]).toBe("v3.addChild");
     });
 });
 
-describe("deriveGhostBranches — focused person with parent family", () => {
-    it("returns 2 branches: spouse and child (no parent branch)", () => {
+describe("deriveGhostLayout — focused person with parent family", () => {
+    it("omits parent ghost when person already has a parent family", () => {
         const index = new StemmaIndex(makeStemma());
-        // p3 is a child in f1
-        const branches = deriveGhostBranches({ kind: "person", id: "p3" }, index);
-        expect(branches).toHaveLength(2);
-        const kinds = branches.map((b) => b.kind);
-        expect(kinds).toContain("spouse");
-        expect(kinds).toContain("child");
-        expect(kinds).not.toContain("parent");
+        // p3 is a child in f1, so it already has a parent family
+        const layout = deriveGhostLayout({ kind: "person", id: "p3" }, index);
+        expect(layout.families).toHaveLength(1);
+        expect(layout.persons).toHaveLength(2);
+        const kinds = layout.persons.map((p) => p.kind).sort();
+        expect(kinds).toEqual(["child", "spouse"]);
     });
 });
 
-describe("deriveGhostBranches — focused family", () => {
-    it("returns 1 branch: child with no ghost family (familyId is null)", () => {
+describe("deriveGhostLayout — focused family", () => {
+    it("emits a single child ghost attached to the focused family", () => {
         const index = new StemmaIndex(makeStemma());
-        const branches = deriveGhostBranches({ kind: "family", id: "f1" }, index);
-        expect(branches).toHaveLength(1);
-        expect(branches[0].kind).toBe("child");
-        expect(branches[0].familyId).toBeNull();
-    });
-
-    it("child branch for family-focused uses downward person offset", () => {
-        const index = new StemmaIndex(makeStemma());
-        const branches = deriveGhostBranches({ kind: "family", id: "f1" }, index);
-        expect(branches[0].personDy).toBeGreaterThan(0);
+        const layout = deriveGhostLayout({ kind: "family", id: "f1" }, index);
+        expect(layout.families).toHaveLength(0);
+        expect(layout.persons).toHaveLength(1);
+        expect(layout.persons[0].kind).toBe("child");
+        expect(layout.persons[0].familyId).toBe(FOCUSED_FAMILY_REF);
+        expect(layout.persons[0].role).toBe("child");
+        expect(layout.persons[0].dy).toBeGreaterThan(0);
+        expect(layout.anchorEdges).toHaveLength(0);
     });
 });
 
-describe("deriveGhostBranches — isolated person", () => {
-    it("returns 3 branches for a person with no family connections", () => {
+describe("deriveGhostLayout — isolated person", () => {
+    it("produces full layout (east family + parent family) for unconnected person", () => {
         const isolatedStemma: Stemma = {
             type: "Stemma",
             people: [{ type: "PersonDescription", id: "lone", name: "Lone", readOnly: false }],
             families: [],
         };
         const index = new StemmaIndex(isolatedStemma);
-        const branches = deriveGhostBranches({ kind: "person", id: "lone" }, index);
-        expect(branches).toHaveLength(3);
-        const kinds = branches.map((b) => b.kind);
-        expect(kinds).toContain("spouse");
-        expect(kinds).toContain("parent");
-        expect(kinds).toContain("child");
+        const layout = deriveGhostLayout({ kind: "person", id: "lone" }, index);
+        expect(layout.families).toHaveLength(2);
+        expect(layout.persons).toHaveLength(3);
     });
 });
-
-// ---------------------------------------------------------------------------
-// immediateNeighborIds
-// ---------------------------------------------------------------------------
 
 describe("immediateNeighborIds — focused person", () => {
     it("returns the containing family and all co-members, excluding the focused person", () => {
         const index = new StemmaIndex(makeStemma());
-        // p1 is in f1 with p2 as co-parent and p3 as child
         const refs = immediateNeighborIds({ kind: "person", id: "p1" }, index);
         const ids = refs.map((r) => r.id);
         expect(ids).toContain("f1");
@@ -287,7 +188,6 @@ describe("immediateNeighborIds — focused person", () => {
         const index = new StemmaIndex(multiStemma);
         const refs = immediateNeighborIds({ kind: "person", id: "a" }, index);
         const ids = refs.map((r) => r.id);
-        // 'a' itself must not appear; b, c, fA, fB must each appear exactly once
         expect(ids.filter((id) => id === "a")).toHaveLength(0);
         expect(ids.filter((id) => id === "b")).toHaveLength(1);
         expect(ids.filter((id) => id === "c")).toHaveLength(1);
@@ -299,7 +199,6 @@ describe("immediateNeighborIds — focused person", () => {
 describe("immediateNeighborIds — focused family", () => {
     it("returns all parents and children, excluding the focused family id", () => {
         const index = new StemmaIndex(makeStemma());
-        // f1 has parents [p1, p2] and children [p3]
         const refs = immediateNeighborIds({ kind: "family", id: "f1" }, index);
         const ids = refs.map((r) => r.id);
         expect(ids).toContain("p1");

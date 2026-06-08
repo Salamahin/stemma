@@ -164,6 +164,7 @@
         if (editMode) return;
         panMode = false;
         spacePan = false;
+        focusedId = null;
         untrack(() => actions.cleanupIncompletePendingFamiliesOnExitEdit());
     });
 

@@ -90,6 +90,7 @@ export function configureSimulation(svg, nodes, relations, width, height) {
     sim.on("tick", () => {
         svg.select("g.main")
             .selectAll("g")
+            .filter((d) => d != null)
             .attr("transform", (d) => {
                 sessionPositions.set(d.id, [d.x, d.y])
                 if (activeLayoutCache) activeLayoutCache.set(d.id, d.x, d.y, d.vx ?? 0, d.vy ?? 0)
@@ -97,6 +98,7 @@ export function configureSimulation(svg, nodes, relations, width, height) {
             });
 
         svg.selectAll("line")
+            .filter((d) => d != null)
             .attr("x1", (d) => d.source.x)
             .attr("y1", (d) => d.source.y)
             .attr("x2", (d) => d.target.x)
@@ -316,12 +318,17 @@ export function renderChart(svg, highlight, stemmaIndex, markers) {
         else return markers.family;
     }
 
+    // v3 ghost elements live inside g.main but have no datum; skip them so
+    // we never dereference t/line/node on undefined.
+    const hasDatum = (d) => d != null;
+
     svg.selectAll("line")
+        .filter((line) => hasDatum(line))
         .attr("stroke", (line) => lineFill(line))
         .attr("stroke-width", (line) => lineWidth(line))
         .attr("marker-end", (line) => markerEnd(line));
 
-    let circles = svg.selectAll("circle")
+    let circles = svg.selectAll("circle").filter((t) => hasDatum(t))
 
     circles
         .filter((t) => t.type == "person")
@@ -335,6 +342,7 @@ export function renderChart(svg, highlight, stemmaIndex, markers) {
 
     svg.select("g.main")
         .selectAll("g")
+        .filter((d) => hasDatum(d))
         .select("text")
         .style("fill", (node) => (highlight.personIsHighlighted(denormalizeId(node.id)) ? null : shadedNodeColor))
         .attr("cursor", "pointer")
@@ -342,9 +350,11 @@ export function renderChart(svg, highlight, stemmaIndex, markers) {
 
     svg.select("g.main")
         .selectAll("g")
+        .filter((d) => hasDatum(d))
         .attr("cursor", "pointer")
 
     svg.selectAll("text")
+        .filter((node) => hasDatum(node))
         .raise()
         .text((node) => node.name)
         .style("font-size", labelFontSize);
