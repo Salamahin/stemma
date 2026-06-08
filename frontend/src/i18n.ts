@@ -270,7 +270,7 @@ export const en: Record<string, string> = {
     'v2.panModeOff': 'Exit pan mode',
 
     // V3 ghost affordances
-    'v3.addAnotherSpouse': 'Add another spouse',
+    'v3.addSpouse': 'Add spouse',
     'v3.addParent': 'Add parent',
     'v3.addChild': 'Add child',
 };
@@ -513,7 +513,7 @@ export const ru: Record<string, string> = {
     'v2.panModeOff': 'Выйти из режима перемещения',
 
     // V3 ghost affordances
-    'v3.addAnotherSpouse': 'Добавить ещё супруга',
+    'v3.addSpouse': 'Добавить супруга',
     'v3.addParent': 'Добавить родителя',
     'v3.addChild': 'Добавить потомка',
 };

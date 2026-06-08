@@ -48,7 +48,7 @@ export type GhostLayout = {
 };
 
 const LABEL_KEYS: Record<GhostKind, string> = {
-    spouse: "v3.addAnotherSpouse",
+    spouse: "v3.addSpouse",
     parent: "v3.addParent",
     child: "v3.addChild",
 };

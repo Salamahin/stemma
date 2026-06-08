@@ -170,11 +170,12 @@
             if (d && d.x != null && d.y != null) return `translate(${d.x},${d.y})`;
             return null;
         });
+        // Foreign lines (v3 ghost edges, drag link-lines) have no datum — d? guards.
         svg.selectAll("line")
-            .attr("x1", (d: any) => d.source?.x ?? 0)
-            .attr("y1", (d: any) => d.source?.y ?? 0)
-            .attr("x2", (d: any) => d.target?.x ?? 0)
-            .attr("y2", (d: any) => d.target?.y ?? 0);
+            .attr("x1", (d: any) => d?.source?.x ?? 0)
+            .attr("y1", (d: any) => d?.source?.y ?? 0)
+            .attr("x2", (d: any) => d?.target?.x ?? 0)
+            .attr("y2", (d: any) => d?.target?.y ?? 0);
     }
 
     $effect(() => {

@@ -130,6 +130,94 @@ test("v3 orphan ghost layout: shared east family for spouse+child, parent family
   expect(parent!.y).toBeLessThan(parentFam!.y);
 });
 
+test("v3 ghost-child stays separated from an existing real child", async ({ page }) => {
+  await page.goto("/v3");
+  await expect(page.getByTestId("v3-chip-stemma-btn")).toBeVisible({ timeout: 30_000 });
+  await createFreshStemma(page);
+  await enterEditMode(page);
+
+  const parentName = `Parent${Date.now()}`;
+  await addOrphan(page, parentName);
+
+  const parentGroup = page
+    .locator("svg#chart g[id^='person_']:not([id*='pending-'])")
+    .filter({ has: page.locator(`text="${parentName}"`) })
+    .first();
+  await expect(parentGroup.locator("circle")).toHaveAttribute("r", /\d+/);
+  const parentBb = await parentGroup.locator("circle").boundingBox();
+  if (!parentBb) throw new Error("no parent bbox");
+  const parentCx = parentBb.x + parentBb.width / 2;
+  const parentCy = parentBb.y + parentBb.height / 2;
+
+  const pressAndDrag = async (fromX: number, fromY: number, toX: number, toY: number) => {
+    await page.mouse.move(fromX, fromY);
+    await page.mouse.down();
+    await page.mouse.move(fromX + 30, fromY + 30, { steps: 4 });
+    await page.mouse.move(toX, toY, { steps: 12 });
+    await page.waitForTimeout(100);
+  };
+
+  await pressAndDrag(parentCx, parentCy, parentCx + 280, parentCy + 120);
+  await page.mouse.up();
+  const pendingFam = page.locator("svg#chart g[id^='family_pending-family-']").first();
+  await expect(pendingFam.locator("circle")).toHaveAttribute("r", /\d+/, { timeout: 5_000 });
+  const pendingCenter = await pendingFam.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  });
+
+  await pressAndDrag(pendingCenter.x, pendingCenter.y, pendingCenter.x + 240, pendingCenter.y + 120);
+  await page.mouse.up();
+  const nameInput = page.getByTestId("v3-person-name-input");
+  await expect(nameInput).toBeVisible({ timeout: 5_000 });
+  const childName = `Child${Date.now()}`;
+  await nameInput.fill(childName);
+  await page.getByTestId("v3-person-create").click();
+
+  const realChild = page
+    .locator("svg#chart g[id^='person_']:not([id*='pending-'])")
+    .filter({ has: page.locator(`text="${childName}"`) })
+    .first();
+  await expect(realChild).toBeVisible({ timeout: 15_000 });
+  await expect(
+    page.locator("svg#chart g[id^='family_']:not([id*='pending-'])"),
+  ).toHaveCount(1, { timeout: 10_000 });
+  await expect(realChild).toHaveAttribute("transform", /translate\(/);
+
+  await page.mouse.move(5, 5);
+  await expect(page.locator("svg#chart g.v3-ghost")).toHaveCount(0, { timeout: 3_000 });
+
+  const readTranslate = async (loc: ReturnType<Page["locator"]>) =>
+    await loc.evaluate((el) => {
+      const t = el.getAttribute("transform") ?? "";
+      const m = t.match(/translate\(([-\d.]+)[,\s]+([-\d.]+)\)/);
+      return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]) } : null;
+    });
+
+  const parentAgain = page
+    .locator("svg#chart g[id^='person_']:not([id*='pending-'])")
+    .filter({ has: page.locator(`text="${parentName}"`) })
+    .first();
+  await parentAgain.locator("circle").first().hover({ force: true });
+
+  const ghostChild = page.locator("svg#chart #ghost-person-child");
+  await expect(ghostChild).toHaveCount(1, { timeout: 5_000 });
+  // Let the ghost-sim collide force settle (alphaDecay=0.04).
+  await page.waitForTimeout(900);
+
+  const realChildPos = await readTranslate(realChild);
+  const ghostPos = await readTranslate(ghostChild);
+  expect(realChildPos && ghostPos).toBeTruthy();
+
+  // Ghost-child and real child don't merge into one node. personR=15, so
+  // require ≥2·personR centre-to-centre — either the static layout or the
+  // ghost-sim must keep them apart.
+  const dx = ghostPos!.x - realChildPos!.x;
+  const dy = ghostPos!.y - realChildPos!.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  expect(dist).toBeGreaterThanOrEqual(2 * 15);
+});
+
 test("v3 no ghosts in view mode", async ({ page }) => {
   await page.goto("/v3");
   await expect(page.getByTestId("v3-chip-stemma-btn")).toBeVisible({ timeout: 30_000 });

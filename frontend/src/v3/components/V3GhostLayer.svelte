@@ -29,7 +29,7 @@
         onghostClick: (
             kind: GhostKind,
             focused: FocusedId,
-            ghostPos: { x: number; y: number },
+            pins: { person: { x: number; y: number }; family: { x: number; y: number } | null },
             existingFamilyId?: string,
         ) => void;
         onpositionsChange: (positions: Array<{ x: number; y: number }>) => void;
@@ -101,12 +101,11 @@
         const labels = $t;
         const allGhostEls: SVGElement[] = [];
 
-        const realFamilyCenter = (realId: string): Pos | null => {
-            const el = mainG.querySelector(`#${CSS.escape(normalizeId("family", realId))}`) as SVGGElement | null;
+        const nodeCenterById = (kind: "person" | "family", id: string): Pos | null => {
+            const el = mainG.querySelector(`#${CSS.escape(normalizeId(kind, id))}`) as SVGGElement | null;
             return el ? nodeCenter(el) : null;
         };
 
-        // Resolve every family anchor (ghost / focused-real / existing-real) to a center point.
         const familyAnchor = new Map<string, Pos>();
         for (const f of layout.families) {
             familyAnchor.set(f.id, { x: origin.x + f.dx, y: origin.y + f.dy });
@@ -116,12 +115,10 @@
             if (familyAnchor.has(p.familyId)) continue;
             const realId = realFamilyIdFromRef(p.familyId);
             if (!realId) continue;
-            const center = realFamilyCenter(realId);
+            const center = nodeCenterById("family", realId);
             if (center) familyAnchor.set(p.familyId, center);
         }
 
-        // Resolve every ghost person's position: relative to its real family center
-        // when familyId points to a real family, otherwise relative to focused.
         const personPos = new Map<string, Pos>();
         for (const p of layout.persons) {
             const realRef = p.familyId === FOCUSED_FAMILY_REF || realFamilyIdFromRef(p.familyId) !== null;
@@ -133,13 +130,15 @@
             source: Pos,
             target: Pos,
             edgeKind: "focusToFamily" | "familyToPerson",
-            targetRadius: number,
         ): void => {
+            const sourceRadius = edgeKind === "focusToFamily" ? personR : familyR;
+            const targetRadius = edgeKind === "focusToFamily" ? familyR : personR;
             const tip = trimToCircle(source.x, source.y, target.x, target.y, targetRadius);
+            const tail = trimToCircle(target.x, target.y, source.x, source.y, sourceRadius);
             const line = document.createElementNS(SVG_NS, "line") as SVGLineElement;
             line.setAttribute("class", "v3-ghost-edge");
-            line.setAttribute("x1", String(source.x));
-            line.setAttribute("y1", String(source.y));
+            line.setAttribute("x1", String(tail.x));
+            line.setAttribute("y1", String(tail.y));
             line.setAttribute("x2", String(tip.x));
             line.setAttribute("y2", String(tip.y));
             if (edgeKind === "focusToFamily") {
@@ -174,6 +173,7 @@
             labelKey: string,
             kind: GhostKind,
             existingFamilyId: string | undefined,
+            familyPos: Pos | null,
         ): void => {
             const g = document.createElementNS(SVG_NS, "g") as SVGGElement;
             g.setAttribute("id", id);
@@ -196,11 +196,10 @@
             const capturedFocused = focusedId;
             g.addEventListener("pointerup", (ev: PointerEvent) => {
                 ev.stopPropagation();
-                onghostClick(kind, capturedFocused, pos, existingFamilyId);
+                onghostClick(kind, capturedFocused, { person: pos, family: familyPos }, existingFamilyId);
             });
         };
 
-        // Render: ghost family circles → ghost person circles → edges.
         for (const f of layout.families) {
             const pos = familyAnchor.get(f.id);
             if (pos) makeGhostFamilyEl(f.id, pos);
@@ -209,29 +208,28 @@
             const pos = personPos.get(p.id);
             if (!pos) continue;
             const existingFamilyId = realFamilyIdFromRef(p.familyId) ?? undefined;
-            makeGhostPersonEl(p.id, pos, p.labelKey, p.kind, existingFamilyId);
+            const famPos = familyAnchor.get(p.familyId) ?? null;
+            makeGhostPersonEl(p.id, pos, p.labelKey, p.kind, existingFamilyId, famPos);
         }
 
-        // Anchor edges: focused ↔ ghost family (arrow at family for parent-role, at focused for child-role).
         for (const a of layout.anchorEdges) {
             const familyPos = familyAnchor.get(a.familyId);
             if (!familyPos) continue;
             if (a.focusedRole === "parent") {
-                makeLine(origin, familyPos, "focusToFamily", familyR);
+                makeLine(origin, familyPos, "focusToFamily");
             } else {
-                makeLine(familyPos, origin, "familyToPerson", personR);
+                makeLine(familyPos, origin, "familyToPerson");
             }
         }
 
-        // Person ↔ family edges (arrow at family when person is incoming parent; at person when outgoing child).
         for (const p of layout.persons) {
             const pos = personPos.get(p.id);
             const anchorPos = familyAnchor.get(p.familyId);
             if (!pos || !anchorPos) continue;
             if (p.role === "parent") {
-                makeLine(pos, anchorPos, "focusToFamily", familyR);
+                makeLine(pos, anchorPos, "focusToFamily");
             } else {
-                makeLine(anchorPos, pos, "familyToPerson", personR);
+                makeLine(anchorPos, pos, "familyToPerson");
             }
         }
 

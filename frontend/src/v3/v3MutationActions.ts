@@ -211,26 +211,27 @@ export class V3MutationActions {
     onGhostClick(
         kind: GhostKind,
         focused: FocusedId | null,
-        ghostPos: { x: number; y: number },
+        pins: { person: { x: number; y: number }; family: { x: number; y: number } | null },
         existingFamilyId?: string,
     ): void {
         if (!focused) return;
 
-        // Family-focused child ghost — material family already exists; create a child into it.
         if (kind === "child" && focused.kind === "family") {
-            this.createPersonInFamily(focused.id, "child", this.t("v3.addChild"), ghostPos);
+            this.createPersonInFamily(focused.id, "child", this.t("v3.addChild"), pins.person);
             return;
         }
 
-        // Person-focused child ghost with an existing spouse-family — add sibling into that family.
         if (kind === "child" && focused.kind === "person" && existingFamilyId) {
-            this.createPersonInFamily(existingFamilyId, "child", this.t("v3.addChild"), ghostPos);
+            this.createPersonInFamily(existingFamilyId, "child", this.t("v3.addChild"), pins.person);
             return;
         }
 
         if (focused.kind !== "person") return;
         const spec = BRANCH_FROM_PERSON[kind];
-        this.startBranchFromPerson(focused.id, spec.titleKey, spec.pending, spec.promote, ghostPos);
+        this.startBranchFromPerson(focused.id, spec.titleKey, spec.pending, spec.promote, {
+            person: pins.person,
+            family: pins.family ?? pins.person,
+        });
     }
 
     private startBranchFromPerson(
@@ -238,16 +239,16 @@ export class V3MutationActions {
         titleKey: string,
         pendingRole: FamilyRole,
         promoteRole: FamilyRole,
-        ghostPos: { x: number; y: number },
+        pins: { person: { x: number; y: number }; family: { x: number; y: number } },
     ): void {
         this.deps.getPersonEditModal()?.showCreatePerson({
             title: this.t(titleKey),
             oncreate: ({ description, pin, photoUpload }) => {
-                const pending = this.createPendingFamilyForPerson(personId, pendingRole, ghostPos);
+                const pending = this.createPendingFamilyForPerson(personId, pendingRole, pins.family);
                 void this.withPendingAdd(
                     description.name,
                     () => this.promotePendingFamily(pending, description, promoteRole),
-                    ghostPos,
+                    pins.person,
                     (result) => {
                         this.clearPendingFamily(pending.tempId);
                         this.pinPromotedFamily(pending, result.newFamilyIds[0]);
@@ -281,7 +282,7 @@ export class V3MutationActions {
 }
 
 const BRANCH_FROM_PERSON: Record<GhostKind, { titleKey: string; pending: FamilyRole; promote: FamilyRole }> = {
-    spouse: { titleKey: "v3.addAnotherSpouse", pending: "parent", promote: "parent" },
+    spouse: { titleKey: "v3.addSpouse", pending: "parent", promote: "parent" },
     parent: { titleKey: "v3.addParent", pending: "child", promote: "parent" },
     child: { titleKey: "v3.addChild", pending: "parent", promote: "child" },
 };
