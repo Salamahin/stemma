@@ -111,7 +111,7 @@
         d3.select("g.main")
             .selectAll("g")
             .each((d) => {
-                d.fixed = false;
+                if (d) d.fixed = false;
             });
 
         pinnedPeople
@@ -125,6 +125,7 @@
                     .attr("transform", "translate(-8.25, -6)")
                     .attr("fill", "white")
                     .each((d) => {
+                        if (!d) return;
                         d.fixed = true;
                         d.fx = d.x;
                         d.fy = d.y;
@@ -137,7 +138,7 @@
         d3.select("g.main")
             .selectAll("g")
             .each((d) => {
-                if (!d.fixed && simulationActive) {
+                if (d && !d.fixed && simulationActive) {
                     d.fx = null;
                     d.fy = null;
                 }
