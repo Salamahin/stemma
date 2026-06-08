@@ -12,7 +12,7 @@
         focusedId: FocusedId | null;
         stemmaIndex: StemmaIndex | null;
         stemmaChartReady: boolean;
-        onghostClick: (kind: GhostKind, focused: FocusedId, ghostPos: { x: number; y: number }) => void;
+        onghostClick: (kind: GhostKind, focused: FocusedId, ghostPos: { x: number; y: number }, existingFamilyId?: string) => void;
         onpositionsChange: (positions: Array<{ x: number; y: number }>) => void;
     };
 
@@ -136,6 +136,8 @@
             edgeFocusToFamily: SVGLineElement | null;
             edgeFamilyToPerson: SVGLineElement | null;
             kind: GhostKind;
+            /** Real family sim node for existingFamilyId branches — used to update the edge source in tick. */
+            realFamilySimNode: SimNode | null;
         };
         const branchEntries: BranchSimEntry[] = [];
 
@@ -193,14 +195,23 @@
             return gEl;
         };
 
+        // simNodeById allows building forceLink references to both real and ghost nodes.
+        const simNodeById = new Map<string, SimNode>();
+        for (const n of realSimNodes) simNodeById.set(n.id, n);
+
+        type SimLink = { source: SimNode; target: SimNode };
+        const simLinks: SimLink[] = [];
+
         for (const branch of branches) {
             const personSeedX = origin ? origin.x + branch.personDx : branch.personDx;
             const personSeedY = origin ? origin.y + branch.personDy : branch.personDy;
 
             const capturedFocusedId = focusedId;
             const capturedKind = branch.kind;
+            const capturedExistingFamilyId = branch.existingFamilyId;
 
             if (branch.familyId !== null) {
+                // Ghost family intermediate node exists.
                 const familySeedX = origin ? origin.x + branch.familyDx : branch.familyDx;
                 const familySeedY = origin ? origin.y + branch.familyDy : branch.familyDy;
 
@@ -228,6 +239,13 @@
                     seedY: personSeedY,
                     isGhost: true,
                 };
+                simNodeById.set(familySimNode.id, familySimNode);
+                simNodeById.set(personSimNode.id, personSimNode);
+
+                // Link: focus → ghost family → ghost person.
+                const focusSimNode = focusDomId ? simNodeById.get(focusDomId) : null;
+                if (focusSimNode) simLinks.push({ source: focusSimNode, target: familySimNode });
+                simLinks.push({ source: familySimNode, target: personSimNode });
 
                 branchEntries.push({
                     familySimNode,
@@ -237,14 +255,59 @@
                     edgeFocusToFamily,
                     edgeFamilyToPerson,
                     kind: capturedKind,
+                    realFamilySimNode: null,
                 });
 
                 personEl.addEventListener("pointerup", (e: PointerEvent) => {
                     e.stopPropagation();
                     const ghostPos = { x: personSimNode.x, y: personSimNode.y };
-                    onghostClick(capturedKind, capturedFocusedId, ghostPos);
+                    onghostClick(capturedKind, capturedFocusedId, ghostPos, capturedExistingFamilyId);
+                });
+            } else if (branch.existingFamilyId) {
+                // Child branch attached to an existing real family (issue #206).
+                // The ghost person becomes a sibling — link the real family node to it.
+                const realFamilyDomId = normalizeId("family", branch.existingFamilyId);
+                const realFamilySimNode = simNodeById.get(realFamilyDomId);
+                const realFamilyCenter = realFamilySimNode
+                    ? { x: realFamilySimNode.x, y: realFamilySimNode.y }
+                    : origin;
+
+                const edgeRealFamilyToPerson = realFamilyCenter
+                    ? makeLine(realFamilyCenter.x, realFamilyCenter.y, personSeedX, personSeedY)
+                    : null;
+                const personEl = makeGhostPersonEl(branch.personId, personSeedX, personSeedY, branch.labelKey);
+
+                const personSimNode: SimNode = {
+                    id: branch.personId,
+                    x: personSeedX,
+                    y: personSeedY,
+                    seedX: personSeedX,
+                    seedY: personSeedY,
+                    isGhost: true,
+                };
+                simNodeById.set(personSimNode.id, personSimNode);
+
+                // Link the existing real family to the ghost-child so siblings shift.
+                if (realFamilySimNode) simLinks.push({ source: realFamilySimNode, target: personSimNode });
+
+                branchEntries.push({
+                    familySimNode: null,
+                    personSimNode,
+                    familyEl: null,
+                    personEl,
+                    edgeFocusToFamily: edgeRealFamilyToPerson,
+                    edgeFamilyToPerson: null,
+                    kind: capturedKind,
+                    realFamilySimNode: realFamilySimNode ?? null,
+                });
+
+                personEl.addEventListener("pointerup", (e: PointerEvent) => {
+                    e.stopPropagation();
+                    const ghostPos = { x: personSimNode.x, y: personSimNode.y };
+                    onghostClick(capturedKind, capturedFocusedId, ghostPos, capturedExistingFamilyId);
                 });
             } else {
+                // Family-focused child branch (no ghost family, no existing family).
                 const edgeFocusToPerson = origin
                     ? makeLine(origin.x, origin.y, personSeedX, personSeedY)
                     : null;
@@ -258,6 +321,11 @@
                     seedY: personSeedY,
                     isGhost: true,
                 };
+                simNodeById.set(personSimNode.id, personSimNode);
+
+                // Link: focus → ghost person.
+                const focusSimNode = focusDomId ? simNodeById.get(focusDomId) : null;
+                if (focusSimNode) simLinks.push({ source: focusSimNode, target: personSimNode });
 
                 branchEntries.push({
                     familySimNode: null,
@@ -267,12 +335,13 @@
                     edgeFocusToFamily: edgeFocusToPerson,
                     edgeFamilyToPerson: null,
                     kind: capturedKind,
+                    realFamilySimNode: null,
                 });
 
                 personEl.addEventListener("pointerup", (e: PointerEvent) => {
                     e.stopPropagation();
                     const ghostPos = { x: personSimNode.x, y: personSimNode.y };
-                    onghostClick(capturedKind, capturedFocusedId, ghostPos);
+                    onghostClick(capturedKind, capturedFocusedId, ghostPos, capturedExistingFamilyId);
                 });
             }
         }
@@ -289,6 +358,7 @@
         });
 
         const GHOST_RADIUS = 32;
+        const LINK_DISTANCE = 85;
         const ghostSimNodes = branchEntries.flatMap((e) =>
             e.familySimNode ? [e.familySimNode, e.personSimNode] : [e.personSimNode],
         );
@@ -299,6 +369,13 @@
             .force("collide", d3.forceCollide<SimNode>().radius(GHOST_RADIUS).strength(0.8))
             .force("seedX", d3.forceX<SimNode>((n) => n.seedX).strength((n) => (n.isGhost ? 0.15 : 0)))
             .force("seedY", d3.forceY<SimNode>((n) => n.seedY).strength((n) => (n.isGhost ? 0.15 : 0)))
+            .force(
+                "link",
+                d3
+                    .forceLink<SimNode, SimLink>(simLinks)
+                    .distance(LINK_DISTANCE)
+                    .strength(0.5),
+            )
             .alphaDecay(0.02)
             .velocityDecay(0.6);
 
@@ -336,7 +413,7 @@
 
             const nextPositions: Array<{ x: number; y: number }> = [];
             for (const entry of branchEntries) {
-                const { familySimNode, personSimNode, familyEl, personEl, edgeFocusToFamily, edgeFamilyToPerson } = entry;
+                const { familySimNode, personSimNode, familyEl, personEl, edgeFocusToFamily, edgeFamilyToPerson, realFamilySimNode } = entry;
 
                 personEl.setAttribute("transform", `translate(${personSimNode.x},${personSimNode.y})`);
                 nextPositions.push({ x: personSimNode.x, y: personSimNode.y });
@@ -354,6 +431,12 @@
                         edgeFamilyToPerson.setAttribute("x2", String(personSimNode.x));
                         edgeFamilyToPerson.setAttribute("y2", String(personSimNode.y));
                     }
+                } else if (realFamilySimNode && edgeFocusToFamily) {
+                    // Edge from existing real family (may move) to ghost person.
+                    edgeFocusToFamily.setAttribute("x1", String(realFamilySimNode.x));
+                    edgeFocusToFamily.setAttribute("y1", String(realFamilySimNode.y));
+                    edgeFocusToFamily.setAttribute("x2", String(personSimNode.x));
+                    edgeFocusToFamily.setAttribute("y2", String(personSimNode.y));
                 } else if (edgeFocusToFamily && origin) {
                     edgeFocusToFamily.setAttribute("x2", String(personSimNode.x));
                     edgeFocusToFamily.setAttribute("y2", String(personSimNode.y));

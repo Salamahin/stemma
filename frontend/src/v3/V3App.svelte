@@ -268,7 +268,7 @@
             {focusedId}
             stemmaIndex={displayedStemmaIndex}
             stemmaChartReady={!!stemmaChart}
-            onghostClick={(kind, focused, pos) => actions.onGhostClick(kind, focused, pos)}
+            onghostClick={(kind, focused, pos, existingFamilyId) => actions.onGhostClick(kind, focused, pos, existingFamilyId)}
             onpositionsChange={(p) => (ghostSimPositions = p)}
         />
         <V3DragGestures

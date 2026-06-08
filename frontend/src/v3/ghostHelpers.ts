@@ -30,7 +30,11 @@ export type GhostDescriptor = {
  * ghost person node, both positioned relative to the focused real node.
  *
  * When the focused entity is a family, there is no intermediate ghost family —
- * only a ghost person (child).  In that case `family` is null.
+ * only a ghost person (child).  In that case `familyId` is null.
+ *
+ * For a child branch attached to an existing spouse-family: `familyId` is null
+ * and `existingFamilyId` is the real family id.  The ghost-person becomes a
+ * sibling inside that existing family via link forces.
  */
 export type GhostBranch = {
     kind: GhostKind;
@@ -47,6 +51,12 @@ export type GhostBranch = {
     familyDy: number;
     personDx: number;
     personDy: number;
+    /**
+     * When set, the ghost child belongs to this existing real family rather than
+     * a new ghost family.  The sim links the real family node to the ghost-person
+     * so existing siblings shift via collision + link forces.
+     */
+    existingFamilyId?: string;
 };
 
 const GHOST_OFFSETS: Record<GhostKind, { dx: number; dy: number }> = {
@@ -163,10 +173,17 @@ export function immediateNeighborIds(focusedId: FocusedId, stemmaIndex: StemmaIn
  * and an endpoint ghost person node.  For a focused family the branch has no
  * intermediate ghost family (the family already exists) — only a ghost person.
  *
+ * Child-branch rules for a focused person:
+ * - If the person is a parent in one or more spouse-families: emit one child
+ *   branch per spouse-family with `existingFamilyId` set (no ghost family).
+ * - If the person has no spouse-families: emit one child branch with a new
+ *   ghost family (legacy behavior).
+ *
  * Seed offsets (SVG user-space, relative to focused node center):
  * - spouse:  ghost family at (+80, 0), ghost person at (+160, 0)
  * - parent:  ghost family at (0, -80), ghost person at (0, -160)
- * - child (person-focused): ghost family at (0, +80), ghost person at (0, +160)
+ * - child (existing family): ghost person at (0, +100) — linked to real family
+ * - child (new ghost family): ghost family at (0, +80), ghost person at (0, +160)
  * - child (family-focused): ghost person at (0, +100) — no ghost family
  */
 export function deriveGhostBranches(
@@ -200,16 +217,34 @@ export function deriveGhostBranches(
                 personDy: -160,
             });
         }
-        branches.push({
-            kind: "child",
-            familyId: "ghost-family-child",
-            personId: "ghost-person-child",
-            labelKey: GHOST_LABEL_KEYS["child"],
-            familyDx: 0,
-            familyDy: 80,
-            personDx: 0,
-            personDy: 160,
-        });
+
+        const spouseFamilies = stemmaIndex.spouseFamilyIds(focusedId.id);
+        if (spouseFamilies.length > 0) {
+            spouseFamilies.forEach((familyId, i) => {
+                branches.push({
+                    kind: "child",
+                    familyId: null,
+                    personId: `ghost-person-child-${i}`,
+                    labelKey: GHOST_LABEL_KEYS["child"],
+                    familyDx: 0,
+                    familyDy: 0,
+                    personDx: 0,
+                    personDy: 100,
+                    existingFamilyId: familyId,
+                });
+            });
+        } else {
+            branches.push({
+                kind: "child",
+                familyId: "ghost-family-child",
+                personId: "ghost-person-child",
+                labelKey: GHOST_LABEL_KEYS["child"],
+                familyDx: 0,
+                familyDy: 80,
+                personDx: 0,
+                personDy: 160,
+            });
+        }
         return branches;
     }
 

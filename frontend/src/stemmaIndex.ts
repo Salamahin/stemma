@@ -115,6 +115,12 @@ export class StemmaIndex {
         return this._childToParents.has(personId)
     }
 
+    spouseFamilyIds(personId: string): string[] {
+        const entries = this._parentToChildren.get(personId)
+        if (!entries) return []
+        return entries.map(e => e.familyId)
+    }
+
     private computeLineage(personId: string, relation: Map<string, DirectedFamilyDescription[]>) {
         var foundRelatieves: string[] = []
         var foundFamilies: string[] = []

@@ -136,12 +136,16 @@ describe("deriveGhostBranches — focused person without parent family", () => {
         expect(kinds).toContain("child");
     });
 
-    it("each branch has a ghost family id", () => {
+    it("spouse and parent branches have a ghost family id; child branch uses existingFamilyId (no ghost family)", () => {
         const index = new StemmaIndex(makeStemma());
+        // p1 is a parent in f1, so child branch uses existingFamilyId=f1
         const branches = deriveGhostBranches({ kind: "person", id: "p1" }, index);
-        for (const branch of branches) {
-            expect(branch.familyId).not.toBeNull();
-        }
+        const byKind = Object.fromEntries(branches.map((b) => [b.kind, b]));
+        expect(byKind["spouse"].familyId).not.toBeNull();
+        expect(byKind["parent"].familyId).not.toBeNull();
+        // child branch attaches to existing family f1
+        expect(byKind["child"].familyId).toBeNull();
+        expect(byKind["child"].existingFamilyId).toBe("f1");
     });
 
     it("spouse branch offsets are rightward", () => {
@@ -162,19 +166,18 @@ describe("deriveGhostBranches — focused person without parent family", () => {
         expect(parent.personDy).toBeLessThan(parent.familyDy);
     });
 
-    it("child branch offsets are downward", () => {
+    it("child branch person offset is downward", () => {
         const index = new StemmaIndex(makeStemma());
         const branches = deriveGhostBranches({ kind: "person", id: "p1" }, index);
         const child = branches.find((b) => b.kind === "child")!;
-        expect(child.familyDy).toBeGreaterThan(0);
+        // child branch uses existingFamilyId so familyId is null; only personDy matters
         expect(child.personDy).toBeGreaterThan(0);
-        expect(child.personDy).toBeGreaterThan(child.familyDy);
     });
 
-    it("assigns distinct stable DOM ids", () => {
+    it("assigns distinct stable DOM ids (familyId may be null for child branch using existingFamilyId)", () => {
         const index = new StemmaIndex(makeStemma());
         const branches = deriveGhostBranches({ kind: "person", id: "p1" }, index);
-        const allIds = branches.flatMap((b) => [b.familyId, b.personId]).filter(Boolean);
+        const allIds = branches.flatMap((b) => [b.familyId, b.personId]).filter((id): id is string => id !== null);
         const unique = new Set(allIds);
         expect(unique.size).toBe(allIds.length);
     });
@@ -192,13 +195,23 @@ describe("deriveGhostBranches — focused person without parent family", () => {
 describe("deriveGhostBranches — focused person with parent family", () => {
     it("returns 2 branches: spouse and child (no parent branch)", () => {
         const index = new StemmaIndex(makeStemma());
-        // p3 is a child in f1
+        // p3 is a child in f1 but NOT a parent in any spouse-family
         const branches = deriveGhostBranches({ kind: "person", id: "p3" }, index);
         expect(branches).toHaveLength(2);
         const kinds = branches.map((b) => b.kind);
         expect(kinds).toContain("spouse");
         expect(kinds).toContain("child");
         expect(kinds).not.toContain("parent");
+    });
+
+    it("child branch falls back to new ghost family when person has no spouse-families", () => {
+        const index = new StemmaIndex(makeStemma());
+        // p3 is a child in f1 but NOT a parent in any family
+        const branches = deriveGhostBranches({ kind: "person", id: "p3" }, index);
+        const child = branches.find((b) => b.kind === "child")!;
+        // No spouse-family → new ghost family
+        expect(child.familyId).not.toBeNull();
+        expect(child.existingFamilyId).toBeUndefined();
     });
 });
 
@@ -232,6 +245,120 @@ describe("deriveGhostBranches — isolated person", () => {
         expect(kinds).toContain("spouse");
         expect(kinds).toContain("parent");
         expect(kinds).toContain("child");
+    });
+
+    it("child branch uses new ghost family (no existingFamilyId) for isolated person", () => {
+        const isolatedStemma: Stemma = {
+            type: "Stemma",
+            people: [{ type: "PersonDescription", id: "lone", name: "Lone", readOnly: false }],
+            families: [],
+        };
+        const index = new StemmaIndex(isolatedStemma);
+        const branches = deriveGhostBranches({ kind: "person", id: "lone" }, index);
+        const child = branches.find((b) => b.kind === "child")!;
+        expect(child.familyId).not.toBeNull();
+        expect(child.existingFamilyId).toBeUndefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// deriveGhostBranches — existingFamilyId new acceptance cases (issue #206)
+// ---------------------------------------------------------------------------
+
+describe("deriveGhostBranches — spouse-family with ≥1 child → child branch uses existingFamilyId", () => {
+    it("ghost child uses existingFamilyId when spouse-family has existing children", () => {
+        // p1 is a parent in f1 which already has child p3
+        const index = new StemmaIndex(makeStemma());
+        const branches = deriveGhostBranches({ kind: "person", id: "p1" }, index);
+        const childBranches = branches.filter((b) => b.kind === "child");
+        expect(childBranches).toHaveLength(1);
+        expect(childBranches[0].existingFamilyId).toBe("f1");
+        expect(childBranches[0].familyId).toBeNull();
+    });
+});
+
+describe("deriveGhostBranches — spouse-family with 0 children → child branch uses existingFamilyId", () => {
+    it("ghost child uses existingFamilyId when spouse-family has no children yet", () => {
+        const emptyStemma: Stemma = {
+            type: "Stemma",
+            people: [
+                { type: "PersonDescription", id: "a", name: "A", readOnly: false },
+                { type: "PersonDescription", id: "b", name: "B", readOnly: false },
+            ],
+            families: [
+                { type: "FamilyDescription", id: "fAB", parents: ["a", "b"], children: [], readOnly: false },
+            ],
+        };
+        const index = new StemmaIndex(emptyStemma);
+        const branches = deriveGhostBranches({ kind: "person", id: "a" }, index);
+        const childBranches = branches.filter((b) => b.kind === "child");
+        expect(childBranches).toHaveLength(1);
+        expect(childBranches[0].existingFamilyId).toBe("fAB");
+        expect(childBranches[0].familyId).toBeNull();
+    });
+});
+
+describe("deriveGhostBranches — multiple spouse-families → one ghost-child per family", () => {
+    it("emits one child branch per spouse-family", () => {
+        const multiStemma: Stemma = {
+            type: "Stemma",
+            people: [
+                { type: "PersonDescription", id: "a", name: "A", readOnly: false },
+                { type: "PersonDescription", id: "b", name: "B", readOnly: false },
+                { type: "PersonDescription", id: "c", name: "C", readOnly: false },
+                { type: "PersonDescription", id: "d", name: "D", readOnly: false },
+            ],
+            families: [
+                { type: "FamilyDescription", id: "fAB", parents: ["a", "b"], children: [], readOnly: false },
+                { type: "FamilyDescription", id: "fAC", parents: ["a", "c"], children: ["d"], readOnly: false },
+            ],
+        };
+        const index = new StemmaIndex(multiStemma);
+        const branches = deriveGhostBranches({ kind: "person", id: "a" }, index);
+        const childBranches = branches.filter((b) => b.kind === "child");
+        expect(childBranches).toHaveLength(2);
+        const familyIds = childBranches.map((b) => b.existingFamilyId);
+        expect(familyIds).toContain("fAB");
+        expect(familyIds).toContain("fAC");
+        // all child branches use existingFamilyId (no ghost family)
+        for (const b of childBranches) {
+            expect(b.familyId).toBeNull();
+        }
+    });
+
+    it("assigns distinct ghost-person DOM ids for each child branch", () => {
+        const multiStemma: Stemma = {
+            type: "Stemma",
+            people: [
+                { type: "PersonDescription", id: "a", name: "A", readOnly: false },
+                { type: "PersonDescription", id: "b", name: "B", readOnly: false },
+                { type: "PersonDescription", id: "c", name: "C", readOnly: false },
+            ],
+            families: [
+                { type: "FamilyDescription", id: "fAB", parents: ["a", "b"], children: [], readOnly: false },
+                { type: "FamilyDescription", id: "fAC", parents: ["a", "c"], children: [], readOnly: false },
+            ],
+        };
+        const index = new StemmaIndex(multiStemma);
+        const branches = deriveGhostBranches({ kind: "person", id: "a" }, index);
+        const personIds = branches.map((b) => b.personId);
+        const unique = new Set(personIds);
+        expect(unique.size).toBe(personIds.length);
+    });
+});
+
+describe("deriveGhostBranches — no spouse-family → fallback to new ghost family + ghost-child", () => {
+    it("child branch creates new ghost family when person has no spouse-families", () => {
+        const isolatedStemma: Stemma = {
+            type: "Stemma",
+            people: [{ type: "PersonDescription", id: "lone", name: "Lone", readOnly: false }],
+            families: [],
+        };
+        const index = new StemmaIndex(isolatedStemma);
+        const branches = deriveGhostBranches({ kind: "person", id: "lone" }, index);
+        const child = branches.find((b) => b.kind === "child")!;
+        expect(child.familyId).not.toBeNull();
+        expect(child.existingFamilyId).toBeUndefined();
     });
 });
 
