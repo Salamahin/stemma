@@ -1,12 +1,13 @@
 <script lang="ts">
     import * as d3 from "d3";
     import { normalizeId } from "../../graphTools";
-    import { personR, familyR, labelFontSize } from "../../graphStyles";
+    import { personR, familyR, labelFontSize, familyRelationWidth, childRelationWidth, arrowPath } from "../../graphStyles";
     import { t } from "../../i18n";
     import type { StemmaIndex } from "../../stemmaIndex";
     import type { FocusedId } from "../focusGesture";
     import { deriveGhostBranches, immediateNeighborIds, type GhostKind } from "../ghostHelpers";
     import { nodeCenter } from "../v3DomGeometry";
+    import { trimToCircle } from "../ghostEdgeGeometry";
 
     type Props = {
         focusedId: FocusedId | null;
@@ -19,6 +20,37 @@
     let { focusedId, stemmaIndex, stemmaChartReady, onghostClick, onpositionsChange }: Props = $props();
 
     const SVG_NS = "http://www.w3.org/2000/svg";
+    const GHOST_COLOR = "#6c757d";
+    const GHOST_ARROW_TO_FAMILY_ID = "v3-ghost-arrow-to-family";
+    const GHOST_ARROW_TO_PERSON_ID = "v3-ghost-arrow-to-person";
+
+    function ensureGhostMarkers(svgEl: SVGSVGElement): void {
+        if (svgEl.querySelector(`#${GHOST_ARROW_TO_FAMILY_ID}`)) return;
+        let defs = svgEl.querySelector("defs");
+        if (!defs) {
+            defs = document.createElementNS(SVG_NS, "defs") as SVGDefsElement;
+            svgEl.insertBefore(defs, svgEl.firstChild);
+        }
+        for (const { id, refX } of [
+            { id: GHOST_ARROW_TO_FAMILY_ID, refX: 10 },
+            { id: GHOST_ARROW_TO_PERSON_ID, refX: 10 },
+        ]) {
+            const marker = document.createElementNS(SVG_NS, "marker") as SVGMarkerElement;
+            marker.setAttribute("id", id);
+            marker.setAttribute("viewBox", "0 0 10 6");
+            marker.setAttribute("refX", String(refX));
+            marker.setAttribute("refY", "3");
+            marker.setAttribute("markerWidth", "10");
+            marker.setAttribute("markerHeight", "6");
+            marker.setAttribute("markerUnits", "userSpaceOnUse");
+            marker.setAttribute("orient", "auto");
+            const path = document.createElementNS(SVG_NS, "path") as SVGPathElement;
+            path.setAttribute("d", arrowPath);
+            path.style.fill = GHOST_COLOR;
+            marker.appendChild(path);
+            defs.appendChild(marker);
+        }
+    }
 
     // Tracks ghost DOM elements that are currently fading out so they can be
     // removed after the CSS transition completes even when a new focus takes
@@ -50,6 +82,7 @@
         const svgEl = document.getElementById("chart") as unknown as SVGSVGElement | null;
         const mainG = svgEl?.querySelector("g.main") as SVGGElement | null;
         if (!svgEl || !mainG) return;
+        ensureGhostMarkers(svgEl);
 
         // Snapshot every real node position before any freeze decision.
         type Snapshot = { x: number; y: number };
@@ -128,6 +161,8 @@
 
         const allGhostEls: Element[] = [];
 
+        type EdgeKind = "focusToFamily" | "familyToPerson" | "focusToPerson";
+
         type BranchSimEntry = {
             familySimNode: SimNode | null;
             personSimNode: SimNode;
@@ -139,13 +174,20 @@
         };
         const branchEntries: BranchSimEntry[] = [];
 
-        const makeLine = (x1: number, y1: number, x2: number, y2: number): SVGLineElement => {
+        const makeLine = (x1: number, y1: number, x2: number, y2: number, edgeKind: EdgeKind): SVGLineElement => {
             const line = document.createElementNS(SVG_NS, "line") as SVGLineElement;
             line.setAttribute("class", "v3-ghost-edge");
             line.setAttribute("x1", String(x1));
             line.setAttribute("y1", String(y1));
             line.setAttribute("x2", String(x2));
             line.setAttribute("y2", String(y2));
+            if (edgeKind === "focusToFamily") {
+                line.setAttribute("stroke-width", familyRelationWidth);
+                line.setAttribute("marker-end", `url(#${GHOST_ARROW_TO_FAMILY_ID})`);
+            } else {
+                line.setAttribute("stroke-width", childRelationWidth);
+                line.setAttribute("marker-end", `url(#${GHOST_ARROW_TO_PERSON_ID})`);
+            }
             line.style.opacity = "0";
             mainG.appendChild(line);
             allGhostEls.push(line);
@@ -205,9 +247,9 @@
                 const familySeedY = origin ? origin.y + branch.familyDy : branch.familyDy;
 
                 const edgeFocusToFamily = origin
-                    ? makeLine(origin.x, origin.y, familySeedX, familySeedY)
+                    ? makeLine(origin.x, origin.y, familySeedX, familySeedY, "focusToFamily")
                     : null;
-                const edgeFamilyToPerson = makeLine(familySeedX, familySeedY, personSeedX, personSeedY);
+                const edgeFamilyToPerson = makeLine(familySeedX, familySeedY, personSeedX, personSeedY, "familyToPerson");
 
                 const familyEl = makeGhostFamilyEl(branch.familyId, familySeedX, familySeedY);
                 const personEl = makeGhostPersonEl(branch.personId, personSeedX, personSeedY, branch.labelKey);
@@ -246,7 +288,7 @@
                 });
             } else {
                 const edgeFocusToPerson = origin
-                    ? makeLine(origin.x, origin.y, personSeedX, personSeedY)
+                    ? makeLine(origin.x, origin.y, personSeedX, personSeedY, "focusToPerson")
                     : null;
                 const personEl = makeGhostPersonEl(branch.personId, personSeedX, personSeedY, branch.labelKey);
 
@@ -345,18 +387,22 @@
                     familyEl.setAttribute("transform", `translate(${familySimNode.x},${familySimNode.y})`);
                     nextPositions.push({ x: familySimNode.x, y: familySimNode.y });
                     if (edgeFocusToFamily && origin) {
-                        edgeFocusToFamily.setAttribute("x2", String(familySimNode.x));
-                        edgeFocusToFamily.setAttribute("y2", String(familySimNode.y));
+                        const trimmed = trimToCircle(origin.x, origin.y, familySimNode.x, familySimNode.y, familyR);
+                        edgeFocusToFamily.setAttribute("x2", String(trimmed.x));
+                        edgeFocusToFamily.setAttribute("y2", String(trimmed.y));
                     }
                     if (edgeFamilyToPerson) {
-                        edgeFamilyToPerson.setAttribute("x1", String(familySimNode.x));
-                        edgeFamilyToPerson.setAttribute("y1", String(familySimNode.y));
-                        edgeFamilyToPerson.setAttribute("x2", String(personSimNode.x));
-                        edgeFamilyToPerson.setAttribute("y2", String(personSimNode.y));
+                        const trimmedStart = trimToCircle(personSimNode.x, personSimNode.y, familySimNode.x, familySimNode.y, familyR);
+                        const trimmedEnd = trimToCircle(familySimNode.x, familySimNode.y, personSimNode.x, personSimNode.y, personR);
+                        edgeFamilyToPerson.setAttribute("x1", String(trimmedStart.x));
+                        edgeFamilyToPerson.setAttribute("y1", String(trimmedStart.y));
+                        edgeFamilyToPerson.setAttribute("x2", String(trimmedEnd.x));
+                        edgeFamilyToPerson.setAttribute("y2", String(trimmedEnd.y));
                     }
                 } else if (edgeFocusToFamily && origin) {
-                    edgeFocusToFamily.setAttribute("x2", String(personSimNode.x));
-                    edgeFocusToFamily.setAttribute("y2", String(personSimNode.y));
+                    const trimmed = trimToCircle(origin.x, origin.y, personSimNode.x, personSimNode.y, personR);
+                    edgeFocusToFamily.setAttribute("x2", String(trimmed.x));
+                    edgeFocusToFamily.setAttribute("y2", String(trimmed.y));
                 }
             }
             if (!positionsEqual(nextPositions, lastPositions)) {
@@ -423,7 +469,6 @@
 
     :global(line.v3-ghost-edge) {
         stroke: #6c757d;
-        stroke-width: 1px;
         stroke-dasharray: 4 3;
         opacity: 0.5;
         pointer-events: none;
