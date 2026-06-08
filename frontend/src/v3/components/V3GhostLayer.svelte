@@ -1,0 +1,447 @@
+<script lang="ts">
+    import * as d3 from "d3";
+    import { normalizeId } from "../../graphTools";
+    import { personR, familyR, labelFontSize } from "../../graphStyles";
+    import { t } from "../../i18n";
+    import type { StemmaIndex } from "../../stemmaIndex";
+    import type { FocusedId } from "../focusGesture";
+    import { deriveGhostBranches, immediateNeighborIds, type GhostKind } from "../ghostHelpers";
+    import { nodeCenter } from "../v3DomGeometry";
+
+    type Props = {
+        focusedId: FocusedId | null;
+        stemmaIndex: StemmaIndex | null;
+        stemmaChartReady: boolean;
+        onghostClick: (kind: GhostKind, focused: FocusedId, ghostPos: { x: number; y: number }) => void;
+        onpositionsChange: (positions: Array<{ x: number; y: number }>) => void;
+    };
+
+    let { focusedId, stemmaIndex, stemmaChartReady, onghostClick, onpositionsChange }: Props = $props();
+
+    const SVG_NS = "http://www.w3.org/2000/svg";
+
+    // Tracks ghost DOM elements that are currently fading out so they can be
+    // removed after the CSS transition completes even when a new focus takes
+    // over before the 200 ms window is up.
+    const GHOST_FADE_MS = 200;
+    let fadingOutGhostEls: Element[] = [];
+
+    function fadeOutAndRemove(els: Element[]): void {
+        if (els.length === 0) return;
+        for (const el of els) {
+            (el as HTMLElement | SVGElement).style.opacity = "0";
+        }
+        fadingOutGhostEls = [...fadingOutGhostEls, ...els];
+        setTimeout(() => {
+            for (const el of els) {
+                el.parentNode?.removeChild(el);
+            }
+            fadingOutGhostEls = fadingOutGhostEls.filter((e) => !els.includes(e));
+        }, GHOST_FADE_MS);
+    }
+
+    $effect(() => {
+        // Read stemmaChartReady first so Svelte tracks it. Without this, the
+        // effect exits early on first mount before the SVG is in the DOM
+        // without ever reading focusedId/stemmaIndex, and those deps are never
+        // tracked — so a later mousemove that sets focusedId never re-triggers
+        // this effect.
+        if (!stemmaChartReady) return;
+        const svgEl = document.getElementById("chart") as unknown as SVGSVGElement | null;
+        const mainG = svgEl?.querySelector("g.main") as SVGGElement | null;
+        if (!svgEl || !mainG) return;
+
+        // Snapshot every real node position before any freeze decision.
+        type Snapshot = { x: number; y: number };
+        const positionSnapshot = new Map<string, Snapshot>();
+        d3.select("g.main").selectAll<SVGGElement, any>("g").each((d: any) => {
+            if (d && d.x != null && d.y != null) {
+                positionSnapshot.set(d.id, { x: d.x, y: d.y });
+            }
+        });
+
+        // Immediate neighbors of the focused node participate in the ghost sim
+        // unfrozen so ghosts can push them. All other real nodes are frozen.
+        // The focused node itself is always frozen.
+        const neighborDomIds: Set<string> =
+            focusedId && stemmaIndex
+                ? new Set(
+                      immediateNeighborIds(focusedId, stemmaIndex).map(({ kind, id }) =>
+                          normalizeId(kind, id),
+                      ),
+                  )
+                : new Set<string>();
+
+        const focusDomId = focusedId ? normalizeId(focusedId.kind, focusedId.id) : null;
+
+        // Freeze non-neighbor real nodes (including the focused node).
+        d3.select("g.main").selectAll<SVGGElement, any>("g").each((d: any) => {
+            if (d && d.x != null && d.y != null) {
+                if (!neighborDomIds.has(d.id)) {
+                    d.fx = d.x;
+                    d.fy = d.y;
+                }
+            }
+        });
+
+        if (!focusedId || !stemmaIndex) return;
+
+        const branches = deriveGhostBranches(focusedId, stemmaIndex);
+        if (branches.length === 0) return;
+
+        const focusEl = focusDomId
+            ? (mainG.querySelector(`#${CSS.escape(focusDomId)}`) as SVGGElement | null)
+            : null;
+        const origin = focusEl ? nodeCenter(focusEl) : null;
+
+        const labels = $t;
+
+        type SimNode = {
+            id: string;
+            x: number;
+            y: number;
+            fx?: number | null;
+            fy?: number | null;
+            seedX: number;
+            seedY: number;
+            isGhost: boolean;
+        };
+
+        const realSimNodes: SimNode[] = [];
+        const neighborDatumById = new Map<string, any>();
+        d3.select("g.main").selectAll<SVGGElement, any>("g").each((d: any) => {
+            if (d && d.x != null && d.y != null) {
+                const isNeighbor = neighborDomIds.has(d.id);
+                if (isNeighbor) neighborDatumById.set(d.id, d);
+                realSimNodes.push({
+                    id: d.id,
+                    x: d.x,
+                    y: d.y,
+                    fx: isNeighbor ? null : d.x,
+                    fy: isNeighbor ? null : d.y,
+                    seedX: d.x,
+                    seedY: d.y,
+                    isGhost: false,
+                });
+            }
+        });
+
+        const allGhostEls: Element[] = [];
+
+        type BranchSimEntry = {
+            familySimNode: SimNode | null;
+            personSimNode: SimNode;
+            familyEl: SVGGElement | null;
+            personEl: SVGGElement;
+            edgeFocusToFamily: SVGLineElement | null;
+            edgeFamilyToPerson: SVGLineElement | null;
+            kind: GhostKind;
+        };
+        const branchEntries: BranchSimEntry[] = [];
+
+        const makeLine = (x1: number, y1: number, x2: number, y2: number): SVGLineElement => {
+            const line = document.createElementNS(SVG_NS, "line") as SVGLineElement;
+            line.setAttribute("class", "v3-ghost-edge");
+            line.setAttribute("x1", String(x1));
+            line.setAttribute("y1", String(y1));
+            line.setAttribute("x2", String(x2));
+            line.setAttribute("y2", String(y2));
+            line.style.opacity = "0";
+            mainG.appendChild(line);
+            allGhostEls.push(line);
+            return line;
+        };
+
+        const makeGhostFamilyEl = (id: string, x: number, y: number): SVGGElement => {
+            const gEl = document.createElementNS(SVG_NS, "g") as SVGGElement;
+            gEl.setAttribute("id", id);
+            gEl.setAttribute("class", "v3-ghost-family");
+            gEl.setAttribute("transform", `translate(${x},${y})`);
+            gEl.style.opacity = "0";
+            gEl.style.pointerEvents = "none";
+
+            const circle = document.createElementNS(SVG_NS, "circle") as SVGCircleElement;
+            circle.setAttribute("r", String(familyR));
+            gEl.appendChild(circle);
+
+            mainG.appendChild(gEl);
+            allGhostEls.push(gEl);
+            return gEl;
+        };
+
+        const makeGhostPersonEl = (id: string, x: number, y: number, labelKey: string): SVGGElement => {
+            const gEl = document.createElementNS(SVG_NS, "g") as SVGGElement;
+            gEl.setAttribute("id", id);
+            gEl.setAttribute("class", "v3-ghost");
+            gEl.setAttribute("transform", `translate(${x},${y})`);
+            gEl.style.opacity = "0";
+
+            const circle = document.createElementNS(SVG_NS, "circle") as SVGCircleElement;
+            circle.setAttribute("r", String(personR));
+            gEl.appendChild(circle);
+
+            const labelEl = document.createElementNS(SVG_NS, "text") as SVGTextElement;
+            labelEl.setAttribute("class", "v3-ghost-label");
+            labelEl.setAttribute("dx", String(-personR));
+            labelEl.setAttribute("dy", "40");
+            labelEl.style.fontSize = labelFontSize;
+            labelEl.textContent = labels(labelKey);
+            gEl.appendChild(labelEl);
+
+            mainG.appendChild(gEl);
+            allGhostEls.push(gEl);
+            return gEl;
+        };
+
+        for (const branch of branches) {
+            const personSeedX = origin ? origin.x + branch.personDx : branch.personDx;
+            const personSeedY = origin ? origin.y + branch.personDy : branch.personDy;
+
+            const capturedFocusedId = focusedId;
+            const capturedKind = branch.kind;
+
+            if (branch.familyId !== null) {
+                const familySeedX = origin ? origin.x + branch.familyDx : branch.familyDx;
+                const familySeedY = origin ? origin.y + branch.familyDy : branch.familyDy;
+
+                const edgeFocusToFamily = origin
+                    ? makeLine(origin.x, origin.y, familySeedX, familySeedY)
+                    : null;
+                const edgeFamilyToPerson = makeLine(familySeedX, familySeedY, personSeedX, personSeedY);
+
+                const familyEl = makeGhostFamilyEl(branch.familyId, familySeedX, familySeedY);
+                const personEl = makeGhostPersonEl(branch.personId, personSeedX, personSeedY, branch.labelKey);
+
+                const familySimNode: SimNode = {
+                    id: branch.familyId,
+                    x: familySeedX,
+                    y: familySeedY,
+                    seedX: familySeedX,
+                    seedY: familySeedY,
+                    isGhost: true,
+                };
+                const personSimNode: SimNode = {
+                    id: branch.personId,
+                    x: personSeedX,
+                    y: personSeedY,
+                    seedX: personSeedX,
+                    seedY: personSeedY,
+                    isGhost: true,
+                };
+
+                branchEntries.push({
+                    familySimNode,
+                    personSimNode,
+                    familyEl,
+                    personEl,
+                    edgeFocusToFamily,
+                    edgeFamilyToPerson,
+                    kind: capturedKind,
+                });
+
+                personEl.addEventListener("pointerup", (e: PointerEvent) => {
+                    e.stopPropagation();
+                    const ghostPos = { x: personSimNode.x, y: personSimNode.y };
+                    onghostClick(capturedKind, capturedFocusedId, ghostPos);
+                });
+            } else {
+                const edgeFocusToPerson = origin
+                    ? makeLine(origin.x, origin.y, personSeedX, personSeedY)
+                    : null;
+                const personEl = makeGhostPersonEl(branch.personId, personSeedX, personSeedY, branch.labelKey);
+
+                const personSimNode: SimNode = {
+                    id: branch.personId,
+                    x: personSeedX,
+                    y: personSeedY,
+                    seedX: personSeedX,
+                    seedY: personSeedY,
+                    isGhost: true,
+                };
+
+                branchEntries.push({
+                    familySimNode: null,
+                    personSimNode,
+                    familyEl: null,
+                    personEl,
+                    edgeFocusToFamily: edgeFocusToPerson,
+                    edgeFamilyToPerson: null,
+                    kind: capturedKind,
+                });
+
+                personEl.addEventListener("pointerup", (e: PointerEvent) => {
+                    e.stopPropagation();
+                    const ghostPos = { x: personSimNode.x, y: personSimNode.y };
+                    onghostClick(capturedKind, capturedFocusedId, ghostPos);
+                });
+            }
+        }
+
+        // Trigger fade-in: after the browser has painted the initial opacity:0
+        // state, remove the inline style so the CSS rule (opacity: 0.6) applies
+        // via the CSS transition.
+        let fadeInCancelled = false;
+        requestAnimationFrame(() => {
+            if (fadeInCancelled) return;
+            for (const el of allGhostEls) {
+                (el as SVGElement).style.opacity = "";
+            }
+        });
+
+        const GHOST_RADIUS = 32;
+        const ghostSimNodes = branchEntries.flatMap((e) =>
+            e.familySimNode ? [e.familySimNode, e.personSimNode] : [e.personSimNode],
+        );
+        const allSimNodes = [...realSimNodes, ...ghostSimNodes];
+
+        const ghostSim = d3
+            .forceSimulation<SimNode>(allSimNodes)
+            .force("collide", d3.forceCollide<SimNode>().radius(GHOST_RADIUS).strength(0.8))
+            .force("seedX", d3.forceX<SimNode>((n) => n.seedX).strength((n) => (n.isGhost ? 0.15 : 0)))
+            .force("seedY", d3.forceY<SimNode>((n) => n.seedY).strength((n) => (n.isGhost ? 0.15 : 0)))
+            .alphaDecay(0.02)
+            .velocityDecay(0.6);
+
+        const neighborSimNodeById = new Map<string, SimNode>();
+        for (const n of realSimNodes) {
+            if (neighborDomIds.has(n.id)) {
+                neighborSimNodeById.set(n.id, n);
+            }
+        }
+
+        let lastPositions: Array<{ x: number; y: number }> = [];
+        const positionsEqual = (
+            a: Array<{ x: number; y: number }>,
+            b: Array<{ x: number; y: number }>,
+        ): boolean => {
+            if (a.length !== b.length) return false;
+            for (let i = 0; i < a.length; i++) {
+                if (a[i].x !== b[i].x || a[i].y !== b[i].y) return false;
+            }
+            return true;
+        };
+
+        ghostSim.on("tick", () => {
+            for (const [domId, simNode] of neighborSimNodeById) {
+                const gEl = mainG.querySelector(`#${CSS.escape(domId)}`) as SVGGElement | null;
+                if (gEl) {
+                    gEl.setAttribute("transform", `translate(${simNode.x},${simNode.y})`);
+                }
+                const datum = neighborDatumById.get(domId);
+                if (datum) {
+                    datum.x = simNode.x;
+                    datum.y = simNode.y;
+                }
+            }
+
+            const nextPositions: Array<{ x: number; y: number }> = [];
+            for (const entry of branchEntries) {
+                const { familySimNode, personSimNode, familyEl, personEl, edgeFocusToFamily, edgeFamilyToPerson } = entry;
+
+                personEl.setAttribute("transform", `translate(${personSimNode.x},${personSimNode.y})`);
+                nextPositions.push({ x: personSimNode.x, y: personSimNode.y });
+
+                if (familySimNode && familyEl) {
+                    familyEl.setAttribute("transform", `translate(${familySimNode.x},${familySimNode.y})`);
+                    nextPositions.push({ x: familySimNode.x, y: familySimNode.y });
+                    if (edgeFocusToFamily && origin) {
+                        edgeFocusToFamily.setAttribute("x2", String(familySimNode.x));
+                        edgeFocusToFamily.setAttribute("y2", String(familySimNode.y));
+                    }
+                    if (edgeFamilyToPerson) {
+                        edgeFamilyToPerson.setAttribute("x1", String(familySimNode.x));
+                        edgeFamilyToPerson.setAttribute("y1", String(familySimNode.y));
+                        edgeFamilyToPerson.setAttribute("x2", String(personSimNode.x));
+                        edgeFamilyToPerson.setAttribute("y2", String(personSimNode.y));
+                    }
+                } else if (edgeFocusToFamily && origin) {
+                    edgeFocusToFamily.setAttribute("x2", String(personSimNode.x));
+                    edgeFocusToFamily.setAttribute("y2", String(personSimNode.y));
+                }
+            }
+            if (!positionsEqual(nextPositions, lastPositions)) {
+                lastPositions = nextPositions;
+                onpositionsChange(nextPositions);
+            }
+        });
+
+        return () => {
+            fadeInCancelled = true;
+            ghostSim.stop();
+            onpositionsChange([]);
+            fadeOutAndRemove(allGhostEls);
+
+            // Snap freed neighbors back to their pre-focus positions then
+            // release them so the main sim can resume.
+            const SNAP_BACK_MS = 250;
+            d3.select("g.main").selectAll<SVGGElement, any>("g").each((d: any) => {
+                if (!d) return;
+                const snap = positionSnapshot.get(d.id);
+                if (neighborDomIds.has(d.id) && snap) {
+                    d.fx = snap.x;
+                    d.fy = snap.y;
+                    const gEl = mainG.querySelector(`#${CSS.escape(d.id)}`) as SVGGElement | null;
+                    if (gEl) {
+                        gEl.style.transition = `transform ${SNAP_BACK_MS}ms ease-out`;
+                        gEl.setAttribute("transform", `translate(${snap.x},${snap.y})`);
+                    }
+                    setTimeout(() => {
+                        d.x = snap.x;
+                        d.y = snap.y;
+                        d.fx = null;
+                        d.fy = null;
+                        if (gEl) gEl.style.transition = "";
+                    }, SNAP_BACK_MS);
+                } else {
+                    d.fx = null;
+                    d.fy = null;
+                }
+            });
+        };
+    });
+</script>
+
+<style>
+    :global(g.v3-ghost) {
+        opacity: 0.6;
+        cursor: default;
+        transition: opacity 200ms ease;
+    }
+
+    :global(g.v3-ghost > circle) {
+        fill: none;
+        stroke: #6c757d;
+        stroke-width: 1.5px;
+        stroke-dasharray: 5 3;
+        pointer-events: none;
+    }
+
+    :global(g.v3-ghost .v3-ghost-label) {
+        fill: #6c757d;
+        pointer-events: none;
+    }
+
+    :global(line.v3-ghost-edge) {
+        stroke: #6c757d;
+        stroke-width: 1px;
+        stroke-dasharray: 4 3;
+        opacity: 0.5;
+        pointer-events: none;
+        transition: opacity 200ms ease;
+    }
+
+    :global(g.v3-ghost-family) {
+        opacity: 0.5;
+        cursor: default;
+        transition: opacity 200ms ease;
+        pointer-events: none;
+    }
+
+    :global(g.v3-ghost-family > circle) {
+        fill: none;
+        stroke: #6c757d;
+        stroke-width: 1.5px;
+        stroke-dasharray: 5 3;
+        pointer-events: none;
+    }
+</style>
