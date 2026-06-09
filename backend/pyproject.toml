@@ -10,6 +10,7 @@ dependencies = [
     "cryptography>=43",
     "google-auth>=2.35",
     "python-dateutil>=2.9",
+    "requests>=2.32",
 ]
 
 [dependency-groups]

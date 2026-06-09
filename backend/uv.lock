@@ -848,6 +848,7 @@ dependencies = [
     { name = "google-auth" },
     { name = "pydantic" },
     { name = "python-dateutil" },
+    { name = "requests" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -870,6 +871,7 @@ requires-dist = [
     { name = "google-auth", specifier = ">=2.35" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "python-dateutil", specifier = ">=2.9" },
+    { name = "requests", specifier = ">=2.32" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
 
