@@ -1,6 +1,7 @@
 import {
     deriveGhostLayout,
     existingFamilyRef,
+    immediateNeighborIds,
     realFamilyIdFromRef,
     FOCUSED_FAMILY_REF,
     EXISTING_FAMILY_PREFIX,
@@ -149,6 +150,52 @@ describe("deriveGhostLayout — focused family", () => {
         expect(layout.persons[0].role).toBe("child");
         expect(layout.persons[0].dy).toBeGreaterThan(0);
         expect(layout.anchorEdges).toHaveLength(0);
+    });
+});
+
+describe("immediateNeighborIds — skip pending entities", () => {
+    it("excludes a pending family from the focused person's neighbor list", () => {
+        const stemma: Stemma = {
+            type: "Stemma",
+            people: [{ type: "PersonDescription", id: "lone", name: "Lone", readOnly: false }],
+            families: [
+                {
+                    type: "FamilyDescription",
+                    id: "pending-family-abc",
+                    parents: ["lone"],
+                    children: [],
+                    readOnly: true,
+                },
+            ],
+        };
+        const index = new StemmaIndex(stemma);
+        const refs = immediateNeighborIds({ kind: "person", id: "lone" }, index);
+        expect(refs.find((r) => r.id === "pending-family-abc")).toBeUndefined();
+    });
+
+    it("still includes real neighbors alongside a pending family", () => {
+        const stemma: Stemma = {
+            type: "Stemma",
+            people: [
+                { type: "PersonDescription", id: "p1", name: "Alice", readOnly: false },
+                { type: "PersonDescription", id: "p2", name: "Bob", readOnly: false },
+            ],
+            families: [
+                { type: "FamilyDescription", id: "fReal", parents: ["p1", "p2"], children: [], readOnly: false },
+                {
+                    type: "FamilyDescription",
+                    id: "pending-family-xyz",
+                    parents: ["p1"],
+                    children: [],
+                    readOnly: true,
+                },
+            ],
+        };
+        const index = new StemmaIndex(stemma);
+        const refs = immediateNeighborIds({ kind: "person", id: "p1" }, index);
+        expect(refs.some((r) => r.id === "fReal")).toBe(true);
+        expect(refs.some((r) => r.id === "p2")).toBe(true);
+        expect(refs.some((r) => r.id === "pending-family-xyz")).toBe(false);
     });
 });
 
