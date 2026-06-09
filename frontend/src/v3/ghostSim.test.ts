@@ -1,48 +1,13 @@
 import {
-    GHOST_SIM_ALPHA_DECAY,
-    GHOST_SIM_CENTER_STRENGTH,
-    GHOST_SIM_CHARGE_STRENGTH,
-    GHOST_SIM_COLLIDE_RADIUS,
-    GHOST_SIM_LINK_DISTANCE,
-    GHOST_SIM_LINK_STRENGTH,
-    GHOST_SIM_VELOCITY_DECAY,
-    buildGhostSimGraph,
-    configureGhostSim,
+    GHOST_NODE_COLLIDE_R,
+    buildGhostInjection,
     ghostSimNeighborDomIds,
+    type GhostAnchors,
 } from "./ghostSim";
-import { deriveGhostLayout } from "./ghostHelpers";
+import { deriveGhostLayout, FOCUSED_FAMILY_REF } from "./ghostHelpers";
 import type { Stemma } from "../model";
 import { StemmaIndex } from "../stemmaIndex";
 import { normalizeId } from "../graphTools";
-
-describe("ghost sim tuning constants", () => {
-    it("decay constants are heavier than the main edit-off sim defaults", () => {
-        // d3 defaults: alphaDecay ≈ 0.0228, velocityDecay = 0.4. Main edit-off
-        // sim uses velocityDecay 0.8. Ghost must be strictly heavier so it
-        // settles inside the 300–500 ms target.
-        expect(GHOST_SIM_ALPHA_DECAY).toBeGreaterThan(0.1);
-        expect(GHOST_SIM_VELOCITY_DECAY).toBeGreaterThanOrEqual(0.8);
-    });
-
-    it("link force is attractive, charge force is repulsive", () => {
-        expect(GHOST_SIM_LINK_DISTANCE).toBeGreaterThan(0);
-        expect(GHOST_SIM_LINK_STRENGTH).toBeGreaterThan(0);
-        expect(GHOST_SIM_CHARGE_STRENGTH).toBeLessThan(0);
-    });
-
-    it("centring and collide are positive", () => {
-        expect(GHOST_SIM_CENTER_STRENGTH).toBeGreaterThan(0);
-        expect(GHOST_SIM_COLLIDE_RADIUS).toBeGreaterThan(0);
-    });
-});
-
-function isolatedStemma(): Stemma {
-    return {
-        type: "Stemma",
-        people: [{ type: "PersonDescription", id: "lone", name: "Lone", readOnly: false }],
-        families: [],
-    };
-}
 
 function familyStemma(): Stemma {
     return {
@@ -59,66 +24,97 @@ function familyStemma(): Stemma {
     };
 }
 
-describe("buildGhostSimGraph — neighbour selection", () => {
-    it("includes focused, 1-hop neighbours, and ghosts; excludes non-neighbour real nodes", () => {
+function anchorsFromLayout(focusedId: { kind: "person" | "family"; id: string }, layout: ReturnType<typeof deriveGhostLayout>, origin = { x: 0, y: 0 }): GhostAnchors {
+    const familyAnchorByRef = new Map<string, { x: number; y: number }>();
+    for (const f of layout.families) familyAnchorByRef.set(f.id, { x: origin.x + f.dx, y: origin.y + f.dy });
+    if (focusedId.kind === "family") familyAnchorByRef.set(FOCUSED_FAMILY_REF, origin);
+    const personPositionById = new Map<string, { x: number; y: number }>();
+    for (const p of layout.persons) {
+        const base = familyAnchorByRef.get(p.familyId) ?? origin;
+        personPositionById.set(p.id, { x: base.x + p.dx, y: base.y + p.dy });
+    }
+    return { origin, familyAnchorByRef, personPositionById };
+}
+
+describe("buildGhostInjection", () => {
+    it("emits ghost-family + ghost-person extras for a focused isolated person", () => {
+        const stemma: Stemma = {
+            type: "Stemma",
+            people: [{ type: "PersonDescription", id: "lone", name: "Lone", readOnly: false }],
+            families: [],
+        };
+        const index = new StemmaIndex(stemma);
+        const focused = { kind: "person" as const, id: "lone" };
+        const layout = deriveGhostLayout(focused, index);
+        const injection = buildGhostInjection(focused, layout, anchorsFromLayout(focused, layout));
+
+        const nodeIds = new Set(injection.extraNodes.map((n) => n.id));
+        expect(nodeIds.has("ghost-family-east")).toBe(true);
+        expect(nodeIds.has("ghost-family-parent")).toBe(true);
+        expect(nodeIds.has("ghost-person-spouse")).toBe(true);
+        expect(nodeIds.has("ghost-person-child")).toBe(true);
+        expect(nodeIds.has("ghost-person-parent")).toBe(true);
+
+        for (const n of injection.extraNodes) {
+            expect(n.r).toBe(GHOST_NODE_COLLIDE_R);
+            expect(n.type === "ghost-family" || n.type === "ghost-person").toBe(true);
+        }
+    });
+
+    it("focused-family case yields only the ghost-child person and links it to the focused dom-id", () => {
         const index = new StemmaIndex(familyStemma());
         const focused = { kind: "family" as const, id: "f1" };
         const layout = deriveGhostLayout(focused, index);
-        const neighborIds = ghostSimNeighborDomIds(focused, index);
-        const seed = {
-            origin: { x: 0, y: 0 },
-            neighborPositions: new Map([...neighborIds].map((id) => [id, { x: 0, y: 0 }])),
-            ghostPositions: new Map(
-                layout.persons.map((p) => [p.id, { x: p.dx, y: p.dy }]),
-            ),
+        const injection = buildGhostInjection(focused, layout, anchorsFromLayout(focused, layout));
+
+        expect(injection.extraNodes.map((n) => n.id)).toEqual(["ghost-person-child"]);
+        const famDom = normalizeId("family", "f1");
+        const hasLink = (a: string, b: string) =>
+            injection.extraLinks.some((l) => l.source === a && l.target === b);
+        expect(hasLink(famDom, "ghost-person-child")).toBe(true);
+    });
+
+    it("anchorEdges emit focusToFamily and familyToPerson links with correct direction", () => {
+        const stemma: Stemma = {
+            type: "Stemma",
+            people: [{ type: "PersonDescription", id: "lone", name: "Lone", readOnly: false }],
+            families: [],
         };
-        const graph = buildGhostSimGraph(focused, index, layout, seed);
-        const ids = new Set(graph.nodes.map((n) => n.id));
-        expect(ids.has(normalizeId("family", "f1"))).toBe(true);
+        const index = new StemmaIndex(stemma);
+        const focused = { kind: "person" as const, id: "lone" };
+        const layout = deriveGhostLayout(focused, index);
+        const injection = buildGhostInjection(focused, layout, anchorsFromLayout(focused, layout));
+
+        const personDom = normalizeId("person", "lone");
+        const east = injection.extraLinks.find((l) => l.source === personDom && l.target === "ghost-family-east");
+        expect(east?.edgeKind).toBe("focusToFamily");
+
+        const parent = injection.extraLinks.find((l) => l.source === "ghost-family-parent" && l.target === personDom);
+        expect(parent?.edgeKind).toBe("familyToPerson");
+    });
+
+    it("ghost-person anchorSimId resolves the focused-family ref to the focused dom-id", () => {
+        const index = new StemmaIndex(familyStemma());
+        const focused = { kind: "family" as const, id: "f1" };
+        const layout = deriveGhostLayout(focused, index);
+        const injection = buildGhostInjection(focused, layout, anchorsFromLayout(focused, layout));
+        const child = injection.extraNodes.find((n) => n.id === "ghost-person-child")!;
+        expect(child.anchorSimId).toBe(normalizeId("family", "f1"));
+    });
+});
+
+describe("ghostSimNeighborDomIds", () => {
+    it("returns 1-hop neighbour dom-ids of a focused family", () => {
+        const index = new StemmaIndex(familyStemma());
+        const focused = { kind: "family" as const, id: "f1" };
+        const ids = ghostSimNeighborDomIds(focused, index);
         expect(ids.has(normalizeId("person", "p1"))).toBe(true);
         expect(ids.has(normalizeId("person", "p2"))).toBe(true);
         expect(ids.has(normalizeId("person", "p3"))).toBe(true);
         expect(ids.has(normalizeId("person", "p4"))).toBe(false);
-        expect(ids.has("ghost-person-child")).toBe(true);
     });
 
-    it("pins focused node at origin (fx/fy set)", () => {
-        const index = new StemmaIndex(familyStemma());
-        const focused = { kind: "family" as const, id: "f1" };
-        const layout = deriveGhostLayout(focused, index);
-        const seed = {
-            origin: { x: 100, y: 200 },
-            neighborPositions: new Map(),
-            ghostPositions: new Map(layout.persons.map((p) => [p.id, { x: 100 + p.dx, y: 200 + p.dy }])),
-        };
-        const graph = buildGhostSimGraph(focused, index, layout, seed);
-        const focusedNode = graph.nodes.find((n) => n.id === normalizeId("family", "f1"))!;
-        expect(focusedNode.fx).toBe(100);
-        expect(focusedNode.fy).toBe(200);
-        expect(focusedNode.isGhost).toBe(false);
-    });
-
-    it("ghost nodes are unfrozen (no fx/fy)", () => {
-        const index = new StemmaIndex(isolatedStemma());
-        const focused = { kind: "person" as const, id: "lone" };
-        const layout = deriveGhostLayout(focused, index);
-        const seed = {
-            origin: { x: 0, y: 0 },
-            neighborPositions: new Map(),
-            ghostPositions: new Map([
-                ...layout.families.map((f) => [f.id, { x: f.dx, y: f.dy }] as const),
-                ...layout.persons.map((p) => [p.id, { x: p.dx, y: p.dy }] as const),
-            ]),
-        };
-        const graph = buildGhostSimGraph(focused, index, layout, seed);
-        for (const n of graph.nodes) {
-            if (!n.isGhost) continue;
-            expect(n.fx == null).toBe(true);
-            expect(n.fy == null).toBe(true);
-        }
-    });
-
-    it("excludes pending entities from the neighbour set", () => {
+    it("excludes pending entities", () => {
         const stemma: Stemma = {
             type: "Stemma",
             people: [
@@ -142,124 +138,5 @@ describe("buildGhostSimGraph — neighbour selection", () => {
         expect(ids.has(normalizeId("family", "pending-family-xyz"))).toBe(false);
         expect(ids.has(normalizeId("family", "fReal"))).toBe(true);
         expect(ids.has(normalizeId("person", "p2"))).toBe(true);
-    });
-
-    it("builds real-family links among focused + neighbours", () => {
-        const index = new StemmaIndex(familyStemma());
-        const focused = { kind: "family" as const, id: "f1" };
-        const layout = deriveGhostLayout(focused, index);
-        const neighborIds = ghostSimNeighborDomIds(focused, index);
-        const seed = {
-            origin: { x: 0, y: 0 },
-            neighborPositions: new Map([...neighborIds].map((id) => [id, { x: 0, y: 0 }])),
-            ghostPositions: new Map(layout.persons.map((p) => [p.id, { x: p.dx, y: p.dy }])),
-        };
-        const graph = buildGhostSimGraph(focused, index, layout, seed);
-        const famDom = normalizeId("family", "f1");
-        const hasLink = (a: string, b: string) =>
-            graph.links.some((l) => l.source === a && l.target === b);
-        expect(hasLink(normalizeId("person", "p1"), famDom)).toBe(true);
-        expect(hasLink(normalizeId("person", "p2"), famDom)).toBe(true);
-        expect(hasLink(famDom, normalizeId("person", "p3"))).toBe(true);
-    });
-
-    it("links the focused-family ghost-child to the focused family", () => {
-        const index = new StemmaIndex(familyStemma());
-        const focused = { kind: "family" as const, id: "f1" };
-        const layout = deriveGhostLayout(focused, index);
-        const seed = {
-            origin: { x: 0, y: 0 },
-            neighborPositions: new Map(),
-            ghostPositions: new Map(layout.persons.map((p) => [p.id, { x: p.dx, y: p.dy }])),
-        };
-        const graph = buildGhostSimGraph(focused, index, layout, seed);
-        const famDom = normalizeId("family", "f1");
-        const hasLink = (a: string, b: string) =>
-            graph.links.some((l) => l.source === a && l.target === b);
-        expect(hasLink(famDom, "ghost-person-child")).toBe(true);
-    });
-});
-
-describe("configureGhostSim — runs to completion", () => {
-    it("settles below alphaMin within ~50 ticks", () => {
-        const index = new StemmaIndex(familyStemma());
-        const focused = { kind: "family" as const, id: "f1" };
-        const layout = deriveGhostLayout(focused, index);
-        const neighborIds = ghostSimNeighborDomIds(focused, index);
-        const seed = {
-            origin: { x: 0, y: 0 },
-            neighborPositions: new Map([...neighborIds].map((id, i) => [id, { x: i * 30, y: i * 10 }])),
-            ghostPositions: new Map(layout.persons.map((p) => [p.id, { x: p.dx, y: p.dy }])),
-        };
-        const graph = buildGhostSimGraph(focused, index, layout, seed);
-        const sim = configureGhostSim(graph, seed.origin);
-        sim.stop();
-        for (let i = 0; i < 50; i++) sim.tick();
-        expect(sim.alpha()).toBeLessThan(0.001);
-    });
-
-    it("keeps the focused node pinned at origin throughout the sim", () => {
-        const index = new StemmaIndex(familyStemma());
-        const focused = { kind: "family" as const, id: "f1" };
-        const layout = deriveGhostLayout(focused, index);
-        const neighborIds = ghostSimNeighborDomIds(focused, index);
-        const origin = { x: 50, y: 60 };
-        const seed = {
-            origin,
-            neighborPositions: new Map([...neighborIds].map((id, i) => [id, { x: i * 30, y: i * 10 }])),
-            ghostPositions: new Map(layout.persons.map((p) => [p.id, { x: p.dx, y: p.dy }])),
-        };
-        const graph = buildGhostSimGraph(focused, index, layout, seed);
-        const sim = configureGhostSim(graph, origin);
-        sim.stop();
-        for (let i = 0; i < 50; i++) sim.tick();
-        const focusedNode = graph.nodes.find((n) => n.id === normalizeId("family", "f1"))!;
-        expect(focusedNode.x).toBe(origin.x);
-        expect(focusedNode.y).toBe(origin.y);
-    });
-
-    it("spreads a real child and a ghost child so they end up well apart around the family", () => {
-        // AC: "With one real child + one ghost-child under a focused family,
-        // the two siblings end up at roughly opposite angles around the family."
-        // Single-parent family so the symmetry isn't biased by a second parent.
-        const stemma: Stemma = {
-            type: "Stemma",
-            people: [
-                { type: "PersonDescription", id: "p1", name: "Alice", readOnly: false },
-                { type: "PersonDescription", id: "p3", name: "Carol", readOnly: false },
-            ],
-            families: [
-                { type: "FamilyDescription", id: "f1", parents: ["p1"], children: ["p3"], readOnly: false },
-            ],
-        };
-        const index = new StemmaIndex(stemma);
-        const focused = { kind: "family" as const, id: "f1" };
-        const layout = deriveGhostLayout(focused, index);
-        const origin = { x: 0, y: 0 };
-        const childDom = normalizeId("person", "p3");
-        const seed = {
-            origin,
-            neighborPositions: new Map([
-                [normalizeId("person", "p1"), { x: 0, y: -100 }],
-                [childDom, { x: 60, y: 60 }],
-            ]),
-            ghostPositions: new Map(layout.persons.map((p) => [p.id, { x: p.dx, y: p.dy }])),
-        };
-        const graph = buildGhostSimGraph(focused, index, layout, seed);
-        const sim = configureGhostSim(graph, origin);
-        sim.stop();
-        for (let i = 0; i < 80; i++) sim.tick();
-        const realChild = graph.nodes.find((n) => n.id === childDom)!;
-        const ghostChild = graph.nodes.find((n) => n.id === "ghost-person-child")!;
-        // Siblings end up clearly separated so the user can click either
-        // without overlap. >1.5× collide-radius covers the practical case.
-        const sepDist = Math.hypot(realChild.x - ghostChild.x, realChild.y - ghostChild.y);
-        expect(sepDist).toBeGreaterThan(GHOST_SIM_COLLIDE_RADIUS * 1.5);
-        // And the angle between them around the family is wide (≥ 45°), so
-        // they sit on visibly different arcs around the family node.
-        const dot = realChild.x * ghostChild.x + realChild.y * ghostChild.y;
-        const magReal = Math.hypot(realChild.x, realChild.y);
-        const magGhost = Math.hypot(ghostChild.x, ghostChild.y);
-        expect(dot / (magReal * magGhost)).toBeLessThan(0.7);
     });
 });
