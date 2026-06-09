@@ -3,7 +3,7 @@
     import { arrowPath } from "../graphStyles";
     import { t } from "../i18n";
     import type { StemmaIndex } from "../stemmaIndex";
-    import { focusedIdFromG, isShortTap, type FocusedId } from "../focusGesture";
+    import { focusedIdFromG, isShortTap, TAP_MAX_MS, TAP_MAX_MOVE_PX, type FocusedId } from "../focusGesture";
     import {
         isPendingFamilyId,
         isPendingId,
@@ -46,6 +46,8 @@
             familyAt: { x: number; y: number },
         ) => void;
         onshortTapFocus: (f: FocusedId | null) => void;
+        onlongPress: (f: FocusedId) => void;
+        ondesktopNodeClick: (f: FocusedId) => void;
         onclearFocus: () => void;
         onclosePanMode: () => void;
         onspacePanChange: (v: boolean) => void;
@@ -63,6 +65,8 @@
         oncreatePersonInFamily,
         oncreatePendingFamily,
         onshortTapFocus,
+        onlongPress,
+        ondesktopNodeClick,
         onclearFocus,
         onclosePanMode,
         onspacePanChange,
@@ -204,6 +208,15 @@
             lastTarget: SVGGElement | null;
         } | null = null;
 
+        let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+
+        const cancelLongPress = () => {
+            if (longPressTimer !== null) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        };
+
         const clearTargetHighlight = () => {
             if (gesture?.lastTarget) gesture.lastTarget.classList.remove("drop-target");
         };
@@ -236,6 +249,7 @@
         };
 
         const cleanup = () => {
+            cancelLongPress();
             document.body.classList.remove("linking");
             if (!gesture) return;
             clearTargetHighlight();
@@ -336,6 +350,19 @@
             };
             document.body.classList.add("linking");
             e.preventDefault();
+
+            if (e.pointerType !== "mouse" && sourceGEl) {
+                const capturedG = sourceGEl;
+                longPressTimer = setTimeout(() => {
+                    longPressTimer = null;
+                    if (!gesture || gesture.active) return;
+                    const focused = focusedIdFromG(capturedG, isPendingId);
+                    if (focused) {
+                        cleanup();
+                        onlongPress(focused);
+                    }
+                }, TAP_MAX_MS);
+            }
         };
 
         const computeTipText = (overInfo: { ref: NodeRef } | null, source: SourceRef): string | null => {
@@ -426,9 +453,11 @@
             if (!gesture) return;
             const dx = e.clientX - gesture.startClientX;
             const dy = e.clientY - gesture.startClientY;
+            if (Math.hypot(dx, dy) > TAP_MAX_MOVE_PX) cancelLongPress();
             if (!gesture.active) {
                 if (Math.hypot(dx, dy) <= 6) return;
                 gesture.active = true;
+                cancelLongPress();
                 activeGestureSource = gesture.source;
                 const mainG = svgEl.querySelector("g.main") as SVGGElement | null;
                 if (mainG) {
@@ -487,12 +516,19 @@
             const overInfo = findNodeUnder(e.clientX, e.clientY);
             cleanup();
             if (!wasActive) {
-                if (e.pointerType !== "mouse" && isShortTap(elapsed, moved)) {
-                    if (sourceGEl) {
-                        onshortTapFocus(focusedIdFromG(sourceGEl, isPendingId));
-                    } else {
-                        onshortTapFocus(null);
+                if (e.pointerType !== "mouse") {
+                    if (isShortTap(elapsed, moved)) {
+                        if (sourceGEl) {
+                            onshortTapFocus(focusedIdFromG(sourceGEl, isPendingId));
+                        } else {
+                            onshortTapFocus(null);
+                        }
                     }
+                    return;
+                }
+                if (sourceGEl) {
+                    const focused = focusedIdFromG(sourceGEl, isPendingId);
+                    if (focused) ondesktopNodeClick(focused);
                 }
                 return;
             }
