@@ -1,4 +1,3 @@
-import * as d3 from "d3";
 import { normalizeId } from "../graphTools";
 import type { StemmaIndex } from "../stemmaIndex";
 import type { FocusedId } from "./focusGesture";
@@ -6,163 +5,153 @@ import {
     FOCUSED_FAMILY_REF,
     immediateNeighborIds,
     realFamilyIdFromRef,
+    type GhostKind,
     type GhostLayout,
 } from "./ghostHelpers";
 
 /**
- * Force tuning for the ghost-mode mini-simulation. The topology mirrors the
- * main edit-off chart (link + repulsion + centring) but the decays are heavy
- * so the system settles in well under a second: ~20 ticks (333 ms @ 60fps)
- * to alpha < 0.01, ~31 ticks (517 ms) to alphaMin (default 0.001).
+ * Collide-radius hints stored on the datums while a focus is active. The
+ * main sim's collide force is `radius((d) => d.r * 20)` and real datums
+ * carry no `r` by default, so unless we set one the collide pair (ghost,
+ * real) only counts the ghost side. Ghost r=4 (80 px) + neighbour r=1.5
+ * (30 px) ⇒ 110 px minimum separation — plenty for the rendered circle
+ * sizes plus padding.
  */
-export const GHOST_SIM_LINK_DISTANCE = 85;
-export const GHOST_SIM_LINK_STRENGTH = 2;
-export const GHOST_SIM_CHARGE_STRENGTH = -800;
-export const GHOST_SIM_CENTER_STRENGTH = 0.15;
-export const GHOST_SIM_VELOCITY_DECAY = 0.85;
-export const GHOST_SIM_ALPHA_DECAY = 0.2;
-export const GHOST_SIM_COLLIDE_RADIUS = 36;
+export const GHOST_NODE_COLLIDE_R = 4;
+export const GHOST_NEIGHBOUR_COLLIDE_R = 1.5;
 
-export type GhostSimNode = {
+export type GhostEdgeKind = "focusToFamily" | "familyToPerson";
+
+export type GhostExtraNode = {
     id: string;
+    type: "ghost-person" | "ghost-family";
+    /** Present for ghost-person nodes the user can click. */
+    kind?: GhostKind;
+    labelKey?: string;
+    /** dom-id of the family node the click should attach the new person to. */
+    anchorSimId?: string;
+    /** Real family id when this ghost extends an existing spouse-family. */
+    existingFamilyId?: string;
     x: number;
     y: number;
-    fx?: number | null;
-    fy?: number | null;
-    isGhost: boolean;
+    r: number;
 };
 
-export type GhostSimLink = { source: string; target: string };
+export type GhostExtraLink = {
+    id: string;
+    source: string;
+    target: string;
+    edgeKind: GhostEdgeKind;
+};
 
-export type GhostSimGraph = {
-    nodes: GhostSimNode[];
-    links: GhostSimLink[];
+export type GhostInjection = {
     focusedDomId: string;
+    extraNodes: GhostExtraNode[];
+    extraLinks: GhostExtraLink[];
 };
 
-export type GhostSimSeed = {
+export type GhostAnchors = {
     origin: { x: number; y: number };
-    /** dom-id (normalizeId) -> current position. Must already exclude pending entities and focused. */
-    neighborPositions: Map<string, { x: number; y: number }>;
-    /** ghost-id (raw layout id) -> seed position. */
-    ghostPositions: Map<string, { x: number; y: number }>;
+    /** familyId (ghost id, FOCUSED_FAMILY_REF, or existing:<realId>) → svg position. */
+    familyAnchorByRef: Map<string, { x: number; y: number }>;
+    /** ghost-person id → svg position. */
+    personPositionById: Map<string, { x: number; y: number }>;
 };
+
+export function resolveAnchorSimId(focusedDomId: string, familyRef: string): string {
+    if (familyRef === FOCUSED_FAMILY_REF) return focusedDomId;
+    const real = realFamilyIdFromRef(familyRef);
+    return real ? normalizeId("family", real) : familyRef;
+}
 
 /**
- * Build the (nodes, links) graph used by the ghost sim. Topology:
- *   - focused (pinned at origin)
- *   - every 1-hop real neighbour (unfrozen)
- *   - every ghost family + ghost person (unfrozen, seeded at plan position)
- * Links replicate the real spouse→family / family→child relations among the
- * focused-plus-neighbours subset, plus the ghost relations declared in
- * `layout.anchorEdges` and `layout.persons[*].familyId`.
+ * Build the extra nodes + links to inject into the main d3 simulation so
+ * that ghost circles participate in the same forces (link, charge, collide)
+ * as real nodes. The caller is responsible for unfreezing the 1-hop real
+ * neighbours and adding the extras to `simulation.nodes()` /
+ * `simulation.force("link").links()`.
  */
-export function buildGhostSimGraph(
+export function buildGhostInjection(
     focusedId: FocusedId,
-    stemmaIndex: StemmaIndex,
     layout: GhostLayout,
-    seed: GhostSimSeed,
-): GhostSimGraph {
+    anchors: GhostAnchors,
+): GhostInjection {
     const focusedDomId = normalizeId(focusedId.kind, focusedId.id);
-    const nodes: GhostSimNode[] = [];
-    const present = new Set<string>();
-
-    nodes.push({
-        id: focusedDomId,
-        x: seed.origin.x,
-        y: seed.origin.y,
-        fx: seed.origin.x,
-        fy: seed.origin.y,
-        isGhost: false,
-    });
-    present.add(focusedDomId);
-
-    for (const [domId, pos] of seed.neighborPositions) {
-        if (present.has(domId)) continue;
-        nodes.push({ id: domId, x: pos.x, y: pos.y, isGhost: false });
-        present.add(domId);
-    }
+    const extraNodes: GhostExtraNode[] = [];
+    const extraLinks: GhostExtraLink[] = [];
 
     for (const f of layout.families) {
-        const pos = seed.ghostPositions.get(f.id);
+        const pos = anchors.familyAnchorByRef.get(f.id);
         if (!pos) continue;
-        nodes.push({ id: f.id, x: pos.x, y: pos.y, isGhost: true });
-        present.add(f.id);
-    }
-    for (const p of layout.persons) {
-        const pos = seed.ghostPositions.get(p.id);
-        if (!pos) continue;
-        nodes.push({ id: p.id, x: pos.x, y: pos.y, isGhost: true });
-        present.add(p.id);
-    }
-
-    const links: GhostSimLink[] = [];
-    const addLink = (source: string, target: string) => {
-        if (!present.has(source) || !present.has(target)) return;
-        links.push({ source, target });
-    };
-
-    const familyIds: string[] = focusedId.kind === "person"
-        ? stemmaIndex.relatedFamilies(focusedId.id).map((f) => f.id)
-        : [focusedId.id];
-
-    const visited = new Set<string>();
-    for (const fid of familyIds) {
-        if (visited.has(fid)) continue;
-        visited.add(fid);
-        const fam = stemmaIndex.family(fid);
-        if (!fam) continue;
-        const famDom = normalizeId("family", fid);
-        for (const pid of fam.parents ?? []) addLink(normalizeId("person", pid), famDom);
-        for (const cid of fam.children ?? []) addLink(famDom, normalizeId("person", cid));
-    }
-
-    for (const e of layout.anchorEdges) {
-        if (e.focusedRole === "parent") addLink(focusedDomId, e.familyId);
-        else addLink(e.familyId, focusedDomId);
+        extraNodes.push({
+            id: f.id,
+            type: "ghost-family",
+            x: pos.x,
+            y: pos.y,
+            r: GHOST_NODE_COLLIDE_R,
+        });
     }
 
     for (const p of layout.persons) {
-        let famNode: string | null = null;
-        if (p.familyId === FOCUSED_FAMILY_REF) famNode = focusedDomId;
-        else if (realFamilyIdFromRef(p.familyId)) {
-            famNode = normalizeId("family", realFamilyIdFromRef(p.familyId)!);
+        const pos = anchors.personPositionById.get(p.id);
+        if (!pos) continue;
+        const existingFamilyId = realFamilyIdFromRef(p.familyId) ?? undefined;
+        extraNodes.push({
+            id: p.id,
+            type: "ghost-person",
+            kind: p.kind,
+            labelKey: p.labelKey,
+            anchorSimId: resolveAnchorSimId(focusedDomId, p.familyId),
+            existingFamilyId,
+            x: pos.x,
+            y: pos.y,
+            r: GHOST_NODE_COLLIDE_R,
+        });
+    }
+
+    for (const a of layout.anchorEdges) {
+        if (!anchors.familyAnchorByRef.has(a.familyId)) continue;
+        if (a.focusedRole === "parent") {
+            extraLinks.push({
+                id: `gl-${focusedDomId}-${a.familyId}`,
+                source: focusedDomId,
+                target: a.familyId,
+                edgeKind: "focusToFamily",
+            });
         } else {
-            famNode = p.familyId;
+            extraLinks.push({
+                id: `gl-${a.familyId}-${focusedDomId}`,
+                source: a.familyId,
+                target: focusedDomId,
+                edgeKind: "familyToPerson",
+            });
         }
-        if (p.role === "parent") addLink(p.id, famNode);
-        else addLink(famNode, p.id);
     }
 
-    return { nodes, links, focusedDomId };
+    for (const p of layout.persons) {
+        if (!anchors.personPositionById.has(p.id)) continue;
+        const anchorSimId = resolveAnchorSimId(focusedDomId, p.familyId);
+        if (p.role === "parent") {
+            extraLinks.push({
+                id: `gl-${p.id}-${anchorSimId}`,
+                source: p.id,
+                target: anchorSimId,
+                edgeKind: "focusToFamily",
+            });
+        } else {
+            extraLinks.push({
+                id: `gl-${anchorSimId}-${p.id}`,
+                source: anchorSimId,
+                target: p.id,
+                edgeKind: "familyToPerson",
+            });
+        }
+    }
+
+    return { focusedDomId, extraNodes, extraLinks };
 }
 
-export function configureGhostSim(
-    graph: GhostSimGraph,
-    origin: { x: number; y: number },
-): d3.Simulation<GhostSimNode, GhostSimLink> {
-    return d3
-        .forceSimulation<GhostSimNode>(graph.nodes)
-        .force(
-            "link",
-            d3
-                .forceLink<GhostSimNode, GhostSimLink>(graph.links)
-                .id((n) => n.id)
-                .distance(GHOST_SIM_LINK_DISTANCE)
-                .strength(GHOST_SIM_LINK_STRENGTH),
-        )
-        .force("charge", d3.forceManyBody<GhostSimNode>().strength(GHOST_SIM_CHARGE_STRENGTH))
-        .force("x", d3.forceX<GhostSimNode>(origin.x).strength(GHOST_SIM_CENTER_STRENGTH))
-        .force("y", d3.forceY<GhostSimNode>(origin.y).strength(GHOST_SIM_CENTER_STRENGTH))
-        .force(
-            "collide",
-            d3.forceCollide<GhostSimNode>().radius(GHOST_SIM_COLLIDE_RADIUS).strength(0.9),
-        )
-        .velocityDecay(GHOST_SIM_VELOCITY_DECAY)
-        .alphaDecay(GHOST_SIM_ALPHA_DECAY);
-}
-
-/** Convenience: dom-ids of the 1-hop real neighbours that should participate in the sim. */
+/** Convenience: dom-ids of the 1-hop real neighbours that should be unfrozen while focused. */
 export function ghostSimNeighborDomIds(
     focusedId: FocusedId,
     stemmaIndex: StemmaIndex,

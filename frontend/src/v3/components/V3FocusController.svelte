@@ -1,6 +1,7 @@
 <script lang="ts">
     import {
         FOCUS_RADIUS_SVG,
+        FOCUS_RADIUS_STICKY_SVG,
         GHOST_HOVER_RADIUS_SVG,
         MOUSE_LEAVE_DEBOUNCE_MS,
         nearestNodeWithinRadius,
@@ -43,7 +44,15 @@
             const mainG = svgEl.querySelector("g.main") as SVGGElement | null;
             if (!mainG) return;
             const svgPt = clientToSvgPoint(svgEl as unknown as SVGSVGElement, e.clientX, e.clientY);
-            const next = nearestNodeWithinRadius(mainG, svgPt.x, svgPt.y, FOCUS_RADIUS_SVG, isPendingId);
+            const next = nearestNodeWithinRadius(
+                mainG,
+                svgPt.x,
+                svgPt.y,
+                FOCUS_RADIUS_SVG,
+                isPendingId,
+                focusedId,
+                FOCUS_RADIUS_STICKY_SVG,
+            );
             if (!next) {
                 if (cursorNearGhost(ghostSimPositions, svgPt.x, svgPt.y, GHOST_HOVER_RADIUS_SVG)) {
                     cancelLeave();

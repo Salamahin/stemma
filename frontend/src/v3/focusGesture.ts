@@ -15,6 +15,13 @@ export const MOUSE_LEAVE_DEBOUNCE_MS = 150;
 export const TAP_MAX_MS = 500;
 export const TAP_MAX_MOVE_PX = 10;
 export const FOCUS_RADIUS_SVG = 150;
+/**
+ * Sticky radius for an already-focused node. The acquire boundary is
+ * FOCUS_RADIUS_SVG; once focus is acquired we hold it until the cursor leaves
+ * this larger radius. Hysteresis prevents focus from flickering on/off when
+ * the cursor sits right at the acquire boundary.
+ */
+export const FOCUS_RADIUS_STICKY_SVG = 220;
 
 /**
  * Hit radius for the "cursor still near a ghost" check that keeps the focused
@@ -90,37 +97,49 @@ export function focusedIdFromG(
 
 /**
  * Finds the nearest real (non-pending) person or family node whose center is
- * within `radiusSvg` SVG user-space units of `(cursorSvgX, cursorSvgY)`.
+ * within `acquireRadius` SVG user-space units of `(cursorSvgX, cursorSvgY)`.
  *
  * Each candidate <g> element must carry a d3 datum with `x` and `y` fields
  * (the same format d3-force populates).  Real node <g> elements have ids
  * starting with "person_" or "family_".
  *
- * Returns null when no node is within range.
+ * Hysteresis: if `currentFocus` is supplied and the cursor is still within
+ * `stickyRadius` of that node, focus is held even when no other node is in
+ * the acquire range. Entering another node's acquire range switches focus
+ * to the closer node.
+ *
+ * Returns null when no node is within range and no sticky candidate exists.
  */
 export function nearestNodeWithinRadius(
     mainG: SVGGElement,
     cursorSvgX: number,
     cursorSvgY: number,
-    radiusSvg: number,
+    acquireRadius: number,
     isPendingId: (id: string) => boolean,
+    currentFocus: FocusedId | null = null,
+    stickyRadius: number = acquireRadius,
 ): FocusedId | null {
-    let best: FocusedId | null = null;
-    let bestDist = radiusSvg;
+    let bestInAcquire: FocusedId | null = null;
+    let bestDist = acquireRadius;
+    let currentDist = Infinity;
 
     const candidates = mainG.querySelectorAll<SVGGElement>("g[id^='person_'], g[id^='family_']");
     for (const g of candidates) {
         const datum = (g as SVGGElement & { __data__?: { x?: number; y?: number } }).__data__;
         if (!datum || datum.x == null || datum.y == null) continue;
+        const focused = focusedIdFromG(g, isPendingId);
+        if (!focused) continue;
         const dist = Math.hypot(datum.x - cursorSvgX, datum.y - cursorSvgY);
         if (dist <= bestDist) {
-            const focused = focusedIdFromG(g, isPendingId);
-            if (focused) {
-                bestDist = dist;
-                best = focused;
-            }
+            bestDist = dist;
+            bestInAcquire = focused;
+        }
+        if (currentFocus && focused.id === currentFocus.id && focused.kind === currentFocus.kind) {
+            currentDist = dist;
         }
     }
 
-    return best;
+    if (bestInAcquire) return bestInAcquire;
+    if (currentFocus && currentDist <= stickyRadius) return currentFocus;
+    return null;
 }

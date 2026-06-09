@@ -270,6 +270,8 @@
             {focusedId}
             stemmaIndex={displayedStemmaIndex}
             stemmaChartReady={!!stemmaChart}
+            getSimulation={() => stemmaChart?.getSimulation() ?? null}
+            applyManualPositions={() => stemmaChart?.applyManualPositions()}
             onghostClick={(kind, focused, pins, existingFamilyId) => actions.onGhostClick(kind, focused, pins, existingFamilyId)}
             onpositionsChange={(p) => (ghostSimPositions = p)}
         />

@@ -8,6 +8,8 @@
         familyRelationWidth,
         childRelationWidth,
         arrowPath,
+        personColor,
+        defaultFamilyColor,
     } from "../../graphStyles";
     import { t } from "../../i18n";
     import type { StemmaIndex } from "../../stemmaIndex";
@@ -21,15 +23,20 @@
     import { nodeCenter } from "../v3DomGeometry";
     import { trimToCircle, GHOST_EDGE_GAP } from "../ghostEdgeGeometry";
     import {
-        buildGhostSimGraph,
-        configureGhostSim,
+        buildGhostInjection,
         ghostSimNeighborDomIds,
+        resolveAnchorSimId,
+        GHOST_NEIGHBOUR_COLLIDE_R,
+        type GhostExtraLink,
+        type GhostExtraNode,
     } from "../ghostSim";
 
     type Props = {
         focusedId: FocusedId | null;
         stemmaIndex: StemmaIndex | null;
         stemmaChartReady: boolean;
+        getSimulation: () => any;
+        applyManualPositions: () => void;
         onghostClick: (
             kind: GhostKind,
             focused: FocusedId,
@@ -39,7 +46,15 @@
         onpositionsChange: (positions: Array<{ x: number; y: number }>) => void;
     };
 
-    let { focusedId, stemmaIndex, stemmaChartReady, onghostClick, onpositionsChange }: Props = $props();
+    let {
+        focusedId,
+        stemmaIndex,
+        stemmaChartReady,
+        getSimulation,
+        applyManualPositions,
+        onghostClick,
+        onpositionsChange,
+    }: Props = $props();
 
     type Pos = { x: number; y: number };
 
@@ -48,6 +63,18 @@
     const GHOST_COLOR = "#6c757d";
     const GHOST_ARROW_TO_FAMILY_ID = "v3-ghost-arrow-to-family";
     const GHOST_ARROW_TO_PERSON_ID = "v3-ghost-arrow-to-person";
+    /**
+     * Springy-bounce profile: one strong energy burst that decays fast.
+     * - alpha kicked to 0.6 on focus so charge + collide push hard up front.
+     * - alphaTarget 0 (not maintained): the burst dies on its own.
+     * - alphaDecay 0.12 → sim reaches alphaMin (0.001) in ~55 ticks (~0.9 s
+     *   at 60 fps), then stops.
+     * - velocityDecay 0.6 (lighter than the main sim's 0.8) keeps momentum
+     *   while the burst lasts so the rebound feels rubbery instead of stiff.
+     */
+    const GHOST_ALPHA_KICK = 0.6;
+    const GHOST_ALPHA_DECAY = 0.12;
+    const GHOST_VELOCITY_DECAY = 0.6;
 
     let fadingOutGhostEls: Element[] = [];
 
@@ -91,6 +118,8 @@
         const svgEl = document.getElementById("chart") as unknown as SVGSVGElement | null;
         const mainG = svgEl?.querySelector("g.main") as SVGGElement | null;
         if (!svgEl || !mainG || !focusedId || !stemmaIndex) return;
+        const sim = getSimulation();
+        if (!sim) return;
 
         const focusDomId = normalizeId(focusedId.kind, focusedId.id);
         const focusEl = mainG.querySelector(`#${CSS.escape(focusDomId)}`) as SVGGElement | null;
@@ -99,6 +128,21 @@
 
         const layout = deriveGhostLayout(focusedId, stemmaIndex);
         if (layout.families.length === 0 && layout.persons.length === 0) return;
+
+        const baseGeneration = (() => {
+            if (focusedId.kind === "person") return stemmaIndex.lineage(focusedId.id).generation;
+            const fam = stemmaIndex.family(focusedId.id);
+            if (!fam) return 0;
+            let g = 0;
+            for (const pid of fam.parents ?? []) g = Math.max(g, stemmaIndex.lineage(pid).generation);
+            return g;
+        })();
+        const maxGen = Math.max(stemmaIndex.maxGeneration(), 1);
+        const ghostPersonColor = (kind: "spouse" | "parent" | "child"): string => {
+            const gen = kind === "parent" ? baseGeneration - 1 : kind === "child" ? baseGeneration + 1 : baseGeneration;
+            const ratio = Math.min(1, Math.max(0, gen / maxGen));
+            return personColor(ratio);
+        };
 
         ensureGhostMarkers(svgEl);
         const labels = $t;
@@ -109,25 +153,84 @@
             return el ? nodeCenter(el) : null;
         };
 
-        const familyAnchor = new Map<string, Pos>();
+        const familyAnchorByRef = new Map<string, Pos>();
         for (const f of layout.families) {
-            familyAnchor.set(f.id, { x: origin.x + f.dx, y: origin.y + f.dy });
+            familyAnchorByRef.set(f.id, { x: origin.x + f.dx, y: origin.y + f.dy });
         }
-        if (focusedId.kind === "family") familyAnchor.set(FOCUSED_FAMILY_REF, origin);
+        if (focusedId.kind === "family") familyAnchorByRef.set(FOCUSED_FAMILY_REF, origin);
         for (const p of layout.persons) {
-            if (familyAnchor.has(p.familyId)) continue;
+            if (familyAnchorByRef.has(p.familyId)) continue;
             const realId = realFamilyIdFromRef(p.familyId);
             if (!realId) continue;
             const center = nodeCenterById("family", realId);
-            if (center) familyAnchor.set(p.familyId, center);
+            if (center) familyAnchorByRef.set(p.familyId, center);
         }
 
-        const personPos = new Map<string, Pos>();
+        const personPositionById = new Map<string, Pos>();
         for (const p of layout.persons) {
             const realRef = p.familyId === FOCUSED_FAMILY_REF || realFamilyIdFromRef(p.familyId) !== null;
-            const base = realRef ? familyAnchor.get(p.familyId) ?? origin : origin;
-            personPos.set(p.id, { x: base.x + p.dx, y: base.y + p.dy });
+            const base = realRef ? familyAnchorByRef.get(p.familyId) ?? origin : origin;
+            personPositionById.set(p.id, { x: base.x + p.dx, y: base.y + p.dy });
         }
+
+        const injection = buildGhostInjection(focusedId, layout, {
+            origin,
+            familyAnchorByRef,
+            personPositionById,
+        });
+
+        // All real datums stay frozen during the ghost burst. Real neighbours
+        // give real datums a temporary `r` so the main sim's collide force
+        // (`radius((d) => d.r * 20)`) registers the pair properly — without
+        // `r`, the focused/neighbour side returns NaN and the ghost would
+        // pass straight through. Frozen + sized = ghost gets pushed around a
+        // rigid real graph; only ghost positions move, no cascade jitter when
+        // the focused node has many children or sits in a dense cluster.
+        const neighborDomIds = ghostSimNeighborDomIds(focusedId, stemmaIndex);
+        const realRSnapshots = new Map<string, number | undefined>();
+        const baseNodes = sim.nodes() as Array<any>;
+        const baseLinks = (sim.force("link") as d3.ForceLink<any, any>).links() as Array<any>;
+        const datumById = new Map<string, any>();
+        for (const n of baseNodes) datumById.set(n.id, n);
+
+        const assignCollideR = (id: string) => {
+            const d = datumById.get(id);
+            if (!d) return;
+            realRSnapshots.set(id, d.r);
+            d.r = GHOST_NEIGHBOUR_COLLIDE_R;
+        };
+        for (const id of neighborDomIds) assignCollideR(id);
+
+        // Hard-pin the focused datum. Edit-mode normally freezes every node,
+        // but a mid-focus re-render can clear fx/fy. Snapshot + force-pin
+        // guarantees the focus origin never shifts while ghosts are alive.
+        const focusedDatum = datumById.get(focusDomId);
+        const focusedSnapshot = focusedDatum
+            ? { fx: focusedDatum.fx, fy: focusedDatum.fy }
+            : null;
+        if (focusedDatum) {
+            focusedDatum.fx = focusedDatum.x;
+            focusedDatum.fy = focusedDatum.y;
+            assignCollideR(focusDomId);
+        }
+
+        // Pin ghost y to the seed value: the schema (spouse east of focus at
+        // same y, child below east family, parent above) is the affordance
+        // semantic and must not drift under the sim's forceY/link pull. Ghosts
+        // stay springy along x — collide + repel still push them rightward off
+        // the focus and away from neighbours.
+        for (const extra of injection.extraNodes) (extra as any).fy = extra.y;
+
+        // Append ghost datums to main sim. d3.forceLink re-resolves string
+        // source/target via the node-id accessor configured in
+        // graphTools.configureSimulation.
+        sim.nodes([...baseNodes, ...injection.extraNodes]);
+        (sim.force("link") as d3.ForceLink<any, any>).links([...baseLinks, ...injection.extraLinks]);
+        const savedVelocityDecay = sim.velocityDecay();
+        const savedAlphaDecay = sim.alphaDecay();
+        sim.velocityDecay(GHOST_VELOCITY_DECAY);
+        sim.alphaDecay(GHOST_ALPHA_DECAY);
+        sim.alphaTarget(0).alpha(GHOST_ALPHA_KICK).restart();
 
         type GhostEdgeRef = {
             line: SVGLineElement;
@@ -136,6 +239,17 @@
             edgeKind: "focusToFamily" | "familyToPerson";
         };
         const edgeRefs: GhostEdgeRef[] = [];
+
+        const applyEdgeEndpoints = (ref: GhostEdgeRef, source: Pos, target: Pos): void => {
+            const sourceR = ref.edgeKind === "focusToFamily" ? personR : familyR;
+            const targetR = ref.edgeKind === "focusToFamily" ? familyR : personR;
+            const tip = trimToCircle(source.x, source.y, target.x, target.y, targetR + GHOST_EDGE_GAP);
+            const tail = trimToCircle(target.x, target.y, source.x, source.y, sourceR + GHOST_EDGE_GAP);
+            ref.line.setAttribute("x1", String(tail.x));
+            ref.line.setAttribute("y1", String(tail.y));
+            ref.line.setAttribute("x2", String(tip.x));
+            ref.line.setAttribute("y2", String(tip.y));
+        };
 
         const makeLine = (
             sourceId: string,
@@ -156,19 +270,9 @@
             line.style.opacity = "0";
             mainG.appendChild(line);
             allGhostEls.push(line);
-            edgeRefs.push({ line, sourceId, targetId, edgeKind });
-            applyEdgeEndpoints(edgeRefs[edgeRefs.length - 1], sourcePos, targetPos);
-        };
-
-        const applyEdgeEndpoints = (ref: GhostEdgeRef, source: Pos, target: Pos): void => {
-            const sourceR = ref.edgeKind === "focusToFamily" ? personR : familyR;
-            const targetR = ref.edgeKind === "focusToFamily" ? familyR : personR;
-            const tip = trimToCircle(source.x, source.y, target.x, target.y, targetR + GHOST_EDGE_GAP);
-            const tail = trimToCircle(target.x, target.y, source.x, source.y, sourceR + GHOST_EDGE_GAP);
-            ref.line.setAttribute("x1", String(tail.x));
-            ref.line.setAttribute("y1", String(tail.y));
-            ref.line.setAttribute("x2", String(tip.x));
-            ref.line.setAttribute("y2", String(tip.y));
+            const ref: GhostEdgeRef = { line, sourceId, targetId, edgeKind };
+            edgeRefs.push(ref);
+            applyEdgeEndpoints(ref, sourcePos, targetPos);
         };
 
         const ghostFamilyEls = new Map<string, SVGGElement>();
@@ -183,72 +287,68 @@
             g.style.pointerEvents = "none";
             const c = document.createElementNS(SVG_NS, "circle") as SVGCircleElement;
             c.setAttribute("r", String(familyR));
+            c.style.fill = defaultFamilyColor;
             g.appendChild(c);
             mainG.appendChild(g);
             allGhostEls.push(g);
             ghostFamilyEls.set(id, g);
         };
 
-        const makeGhostPersonEl = (
-            id: string,
-            pos: Pos,
-            labelKey: string,
-            kind: GhostKind,
-            existingFamilyId: string | undefined,
-            familyId: string,
-        ): void => {
+        const makeGhostPersonEl = (extra: GhostExtraNode, pos: Pos): void => {
+            if (extra.kind == null || extra.labelKey == null || extra.anchorSimId == null) return;
             const g = document.createElementNS(SVG_NS, "g") as SVGGElement;
-            g.setAttribute("id", id);
+            g.setAttribute("id", extra.id);
             g.setAttribute("class", "v3-ghost");
             g.setAttribute("transform", `translate(${pos.x},${pos.y})`);
             g.style.opacity = "0";
             const c = document.createElementNS(SVG_NS, "circle") as SVGCircleElement;
             c.setAttribute("r", String(personR));
+            c.style.fill = ghostPersonColor(extra.kind);
             g.appendChild(c);
             const label = document.createElementNS(SVG_NS, "text") as SVGTextElement;
             label.setAttribute("class", "v3-ghost-label");
             label.setAttribute("dx", String(-personR));
             label.setAttribute("dy", "40");
             label.style.fontSize = labelFontSize;
-            label.textContent = labels(labelKey);
+            label.textContent = labels(extra.labelKey);
             g.appendChild(label);
             mainG.appendChild(g);
             allGhostEls.push(g);
-            ghostPersonEls.set(id, g);
+            ghostPersonEls.set(extra.id, g);
 
             const capturedFocused = focusedId;
+            const capturedKind = extra.kind;
+            const capturedExistingFamilyId = extra.existingFamilyId;
+            const capturedAnchorSimId = extra.anchorSimId;
             g.addEventListener("pointerup", (ev: PointerEvent) => {
                 ev.stopPropagation();
-                const personNode = nodesById.get(id);
-                const famNode = nodesById.get(familyId);
+                const personNode = ghostNodeById.get(extra.id);
+                const famNode = ghostNodeById.get(capturedAnchorSimId) ?? datumById.get(capturedAnchorSimId);
                 const personPosNow = personNode ?? pos;
                 const famPosNow = famNode ? { x: famNode.x, y: famNode.y } : null;
-                onghostClick(kind, capturedFocused, {
+                onghostClick(capturedKind, capturedFocused, {
                     person: { x: personPosNow.x, y: personPosNow.y },
                     family: famPosNow,
-                }, existingFamilyId);
+                }, capturedExistingFamilyId);
             });
         };
 
-        const resolveAnchorSimId = (familyRef: string): string => {
-            if (familyRef === FOCUSED_FAMILY_REF) return focusDomId;
-            const real = realFamilyIdFromRef(familyRef);
-            return real ? normalizeId("family", real) : familyRef;
-        };
+        const ghostNodeById = new Map<string, GhostExtraNode>();
+        for (const n of injection.extraNodes) ghostNodeById.set(n.id, n);
 
         for (const f of layout.families) {
-            const pos = familyAnchor.get(f.id);
+            const pos = familyAnchorByRef.get(f.id);
             if (pos) makeGhostFamilyEl(f.id, pos);
         }
-        for (const p of layout.persons) {
-            const pos = personPos.get(p.id);
+        for (const extra of injection.extraNodes) {
+            if (extra.type !== "ghost-person") continue;
+            const pos = personPositionById.get(extra.id);
             if (!pos) continue;
-            const existingFamilyId = realFamilyIdFromRef(p.familyId) ?? undefined;
-            makeGhostPersonEl(p.id, pos, p.labelKey, p.kind, existingFamilyId, resolveAnchorSimId(p.familyId));
+            makeGhostPersonEl(extra, pos);
         }
 
         for (const a of layout.anchorEdges) {
-            const familyPos = familyAnchor.get(a.familyId);
+            const familyPos = familyAnchorByRef.get(a.familyId);
             if (!familyPos) continue;
             if (a.focusedRole === "parent") {
                 makeLine(focusDomId, a.familyId, origin, familyPos, "focusToFamily");
@@ -257,91 +357,47 @@
             }
         }
         for (const p of layout.persons) {
-            const pos = personPos.get(p.id);
-            const anchorPos = familyAnchor.get(p.familyId);
-            if (!pos || !anchorPos) continue;
-            const anchorSimId = resolveAnchorSimId(p.familyId);
+            const pos = personPositionById.get(p.id);
+            const anchorRef = familyAnchorByRef.get(p.familyId);
+            if (!pos || !anchorRef) continue;
+            const anchorSimId = resolveAnchorSimId(focusDomId, p.familyId);
             if (p.role === "parent") {
-                makeLine(p.id, anchorSimId, pos, anchorPos, "focusToFamily");
+                makeLine(p.id, anchorSimId, pos, anchorRef, "focusToFamily");
             } else {
-                makeLine(anchorSimId, p.id, anchorPos, pos, "familyToPerson");
+                makeLine(anchorSimId, p.id, anchorRef, pos, "familyToPerson");
             }
         }
-
-        const neighborDomIds = ghostSimNeighborDomIds(focusedId, stemmaIndex);
-        const positionSnapshot = new Map<string, Pos>();
-        const neighborEls = new Map<string, SVGGElement>();
-        const neighborDatums = new Map<string, any>();
-        const neighborPositions = new Map<string, Pos>();
-
-        d3.select("g.main").selectAll<SVGGElement, any>("g").each(function (this: SVGGElement, d: any) {
-            if (!d || d.x == null || d.y == null) return;
-            positionSnapshot.set(d.id, { x: d.x, y: d.y });
-            if (neighborDomIds.has(d.id)) {
-                neighborEls.set(d.id, this);
-                neighborDatums.set(d.id, d);
-                neighborPositions.set(d.id, { x: d.x, y: d.y });
-            }
-        });
-
-        const ghostSeedPositions = new Map<string, Pos>();
-        for (const f of layout.families) {
-            const pos = familyAnchor.get(f.id);
-            if (pos) ghostSeedPositions.set(f.id, pos);
-        }
-        for (const p of layout.persons) {
-            const pos = personPos.get(p.id);
-            if (pos) ghostSeedPositions.set(p.id, pos);
-        }
-
-        const graph = buildGhostSimGraph(focusedId, stemmaIndex, layout, {
-            origin,
-            neighborPositions,
-            ghostPositions: ghostSeedPositions,
-        });
-        const sim = configureGhostSim(graph, origin);
-
-        const nodesById = new Map(graph.nodes.map((n) => [n.id, n]));
 
         const emitPositions = () => {
             const live: Pos[] = [];
-            for (const n of graph.nodes) {
-                if (n.isGhost) live.push({ x: n.x, y: n.y });
-            }
+            for (const n of injection.extraNodes) live.push({ x: n.x, y: n.y });
             onpositionsChange(live);
         };
-
-        // Initial emit covers the seed positions so V3FocusController has
-        // ghost coordinates before the sim's first tick; the on("end") emit
-        // refreshes them once the sim has settled.
         emitPositions();
 
-        sim.on("tick", () => {
-            for (const n of graph.nodes) {
-                if (n.isGhost) {
-                    const fEl = ghostFamilyEls.get(n.id);
-                    if (fEl) fEl.setAttribute("transform", `translate(${n.x},${n.y})`);
-                    const pEl = ghostPersonEls.get(n.id);
-                    if (pEl) pEl.setAttribute("transform", `translate(${n.x},${n.y})`);
-                } else {
-                    const el = neighborEls.get(n.id);
-                    if (!el) continue;
-                    el.setAttribute("transform", `translate(${n.x},${n.y})`);
-                    const d = neighborDatums.get(n.id);
-                    if (d) {
-                        d.x = n.x;
-                        d.y = n.y;
-                    }
-                }
+        const resolveEndpoint = (id: string): Pos | null => {
+            const ghost = ghostNodeById.get(id);
+            if (ghost) return ghost;
+            const real = datumById.get(id);
+            if (real) return real;
+            return null;
+        };
+
+        sim.on("tick.v3ghost", () => {
+            for (const extra of injection.extraNodes) {
+                const el = extra.type === "ghost-family"
+                    ? ghostFamilyEls.get(extra.id)
+                    : ghostPersonEls.get(extra.id);
+                if (el) el.setAttribute("transform", `translate(${extra.x},${extra.y})`);
             }
             for (const e of edgeRefs) {
-                const s = nodesById.get(e.sourceId);
-                const t = nodesById.get(e.targetId);
+                const s = resolveEndpoint(e.sourceId);
+                const t = resolveEndpoint(e.targetId);
                 if (s && t) applyEdgeEndpoints(e, s, t);
             }
         });
 
-        sim.on("end", emitPositions);
+        sim.on("end.v3ghost", emitPositions);
 
         let fadeInCancelled = false;
         requestAnimationFrame(() => {
@@ -351,24 +407,42 @@
 
         return () => {
             fadeInCancelled = true;
-            sim.stop();
+            sim.on("tick.v3ghost", null);
+            sim.on("end.v3ghost", null);
+
+            // Strip ghost datums out of the main sim arrays.
+            const ghostIds = new Set(injection.extraNodes.map((n) => n.id));
+            const survivingNodes = (sim.nodes() as Array<any>).filter((n) => !ghostIds.has(n.id));
+            const survivingLinks = ((sim.force("link") as d3.ForceLink<any, any>).links() as Array<any>).filter((l) => {
+                const src = typeof l.source === "string" ? l.source : (l.source as any).id;
+                const tgt = typeof l.target === "string" ? l.target : (l.target as any).id;
+                return !ghostIds.has(src) && !ghostIds.has(tgt);
+            });
+            sim.nodes(survivingNodes);
+            (sim.force("link") as d3.ForceLink<any, any>).links(survivingLinks);
+
+            // Strip temporary `r` from real datums so post-blur edit-mode
+            // collide behaviour is identical to pre-focus. Positions don't
+            // need restoring — neighbours were pinned the whole time.
+            for (const [id, prevR] of realRSnapshots) {
+                const d = datumById.get(id);
+                if (!d) continue;
+                d.r = prevR;
+            }
+
+            // Restore focused datum's original fx/fy snapshot. Edit-mode's
+            // re-pin path picks it back up via hadKnownPosition.
+            if (focusedDatum && focusedSnapshot) {
+                focusedDatum.fx = focusedSnapshot.fx;
+                focusedDatum.fy = focusedSnapshot.fy;
+            }
+
+            sim.alphaTarget(0).stop();
+            sim.velocityDecay(savedVelocityDecay);
+            sim.alphaDecay(savedAlphaDecay);
+            applyManualPositions();
             onpositionsChange([]);
             fadeOutAndRemove(allGhostEls);
-
-            // Hard-snap neighbours back to their pre-focus positions
-            // synchronously so the next focus snapshot doesn't pick up
-            // mid-physics coordinates. Datum fx/fy is left as FullStemma set
-            // it — edit mode keeps every real node pinned anyway.
-            for (const [id, el] of neighborEls) {
-                const snap = positionSnapshot.get(id);
-                if (!snap) continue;
-                const d = neighborDatums.get(id);
-                if (d) {
-                    d.x = snap.x;
-                    d.y = snap.y;
-                }
-                el.setAttribute("transform", `translate(${snap.x},${snap.y})`);
-            }
         };
     });
 </script>
@@ -381,11 +455,20 @@
     }
 
     :global(g.v3-ghost > circle) {
-        fill: none;
+        fill-opacity: 0.25;
         stroke: #6c757d;
         stroke-width: 1.5px;
         stroke-dasharray: 5 3;
         pointer-events: all;
+        transition: fill-opacity 150ms ease;
+    }
+
+    :global(g.v3-ghost:hover > circle) {
+        fill-opacity: 0.85;
+    }
+
+    :global(g.v3-ghost:hover) {
+        opacity: 1;
     }
 
     :global(g.v3-ghost .v3-ghost-label) {
@@ -409,7 +492,7 @@
     }
 
     :global(g.v3-ghost-family > circle) {
-        fill: none;
+        fill-opacity: 0.3;
         stroke: #6c757d;
         stroke-width: 1.5px;
         stroke-dasharray: 5 3;

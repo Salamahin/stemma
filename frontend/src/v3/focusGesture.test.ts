@@ -1,4 +1,15 @@
-import { isShortTap, isLongPress, focusedIdFromG, closestNodeG, cursorNearGhost, TAP_MAX_MS, TAP_MAX_MOVE_PX, FOCUS_RADIUS_SVG } from "./focusGesture";
+import {
+    isShortTap,
+    isLongPress,
+    focusedIdFromG,
+    closestNodeG,
+    cursorNearGhost,
+    nearestNodeWithinRadius,
+    TAP_MAX_MS,
+    TAP_MAX_MOVE_PX,
+    FOCUS_RADIUS_SVG,
+    FOCUS_RADIUS_STICKY_SVG,
+} from "./focusGesture";
 
 describe("isShortTap", () => {
     it("returns true when elapsed < TAP_MAX_MS and moved <= TAP_MAX_MOVE_PX", () => {
@@ -150,5 +161,72 @@ describe("cursorNearGhost", () => {
         expect(cursorNearGhost([{ x: 160, y: 0 }], 145, 0, ghostPersonR)).toBe(true);
         // cursor at (144,0): distance to ghost=16 > personR=15, so NOT near ghost
         expect(cursorNearGhost([{ x: 160, y: 0 }], 144, 0, ghostPersonR)).toBe(false);
+    });
+});
+
+describe("nearestNodeWithinRadius hysteresis", () => {
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    const noPending = (_id: string) => false;
+
+    function makeMain(nodes: Array<{ kind: "person" | "family"; id: string; x: number; y: number }>): SVGGElement {
+        const main = document.createElementNS(SVG_NS, "g") as SVGGElement;
+        for (const n of nodes) {
+            const g = document.createElementNS(SVG_NS, "g") as SVGGElement;
+            g.setAttribute("id", `${n.kind}_${n.id}`);
+            (g as SVGGElement & { __data__?: { x: number; y: number } }).__data__ = { x: n.x, y: n.y };
+            main.appendChild(g);
+        }
+        return main;
+    }
+
+    it("acquires the nearest node within the acquire radius when no current focus", () => {
+        const main = makeMain([{ kind: "person", id: "a", x: 0, y: 0 }]);
+        expect(nearestNodeWithinRadius(main, 100, 0, FOCUS_RADIUS_SVG, noPending, null, FOCUS_RADIUS_STICKY_SVG))
+            .toEqual({ kind: "person", id: "a" });
+    });
+
+    it("returns null when no node is in acquire range and there is no current focus", () => {
+        const main = makeMain([{ kind: "person", id: "a", x: 0, y: 0 }]);
+        expect(nearestNodeWithinRadius(main, 200, 0, FOCUS_RADIUS_SVG, noPending, null, FOCUS_RADIUS_STICKY_SVG))
+            .toBeNull();
+    });
+
+    it("keeps the current focus when cursor is past acquire radius but within sticky radius", () => {
+        const main = makeMain([{ kind: "person", id: "a", x: 0, y: 0 }]);
+        const cursorX = FOCUS_RADIUS_SVG + 30; // 180, outside acquire (150) but inside sticky (220)
+        const current = { kind: "person" as const, id: "a" };
+        expect(nearestNodeWithinRadius(main, cursorX, 0, FOCUS_RADIUS_SVG, noPending, current, FOCUS_RADIUS_STICKY_SVG))
+            .toEqual(current);
+    });
+
+    it("drops focus once cursor leaves the sticky radius", () => {
+        const main = makeMain([{ kind: "person", id: "a", x: 0, y: 0 }]);
+        const cursorX = FOCUS_RADIUS_STICKY_SVG + 1; // 221
+        const current = { kind: "person" as const, id: "a" };
+        expect(nearestNodeWithinRadius(main, cursorX, 0, FOCUS_RADIUS_SVG, noPending, current, FOCUS_RADIUS_STICKY_SVG))
+            .toBeNull();
+    });
+
+    it("switches to a different node once cursor enters that node's acquire radius", () => {
+        const main = makeMain([
+            { kind: "person", id: "a", x: 0, y: 0 },
+            { kind: "person", id: "b", x: 300, y: 0 },
+        ]);
+        // Cursor at x=180: distance to A=180 (within sticky 220, outside acquire 150),
+        // distance to B=120 (within acquire 150). Should switch to B.
+        const current = { kind: "person" as const, id: "a" };
+        expect(nearestNodeWithinRadius(main, 180, 0, FOCUS_RADIUS_SVG, noPending, current, FOCUS_RADIUS_STICKY_SVG))
+            .toEqual({ kind: "person", id: "b" });
+    });
+
+    it("does not flicker: cursor oscillating at the acquire boundary keeps the same focus", () => {
+        const main = makeMain([{ kind: "person", id: "a", x: 0, y: 0 }]);
+        const current = { kind: "person" as const, id: "a" };
+        // Cursor at 149 (inside acquire) — keeps A.
+        expect(nearestNodeWithinRadius(main, 149, 0, FOCUS_RADIUS_SVG, noPending, current, FOCUS_RADIUS_STICKY_SVG))
+            .toEqual(current);
+        // Cursor at 151 (just past acquire, still well inside sticky) — still A.
+        expect(nearestNodeWithinRadius(main, 151, 0, FOCUS_RADIUS_SVG, noPending, current, FOCUS_RADIUS_STICKY_SVG))
+            .toEqual(current);
     });
 });

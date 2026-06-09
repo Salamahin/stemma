@@ -164,7 +164,7 @@
         else simulation.alphaTarget(0).stop();
     }
 
-    function applyManualPositions() {
+    export function applyManualPositions() {
         if (!svg) return;
         svg.select("g.main").selectAll("g").attr("transform", (d: any) => {
             if (d && d.x != null && d.y != null) return `translate(${d.x},${d.y})`;
@@ -176,6 +176,10 @@
             .attr("y1", (d: any) => d?.source?.y ?? 0)
             .attr("x2", (d: any) => d?.target?.x ?? 0)
             .attr("y2", (d: any) => d?.target?.y ?? 0);
+    }
+
+    export function getSimulation(): any {
+        return simulation;
     }
 
     $effect(() => {
