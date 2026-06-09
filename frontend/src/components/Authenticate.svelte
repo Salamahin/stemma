@@ -1,26 +1,16 @@
 <script lang="ts">
-    import { jwtDecode } from "jwt-decode";
     import { onMount } from "svelte";
     import { initializeGoogleAuth, onCredential, promptInitialSignIn } from "../googleAuth";
 
     type Props = {
         google_client_id: string;
-        onsignIn?: (user: { name: string; image_url: string; id_token: string }) => void;
+        onsignIn?: (idToken: string) => void;
     };
 
     let { google_client_id, onsignIn }: Props = $props();
 
-    function handleCredential(credential: string) {
-        const decoded = jwtDecode<{ given_name: string; picture: string }>(credential);
-        onsignIn?.({
-            name: decoded.given_name,
-            image_url: decoded.picture,
-            id_token: credential,
-        });
-    }
-
     onMount(() => {
-        const unsubscribe = onCredential(handleCredential);
+        const unsubscribe = onCredential((credential) => onsignIn?.(credential));
         initializeGoogleAuth(google_client_id)
             .then(() => promptInitialSignIn(document.getElementById("signin")))
             .catch((err) => console.error("Google Identity init failed", err));

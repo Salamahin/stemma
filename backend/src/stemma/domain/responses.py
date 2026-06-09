@@ -80,6 +80,18 @@ class TokenAccepted:
     type: Literal["TokenAccepted"] = "TokenAccepted"
 
 
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
+class AuthLoginResponse:
+    user_id: str
+    email: str
+    type: Literal["AuthLoginResponse"] = "AuthLoginResponse"
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
+class AuthLogoutResponse:
+    type: Literal["AuthLogoutResponse"] = "AuthLogoutResponse"
+
+
 Response = Annotated[
     OwnedStemmas
     | Stemma
@@ -89,6 +101,8 @@ Response = Annotated[
     | InviteToken
     | CloneResult
     | TokenAccepted
-    | PhotoUploadUrl,
+    | PhotoUploadUrl
+    | AuthLoginResponse
+    | AuthLogoutResponse,
     Discriminator("type"),
 ]

@@ -1,7 +1,7 @@
 """DynamoDB key encoders and item shape constants.
 
 Single-table layout. Every item is keyed by (pk, sk). GSI1 lets us list every
-stemma a user owns by querying gsi1pk = USER#<user_id>.
+stemma (or session) a user owns by querying gsi1pk = USER#<user_id>.
 
     pk                      | sk                                | item
     ----------------------- | --------------------------------- | -----------------------
@@ -12,6 +12,7 @@ stemma a user owns by querying gsi1pk = USER#<user_id>.
     STEMMA#<sid>            | OWNER#STEMMA#<uid>                | stemma ownership (also on GSI1)
     STEMMA#<sid>            | OWNER#PERSON#<pid>#<uid>          | person ownership
     STEMMA#<sid>            | OWNER#FAMILY#<fid>#<uid>          | family ownership
+    SESSION#<sid>           | META                              | session (TTL attr drives DynamoDB expiry)
 """
 
 SK_PROFILE = "PROFILE"
@@ -19,8 +20,10 @@ SK_META = "META"
 
 ATTR_DISPLAY_NAME = "display_name"
 ATTR_DEFAULT_STEMMA_ID = "default_stemma_id"
+ATTR_TTL = "ttl"
 
 STEMMA_PK_PREFIX = "STEMMA#"
+SESSION_PK_PREFIX = "SESSION#"
 PERSON_PREFIX = "PERSON#"
 FAMILY_PREFIX = "FAMILY#"
 STEMMA_OWNER_PREFIX = "OWNER#STEMMA#"
@@ -89,6 +92,10 @@ def user_gsi_pk(user_id: str) -> str:
 
 def user_gsi_sk(stemma_id: str) -> str:
     return f"{STEMMA_PK_PREFIX}{stemma_id}"
+
+
+def session_pk(sid: str) -> str:
+    return f"{SESSION_PK_PREFIX}{sid}"
 
 
 def parse_id_after_prefix(sk: str, prefix: str) -> str:

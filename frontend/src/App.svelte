@@ -6,14 +6,13 @@
         PersonDescription,
         Stemma,
         StemmaDescription,
-        User,
     } from "./model";
     import { StemmaIndex } from "./stemmaIndex";
     import { HiglightLineages } from "./highlight";
     import { PinnedPeopleStorage } from "./pinnedPeopleStorage";
     import { ViewMode } from "./model";
     import { LocalizedError, t } from "./i18n";
-    import { initializeGoogleAuth } from "./googleAuth";
+    import { disableAutoSelect, initializeGoogleAuth } from "./googleAuth";
     import Authenticate from "./components/Authenticate.svelte";
     import FullStemma from "./components/FullStemma.svelte";
     import Sheet from "./components/Sheet.svelte";
@@ -82,6 +81,7 @@
     let pendingRemovedPersonIds = $state<Set<string>>(new Set());
     let pendingRemovedFamilyIds = $state<Set<string>>(new Set());
     let signedIn = $state(false);
+    let bootProbing = $state(true);
 
     const actions = new MutationActions({
         controller,
@@ -103,12 +103,37 @@
     });
 
     const session = new Session(
+        controller.model,
         { get: () => signedIn, set: (v) => (signedIn = v) },
         {
-            onSignIn: () => controller.authenticateAndListStemmas(session.tokenProvider),
-            onSignOut: () => {},
+            onSignIn: () => {
+                void loadStemmasOrSignOut();
+            },
+            onSignOut: () => disableAutoSelect(),
         },
     );
+
+    async function loadStemmasOrSignOut(): Promise<void> {
+        try {
+            await controller.listStemmas();
+        } catch (err) {
+            if ((err as { key?: string }).key === "error.sessionExpired") {
+                session.markSignedOut();
+                return;
+            }
+            error = err as Error;
+            console.error("Listing stemmas failed", err);
+        }
+    }
+
+    async function handleGoogleSignIn(idToken: string) {
+        try {
+            await session.signIn(idToken);
+        } catch (err) {
+            error = err as Error;
+            console.error("Sign-in failed", err);
+        }
+    }
 
     let lastStemmaIdSeen: string | null = null;
     const subscriptions = [
@@ -206,22 +231,30 @@
         selectedFamilyEl = null;
     }
 
-    onMount(() => {
-        if (session.e2eAutoLoginEnabled) {
-            session.enableE2eMode();
-            const override = (window as unknown as { __STEMMA_E2E_USER__?: string }).__STEMMA_E2E_USER__;
-            session.handleSignIn({ id_token: override || "e2e-user@stemma.local" } as User);
-        } else {
-            initializeGoogleAuth(google_client_id).catch((err) => console.error("Google Identity init failed", err));
-            if (session.initialCached) {
-                session.handleSignIn({ id_token: session.initialCached.token });
-            } else {
+    async function probeCookieSession() {
+        try {
+            await controller.listStemmas();
+            signedIn = true;
+        } catch (err) {
+            if ((err as { key?: string }).key === "error.sessionExpired") {
+                signedIn = false;
                 fetch(`${stemma_backend_url}/warmup`).catch(() => {});
+                return;
             }
+            error = err as Error;
         }
+    }
+
+    onMount(() => {
+        const boot = session.e2eAutoLoginEnabled
+            ? session.signInAsE2eUser()
+            : (initializeGoogleAuth(google_client_id).catch((err) =>
+                  console.error("Google Identity init failed", err),
+              ),
+              probeCookieSession());
+        void Promise.resolve(boot).finally(() => (bootProbing = false));
         return () => {
             for (const unsub of subscriptions) unsub();
-            session.teardown();
         };
     });
 
@@ -229,7 +262,13 @@
     const showEmpty = $derived(!isWorking && stemma && stemma.people.length === 0);
 </script>
 
-{#if signedIn}
+{#if bootProbing}
+    <div class="authenticate-bg vh-100">
+        <div class="authenticate-holder">
+            <Circle2 />
+        </div>
+    </div>
+{:else if signedIn}
     <div class="layout" class:edit-mode={editMode}>
         <EditModeOverlay {editMode} />
 
@@ -329,7 +368,7 @@
             onabout={() => aboutModal?.show()}
             onsettings={() => settingsModal?.show()}
             onexport={() => stemmaChart?.exportSvg($t("nav.exportDefaultName"))}
-            onsignOut={() => session.endSession()}
+            onsignOut={() => session.signOut()}
             oneditToggle={() => { editMode = !editMode; }}
             onpanToggle={() => { panMode = !panMode; }}
             onaddPerson={() => modals.addPerson()}
@@ -393,7 +432,7 @@
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
-            <Authenticate {google_client_id} onsignIn={(user) => session.handleSignIn(user)} />
+            <Authenticate {google_client_id} onsignIn={handleGoogleSignIn} />
         </div>
     </div>
 {/if}

@@ -115,6 +115,8 @@ async function main() {
         STEMMA_TABLE_NAME: tableName,
         STEMMA_AUTO_CREATE_TABLE: "1",
         STEMMA_REQUEST_DELAY_SECONDS: "0",
+        STEMMA_ALLOWED_ORIGINS: "http://127.0.0.1:4173",
+        STEMMA_COOKIE_SECURE: "0",
         DYNAMODB_ENDPOINT_URL: `http://127.0.0.1:${dynamoPort}`,
         AWS_ACCESS_KEY_ID: "local",
         AWS_SECRET_ACCESS_KEY: "local",

@@ -38,8 +38,8 @@ describe("AppController", () => {
 
         localStorage.setItem("stemma_last_stemma_id", "b");
 
-        const controller = new AppController("http://example", () => model as any);
-        controller.authenticateAndListStemmas({ getToken: () => "token", refresh: () => Promise.resolve("token") });
+        const controller = new AppController("http://example", model as any);
+        await controller.listStemmas();
         await drainPromises();
 
         expect(model.getStemma).toHaveBeenCalledWith("b");
@@ -57,8 +57,8 @@ describe("AppController", () => {
             getStemma: jest.fn().mockResolvedValue(stemmaB),
         };
 
-        const controller = new AppController("http://example", () => model as any);
-        controller.authenticateAndListStemmas({ getToken: () => "token", refresh: () => Promise.resolve("token") });
+        const controller = new AppController("http://example", model as any);
+        await controller.listStemmas();
         await drainPromises();
 
         expect(model.getStemma).not.toHaveBeenCalled();
@@ -77,8 +77,8 @@ describe("AppController", () => {
             getStemma: jest.fn().mockResolvedValue(stemmaB),
         };
 
-        const controller = new AppController("http://example", () => model as any);
-        controller.authenticateAndListStemmas({ getToken: () => "token", refresh: () => Promise.resolve("token") });
+        const controller = new AppController("http://example", model as any);
+        await controller.listStemmas();
         await drainPromises();
 
         expect(model.getStemma).toHaveBeenCalledWith("b");
@@ -99,8 +99,8 @@ describe("AppController", () => {
 
         localStorage.setItem("stemma_last_stemma_id", "a");
 
-        const controller = new AppController("http://example", () => model as any);
-        controller.authenticateAndListStemmas({ getToken: () => "token", refresh: () => Promise.resolve("token") });
+        const controller = new AppController("http://example", model as any);
+        await controller.listStemmas();
         await drainPromises();
 
         expect(model.getStemma).not.toHaveBeenCalled();
@@ -117,8 +117,8 @@ describe("AppController", () => {
             getStemma: jest.fn(),
         };
 
-        const controller = new AppController("http://example", () => model as any);
-        controller.authenticateAndListStemmas({ getToken: () => "token", refresh: () => Promise.resolve("token") });
+        const controller = new AppController("http://example", model as any);
+        await controller.listStemmas();
         await drainPromises();
 
         expect(model.getStemma).not.toHaveBeenCalled();
@@ -131,7 +131,7 @@ describe("AppController", () => {
             getStemma: jest.fn().mockResolvedValue(stemmaB),
         };
 
-        const controller = new AppController("http://example", () => model as any);
+        const controller = new AppController("http://example", model as any);
         (controller as any).model = model;
 
         controller.selectStemma("b");
@@ -148,7 +148,7 @@ describe("AppController", () => {
         const model = {
             getStemma: jest.fn().mockReturnValue(new Promise<Stemma>((r) => { resolveFetch = r; })),
         };
-        const controller = new AppController("http://example", () => model as any);
+        const controller = new AppController("http://example", model as any);
         (controller as any).model = model;
         controller.currentStemmaId.set("a");
 
@@ -165,7 +165,7 @@ describe("AppController", () => {
         const model = {
             getStemma: jest.fn().mockReturnValue(new Promise<Stemma>((r) => { resolveFetch = r; })),
         };
-        const controller = new AppController("http://example", () => model as any);
+        const controller = new AppController("http://example", model as any);
         (controller as any).model = model;
         controller.currentStemmaId.set("b");
 
@@ -183,7 +183,7 @@ describe("AppController", () => {
         const baseStemma: Stemma = { type: "Stemma", people: [], families: [] };
 
         function makeController(model: any) {
-            const c = new AppController("http://example", () => model as any);
+            const c = new AppController("http://example", model as any);
             (c as any).model = model;
             c.currentStemmaId.set(stemmaId);
             c.stemmaIndex.set(new StemmaIndex(baseStemma));
@@ -286,7 +286,7 @@ describe("AppController", () => {
         };
 
         function makeController(model: any) {
-            const c = new AppController("http://example", () => model as any);
+            const c = new AppController("http://example", model as any);
             (c as any).model = model;
             c.currentStemmaId.set(stemmaId);
             c.stemmaIndex.set(new StemmaIndex(baseStemma));

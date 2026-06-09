@@ -26,8 +26,6 @@ type Gsi = {
 
 type CredentialListener = (token: string) => void;
 
-const REFRESH_TIMEOUT_MS = 8_000;
-
 let initPromise: Promise<void> | null = null;
 const listeners = new Set<CredentialListener>();
 
@@ -68,37 +66,6 @@ export async function promptInitialSignIn(fallbackTarget: HTMLElement | null): P
     g.accounts.id.prompt((notification) => {
         if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
             if (fallbackTarget) g.accounts.id.renderButton(fallbackTarget, { theme: "outline", size: "large" });
-        }
-    });
-}
-
-export async function refreshCredential(): Promise<string> {
-    if (!initPromise) throw new Error("Google Identity Services not initialized");
-    await initPromise;
-    const g = gsi();
-    if (!g) throw new Error("Google Identity Services not loaded");
-
-    return new Promise<string>((resolve, reject) => {
-        let settled = false;
-        const finish = (ok: boolean, value: string | Error) => {
-            if (settled) return;
-            settled = true;
-            unsubscribe();
-            clearTimeout(timer);
-            if (ok) resolve(value as string);
-            else reject(value as Error);
-        };
-        const unsubscribe = onCredential((token) => finish(true, token));
-        const timer = setTimeout(() => finish(false, new Error("Silent refresh timed out")), REFRESH_TIMEOUT_MS);
-
-        try {
-            g.accounts.id.prompt((notification) => {
-                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                    finish(false, new Error("Silent refresh blocked by GIS"));
-                }
-            });
-        } catch (err) {
-            finish(false, err instanceof Error ? err : new Error(String(err)));
         }
     });
 }
