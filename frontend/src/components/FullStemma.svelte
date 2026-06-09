@@ -170,7 +170,7 @@
             if (d && d.x != null && d.y != null) return `translate(${d.x},${d.y})`;
             return null;
         });
-        // Foreign lines (v3 ghost edges, drag link-lines) have no datum — d? guards.
+        // Foreign lines (ghost edges, drag link-lines) have no datum — d? guards.
         svg.selectAll("line")
             .attr("x1", (d: any) => d?.source?.x ?? 0)
             .attr("y1", (d: any) => d?.source?.y ?? 0)
@@ -262,7 +262,7 @@
                     pendingMouseLeave = false;
                     return;
                 }
-                if (document.body.classList.contains("v2-linking")) return;
+                if (document.body.classList.contains("linking")) return;
                 if (!hoverHighlight) return;
                 if (node.type == "person") {
                     highlight.pushPerson(denormalizeId(node.id));
@@ -283,7 +283,7 @@
                     if (hoverHighlight) pendingMouseLeave = true;
                     return;
                 }
-                if (document.body.classList.contains("v2-linking")) return;
+                if (document.body.classList.contains("linking")) return;
                 if (!hoverHighlight) return;
                 highlight.pop();
                 renderFullStemma();
