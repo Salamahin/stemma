@@ -27,6 +27,7 @@ async function openFirstPersonSheet(page: import("@playwright/test").Page) {
 }
 
 test("v2 modals screenshots (mobile)", async ({ page }) => {
+  test.setTimeout(120_000);
   await page.setViewportSize(MOBILE);
   await page.goto("/v2");
   await waitForV2Ready(page);

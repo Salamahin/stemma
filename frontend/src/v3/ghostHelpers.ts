@@ -1,6 +1,6 @@
 import type { FocusedId } from "./focusGesture";
 import type { StemmaIndex } from "../stemmaIndex";
-import type { FamilyRole } from "./pendingState";
+import { isPendingId, type FamilyRole } from "./pendingState";
 
 export type GhostKind = "spouse" | "parent" | "child";
 
@@ -67,7 +67,10 @@ export type NeighborRef = { kind: "person" | "family"; id: string };
 /**
  * 1-hop neighbors of the focused entity. The ghost-layer sim leaves these
  * unfrozen so ghost circles can push them aside via collision force. The
- * focused node itself is excluded — it is frozen separately.
+ * focused node itself is excluded — it is frozen separately. Pending
+ * entities are also excluded: they were just placed by the user at the
+ * release point of a drag and must stay there so the follow-up gesture
+ * can target them.
  */
 export function immediateNeighborIds(
     focusedId: FocusedId,
@@ -77,13 +80,13 @@ export function immediateNeighborIds(
     const refs: NeighborRef[] = [];
 
     const addPerson = (id: string) => {
-        if (!seen.has(id) && id !== focusedId.id) {
+        if (!seen.has(id) && id !== focusedId.id && !isPendingId(id)) {
             seen.add(id);
             refs.push({ kind: "person", id });
         }
     };
     const addFamily = (id: string) => {
-        if (!seen.has(id) && id !== focusedId.id) {
+        if (!seen.has(id) && id !== focusedId.id && !isPendingId(id)) {
             seen.add(id);
             refs.push({ kind: "family", id });
         }
