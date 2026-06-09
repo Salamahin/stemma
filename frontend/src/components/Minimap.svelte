@@ -35,7 +35,6 @@
     const PERSON_R = 2.5;
     const FAMILY_R = 1.5;
 
-    let visible = $state(true);
     let personsPath = $state("");
     let familiesPath = $state("");
     let currentTransform = $state<d3.ZoomTransform>(d3.zoomIdentity);
@@ -139,56 +138,37 @@
 </script>
 
 {#if editMode}
-    <div class="minimap-container" class:collapsed={!visible}>
-        <button
-            class="minimap-toggle"
-            title={visible ? $t("minimap.hide") : $t("minimap.show")}
-            aria-label={visible ? $t("minimap.hide") : $t("minimap.show")}
-            onclick={() => (visible = !visible)}
+    <div class="minimap-container">
+        <svg
+            class="minimap-canvas"
+            width={CANVAS_W}
+            height={CANVAS_H}
+            role="img"
+            aria-label={$t("minimap.show")}
+            style="cursor: {isDragging ? 'grabbing' : 'crosshair'}"
+            onpointerdown={onMinimapPointerDown}
+            onpointermove={onMinimapPointerMove}
+            onpointerup={onMinimapPointerUp}
         >
-            {#if visible}
-                <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
-                    <path d="M2 8a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11A.5.5 0 0 1 2 8z" fill="currentColor"/>
-                </svg>
-            {:else}
-                <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
-                    <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" fill="currentColor"/>
-                </svg>
-            {/if}
-        </button>
+            <path d={personsPath} class="minimap-person" />
+            <path d={familiesPath} class="minimap-family" />
 
-        {#if visible}
-            <svg
-                class="minimap-canvas"
-                width={CANVAS_W}
-                height={CANVAS_H}
-                role="img"
-                aria-label={$t("minimap.show")}
-                style="cursor: {isDragging ? 'grabbing' : 'crosshair'}"
-                onpointerdown={onMinimapPointerDown}
-                onpointermove={onMinimapPointerMove}
-                onpointerup={onMinimapPointerUp}
-            >
-                <path d={personsPath} class="minimap-person" />
-                <path d={familiesPath} class="minimap-family" />
-
-                <rect
-                    x={projectedViewport.x}
-                    y={projectedViewport.y}
-                    width={projectedViewport.width}
-                    height={projectedViewport.height}
-                    class="minimap-viewport"
-                />
-            </svg>
-        {/if}
+            <rect
+                x={projectedViewport.x}
+                y={projectedViewport.y}
+                width={projectedViewport.width}
+                height={projectedViewport.height}
+                class="minimap-viewport"
+            />
+        </svg>
     </div>
 {/if}
 
 <style>
     .minimap-container {
         position: absolute;
-        bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-        left: calc(20px + env(safe-area-inset-left, 0px));
+        bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+        right: calc(96px + env(safe-area-inset-right, 0px));
         z-index: 100;
         background: rgba(255, 255, 255, 0.92);
         border: 1px solid rgba(0, 0, 0, 0.12);
@@ -204,40 +184,6 @@
         .minimap-container {
             display: none;
         }
-    }
-
-    .minimap-container.collapsed {
-        border-radius: 50%;
-        width: 28px;
-        height: 28px;
-    }
-
-    .minimap-toggle {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: none;
-        border: none;
-        cursor: pointer;
-        padding: 4px 6px;
-        color: #495057;
-        font-size: 10px;
-        min-width: 28px;
-        min-height: 20px;
-        align-self: flex-end;
-        line-height: 1;
-    }
-
-    .minimap-container.collapsed .minimap-toggle {
-        width: 28px;
-        height: 28px;
-        padding: 0;
-        align-self: auto;
-    }
-
-    .minimap-toggle:hover {
-        color: #212529;
-        background: rgba(0, 0, 0, 0.05);
     }
 
     .minimap-canvas {
