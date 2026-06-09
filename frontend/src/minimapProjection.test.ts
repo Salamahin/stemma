@@ -4,6 +4,7 @@ import {
     projectNodes,
     projectViewport,
     minimapClickToTranslate,
+    projectAndBuildPaths,
     type NodeDot,
 } from "./minimapProjection";
 import { zoomIdentity } from "d3";
@@ -104,6 +105,36 @@ describe("projectViewport", () => {
         const rect = projectViewport(transform, 200, 200, layout);
         expect(rect.x).toBeCloseTo(100, 5);
         expect(rect.y).toBeCloseTo(50, 5);
+    });
+});
+
+describe("projectAndBuildPaths", () => {
+    const layout = { scale: 2, offsetX: 5, offsetY: 3, contentWidth: 100, contentHeight: 100 };
+
+    it("returns empty strings for empty input", () => {
+        expect(projectAndBuildPaths([], layout, 2, 1)).toEqual({ persons: "", families: "" });
+    });
+
+    it("splits nodes by type into separate path strings", () => {
+        const nodes: NodeDot[] = [
+            { x: 10, y: 10, type: "person" },
+            { x: 20, y: 20, type: "family" },
+        ];
+        const { persons, families } = projectAndBuildPaths(nodes, layout, 2, 1);
+        // person projected: x = 10*2+5 = 25, y = 10*2+3 = 23 → "M23,23..."
+        expect(persons).toContain("M23,23");
+        expect(families).toContain("M44,43");
+        expect(persons).not.toContain("M44");
+        expect(families).not.toContain("M23,23");
+    });
+
+    it("concatenates one subpath per node", () => {
+        const nodes: NodeDot[] = [
+            { x: 10, y: 10, type: "person" },
+            { x: 30, y: 30, type: "person" },
+        ];
+        const { persons } = projectAndBuildPaths(nodes, layout, 1, 1);
+        expect(persons.match(/M/g)?.length).toBe(2);
     });
 });
 

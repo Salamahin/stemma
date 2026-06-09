@@ -76,6 +76,30 @@ export function projectNodes(nodes: NodeDot[], layout: MinimapLayout): NodeDot[]
     }));
 }
 
+export type ProjectedPaths = { persons: string; families: string };
+
+export function projectAndBuildPaths(
+    rawNodes: NodeDot[],
+    layout: MinimapLayout,
+    personRadius: number,
+    familyRadius: number,
+): ProjectedPaths {
+    const persons: string[] = [];
+    const families: string[] = [];
+    const pd2 = personRadius * 2;
+    const fd2 = familyRadius * 2;
+    for (const n of rawNodes) {
+        const x = n.x * layout.scale + layout.offsetX;
+        const y = n.y * layout.scale + layout.offsetY;
+        if (n.type === "person") {
+            persons.push(`M${x - personRadius},${y}a${personRadius},${personRadius} 0 1,0 ${pd2},0a${personRadius},${personRadius} 0 1,0 ${-pd2},0`);
+        } else {
+            families.push(`M${x - familyRadius},${y}a${familyRadius},${familyRadius} 0 1,0 ${fd2},0a${familyRadius},${familyRadius} 0 1,0 ${-fd2},0`);
+        }
+    }
+    return { persons: persons.join(""), families: families.join("") };
+}
+
 export function projectViewport(
     transform: ZoomTransform,
     viewWidth: number,
