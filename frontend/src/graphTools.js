@@ -210,7 +210,7 @@ export function denormalizeId(id) {
 }
 
 export function mergeData(svg, nodes, relations, width, height, initialPositions, pinnedPeople, ignoreCache) {
-    // Foreign DOM (v3 ghost edges/nodes, drag link-lines) lives in g.main too.
+    // Foreign DOM (ghost edges/nodes, drag link-lines) lives in g.main too.
     // selectAll must match only d3-bound elements or the join's keyFn dereferences
     // `undefined` and exit.remove() wipes the decorations.
     svg.select("g.main")
@@ -326,7 +326,7 @@ export function renderChart(svg, highlight, stemmaIndex, markers) {
         else return markers.family;
     }
 
-    // v3 ghost elements live inside g.main but have no datum; skip them so we
+    // Ghost elements live inside g.main but have no datum; skip them so we
     // never dereference t/line/node on undefined.
     const hasDatum = (d) => d != null;
 
