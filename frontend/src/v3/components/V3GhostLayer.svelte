@@ -214,6 +214,13 @@
             assignCollideR(focusDomId);
         }
 
+        // Pin ghost y to the seed value: the schema (spouse east of focus at
+        // same y, child below east family, parent above) is the affordance
+        // semantic and must not drift under the sim's forceY/link pull. Ghosts
+        // stay springy along x — collide + repel still push them rightward off
+        // the focus and away from neighbours.
+        for (const extra of injection.extraNodes) (extra as any).fy = extra.y;
+
         // Append ghost datums to main sim. d3.forceLink re-resolves string
         // source/target via the node-id accessor configured in
         // graphTools.configureSimulation.
