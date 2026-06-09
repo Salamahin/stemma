@@ -4,9 +4,9 @@
     import {
         computeBounds,
         computeLayout,
-        projectNodes,
         projectViewport,
         minimapClickToTranslate,
+        projectAndBuildPaths,
         type NodeDot,
         type MinimapLayout,
     } from "../minimapProjection";
@@ -36,7 +36,8 @@
     const FAMILY_R = 1.5;
 
     let visible = $state(true);
-    let nodes = $state<NodeDot[]>([]);
+    let personsPath = $state("");
+    let familiesPath = $state("");
     let currentTransform = $state<d3.ZoomTransform>(d3.zoomIdentity);
     let isDragging = $state(false);
     let viewWidth = $state(typeof window !== "undefined" ? window.innerWidth : 0);
@@ -64,12 +65,17 @@
         const raw = sim ? readSimNodes(sim) : [];
         const bounds = computeBounds(raw);
         layout = computeLayout(bounds, CANVAS_W, CANVAS_H);
-        nodes = projectNodes(raw, layout);
+        const paths = projectAndBuildPaths(raw, layout, PERSON_R, FAMILY_R);
+        personsPath = paths.persons;
+        familiesPath = paths.families;
         currentTransform = getZoomTransform() ?? d3.zoomIdentity;
     }
 
     $effect(() => {
         if (!editMode || !stemmaChartReady) return;
+
+        viewWidth = window.innerWidth;
+        viewHeight = window.innerHeight;
 
         let rafHandle = 0;
         const scheduleRefresh = () => {
@@ -163,13 +169,8 @@
                 onpointermove={onMinimapPointerMove}
                 onpointerup={onMinimapPointerUp}
             >
-                {#each nodes as node}
-                    {#if node.type === "person"}
-                        <circle cx={node.x} cy={node.y} r={PERSON_R} class="minimap-person" />
-                    {:else}
-                        <circle cx={node.x} cy={node.y} r={FAMILY_R} class="minimap-family" />
-                    {/if}
-                {/each}
+                <path d={personsPath} class="minimap-person" />
+                <path d={familiesPath} class="minimap-family" />
 
                 <rect
                     x={projectedViewport.x}
@@ -186,8 +187,8 @@
 <style>
     .minimap-container {
         position: absolute;
-        bottom: 20px;
-        right: 20px;
+        bottom: calc(216px + env(safe-area-inset-bottom, 0px));
+        right: calc(20px + env(safe-area-inset-right, 0px));
         z-index: 100;
         background: rgba(255, 255, 255, 0.92);
         border: 1px solid rgba(0, 0, 0, 0.12);
@@ -197,6 +198,12 @@
         display: flex;
         flex-direction: column;
         user-select: none;
+    }
+
+    @media (max-width: 767.98px) {
+        .minimap-container {
+            bottom: calc(192px + env(safe-area-inset-bottom, 0px));
+        }
     }
 
     .minimap-container.collapsed {
