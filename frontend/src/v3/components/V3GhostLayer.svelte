@@ -179,28 +179,39 @@
             personPositionById,
         });
 
-        // Capture pre-focus snapshot of every datum currently in the main sim
-        // so we can hard-snap real neighbours back on blur and detect ghost
-        // datums to filter on cleanup.
+        // All real datums stay frozen during the ghost burst. Real neighbours
+        // give real datums a temporary `r` so the main sim's collide force
+        // (`radius((d) => d.r * 20)`) registers the pair properly — without
+        // `r`, the focused/neighbour side returns NaN and the ghost would
+        // pass straight through. Frozen + sized = ghost gets pushed around a
+        // rigid real graph; only ghost positions move, no cascade jitter when
+        // the focused node has many children or sits in a dense cluster.
         const neighborDomIds = ghostSimNeighborDomIds(focusedId, stemmaIndex);
-        const neighbourSnapshots = new Map<string, { x: number; y: number; fx: number | null | undefined; fy: number | null | undefined; r: number | undefined }>();
+        const realRSnapshots = new Map<string, number | undefined>();
         const baseNodes = sim.nodes() as Array<any>;
         const baseLinks = (sim.force("link") as d3.ForceLink<any, any>).links() as Array<any>;
         const datumById = new Map<string, any>();
         for (const n of baseNodes) datumById.set(n.id, n);
 
-        // Unfreeze 1-hop neighbours so ghosts can push them via charge/collide.
-        // Real datums normally carry no `r`, so the main sim's
-        // `radius((d) => d.r * 20)` collide only counts the ghost side. Give
-        // each unfrozen neighbour a temporary `r` so the pair-collide pushes
-        // properly; restored on cleanup so post-blur edit-mode is unchanged.
-        for (const id of neighborDomIds) {
+        const assignCollideR = (id: string) => {
             const d = datumById.get(id);
-            if (!d) continue;
-            neighbourSnapshots.set(id, { x: d.x, y: d.y, fx: d.fx, fy: d.fy, r: d.r });
-            d.fx = null;
-            d.fy = null;
+            if (!d) return;
+            realRSnapshots.set(id, d.r);
             d.r = GHOST_NEIGHBOUR_COLLIDE_R;
+        };
+        for (const id of neighborDomIds) assignCollideR(id);
+
+        // Hard-pin the focused datum. Edit-mode normally freezes every node,
+        // but a mid-focus re-render can clear fx/fy. Snapshot + force-pin
+        // guarantees the focus origin never shifts while ghosts are alive.
+        const focusedDatum = datumById.get(focusDomId);
+        const focusedSnapshot = focusedDatum
+            ? { fx: focusedDatum.fx, fy: focusedDatum.fy }
+            : null;
+        if (focusedDatum) {
+            focusedDatum.fx = focusedDatum.x;
+            focusedDatum.fy = focusedDatum.y;
+            assignCollideR(focusDomId);
         }
 
         // Append ghost datums to main sim. d3.forceLink re-resolves string
@@ -403,18 +414,20 @@
             sim.nodes(survivingNodes);
             (sim.force("link") as d3.ForceLink<any, any>).links(survivingLinks);
 
-            // Hard-snap neighbours back to pre-focus positions and re-pin so
-            // edit-mode's "every real node frozen" invariant is restored. The
-            // applyManualPositions() call below redraws every real edge from
-            // the snapped datum coordinates in one pass.
-            for (const [id, snap] of neighbourSnapshots) {
+            // Strip temporary `r` from real datums so post-blur edit-mode
+            // collide behaviour is identical to pre-focus. Positions don't
+            // need restoring — neighbours were pinned the whole time.
+            for (const [id, prevR] of realRSnapshots) {
                 const d = datumById.get(id);
                 if (!d) continue;
-                d.x = snap.x;
-                d.y = snap.y;
-                d.fx = snap.fx == null ? snap.x : snap.fx;
-                d.fy = snap.fy == null ? snap.y : snap.fy;
-                d.r = snap.r;
+                d.r = prevR;
+            }
+
+            // Restore focused datum's original fx/fy snapshot. Edit-mode's
+            // re-pin path picks it back up via hadKnownPosition.
+            if (focusedDatum && focusedSnapshot) {
+                focusedDatum.fx = focusedSnapshot.fx;
+                focusedDatum.fy = focusedSnapshot.fy;
             }
 
             sim.alphaTarget(0).stop();

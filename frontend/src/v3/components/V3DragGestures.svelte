@@ -283,7 +283,16 @@
                 return "noop";
             }
             if (source.kind === "empty") {
-                if (overInfo?.ref.kind === "family") return "valid";
+                if (overInfo?.ref.kind === "family") {
+                    // Pending families always carry a single member; adding
+                    // the modal-created spouse promotes them. Real families
+                    // already at 2 parents would land a 3rd spouse — block.
+                    if (isPendingFamilyId(overInfo.ref.id)) return "valid";
+                    const fam = displayedStemmaIndex?.family(overInfo.ref.id);
+                    if (!fam) return "noop";
+                    if ((fam.parents?.length ?? 0) >= 2) return "noop";
+                    return "valid";
+                }
                 if (overInfo?.ref.kind === "person") {
                     if (displayedStemmaIndex?.hasParentFamily(overInfo.ref.id)) return "noop";
                     return "valid";
@@ -487,6 +496,13 @@
                 }
                 return;
             }
+
+            // Re-check compatibility at drop. Hover-time compat only drives the
+            // visual highlight; without this guard a drop on a "disallowed"
+            // target (e.g. family with 2 parents) would still fire
+            // attachPersonToFamily and the backend would reject the implicit
+            // 3rd-parent update.
+            if (targetCompatibility(source, overInfo) === "noop") return;
 
             if (source.kind === "person" && overInfo?.ref.kind === "family") {
                 onattachPersonToFamily(source.id, overInfo.ref.id, "parent", startCenter);
