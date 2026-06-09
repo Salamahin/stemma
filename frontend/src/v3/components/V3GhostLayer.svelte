@@ -15,12 +15,16 @@
     import {
         deriveGhostLayout,
         FOCUSED_FAMILY_REF,
-        immediateNeighborIds,
         realFamilyIdFromRef,
         type GhostKind,
     } from "../ghostHelpers";
     import { nodeCenter } from "../v3DomGeometry";
     import { trimToCircle, GHOST_EDGE_GAP } from "../ghostEdgeGeometry";
+    import {
+        buildGhostSimGraph,
+        configureGhostSim,
+        ghostSimNeighborDomIds,
+    } from "../ghostSim";
 
     type Props = {
         focusedId: FocusedId | null;
@@ -44,7 +48,6 @@
     const GHOST_COLOR = "#6c757d";
     const GHOST_ARROW_TO_FAMILY_ID = "v3-ghost-arrow-to-family";
     const GHOST_ARROW_TO_PERSON_ID = "v3-ghost-arrow-to-person";
-    const GHOST_COLLIDE_RADIUS = 36;
 
     let fadingOutGhostEls: Element[] = [];
 
@@ -126,21 +129,23 @@
             personPos.set(p.id, { x: base.x + p.dx, y: base.y + p.dy });
         }
 
+        type GhostEdgeRef = {
+            line: SVGLineElement;
+            sourceId: string;
+            targetId: string;
+            edgeKind: "focusToFamily" | "familyToPerson";
+        };
+        const edgeRefs: GhostEdgeRef[] = [];
+
         const makeLine = (
-            source: Pos,
-            target: Pos,
+            sourceId: string,
+            targetId: string,
+            sourcePos: Pos,
+            targetPos: Pos,
             edgeKind: "focusToFamily" | "familyToPerson",
         ): void => {
-            const sourceR = edgeKind === "focusToFamily" ? personR : familyR;
-            const targetR = edgeKind === "focusToFamily" ? familyR : personR;
-            const tip = trimToCircle(source.x, source.y, target.x, target.y, targetR + GHOST_EDGE_GAP);
-            const tail = trimToCircle(target.x, target.y, source.x, source.y, sourceR + GHOST_EDGE_GAP);
             const line = document.createElementNS(SVG_NS, "line") as SVGLineElement;
             line.setAttribute("class", "v3-ghost-edge");
-            line.setAttribute("x1", String(tail.x));
-            line.setAttribute("y1", String(tail.y));
-            line.setAttribute("x2", String(tip.x));
-            line.setAttribute("y2", String(tip.y));
             if (edgeKind === "focusToFamily") {
                 line.setAttribute("stroke-width", familyRelationWidth);
                 line.setAttribute("marker-end", `url(#${GHOST_ARROW_TO_FAMILY_ID})`);
@@ -151,7 +156,23 @@
             line.style.opacity = "0";
             mainG.appendChild(line);
             allGhostEls.push(line);
+            edgeRefs.push({ line, sourceId, targetId, edgeKind });
+            applyEdgeEndpoints(edgeRefs[edgeRefs.length - 1], sourcePos, targetPos);
         };
+
+        const applyEdgeEndpoints = (ref: GhostEdgeRef, source: Pos, target: Pos): void => {
+            const sourceR = ref.edgeKind === "focusToFamily" ? personR : familyR;
+            const targetR = ref.edgeKind === "focusToFamily" ? familyR : personR;
+            const tip = trimToCircle(source.x, source.y, target.x, target.y, targetR + GHOST_EDGE_GAP);
+            const tail = trimToCircle(target.x, target.y, source.x, source.y, sourceR + GHOST_EDGE_GAP);
+            ref.line.setAttribute("x1", String(tail.x));
+            ref.line.setAttribute("y1", String(tail.y));
+            ref.line.setAttribute("x2", String(tip.x));
+            ref.line.setAttribute("y2", String(tip.y));
+        };
+
+        const ghostFamilyEls = new Map<string, SVGGElement>();
+        const ghostPersonEls = new Map<string, SVGGElement>();
 
         const makeGhostFamilyEl = (id: string, pos: Pos): void => {
             const g = document.createElementNS(SVG_NS, "g") as SVGGElement;
@@ -165,6 +186,7 @@
             g.appendChild(c);
             mainG.appendChild(g);
             allGhostEls.push(g);
+            ghostFamilyEls.set(id, g);
         };
 
         const makeGhostPersonEl = (
@@ -173,7 +195,7 @@
             labelKey: string,
             kind: GhostKind,
             existingFamilyId: string | undefined,
-            familyPos: Pos | null,
+            familyId: string,
         ): void => {
             const g = document.createElementNS(SVG_NS, "g") as SVGGElement;
             g.setAttribute("id", id);
@@ -192,12 +214,26 @@
             g.appendChild(label);
             mainG.appendChild(g);
             allGhostEls.push(g);
+            ghostPersonEls.set(id, g);
 
             const capturedFocused = focusedId;
             g.addEventListener("pointerup", (ev: PointerEvent) => {
                 ev.stopPropagation();
-                onghostClick(kind, capturedFocused, { person: pos, family: familyPos }, existingFamilyId);
+                const personNode = nodesById.get(id);
+                const famNode = nodesById.get(familyId);
+                const personPosNow = personNode ?? pos;
+                const famPosNow = famNode ? { x: famNode.x, y: famNode.y } : null;
+                onghostClick(kind, capturedFocused, {
+                    person: { x: personPosNow.x, y: personPosNow.y },
+                    family: famPosNow,
+                }, existingFamilyId);
             });
+        };
+
+        const resolveAnchorSimId = (familyRef: string): string => {
+            if (familyRef === FOCUSED_FAMILY_REF) return focusDomId;
+            const real = realFamilyIdFromRef(familyRef);
+            return real ? normalizeId("family", real) : familyRef;
         };
 
         for (const f of layout.families) {
@@ -208,106 +244,109 @@
             const pos = personPos.get(p.id);
             if (!pos) continue;
             const existingFamilyId = realFamilyIdFromRef(p.familyId) ?? undefined;
-            const famPos = familyAnchor.get(p.familyId) ?? null;
-            makeGhostPersonEl(p.id, pos, p.labelKey, p.kind, existingFamilyId, famPos);
+            makeGhostPersonEl(p.id, pos, p.labelKey, p.kind, existingFamilyId, resolveAnchorSimId(p.familyId));
         }
 
         for (const a of layout.anchorEdges) {
             const familyPos = familyAnchor.get(a.familyId);
             if (!familyPos) continue;
             if (a.focusedRole === "parent") {
-                makeLine(origin, familyPos, "focusToFamily");
+                makeLine(focusDomId, a.familyId, origin, familyPos, "focusToFamily");
             } else {
-                makeLine(familyPos, origin, "familyToPerson");
+                makeLine(a.familyId, focusDomId, familyPos, origin, "familyToPerson");
             }
         }
-
         for (const p of layout.persons) {
             const pos = personPos.get(p.id);
             const anchorPos = familyAnchor.get(p.familyId);
             if (!pos || !anchorPos) continue;
+            const anchorSimId = resolveAnchorSimId(p.familyId);
             if (p.role === "parent") {
-                makeLine(pos, anchorPos, "focusToFamily");
+                makeLine(p.id, anchorSimId, pos, anchorPos, "focusToFamily");
             } else {
-                makeLine(anchorPos, pos, "familyToPerson");
+                makeLine(anchorSimId, p.id, anchorPos, pos, "familyToPerson");
             }
         }
+
+        const neighborDomIds = ghostSimNeighborDomIds(focusedId, stemmaIndex);
+        const positionSnapshot = new Map<string, Pos>();
+        const neighborEls = new Map<string, SVGGElement>();
+        const neighborDatums = new Map<string, any>();
+        const neighborPositions = new Map<string, Pos>();
+
+        d3.select("g.main").selectAll<SVGGElement, any>("g").each(function (this: SVGGElement, d: any) {
+            if (!d || d.x == null || d.y == null) return;
+            positionSnapshot.set(d.id, { x: d.x, y: d.y });
+            if (neighborDomIds.has(d.id)) {
+                neighborEls.set(d.id, this);
+                neighborDatums.set(d.id, d);
+                neighborPositions.set(d.id, { x: d.x, y: d.y });
+            }
+        });
+
+        const ghostSeedPositions = new Map<string, Pos>();
+        for (const f of layout.families) {
+            const pos = familyAnchor.get(f.id);
+            if (pos) ghostSeedPositions.set(f.id, pos);
+        }
+        for (const p of layout.persons) {
+            const pos = personPos.get(p.id);
+            if (pos) ghostSeedPositions.set(p.id, pos);
+        }
+
+        const graph = buildGhostSimGraph(focusedId, stemmaIndex, layout, {
+            origin,
+            neighborPositions,
+            ghostPositions: ghostSeedPositions,
+        });
+        const sim = configureGhostSim(graph, origin);
+
+        const nodesById = new Map(graph.nodes.map((n) => [n.id, n]));
+
+        const emitPositions = () => {
+            const live: Pos[] = [];
+            for (const n of graph.nodes) {
+                if (n.isGhost) live.push({ x: n.x, y: n.y });
+            }
+            onpositionsChange(live);
+        };
+
+        // Initial emit covers the seed positions so V3FocusController has
+        // ghost coordinates before the sim's first tick; the on("end") emit
+        // refreshes them once the sim has settled.
+        emitPositions();
+
+        sim.on("tick", () => {
+            for (const n of graph.nodes) {
+                if (n.isGhost) {
+                    const fEl = ghostFamilyEls.get(n.id);
+                    if (fEl) fEl.setAttribute("transform", `translate(${n.x},${n.y})`);
+                    const pEl = ghostPersonEls.get(n.id);
+                    if (pEl) pEl.setAttribute("transform", `translate(${n.x},${n.y})`);
+                } else {
+                    const el = neighborEls.get(n.id);
+                    if (!el) continue;
+                    el.setAttribute("transform", `translate(${n.x},${n.y})`);
+                    const d = neighborDatums.get(n.id);
+                    if (d) {
+                        d.x = n.x;
+                        d.y = n.y;
+                    }
+                }
+            }
+            for (const e of edgeRefs) {
+                const s = nodesById.get(e.sourceId);
+                const t = nodesById.get(e.targetId);
+                if (s && t) applyEdgeEndpoints(e, s, t);
+            }
+        });
+
+        sim.on("end", emitPositions);
 
         let fadeInCancelled = false;
         requestAnimationFrame(() => {
             if (fadeInCancelled) return;
             for (const el of allGhostEls) el.style.opacity = "";
-        });
-
-        onpositionsChange([...familyAnchor.values(), ...personPos.values()]);
-
-        // One-way physics: ghosts are frozen at their planned positions but
-        // their collision circles push 1-hop real neighbours aside so existing
-        // nodes don't sit on top of the affordances. Real non-neighbour nodes
-        // stay pinned at their current positions.
-        type SimNode = {
-            id: string;
-            x: number;
-            y: number;
-            fx?: number | null;
-            fy?: number | null;
-            isGhost: boolean;
-            el?: SVGGElement | null;
-            datum?: any;
-        };
-
-        const neighborDomIds = new Set(
-            immediateNeighborIds(focusedId, stemmaIndex).map((n) => normalizeId(n.kind, n.id)),
-        );
-        const positionSnapshot = new Map<string, { x: number; y: number }>();
-        const simNodes: SimNode[] = [];
-        const neighborSims: SimNode[] = [];
-
-        d3.select("g.main").selectAll<SVGGElement, any>("g").each(function (this: SVGGElement, d: any) {
-            if (!d || d.x == null || d.y == null) return;
-            positionSnapshot.set(d.id, { x: d.x, y: d.y });
-            const isNeighbor = neighborDomIds.has(d.id);
-            const sim: SimNode = {
-                id: d.id,
-                x: d.x,
-                y: d.y,
-                fx: isNeighbor ? null : d.x,
-                fy: isNeighbor ? null : d.y,
-                isGhost: false,
-                el: this,
-                datum: d,
-            };
-            simNodes.push(sim);
-            if (isNeighbor) neighborSims.push(sim);
-        });
-
-        // Ghost sim nodes: frozen at the static plan positions.
-        for (const f of layout.families) {
-            const pos = familyAnchor.get(f.id);
-            if (!pos) continue;
-            simNodes.push({ id: f.id, x: pos.x, y: pos.y, fx: pos.x, fy: pos.y, isGhost: true });
-        }
-        for (const p of layout.persons) {
-            const pos = personPos.get(p.id);
-            if (!pos) continue;
-            simNodes.push({ id: p.id, x: pos.x, y: pos.y, fx: pos.x, fy: pos.y, isGhost: true });
-        }
-
-        const sim = d3
-            .forceSimulation<SimNode>(simNodes)
-            .force("collide", d3.forceCollide<SimNode>().radius(GHOST_COLLIDE_RADIUS).strength(0.9))
-            .alphaDecay(0.04)
-            .velocityDecay(0.5);
-
-        sim.on("tick", () => {
-            for (const n of neighborSims) {
-                if (!n.el) continue;
-                n.el.setAttribute("transform", `translate(${n.x},${n.y})`);
-                if (n.datum) {
-                    n.datum.x = n.x;
-                    n.datum.y = n.y;
-                }
-            }
         });
 
         return () => {
@@ -320,14 +359,15 @@
             // synchronously so the next focus snapshot doesn't pick up
             // mid-physics coordinates. Datum fx/fy is left as FullStemma set
             // it — edit mode keeps every real node pinned anyway.
-            for (const n of neighborSims) {
-                const snap = positionSnapshot.get(n.id);
+            for (const [id, el] of neighborEls) {
+                const snap = positionSnapshot.get(id);
                 if (!snap) continue;
-                if (n.datum) {
-                    n.datum.x = snap.x;
-                    n.datum.y = snap.y;
+                const d = neighborDatums.get(id);
+                if (d) {
+                    d.x = snap.x;
+                    d.y = snap.y;
                 }
-                if (n.el) n.el.setAttribute("transform", `translate(${snap.x},${snap.y})`);
+                el.setAttribute("transform", `translate(${snap.x},${snap.y})`);
             }
         };
     });
