@@ -54,6 +54,14 @@
 <div>
     <div class="family-title">
         <span class="title-text">{familyTitle}</span>
+        <button
+            type="button"
+            class="card-close"
+            aria-label={$t("common.close")}
+            onclick={() => onclose?.()}
+        >
+            <i class="bi bi-x-lg"></i>
+        </button>
     </div>
 
     {#if family && family.parents.length > 0}
@@ -99,6 +107,10 @@
 
 <style>
     .family-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
         margin-bottom: 14px;
         line-height: 1.35;
     }
@@ -106,6 +118,32 @@
     .title-text {
         font-weight: 700;
         font-size: 0.95rem;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .card-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: transparent;
+        border: none;
+        color: var(---text-muted);
+        cursor: pointer;
+        font-size: var(---fs-label);
+        transition: background-color 0.12s ease, color 0.12s ease;
+        flex-shrink: 0;
+    }
+
+    .card-close:hover {
+        background: #f1f3f5;
+        color: var(---text-primary);
     }
 
     .section-label {
