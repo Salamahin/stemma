@@ -230,6 +230,8 @@ export const en: Record<string, string> = {
     'createParentTitleOf': "Add {names}'s parent",
     'panModeOn': 'Pan canvas',
     'panModeOff': 'Exit pan mode',
+    'minimap.show': 'Show minimap',
+    'minimap.hide': 'Hide minimap',
 };
 
 export const ru: Record<string, string> = {
@@ -430,6 +432,8 @@ export const ru: Record<string, string> = {
     'createParentTitleOf': 'Добавить родителя {names}',
     'panModeOn': 'Перемещать холст',
     'panModeOff': 'Выйти из режима перемещения',
+    'minimap.show': 'Показать миникарту',
+    'minimap.hide': 'Скрыть миникарту',
 };
 
 const dictionaries: Record<Locale, Record<string, string>> = { en, ru };
