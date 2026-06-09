@@ -17,9 +17,9 @@ import { normalizeId } from "../graphTools";
 
 describe("ghost sim tuning constants", () => {
     it("decay constants are heavier than the main edit-off sim defaults", () => {
-        // d3 defaults: alphaDecay ≈ 0.0228, velocityDecay = 0.4.
-        // Main edit-off sim uses velocityDecay 0.8. Ghost must be strictly heavier
-        // so it settles inside the 300–500 ms budget called out in #219.
+        // d3 defaults: alphaDecay ≈ 0.0228, velocityDecay = 0.4. Main edit-off
+        // sim uses velocityDecay 0.8. Ghost must be strictly heavier so it
+        // settles inside the 300–500 ms target.
         expect(GHOST_SIM_ALPHA_DECAY).toBeGreaterThan(0.1);
         expect(GHOST_SIM_VELOCITY_DECAY).toBeGreaterThanOrEqual(0.8);
     });

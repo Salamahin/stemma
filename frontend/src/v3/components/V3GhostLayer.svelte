@@ -109,8 +109,6 @@
             return el ? nodeCenter(el) : null;
         };
 
-        // Seed positions for ghost nodes. Families derive from their declared
-        // offset relative to either the focused node or an existing family.
         const familyAnchor = new Map<string, Pos>();
         for (const f of layout.families) {
             familyAnchor.set(f.id, { x: origin.x + f.dx, y: origin.y + f.dy });
@@ -221,8 +219,10 @@
             const capturedFocused = focusedId;
             g.addEventListener("pointerup", (ev: PointerEvent) => {
                 ev.stopPropagation();
-                const personPosNow = positionsById.get(id) ?? pos;
-                const famPosNow = positionsById.get(familyId) ?? null;
+                const personNode = nodesById.get(id);
+                const famNode = nodesById.get(familyId);
+                const personPosNow = personNode ?? pos;
+                const famPosNow = famNode ? { x: famNode.x, y: famNode.y } : null;
                 onghostClick(kind, capturedFocused, {
                     person: { x: personPosNow.x, y: personPosNow.y },
                     family: famPosNow,
@@ -230,7 +230,12 @@
             });
         };
 
-        // Render ghost DOM elements at seed positions.
+        const resolveAnchorSimId = (familyRef: string): string => {
+            if (familyRef === FOCUSED_FAMILY_REF) return focusDomId;
+            const real = realFamilyIdFromRef(familyRef);
+            return real ? normalizeId("family", real) : familyRef;
+        };
+
         for (const f of layout.families) {
             const pos = familyAnchor.get(f.id);
             if (pos) makeGhostFamilyEl(f.id, pos);
@@ -239,14 +244,9 @@
             const pos = personPos.get(p.id);
             if (!pos) continue;
             const existingFamilyId = realFamilyIdFromRef(p.familyId) ?? undefined;
-            const ghostFamilyId = p.familyId === FOCUSED_FAMILY_REF
-                ? focusDomId
-                : (realFamilyIdFromRef(p.familyId) ? normalizeId("family", realFamilyIdFromRef(p.familyId)!) : p.familyId);
-            makeGhostPersonEl(p.id, pos, p.labelKey, p.kind, existingFamilyId, ghostFamilyId);
+            makeGhostPersonEl(p.id, pos, p.labelKey, p.kind, existingFamilyId, resolveAnchorSimId(p.familyId));
         }
 
-        // Ghost edges — anchor edges link focused ↔ ghost-family; person edges
-        // link each ghost person to its anchor family (ghost or real).
         for (const a of layout.anchorEdges) {
             const familyPos = familyAnchor.get(a.familyId);
             if (!familyPos) continue;
@@ -260,9 +260,7 @@
             const pos = personPos.get(p.id);
             const anchorPos = familyAnchor.get(p.familyId);
             if (!pos || !anchorPos) continue;
-            const anchorSimId = p.familyId === FOCUSED_FAMILY_REF
-                ? focusDomId
-                : (realFamilyIdFromRef(p.familyId) ? normalizeId("family", realFamilyIdFromRef(p.familyId)!) : p.familyId);
+            const anchorSimId = resolveAnchorSimId(p.familyId);
             if (p.role === "parent") {
                 makeLine(p.id, anchorSimId, pos, anchorPos, "focusToFamily");
             } else {
@@ -270,8 +268,6 @@
             }
         }
 
-        // Set up sim. Real neighbours participate; non-neighbours stay pinned
-        // at their current positions and are excluded from the sim.
         const neighborDomIds = ghostSimNeighborDomIds(focusedId, stemmaIndex);
         const positionSnapshot = new Map<string, Pos>();
         const neighborEls = new Map<string, SVGGElement>();
@@ -305,25 +301,23 @@
         });
         const sim = configureGhostSim(graph, origin);
 
-        // Live position map shared with ghost-click handler and the focus
-        // controller hover-detection callback.
-        const positionsById = new Map<string, Pos>();
-        for (const n of graph.nodes) positionsById.set(n.id, { x: n.x, y: n.y });
+        const nodesById = new Map(graph.nodes.map((n) => [n.id, n]));
 
         const emitPositions = () => {
             const live: Pos[] = [];
             for (const n of graph.nodes) {
-                if (!n.isGhost) continue;
-                live.push({ x: n.x, y: n.y });
+                if (n.isGhost) live.push({ x: n.x, y: n.y });
             }
             onpositionsChange(live);
         };
 
+        // Initial emit covers the seed positions so V3FocusController has
+        // ghost coordinates before the sim's first tick; the on("end") emit
+        // refreshes them once the sim has settled.
         emitPositions();
 
         sim.on("tick", () => {
             for (const n of graph.nodes) {
-                positionsById.set(n.id, { x: n.x, y: n.y });
                 if (n.isGhost) {
                     const fEl = ghostFamilyEls.get(n.id);
                     if (fEl) fEl.setAttribute("transform", `translate(${n.x},${n.y})`);
@@ -341,12 +335,13 @@
                 }
             }
             for (const e of edgeRefs) {
-                const s = positionsById.get(e.sourceId);
-                const t = positionsById.get(e.targetId);
+                const s = nodesById.get(e.sourceId);
+                const t = nodesById.get(e.targetId);
                 if (s && t) applyEdgeEndpoints(e, s, t);
             }
-            emitPositions();
         });
+
+        sim.on("end", emitPositions);
 
         let fadeInCancelled = false;
         requestAnimationFrame(() => {
