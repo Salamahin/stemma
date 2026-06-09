@@ -49,7 +49,6 @@
     let panMode = $state(false);
     let spacePan = $state(false);
     const panActive = $derived(editMode && (panMode || spacePan));
-    let trayOpen = $state(false);
 
     let ownedStemmas = $state<StemmaDescription[]>([]);
     let currentStemmaId = $state<string | null>(null);
@@ -157,11 +156,6 @@
         displayedStemma ? new StemmaIndex(displayedStemma) : null,
     );
 
-    const orphanPeople = $derived.by<PersonDescription[]>(() => {
-        if (!stemma || !stemmaIndex) return [];
-        return stemma.people.filter((p) => stemmaIndex!.relatedFamilies(p.id).length === 0);
-    });
-
     $effect(() => {
         if (editMode) return;
         panMode = false;
@@ -174,14 +168,6 @@
     $effect(() => {
         if (panActive) focusedId = null;
     });
-
-    async function handleBulkAdd(names: string[]) {
-        for (const name of names) {
-            await actions.withPendingAdd(name, () =>
-                controller.createOrphanPerson({ type: "CreateNewPerson", name }, { silent: true }),
-            );
-        }
-    }
 
     function errorMessage(err: Error): string {
         if (err instanceof LocalizedError) return $t(err.key, err.params);
@@ -334,8 +320,6 @@
             {editMode}
             {panMode}
             showSignOut={!session.e2eAutoLoginEnabled}
-            {orphanPeople}
-            {trayOpen}
             onstemmaSelect={(id) => controller.selectStemma(id)}
             onstemmaAddNew={() => modals.addStemma()}
             onstemmaRename={(s) => modals.renameStemma(s)}
@@ -349,8 +333,6 @@
             oneditToggle={() => { editMode = !editMode; }}
             onpanToggle={() => { panMode = !panMode; }}
             onaddPerson={() => modals.addPerson()}
-            onbulkAdd={handleBulkAdd}
-            ontrayToggle={() => { trayOpen = !trayOpen; }}
         />
 
         {#if isWorking}
