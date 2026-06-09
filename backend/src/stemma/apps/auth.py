@@ -20,7 +20,7 @@ class AllowAnyTokenVerifier:
 
 class GoogleTokenVerifier:
     def __init__(self, client_id: str) -> None:
-        self._audience = f"{client_id}.apps.googleusercontent.com"
+        self._audience = client_id
         self._request = google_requests.Request()
 
     def email_from(self, token: str) -> str:
