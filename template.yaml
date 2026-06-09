@@ -16,6 +16,9 @@ Globals:
         STEMMA_TABLE_NAME: !Ref StemmaTable
         STEMMA_PHOTO_BUCKET: !Ref PersonPhotoBucket
         GOOGLE_CLIENT_ID: !Sub "${googleAuthClientId}"
+        STEMMA_ALLOWED_ORIGINS: !Sub "https://${cloudFrontAlias}"
+        STEMMA_COOKIE_DOMAIN: !Sub "${cloudFrontAlias}"
+        STEMMA_COOKIE_SECURE: "1"
     Layers:
       - !Ref MyLayer
 
@@ -159,22 +162,16 @@ Resources:
   MyApi:
     Type: AWS::Serverless::HttpApi
     Properties:
-      Auth:
-        Authorizers:
-          OAuth2Authorizer:
-            JwtConfiguration:
-              issuer: "https://accounts.google.com"
-              audience:
-                - !Sub "${googleAuthClientId}"
-            IdentitySource: "$request.header.Authorization"
-        DefaultAuthorizer: OAuth2Authorizer
       CorsConfiguration:
         AllowOrigins:
-          - '*'
+          - !Sub "https://${cloudFrontAlias}"
         AllowHeaders:
-          - '*'
+          - content-type
         AllowMethods:
-          - '*'
+          - POST
+          - GET
+          - OPTIONS
+        AllowCredentials: true
         MaxAge: 600
       RouteSettings:
         "GET /warmup":
@@ -240,6 +237,9 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
   BackupVault:
@@ -300,8 +300,6 @@ Resources:
             ApiId: !Ref MyApi
             Path: /warmup
             Method: get
-            Auth:
-              Authorizer: NONE
       Policies:
         - S3FullAccessPolicy:
             BucketName: stemma-app-backend-assets

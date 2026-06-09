@@ -44,6 +44,8 @@ export type SetPersonPhotoRequest = { type: "SetPersonPhotoRequest", stemmaId: s
 export type CreateOrphanPersonRequest = { type: "CreateOrphanPersonRequest", stemmaId: string, personDescr: CreateNewPerson }
 export type LinkRole = "spouse" | "parent" | "child"
 export type LinkPersonsRequest = { type: "LinkPersonsRequest", stemmaId: string, fromPersonId: string, toPersonId: string, role: LinkRole }
+export type AuthLoginRequest = { type: "AuthLoginRequest", idToken: string }
+export type AuthLogoutRequest = { type: "AuthLogoutRequest" }
 
 type Request =
     | CreateFamilyRequest
@@ -63,6 +65,8 @@ type Request =
     | SetPersonPhotoRequest
     | CreateOrphanPersonRequest
     | LinkPersonsRequest
+    | AuthLoginRequest
+    | AuthLogoutRequest
 
 
 //responses
@@ -75,6 +79,8 @@ export type PersonDescription = { type: "PersonDescription", id: string, name: s
 export type TokenAccepted = { type: "TokenAccepted", stemmas: Array<StemmaDescription>, lastStemma: Stemma }
 export type CloneResult = { type: "CloneResult", createdStemma: Stemma, stemmas: Array<StemmaDescription> }
 export type PhotoUploadUrl = { type: "PhotoUploadUrl", uploadUrl: string, photoKey: string, expiresInSeconds: number }
+export type AuthLoginResponse = { type: "AuthLoginResponse", userId: string, email: string }
+export type AuthLogoutResponse = { type: "AuthLogoutResponse" }
 
 //errors
 export type UnknownError = { type: "UnknownError", cause: string }
@@ -105,6 +111,8 @@ export type StemmaResponse =
     | TokenAccepted
     | CloneResult
     | PhotoUploadUrl
+    | AuthLoginResponse
+    | AuthLogoutResponse
     | UnknownError
     | RequestDeserializationProblem
     | NoSuchPersonId
@@ -123,27 +131,25 @@ export type StemmaResponse =
     | SpouseLinkAlreadyExists
     | TooManyParents
 
-//aux
-export type User = { id_token: string }
-export type TokenProvider = {
-    getToken: () => string;
-    refresh: () => Promise<string>;
-}
-
 export class Model {
     endpoint: string;
-    private tokenProvider: TokenProvider;
 
-    constructor(endpoint: string, tokenProvider: TokenProvider) {
+    constructor(endpoint: string) {
         this.endpoint = endpoint
-        this.tokenProvider = tokenProvider
     }
 
-    private headers(token: string) {
+    private headers() {
         return {
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json; charset=UTF-8',
         }
+    }
+
+    async login(idToken: string): Promise<AuthLoginResponse> {
+        return this.send<AuthLoginResponse>({ type: "AuthLoginRequest", idToken }, null)
+    }
+
+    async logout(): Promise<AuthLogoutResponse> {
+        return this.send<AuthLogoutResponse>({ type: "AuthLogoutRequest" }, null)
     }
 
     async listDescribeStemmas(): Promise<OwnedStemmas> {
@@ -265,24 +271,13 @@ export class Model {
 
     private async send<R extends StemmaResponse>(request: Request, stemmaIndex: StemmaIndex | null): Promise<R> {
         const body = JSON.stringify(request)
-        let response = await fetch(`${this.endpoint}/stemma`, {
+        const response = await fetch(`${this.endpoint}/stemma`, {
             method: 'POST',
-            headers: this.headers(this.tokenProvider.getToken()),
+            credentials: 'include',
+            headers: this.headers(),
             body,
         })
-        if (response.status === 401) {
-            try {
-                const refreshed = await this.tokenProvider.refresh()
-                response = await fetch(`${this.endpoint}/stemma`, {
-                    method: 'POST',
-                    headers: this.headers(refreshed),
-                    body,
-                })
-            } catch {
-                throw new LocalizedError("error.sessionExpired")
-            }
-            if (response.status === 401) throw new LocalizedError("error.sessionExpired")
-        }
+        if (response.status === 401) throw new LocalizedError("error.sessionExpired")
         if (!response.ok) throw new LocalizedError("error.unexpectedResponse")
         const payload = (await response.json()) as StemmaResponse
         return mapStemmaError(payload, (id) => this.describePerson(id, stemmaIndex)) as R

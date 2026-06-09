@@ -1,6 +1,6 @@
 import { HiglightLineages } from './highlight';
 import { Model } from './model';
-import type { CreateNewPerson, LinkRole, PersonDefinition, Stemma, StemmaDescription, TokenProvider } from './model';
+import type { CreateNewPerson, LinkRole, PersonDefinition, Stemma, StemmaDescription } from './model';
 import { PinnedPeopleStorage } from './pinnedPeopleStorage';
 import { StemmaIndex } from './stemmaIndex';
 import { writable, get } from 'svelte/store';
@@ -12,7 +12,6 @@ export type MutationResult = { newPersonIds: string[]; newFamilyIds: string[] }
 
 export class AppController {
     private static readonly LAST_STEMMA_KEY = "stemma_last_stemma_id";
-    private modelFactory: (endpoint: string, tokenProvider: TokenProvider) => Model;
     stemma = writable<Stemma>(null)
     stemmaIndex = writable<StemmaIndex>(null)
     pinnedStorage = writable<PinnedPeopleStorage>(null)
@@ -24,55 +23,43 @@ export class AppController {
     err = writable<Error>(null)
     settingsStorage = writable<SettingsStorage>(null);
 
-    private model: Model
-    private stemmaBackendUrl: string
+    readonly model: Model
 
-    constructor(stemmaBackendUrl: string, modelFactory?: (endpoint: string, tokenProvider: TokenProvider) => Model) {
-        this.stemmaBackendUrl = stemmaBackendUrl;
-        this.modelFactory = modelFactory ?? ((endpoint, tokenProvider) => new Model(endpoint, tokenProvider));
+    constructor(stemmaBackendUrl: string, model?: Model) {
+        this.model = model ?? new Model(stemmaBackendUrl);
     }
 
-    authenticateAndListStemmas(tokenProvider: TokenProvider) {
+    async listStemmas(): Promise<void> {
+        this.isWorking.set(true)
+        this.err.set(null)
+        try {
+            const result = await this.model.listDescribeStemmas()
+            if (result.stemmas.length === 0) {
+                this.ownedStemmas.set(result.stemmas)
+                return
+            }
+            const selectedId = selectStemmaId(
+                result.stemmas,
+                this.loadLastStemmaId(),
+                result.defaultStemmaId,
+            );
+            const selectedStemma = result.stemmas.find((s) => s.id === selectedId)!;
+            const stemma = selectedStemma.id === result.stemmas[0].id
+                ? result.firstStemma
+                : await this.model.getStemma(selectedStemma.id);
+            this.refreshIndexes(stemma, selectedStemma.id)
+            this.ownedStemmas.set(result.stemmas)
+            this.setCurrentStemmaId(selectedStemma.id)
+            this.stemma.set(stemma)
+        } finally {
+            this.isWorking.set(false)
+        }
+    }
+
+    bearInvitationToken(token: string) {
         this.isWorking.set(true)
         this.err.set(null)
 
-        this.model = this.modelFactory(this.stemmaBackendUrl, tokenProvider)
-        this.model
-            .listDescribeStemmas()
-            .then((result) => {
-                if (result.stemmas.length === 0) {
-                    this.ownedStemmas.set(result.stemmas)
-                    return
-                }
-                const selectedId = selectStemmaId(
-                    result.stemmas,
-                    this.loadLastStemmaId(),
-                    result.defaultStemmaId,
-                );
-                const selectedStemma = result.stemmas.find((s) => s.id === selectedId);
-                const stemmaPromise = selectedStemma.id === result.stemmas[0].id
-                    ? Promise.resolve(result.firstStemma)
-                    : this.model.getStemma(selectedStemma.id);
-
-                return stemmaPromise.then((stemma) => {
-                    this.refreshIndexes(stemma, selectedStemma.id)
-                    this.ownedStemmas.set(result.stemmas)
-                    this.setCurrentStemmaId(selectedStemma.id)
-                    this.stemma.set(stemma)
-                })
-            })
-            .catch(err => {
-                this.err.set(err)
-                console.error('Err when listing stemmas after authenticate: ', err.stack);
-            })
-            .finally(() => this.isWorking.set(false))
-    }
-
-    authenticateAndBearToken(tokenProvider: TokenProvider, token: string) {
-        this.isWorking.set(true)
-        this.err.set(null)
-
-        this.model = this.modelFactory(this.stemmaBackendUrl, tokenProvider)
         this.model
             .bearInvitationToken(token)
             .then((result) => {

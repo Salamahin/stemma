@@ -158,6 +158,17 @@ class SetPersonPhotoRequest:
     type: Literal["SetPersonPhotoRequest"] = "SetPersonPhotoRequest"
 
 
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
+class AuthLoginRequest:
+    id_token: str
+    type: Literal["AuthLoginRequest"] = "AuthLoginRequest"
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
+class AuthLogoutRequest:
+    type: Literal["AuthLogoutRequest"] = "AuthLogoutRequest"
+
+
 Request = Annotated[
     CreateFamilyRequest
     | UpdateFamilyRequest
@@ -175,6 +186,8 @@ Request = Annotated[
     | CreateOrphanPersonRequest
     | LinkPersonsRequest
     | RequestPhotoUploadUrlRequest
-    | SetPersonPhotoRequest,
+    | SetPersonPhotoRequest
+    | AuthLoginRequest
+    | AuthLogoutRequest,
     Discriminator("type"),
 ]

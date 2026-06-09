@@ -16,60 +16,53 @@ describe("Model", () => {
         jest.restoreAllMocks();
     });
 
-    test("retries once after 401 using a freshly refreshed token", async () => {
-        let calls = 0;
-        const refresh = jest.fn().mockResolvedValue("new-token");
-        const fetchMock = jest.fn().mockImplementation(async (_url: string, init: RequestInit) => {
-            calls += 1;
-            const auth = (init.headers as Record<string, string>)["Authorization"];
-            if (calls === 1) {
-                expect(auth).toBe("Bearer old-token");
-                return fakeResponse(401);
-            }
-            expect(auth).toBe("Bearer new-token");
-            return fakeResponse(200, okStemma);
-        });
+    test("sends requests with credentials:include and no Authorization header", async () => {
+        const fetchMock = jest.fn().mockResolvedValue(fakeResponse(200, okStemma));
         (globalThis as any).fetch = fetchMock;
 
-        const model = new Model("http://example", {
-            getToken: () => "old-token",
-            refresh,
-        });
+        const model = new Model("http://example");
+        await model.getStemma("s");
 
-        const result = await model.getStemma("s");
-        expect(result).toEqual(okStemma);
-        expect(refresh).toHaveBeenCalledTimes(1);
-        expect(fetchMock).toHaveBeenCalledTimes(2);
+        const [, init] = fetchMock.mock.calls[0];
+        expect((init as RequestInit).credentials).toBe("include");
+        const headers = (init as RequestInit).headers as Record<string, string>;
+        expect(headers["Authorization"]).toBeUndefined();
     });
 
-    test("throws sessionExpired when refresh fails", async () => {
-        const refresh = jest.fn().mockRejectedValue(new Error("nope"));
+    test("throws sessionExpired on 401 without retry", async () => {
         const fetchMock = jest.fn().mockResolvedValue(fakeResponse(401));
         (globalThis as any).fetch = fetchMock;
 
-        const model = new Model("http://example", {
-            getToken: () => "old-token",
-            refresh,
-        });
+        const model = new Model("http://example");
 
         await expect(model.getStemma("s")).rejects.toMatchObject({ key: "error.sessionExpired" });
-        expect(refresh).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
-    test("throws sessionExpired when refreshed token still gets 401", async () => {
-        const refresh = jest.fn().mockResolvedValue("new-token");
-        const fetchMock = jest.fn().mockResolvedValue(fakeResponse(401));
+    test("login posts AuthLoginRequest with idToken", async () => {
+        const body = { type: "AuthLoginResponse", userId: "u", email: "a@b" };
+        const fetchMock = jest.fn().mockResolvedValue(fakeResponse(200, body));
         (globalThis as any).fetch = fetchMock;
 
-        const model = new Model("http://example", {
-            getToken: () => "old-token",
-            refresh,
-        });
+        const model = new Model("http://example");
+        const result = await model.login("abc");
 
-        await expect(model.getStemma("s")).rejects.toMatchObject({ key: "error.sessionExpired" });
-        expect(refresh).toHaveBeenCalledTimes(1);
-        expect(fetchMock).toHaveBeenCalledTimes(2);
+        const sent = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+        expect(sent).toEqual({ type: "AuthLoginRequest", idToken: "abc" });
+        expect(result).toEqual(body);
+    });
+
+    test("logout posts AuthLogoutRequest", async () => {
+        const fetchMock = jest
+            .fn()
+            .mockResolvedValue(fakeResponse(200, { type: "AuthLogoutResponse" }));
+        (globalThis as any).fetch = fetchMock;
+
+        const model = new Model("http://example");
+        await model.logout();
+
+        const sent = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+        expect(sent).toEqual({ type: "AuthLogoutRequest" });
     });
 
     const unknownPerson: CreateNewPerson = { type: "CreateNewPerson", name: "" };
@@ -79,7 +72,7 @@ describe("Model", () => {
         const fetchMock = jest.fn().mockResolvedValue(fakeResponse(200, okStemma));
         (globalThis as any).fetch = fetchMock;
 
-        const model = new Model("http://example", { getToken: () => "tok", refresh: jest.fn() });
+        const model = new Model("http://example");
         await model.createOrphanPerson("s", unknownPerson);
 
         const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
@@ -90,7 +83,7 @@ describe("Model", () => {
         const fetchMock = jest.fn().mockResolvedValue(fakeResponse(200, okStemma));
         (globalThis as any).fetch = fetchMock;
 
-        const model = new Model("http://example", { getToken: () => "tok", refresh: jest.fn() });
+        const model = new Model("http://example");
         await model.updatePerson("s", "p", unknownPerson, noIndex);
 
         const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
@@ -102,7 +95,7 @@ describe("Model", () => {
         (globalThis as any).fetch = fetchMock;
         const existingChild: ExistingPerson = { type: "ExistingPerson", id: "kid" };
 
-        const model = new Model("http://example", { getToken: () => "tok", refresh: jest.fn() });
+        const model = new Model("http://example");
         await model.createFamily("s", [unknownPerson], [existingChild], noIndex);
 
         const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);

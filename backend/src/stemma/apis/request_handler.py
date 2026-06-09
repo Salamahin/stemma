@@ -2,6 +2,8 @@ import logging
 
 from stemma.domain.errors import AccessToPersonDenied, ForeignInviteToken
 from stemma.domain.requests import (
+    AuthLoginRequest,
+    AuthLogoutRequest,
     BearInvitationRequest,
     CloneStemmaRequest,
     CreateFamilyRequest,
@@ -87,6 +89,8 @@ class RequestHandler:
                 return self._request_photo_upload_url(user, request)
             case SetPersonPhotoRequest():
                 return self._set_person_photo(user, request)
+            case AuthLoginRequest() | AuthLogoutRequest():
+                raise RuntimeError("auth requests must be handled at the transport layer")
 
     def _list_describe_stemmas(self, user: User, request: ListDescribeStemmasRequest) -> OwnedStemmas:
         existing = self._storage.list_owned_stemmas(user.user_id)

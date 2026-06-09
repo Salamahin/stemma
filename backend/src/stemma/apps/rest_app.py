@@ -1,17 +1,17 @@
 import asyncio
-import json
 import logging
 
-from fastapi import FastAPI, HTTPException, Request as FastApiRequest
+from fastapi import FastAPI, Request as FastApiRequest
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response as FastApiResponse
 
 from stemma.apis.request_handler import RequestHandler
-from stemma.apps.auth import TokenVerifier
-from stemma.domain.codec import decode_request, encode_error, encode_response
-from stemma.domain.errors import RequestDeserializationProblem, StemmaError, UnknownError
-from stemma.domain.user import User
-from stemma.services.user_service import UserService
+from stemma.apps.dispatch import (
+    CookieAction,
+    CookieConfig,
+    dispatch_payload,
+)
+from stemma.services.auth_service import AuthService
 
 logger = logging.getLogger(__name__)
 
@@ -20,51 +20,65 @@ DEFAULT_REQUEST_DELAY_SECONDS = 2
 
 def build_app(
     handler: RequestHandler,
-    verifier: TokenVerifier,
-    users: UserService,
+    auth: AuthService,
     *,
+    allowed_origins: set[str],
+    cookie_config: CookieConfig,
     request_delay_seconds: float = DEFAULT_REQUEST_DELAY_SECONDS,
 ) -> FastAPI:
     app = FastAPI()
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=sorted(allowed_origins) if "*" not in allowed_origins else ["*"],
+        allow_methods=["POST", "OPTIONS"],
+        allow_headers=["content-type"],
+        allow_credentials="*" not in allowed_origins,
         max_age=600,
     )
 
     @app.post("/stemma")
-    async def stemma_endpoint(request: FastApiRequest) -> JSONResponse:
-        user = await asyncio.to_thread(_resolve_user, request, verifier, users)
+    async def stemma_endpoint(request: FastApiRequest) -> FastApiResponse:
         body_bytes = await request.body()
         if request_delay_seconds:
             await asyncio.sleep(request_delay_seconds)
-        try:
-            payload = json.loads(body_bytes)
-            domain_request = decode_request(payload)
-        except (ValueError, json.JSONDecodeError) as e:
-            return JSONResponse(content=encode_error(RequestDeserializationProblem(descr=str(e))))
-        try:
-            response = await asyncio.to_thread(handler.handle, user, domain_request)
-            return JSONResponse(content=encode_response(response))
-        except StemmaError as e:
-            logger.exception("Service error")
-            return JSONResponse(content=encode_error(e))
-        except Exception as e:
-            logger.exception("Unexpected error")
-            return JSONResponse(content=encode_error(UnknownError(cause=repr(e))))
+        result = await asyncio.to_thread(
+            dispatch_payload,
+            raw_body=body_bytes.decode("utf-8") if body_bytes else "",
+            cookies=dict(request.cookies),
+            origin=request.headers.get("origin"),
+            allowed_origins=allowed_origins,
+            auth=auth,
+            handler=handler,
+        )
+        if result.body is None:
+            response = FastApiResponse(status_code=result.status_code)
+        else:
+            response = JSONResponse(status_code=result.status_code, content=result.body)
+        if result.cookie_action == CookieAction.SET:
+            assert result.session_id is not None and result.session_max_age is not None
+            response.set_cookie(
+                key=cookie_config.name,
+                value=result.session_id,
+                max_age=result.session_max_age,
+                path=cookie_config.path,
+                domain=cookie_config.domain,
+                secure=cookie_config.secure,
+                httponly=True,
+                samesite=cookie_config.same_site.lower(),  # type: ignore[arg-type]
+            )
+        elif result.cookie_action == CookieAction.CLEAR:
+            response.delete_cookie(
+                key=cookie_config.name,
+                path=cookie_config.path,
+                domain=cookie_config.domain,
+                secure=cookie_config.secure,
+                httponly=True,
+                samesite=cookie_config.same_site.lower(),  # type: ignore[arg-type]
+            )
+        return response
+
+    @app.get("/warmup")
+    async def warmup() -> JSONResponse:
+        return JSONResponse(content={"ok": True})
 
     return app
-
-
-def _resolve_user(request: FastApiRequest, verifier: TokenVerifier, users: UserService) -> User:
-    auth_header = request.headers.get("authorization")
-    if not auth_header:
-        raise HTTPException(status_code=401, detail="missing authorization header")
-    token = auth_header.removeprefix("Bearer ").strip()
-    try:
-        email = verifier.email_from(token)
-    except Exception as e:
-        raise HTTPException(status_code=401, detail="invalid token") from e
-    return users.get_or_create_user(email)
