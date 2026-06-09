@@ -40,6 +40,7 @@
         onpersonSelected?: (person: any) => void;
         onfamilySelected?: (family: any) => void;
         onhighlightChanged?: () => void;
+        onzoomChanged?: () => void;
     };
 
     let {
@@ -55,6 +56,7 @@
         onpersonSelected,
         onfamilySelected,
         onhighlightChanged,
+        onzoomChanged,
     }: Props = $props();
 
     const hoveredPersonR = 25;
@@ -150,12 +152,28 @@
 
     const zoomHandler = d3.zoom().on("zoom", (e) => {
         svg.select("g.main").attr("transform", e.transform);
+        onzoomChanged?.();
     });
 
     export function exportSvg(filename: string) {
         if (!svg) return;
         const node = svg.node() as SVGSVGElement | null;
         if (node) exportChartSvg(node, filename);
+    }
+
+    export function getZoomTransform(): d3.ZoomTransform {
+        const node = svg?.node() as SVGSVGElement | null;
+        if (!node) return d3.zoomIdentity;
+        return d3.zoomTransform(node);
+    }
+
+    export function applyZoomTranslate(tx: number, ty: number) {
+        if (!svg) return;
+        const node = svg.node() as SVGSVGElement | null;
+        if (!node) return;
+        const current = d3.zoomTransform(node);
+        const next = d3.zoomIdentity.translate(tx, ty).scale(current.k);
+        svg.call(zoomHandler.transform, next as d3.ZoomTransform);
     }
 
     export function setSimulationActive(active: boolean) {

@@ -31,6 +31,7 @@
     import EditModeOverlay from "./components/EditModeOverlay.svelte";
     import Chrome from "./components/Chrome.svelte";
     import PendingVisuals from "./components/PendingVisuals.svelte";
+    import Minimap from "./components/Minimap.svelte";
     import { buildInviteLink } from "./inviteLinkBuilder";
     import { Circle2 } from "svelte-loading-spinners";
     import { normalizeId } from "./graphTools";
@@ -73,6 +74,7 @@
     let promptModal = $state<ReturnType<typeof PromptModal> | null>(null);
     let confirmModal = $state<ReturnType<typeof ConfirmModal> | null>(null);
     let stemmaChart = $state<ReturnType<typeof FullStemma> | null>(null);
+    let minimap = $state<ReturnType<typeof Minimap> | null>(null);
 
     const controller = new AppController(untrack(() => stemma_backend_url));
 
@@ -251,6 +253,7 @@
                     onpersonSelected={handlePersonSelected}
                     onfamilySelected={handleFamilySelected}
                     onhighlightChanged={() => highlightVersion++}
+                    onzoomChanged={() => minimap?.refresh()}
                 />
             {/if}
 
@@ -297,6 +300,15 @@
             removedPersonIds={pendingRemovedPersonIds}
             removedFamilyIds={pendingRemovedFamilyIds}
             stemmaChartReady={!!stemmaChart}
+        />
+
+        <Minimap
+            bind:this={minimap}
+            {editMode}
+            stemmaChartReady={!!stemmaChart}
+            getSimulation={() => stemmaChart?.getSimulation() ?? null}
+            getZoomTransform={() => stemmaChart?.getZoomTransform() ?? null}
+            applyZoomTranslate={(tx, ty) => stemmaChart?.applyZoomTranslate(tx, ty)}
         />
 
         <Chrome
