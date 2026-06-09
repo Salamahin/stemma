@@ -23,3 +23,21 @@ export function trimToCircle(
     const scale = (dist - r) / dist;
     return { x: x1 + dx * scale, y: y1 + dy * scale };
 }
+
+/** Visible gap (user-space px) between a ghost edge endpoint and the node circle it touches. */
+export const GHOST_EDGE_GAP = 2;
+
+/**
+ * Reads a circle child's `r` attribute from a node `<g>`. Falls back to the
+ * supplied default if the circle is missing or the attribute can't be parsed.
+ * Used to follow hover-enlargement of real nodes (FullStemma grows the
+ * focused person/family circle on mouseenter).
+ */
+export function readNodeCircleRadius(el: SVGGElement | null, fallback: number): number {
+    const circle = el?.querySelector("circle") as SVGCircleElement | null;
+    if (!circle) return fallback;
+    const raw = circle.getAttribute("r");
+    if (raw == null) return fallback;
+    const parsed = Number.parseFloat(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
