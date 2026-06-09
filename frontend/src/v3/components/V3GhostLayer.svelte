@@ -20,7 +20,7 @@
         type GhostKind,
     } from "../ghostHelpers";
     import { nodeCenter } from "../v3DomGeometry";
-    import { trimToCircle, readNodeCircleRadius, GHOST_EDGE_GAP } from "../ghostEdgeGeometry";
+    import { trimToCircle, GHOST_EDGE_GAP } from "../ghostEdgeGeometry";
 
     type Props = {
         focusedId: FocusedId | null;
@@ -100,23 +100,11 @@
         ensureGhostMarkers(svgEl);
         const labels = $t;
         const allGhostEls: SVGElement[] = [];
-        // Lines whose endpoint hugs the focused real node — re-trimmed when
-        // FullStemma grows the focused circle on hover so the arrow keeps
-        // touching the visible boundary instead of being swallowed.
-        const focusedSideLines: Array<{
-            line: SVGLineElement;
-            farPos: Pos;
-            farFixedR: number;
-            focusedOnTarget: boolean;
-        }> = [];
 
         const nodeCenterById = (kind: "person" | "family", id: string): Pos | null => {
             const el = mainG.querySelector(`#${CSS.escape(normalizeId(kind, id))}`) as SVGGElement | null;
             return el ? nodeCenter(el) : null;
         };
-
-        const focusedFallbackR = focusedId.kind === "person" ? personR : familyR;
-        const focusedCurrentR = (): number => readNodeCircleRadius(focusEl, focusedFallbackR);
 
         const familyAnchor = new Map<string, Pos>();
         for (const f of layout.families) {
@@ -138,34 +126,21 @@
             personPos.set(p.id, { x: base.x + p.dx, y: base.y + p.dy });
         }
 
-        const setTrimmedEndpoints = (
-            line: SVGLineElement,
-            source: Pos,
-            target: Pos,
-            sourceR: number,
-            targetR: number,
-        ): void => {
-            const tip = trimToCircle(source.x, source.y, target.x, target.y, targetR + GHOST_EDGE_GAP);
-            const tail = trimToCircle(target.x, target.y, source.x, source.y, sourceR + GHOST_EDGE_GAP);
-            line.setAttribute("x1", String(tail.x));
-            line.setAttribute("y1", String(tail.y));
-            line.setAttribute("x2", String(tip.x));
-            line.setAttribute("y2", String(tip.y));
-        };
-
         const makeLine = (
             source: Pos,
             target: Pos,
             edgeKind: "focusToFamily" | "familyToPerson",
-            opts: { sourceIsFocused?: boolean; targetIsFocused?: boolean } = {},
         ): void => {
-            const sourceFixedR = edgeKind === "focusToFamily" ? personR : familyR;
-            const targetFixedR = edgeKind === "focusToFamily" ? familyR : personR;
-            const sourceR = opts.sourceIsFocused ? focusedCurrentR() : sourceFixedR;
-            const targetR = opts.targetIsFocused ? focusedCurrentR() : targetFixedR;
+            const sourceR = edgeKind === "focusToFamily" ? personR : familyR;
+            const targetR = edgeKind === "focusToFamily" ? familyR : personR;
+            const tip = trimToCircle(source.x, source.y, target.x, target.y, targetR + GHOST_EDGE_GAP);
+            const tail = trimToCircle(target.x, target.y, source.x, source.y, sourceR + GHOST_EDGE_GAP);
             const line = document.createElementNS(SVG_NS, "line") as SVGLineElement;
             line.setAttribute("class", "v3-ghost-edge");
-            setTrimmedEndpoints(line, source, target, sourceR, targetR);
+            line.setAttribute("x1", String(tail.x));
+            line.setAttribute("y1", String(tail.y));
+            line.setAttribute("x2", String(tip.x));
+            line.setAttribute("y2", String(tip.y));
             if (edgeKind === "focusToFamily") {
                 line.setAttribute("stroke-width", familyRelationWidth);
                 line.setAttribute("marker-end", `url(#${GHOST_ARROW_TO_FAMILY_ID})`);
@@ -176,23 +151,6 @@
             line.style.opacity = "0";
             mainG.appendChild(line);
             allGhostEls.push(line);
-
-            if (opts.targetIsFocused) {
-                focusedSideLines.push({ line, farPos: source, farFixedR: sourceFixedR, focusedOnTarget: true });
-            } else if (opts.sourceIsFocused) {
-                focusedSideLines.push({ line, farPos: target, farFixedR: targetFixedR, focusedOnTarget: false });
-            }
-        };
-
-        const retrimFocusedSideLines = (): void => {
-            const r = focusedCurrentR();
-            for (const entry of focusedSideLines) {
-                const source = entry.focusedOnTarget ? entry.farPos : origin;
-                const target = entry.focusedOnTarget ? origin : entry.farPos;
-                const sourceR = entry.focusedOnTarget ? entry.farFixedR : r;
-                const targetR = entry.focusedOnTarget ? r : entry.farFixedR;
-                setTrimmedEndpoints(entry.line, source, target, sourceR, targetR);
-            }
         };
 
         const makeGhostFamilyEl = (id: string, pos: Pos): void => {
@@ -258,9 +216,9 @@
             const familyPos = familyAnchor.get(a.familyId);
             if (!familyPos) continue;
             if (a.focusedRole === "parent") {
-                makeLine(origin, familyPos, "focusToFamily", { sourceIsFocused: true });
+                makeLine(origin, familyPos, "focusToFamily");
             } else {
-                makeLine(familyPos, origin, "familyToPerson", { targetIsFocused: true });
+                makeLine(familyPos, origin, "familyToPerson");
             }
         }
 
@@ -268,15 +226,10 @@
             const pos = personPos.get(p.id);
             const anchorPos = familyAnchor.get(p.familyId);
             if (!pos || !anchorPos) continue;
-            // Focused-family case: only edges connect the focused family directly
-            // to ghost persons (no intermediate anchor edge). Mark the focused
-            // family as the source so the line hugs its real (hover-grown) radius.
-            const focusedFamilyIsAnchor =
-                focusedId.kind === "family" && p.familyId === FOCUSED_FAMILY_REF;
             if (p.role === "parent") {
-                makeLine(pos, anchorPos, "focusToFamily", { targetIsFocused: focusedFamilyIsAnchor });
+                makeLine(pos, anchorPos, "focusToFamily");
             } else {
-                makeLine(anchorPos, pos, "familyToPerson", { sourceIsFocused: focusedFamilyIsAnchor });
+                makeLine(anchorPos, pos, "familyToPerson");
             }
         }
 
@@ -285,21 +238,6 @@
             if (fadeInCancelled) return;
             for (const el of allGhostEls) el.style.opacity = "";
         });
-
-        // FullStemma grows the focused real node's circle on mouseenter (and
-        // resets on mouseleave). Re-trim the lines whose endpoint hugs the
-        // focused node so the arrow keeps touching the visible boundary
-        // instead of disappearing inside the enlarged circle.
-        let focusedHoverRaf: number | null = null;
-        const onFocusedHoverChange = () => {
-            if (focusedHoverRaf !== null) return;
-            focusedHoverRaf = requestAnimationFrame(() => {
-                focusedHoverRaf = null;
-                retrimFocusedSideLines();
-            });
-        };
-        focusEl?.addEventListener("mouseenter", onFocusedHoverChange);
-        focusEl?.addEventListener("mouseleave", onFocusedHoverChange);
 
         onpositionsChange([...familyAnchor.values(), ...personPos.values()]);
 
@@ -375,9 +313,6 @@
         return () => {
             fadeInCancelled = true;
             sim.stop();
-            if (focusedHoverRaf !== null) cancelAnimationFrame(focusedHoverRaf);
-            focusEl?.removeEventListener("mouseenter", onFocusedHoverChange);
-            focusEl?.removeEventListener("mouseleave", onFocusedHoverChange);
             onpositionsChange([]);
             fadeOutAndRemove(allGhostEls);
 
