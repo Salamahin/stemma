@@ -204,6 +204,16 @@
         familySheetOpen = true;
     }
 
+    function handleNodeActivation(f: FocusedId) {
+        if (f.kind === "person") {
+            const person = displayedStemmaIndex?.person(f.id);
+            if (person) handlePersonSelected(person);
+        } else {
+            const family = displayedStemmaIndex?.family(f.id);
+            if (family) handleFamilySelected(family);
+        }
+    }
+
     function closeFamilySheet() {
         familySheetOpen = false;
         selectedFamilyId = null;
@@ -290,6 +300,8 @@
             oncreatePersonInFamily={(familyId, role, title, pinAt) => actions.createPersonInFamily(familyId, role, title, pinAt)}
             oncreatePendingFamily={(personId, role, familyAt) => { actions.createPendingFamilyForPerson(personId, role, familyAt); }}
             onshortTapFocus={(f) => (focusedId = f)}
+            onlongPress={handleNodeActivation}
+            ondesktopNodeClick={handleNodeActivation}
             onclearFocus={() => (focusedId = null)}
             onclosePanMode={() => (panMode = false)}
             onspacePanChange={(v) => (spacePan = v)}
