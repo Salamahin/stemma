@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { PersonDescription, Stemma, StemmaDescription } from "../model";
+    import type { Stemma, StemmaDescription } from "../model";
     import type { StemmaIndex } from "../stemmaIndex";
     import type { HiglightLineages } from "../highlight";
     import Chip from "./Chip.svelte";
@@ -7,7 +7,6 @@
     import Menu from "./Menu.svelte";
     import Fab from "./Fab.svelte";
     import Search from "./Search.svelte";
-    import BulkAddTray from "./BulkAddTray.svelte";
     import StatsCard from "./StatsCard.svelte";
 
     type Props = {
@@ -21,8 +20,6 @@
         editMode: boolean;
         panMode: boolean;
         showSignOut: boolean;
-        orphanPeople: PersonDescription[];
-        trayOpen: boolean;
         onstemmaSelect: (id: string) => void;
         onstemmaAddNew: () => void;
         onstemmaRename: (s: StemmaDescription) => void;
@@ -36,8 +33,6 @@
         oneditToggle: () => void;
         onpanToggle: () => void;
         onaddPerson: () => void;
-        onbulkAdd: (names: string[]) => Promise<void> | void;
-        ontrayToggle: () => void;
     };
 
     let {
@@ -51,8 +46,6 @@
         editMode,
         panMode,
         showSignOut,
-        orphanPeople,
-        trayOpen,
         onstemmaSelect,
         onstemmaAddNew,
         onstemmaRename,
@@ -66,8 +59,6 @@
         oneditToggle,
         onpanToggle,
         onaddPerson,
-        onbulkAdd,
-        ontrayToggle,
     }: Props = $props();
 </script>
 
@@ -121,16 +112,6 @@
         <div class="bottom-left">
             <StatsCard {stemma} {stemmaIndex} {highlight} {highlightVersion} />
         </div>
-    {/if}
-
-    {#if editMode && stemma}
-        <BulkAddTray
-            orphans={orphanPeople}
-            busy={isWorking}
-            open={trayOpen}
-            {onbulkAdd}
-            ontoggle={ontrayToggle}
-        />
     {/if}
 </div>
 

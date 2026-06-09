@@ -595,14 +595,31 @@
         };
         // touchstart fires before pointerdown, so d3.zoom would start a pan in
         // parallel with the link gesture; swallow single-finger touch, let
-        // pinch through.
+        // pinch through. preventDefault also suppresses the synthesized
+        // mousedown/click that would otherwise wake d3.drag and d3-selection's
+        // click handler, opening the edit modal on every short tap.
         const onTouchStartCapture = (e: TouchEvent) => {
             if (panActive) return;
             if (e.touches.length !== 1) return;
-            e.stopPropagation();
+            e.stopImmediatePropagation();
+            e.preventDefault();
+        };
+        // Edit-mode mouse drag must not pin simulation physics via d3.drag.
+        const onMouseDownCapture = (e: MouseEvent) => {
+            if (panActive) return;
+            if (e.button !== 0) return;
+            e.stopImmediatePropagation();
+        };
+        // Swallow click in edit mode so taps focus (via gesture machine)
+        // instead of opening the edit modal via the chart's d3 click handler.
+        const onClickCapture = (e: MouseEvent) => {
+            if (panActive) return;
+            e.stopImmediatePropagation();
         };
         svgEl.addEventListener("pointerdown", onPointerDownCapture, true);
         svgEl.addEventListener("touchstart", onTouchStartCapture, true);
+        svgEl.addEventListener("mousedown", onMouseDownCapture, true);
+        svgEl.addEventListener("click", onClickCapture, true);
         window.addEventListener("pointermove", onPointerMove);
         window.addEventListener("pointerup", onPointerEnd);
         window.addEventListener("pointercancel", onCancel);
@@ -612,6 +629,8 @@
         return () => {
             svgEl.removeEventListener("pointerdown", onPointerDownCapture, true);
             svgEl.removeEventListener("touchstart", onTouchStartCapture, true);
+            svgEl.removeEventListener("mousedown", onMouseDownCapture, true);
+            svgEl.removeEventListener("click", onClickCapture, true);
             window.removeEventListener("pointermove", onPointerMove);
             window.removeEventListener("pointerup", onPointerEnd);
             window.removeEventListener("pointercancel", onCancel);

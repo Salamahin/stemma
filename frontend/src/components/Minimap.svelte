@@ -187,8 +187,8 @@
 <style>
     .minimap-container {
         position: absolute;
-        bottom: calc(216px + env(safe-area-inset-bottom, 0px));
-        right: calc(20px + env(safe-area-inset-right, 0px));
+        bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+        left: calc(20px + env(safe-area-inset-left, 0px));
         z-index: 100;
         background: rgba(255, 255, 255, 0.92);
         border: 1px solid rgba(0, 0, 0, 0.12);
@@ -202,7 +202,7 @@
 
     @media (max-width: 767.98px) {
         .minimap-container {
-            bottom: calc(192px + env(safe-area-inset-bottom, 0px));
+            display: none;
         }
     }
 
