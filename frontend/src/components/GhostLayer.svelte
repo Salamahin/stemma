@@ -219,7 +219,12 @@
         // semantic and must not drift under the sim's forceY/link pull. Ghosts
         // stay springy along x — collide + repel still push them rightward off
         // the focus and away from neighbours.
-        for (const extra of injection.extraNodes) (extra as any).fy = extra.y;
+        // ghost-family is an invisible-ish anchor for spouse/child edges; pin
+        // both axes so it stays at its seed and the arrows do not drift.
+        for (const extra of injection.extraNodes) {
+            (extra as any).fy = extra.y;
+            if (extra.type === "ghost-family") (extra as any).fx = extra.x;
+        }
 
         // Append ghost datums to main sim. d3.forceLink re-resolves string
         // source/target via the node-id accessor configured in
