@@ -5,35 +5,37 @@ from stemma.domain.responses import Stemma
 
 def has_cycles(stemma: Stemma) -> bool:
     adjacency: dict[str, list[str]] = defaultdict(list)
+    nodes: set[str] = set()
     for family in stemma.families:
-        fid = f"family_{family.id}"
-        parent_nodes = [f"person_{pid}" for pid in family.parents]
-        child_nodes = [f"person_{cid}" for cid in family.children]
-        adjacency[fid].extend(parent_nodes)
-        adjacency[fid].extend(child_nodes)
-        for pnode in parent_nodes:
-            adjacency[pnode].append(fid)
-        for cnode in child_nodes:
-            adjacency[cnode].append(fid)
+        nodes.update(family.parents)
+        nodes.update(family.children)
+        for parent in family.parents:
+            adjacency[parent].extend(family.children)
 
-    visited: set[str] = set()
+    WHITE, GRAY, BLACK = 0, 1, 2
+    color: dict[str, int] = dict.fromkeys(nodes, WHITE)
 
     def is_cyclic(start: str) -> bool:
-        stack: list[tuple[str, str | None]] = [(start, None)]
+        stack: list[tuple[str, int]] = [(start, 0)]
+        color[start] = GRAY
         while stack:
-            node, parent = stack.pop()
-            if node in visited:
-                return True
-            visited.add(node)
-            for neighbor in adjacency[node]:
-                if neighbor == parent:
-                    continue
-                if neighbor in visited:
+            node, index = stack[-1]
+            neighbors = adjacency[node]
+            if index < len(neighbors):
+                stack[-1] = (node, index + 1)
+                neighbor = neighbors[index]
+                state = color[neighbor]
+                if state == GRAY:
                     return True
-                stack.append((neighbor, node))
+                if state == WHITE:
+                    color[neighbor] = GRAY
+                    stack.append((neighbor, 0))
+            else:
+                color[node] = BLACK
+                stack.pop()
         return False
 
-    for node in list(adjacency):
-        if node not in visited and is_cyclic(node):
+    for node in nodes:
+        if color[node] == WHITE and is_cyclic(node):
             return True
     return False

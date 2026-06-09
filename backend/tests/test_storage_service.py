@@ -408,7 +408,7 @@ def test_can_add_parents_if_child_has_spouse_and_child(storage: StorageService) 
     )
 
 
-def test_loops_prohibited(storage: StorageService) -> None:
+def test_consanguineous_marriage_allowed(storage: StorageService) -> None:
     user = storage.get_or_create_user("user1@test.com")
     sid = storage.create_stemma(user.user_id, "my first stemma")
     _, f1 = storage.create_family(user.user_id, sid, family(create_jane)(create_jill))
@@ -418,8 +418,21 @@ def test_loops_prohibited(storage: StorageService) -> None:
     josh_id = f2.children[0]
     _, f3 = storage.create_family(user.user_id, sid, family(existing(josh_id))(create_jabe))
     jabe_id = f3.children[0]
+    storage.create_family(user.user_id, sid, family(existing(jabe_id), existing(jill_id))())
+
+    stemma = storage.stemma(user.user_id, sid)
+    parent_pairs = {tuple(sorted(f.parents)) for f in stemma.families}
+    assert tuple(sorted([jabe_id, jill_id])) in parent_pairs
+
+
+def test_self_descendant_cycle_prohibited(storage: StorageService) -> None:
+    user = storage.get_or_create_user("user1@test.com")
+    sid = storage.create_stemma(user.user_id, "my first stemma")
+    _, f1 = storage.create_family(user.user_id, sid, family(create_jane)(create_jill))
+    jane_id = f1.parents[0]
+    jill_id = f1.children[0]
     with pytest.raises(StemmaHasCycles):
-        storage.create_family(user.user_id, sid, family(existing(jabe_id), existing(jill_id))())
+        storage.create_family(user.user_id, sid, family(existing(jill_id))(existing(jane_id)))
 
 
 @pytest.mark.parametrize("value", [None, ""])
