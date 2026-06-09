@@ -20,7 +20,7 @@
         type GhostKind,
     } from "../ghostHelpers";
     import { nodeCenter } from "../v3DomGeometry";
-    import { trimToCircle, GHOST_EDGE_GAP } from "../ghostEdgeGeometry";
+    import { trimToCircle } from "../ghostEdgeGeometry";
 
     type Props = {
         focusedId: FocusedId | null;
@@ -131,10 +131,10 @@
             target: Pos,
             edgeKind: "focusToFamily" | "familyToPerson",
         ): void => {
-            const sourceR = edgeKind === "focusToFamily" ? personR : familyR;
-            const targetR = edgeKind === "focusToFamily" ? familyR : personR;
-            const tip = trimToCircle(source.x, source.y, target.x, target.y, targetR + GHOST_EDGE_GAP);
-            const tail = trimToCircle(target.x, target.y, source.x, source.y, sourceR + GHOST_EDGE_GAP);
+            const sourceRadius = edgeKind === "focusToFamily" ? personR : familyR;
+            const targetRadius = edgeKind === "focusToFamily" ? familyR : personR;
+            const tip = trimToCircle(source.x, source.y, target.x, target.y, targetRadius);
+            const tail = trimToCircle(target.x, target.y, source.x, source.y, sourceRadius);
             const line = document.createElementNS(SVG_NS, "line") as SVGLineElement;
             line.setAttribute("class", "v3-ghost-edge");
             line.setAttribute("x1", String(tail.x));

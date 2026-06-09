@@ -23,6 +23,3 @@ export function trimToCircle(
     const scale = (dist - r) / dist;
     return { x: x1 + dx * scale, y: y1 + dy * scale };
 }
-
-/** Visible gap (user-space px) between a ghost edge endpoint and the node circle it touches. */
-export const GHOST_EDGE_GAP = 2;
