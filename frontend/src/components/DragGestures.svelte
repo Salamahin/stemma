@@ -403,7 +403,7 @@
                 return;
             }
             const r = previewKind === "person" ? PERSON_PREVIEW_R : FAMILY_PREVIEW_R;
-            const previewClass = `endpoint-preview -endpoint-${previewKind}`;
+            const previewClass = `endpoint-preview endpoint-${previewKind}`;
             if (gesture.endpointPreview && gesture.endpointPreview.getAttribute("class") !== previewClass) {
                 gesture.endpointPreview.parentNode?.removeChild(gesture.endpointPreview);
                 gesture.endpointPreview = null;
@@ -674,10 +674,10 @@
     }
 
     :global(g.drop-allowed > circle) {
-        animation: -drop-allowed-pulse 1.8s ease-in-out infinite;
+        animation: drop-allowed-pulse 1.8s ease-in-out infinite;
     }
 
-    @keyframes -drop-allowed-pulse {
+    @keyframes drop-allowed-pulse {
         0%, 100% { stroke-opacity: 1; }
         50% { stroke-opacity: 0.45; }
     }

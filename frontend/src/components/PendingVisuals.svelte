@@ -44,17 +44,17 @@
         stroke-dasharray: 4 4;
         stroke: #dc3545;
         opacity: 0.45;
-        animation: -pending-pulse 1.2s ease-in-out infinite;
+        animation: pending-pulse 1.2s ease-in-out infinite;
     }
 
     :global(.pending-add) {
         opacity: 0.45;
         stroke-dasharray: 4 3;
         stroke: #0d6efd;
-        animation: -pending-pulse 1.2s ease-in-out infinite;
+        animation: pending-pulse 1.2s ease-in-out infinite;
     }
 
-    @keyframes -pending-pulse {
+    @keyframes pending-pulse {
         0%, 100% { stroke-opacity: 1; }
         50% { stroke-opacity: 0.35; }
     }

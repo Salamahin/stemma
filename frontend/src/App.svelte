@@ -232,7 +232,7 @@
 </script>
 
 {#if signedIn}
-    <div class="layout" class:-edit-mode={editMode}>
+    <div class="layout" class:edit-mode={editMode}>
         <EditModeOverlay {editMode} />
 
         <div class="canvas-layer">

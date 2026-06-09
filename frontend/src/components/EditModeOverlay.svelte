@@ -29,10 +29,10 @@
 
     :global(.edit-mode) {
         box-shadow: inset 0 0 0 3px rgba(73, 80, 87, 0.55);
-        animation: -edit-mode-ring-pulse 2.4s ease-in-out infinite;
+        animation: edit-mode-ring-pulse 2.4s ease-in-out infinite;
     }
 
-    @keyframes -edit-mode-ring-pulse {
+    @keyframes edit-mode-ring-pulse {
         0%, 100% { box-shadow: inset 0 0 0 3px rgba(73, 80, 87, 0.55); }
         50% { box-shadow: inset 0 0 0 3px rgba(73, 80, 87, 0.22); }
     }
