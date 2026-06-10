@@ -81,7 +81,6 @@
     let pendingRemovedPersonIds = $state<Set<string>>(new Set());
     let pendingRemovedFamilyIds = $state<Set<string>>(new Set());
     let signedIn = $state(false);
-    let bootProbing = $state(true);
 
     const actions = new MutationActions({
         controller,
@@ -246,13 +245,14 @@
     }
 
     onMount(() => {
-        const boot = session.e2eAutoLoginEnabled
-            ? session.signInAsE2eUser()
-            : (initializeGoogleAuth(google_client_id).catch((err) =>
-                  console.error("Google Identity init failed", err),
-              ),
-              probeCookieSession());
-        void Promise.resolve(boot).finally(() => (bootProbing = false));
+        if (session.e2eAutoLoginEnabled) {
+            void session.signInAsE2eUser();
+        } else {
+            initializeGoogleAuth(google_client_id).catch((err) =>
+                console.error("Google Identity init failed", err),
+            );
+            void probeCookieSession();
+        }
         return () => {
             for (const unsub of subscriptions) unsub();
         };
@@ -262,13 +262,7 @@
     const showEmpty = $derived(!isWorking && stemma && stemma.people.length === 0);
 </script>
 
-{#if bootProbing}
-    <div class="authenticate-bg vh-100">
-        <div class="authenticate-holder">
-            <Circle2 />
-        </div>
-    </div>
-{:else if signedIn}
+{#if signedIn}
     <div class="layout" class:edit-mode={editMode}>
         <EditModeOverlay {editMode} />
 
