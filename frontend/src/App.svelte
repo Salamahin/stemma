@@ -81,6 +81,7 @@
     let pendingRemovedPersonIds = $state<Set<string>>(new Set());
     let pendingRemovedFamilyIds = $state<Set<string>>(new Set());
     let signedIn = $state(false);
+    let bootProbing = $state(true);
 
     const actions = new MutationActions({
         controller,
@@ -245,14 +246,13 @@
     }
 
     onMount(() => {
-        if (session.e2eAutoLoginEnabled) {
-            void session.signInAsE2eUser();
-        } else {
-            initializeGoogleAuth(google_client_id).catch((err) =>
-                console.error("Google Identity init failed", err),
-            );
-            void probeCookieSession();
-        }
+        const boot = session.e2eAutoLoginEnabled
+            ? session.signInAsE2eUser()
+            : (initializeGoogleAuth(google_client_id).catch((err) =>
+                  console.error("Google Identity init failed", err),
+              ),
+              probeCookieSession());
+        void Promise.resolve(boot).finally(() => (bootProbing = false));
         return () => {
             for (const unsub of subscriptions) unsub();
         };
@@ -426,7 +426,7 @@
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
-            <Authenticate {google_client_id} onsignIn={handleGoogleSignIn} />
+            <Authenticate {google_client_id} onsignIn={handleGoogleSignIn} showSignIn={!bootProbing} />
         </div>
     </div>
 {/if}
