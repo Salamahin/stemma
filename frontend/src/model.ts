@@ -78,7 +78,7 @@ export type StemmaDescription = { type: "StemmaDescription", id: string, name: s
 export type PersonDescription = { type: "PersonDescription", id: string, name: string, birthDate?: string, deathDate?: string, bio?: string, readOnly: boolean, photoUrl?: string | null }
 export type TokenAccepted = { type: "TokenAccepted", stemmas: Array<StemmaDescription>, lastStemma: Stemma }
 export type CloneResult = { type: "CloneResult", createdStemma: Stemma, stemmas: Array<StemmaDescription> }
-export type PhotoUploadUrl = { type: "PhotoUploadUrl", uploadUrl: string, photoKey: string, expiresInSeconds: number }
+export type PhotoUploadUrl = { type: "PhotoUploadUrl", uploadUrl: string, uploadFields: Record<string, string>, photoKey: string, expiresInSeconds: number }
 export type AuthLoginResponse = { type: "AuthLoginResponse", userId: string, email: string }
 export type AuthLogoutResponse = { type: "AuthLogoutResponse" }
 
@@ -260,12 +260,11 @@ export class Model {
         )
     }
 
-    async uploadPhotoToPresignedUrl(uploadUrl: string, file: Blob): Promise<void> {
-        const response = await fetch(uploadUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': file.type },
-            body: file,
-        })
+    async uploadPhotoToPresignedUrl(uploadUrl: string, uploadFields: Record<string, string>, file: Blob): Promise<void> {
+        const form = new FormData()
+        for (const [k, v] of Object.entries(uploadFields)) form.append(k, v)
+        form.append('file', file)
+        const response = await fetch(uploadUrl, { method: 'POST', body: form })
         if (!response.ok) throw new LocalizedError("error.unexpectedResponse")
     }
 

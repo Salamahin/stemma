@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 def build_verifier() -> TokenVerifier:
     if os.environ.get("E2E_AUTH_BYPASS") == "1":
+        logger.warning("E2E_AUTH_BYPASS active — accepting any token. Never enable in production.")
         return AllowAnyTokenVerifier()
     return GoogleTokenVerifier(os.environ["GOOGLE_CLIENT_ID"])
 

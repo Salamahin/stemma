@@ -1,3 +1,4 @@
+import logging
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, replace
@@ -34,7 +35,6 @@ from stemma.seed.kings_of_europe import SeedStemma
 from stemma.services.kinship import FamilyLink, kinsmen_families, members_of
 from stemma.services.photo_service import PhotoStore
 from stemma.services.stemma_dfs import has_cycles
-from stemma.storage.effects import ChownEffect
 from stemma.storage.schema import (
     ATTR_DEFAULT_STEMMA_ID,
     ATTR_DISPLAY_NAME,
@@ -59,6 +59,8 @@ from stemma.storage.schema import (
     user_gsi_pk,
     user_gsi_sk,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -205,10 +207,11 @@ class StorageService:
         ).get("Items", [])
         if not owner_rows:
             return []
+        stemma_ids = [parse_id_after_prefix(row["gsi1sk"], STEMMA_PK_PREFIX) for row in owner_rows]
+        meta_by_sid = self._batch_get_meta(stemma_ids)
         descriptions: list[StemmaDescription] = []
-        for row in owner_rows:
-            sid = parse_id_after_prefix(row["gsi1sk"], STEMMA_PK_PREFIX)
-            meta = self._table.get_item(Key={"pk": stemma_pk(sid), "sk": SK_META}).get("Item")
+        for row, sid in zip(owner_rows, stemma_ids):
+            meta = meta_by_sid.get(sid)
             if meta is None:
                 continue
             owners_count = self._count_stemma_owners(sid)
@@ -217,6 +220,22 @@ class StorageService:
                 StemmaDescription(id=sid, name=display_name, removable=owners_count == 1)
             )
         return descriptions
+
+    def _batch_get_meta(self, stemma_ids: list[str]) -> dict[str, dict]:
+        if not stemma_ids:
+            return {}
+        result: dict[str, dict] = {}
+        chunk_size = 100
+        for offset in range(0, len(stemma_ids), chunk_size):
+            chunk = stemma_ids[offset : offset + chunk_size]
+            pending = {self._table.name: {"Keys": [{"pk": stemma_pk(sid), "sk": SK_META} for sid in chunk]}}
+            while pending:
+                response = self._table.meta.client.batch_get_item(RequestItems=pending)
+                for item in response.get("Responses", {}).get(self._table.name, []):
+                    sid = parse_id_after_prefix(item["pk"], STEMMA_PK_PREFIX)
+                    result[sid] = item
+                pending = response.get("UnprocessedKeys") or {}
+        return result
 
     def rename_stemma(self, user_id: str, stemma_id: str, new_name: str) -> StemmaDescription:
         snapshot = self._load_snapshot(stemma_id)
@@ -418,14 +437,27 @@ class StorageService:
 
     # ---------- ownership ----------
 
-    def chown(self, user_id: str, stemma_id: str, target_person_id: str) -> ChownEffect:
+    def chown(
+        self,
+        user_id: str,
+        stemma_id: str,
+        target_person_id: str,
+        *,
+        authorized: bool,
+    ) -> None:
+        if not authorized:
+            raise PermissionError("chown called without authorization")
         snapshot = self._load_snapshot(stemma_id)
+        if target_person_id not in snapshot.people:
+            raise NoSuchPersonId(id=target_person_id)
         family_links = [
             FamilyLink(family_id=f.id, parents=frozenset(f.parents), children=frozenset(f.children))
             for f in snapshot.families.values()
         ]
         affected_families = kinsmen_families(target_person_id, family_links)
         affected_people = members_of(family_links, affected_families)
+        new_families = [fid for fid in affected_families if (fid, user_id) not in snapshot.family_owners]
+        new_people = [pid for pid in affected_people if (pid, user_id) not in snapshot.person_owners]
 
         with self._table.batch_writer() as batch:
             if user_id not in snapshot.stemma_owners:
@@ -437,20 +469,22 @@ class StorageService:
                         "gsi1sk": user_gsi_sk(stemma_id),
                     }
                 )
-            for fid in affected_families:
-                if (fid, user_id) not in snapshot.family_owners:
-                    batch.put_item(
-                        Item={"pk": stemma_pk(stemma_id), "sk": family_owner_sk(fid, user_id)}
-                    )
-            for pid in affected_people:
-                if (pid, user_id) not in snapshot.person_owners:
-                    batch.put_item(
-                        Item={"pk": stemma_pk(stemma_id), "sk": person_owner_sk(pid, user_id)}
-                    )
+            for fid in new_families:
+                batch.put_item(
+                    Item={"pk": stemma_pk(stemma_id), "sk": family_owner_sk(fid, user_id)}
+                )
+            for pid in new_people:
+                batch.put_item(
+                    Item={"pk": stemma_pk(stemma_id), "sk": person_owner_sk(pid, user_id)}
+                )
 
-        return ChownEffect(
-            affected_families=sorted(affected_families),
-            affected_people=sorted(affected_people),
+        logger.info(
+            "chown granted user_id=%s stemma_id=%s target_person_id=%s persons_granted=%d families_granted=%d",
+            user_id,
+            stemma_id,
+            target_person_id,
+            len(new_people),
+            len(new_families),
         )
 
     def owns_person(self, user_id: str, stemma_id: str, person_id: str) -> bool:

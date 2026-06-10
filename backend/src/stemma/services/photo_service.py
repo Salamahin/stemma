@@ -17,7 +17,9 @@ def photo_key(stemma_id: str, person_id: str) -> str:
 
 
 class PhotoStore(Protocol):
-    def issue_upload_url(self, stemma_id: str, person_id: str, content_type: str) -> tuple[str, str]: ...
+    def issue_upload_url(
+        self, stemma_id: str, person_id: str, content_type: str
+    ) -> tuple[str, dict[str, str], str]: ...
 
     def issue_get_url(self, key: str) -> str: ...
 
@@ -29,20 +31,23 @@ class S3PhotoService:
     s3_client: Any
     bucket: str
 
-    def issue_upload_url(self, stemma_id: str, person_id: str, content_type: str) -> tuple[str, str]:
+    def issue_upload_url(
+        self, stemma_id: str, person_id: str, content_type: str
+    ) -> tuple[str, dict[str, str], str]:
         if content_type not in ALLOWED_PHOTO_CONTENT_TYPES:
             raise UnsupportedPhotoType(content_type=content_type)
         key = photo_key(stemma_id, person_id)
-        url = self.s3_client.generate_presigned_url(
-            "put_object",
-            Params={
-                "Bucket": self.bucket,
-                "Key": key,
-                "ContentType": content_type,
-            },
+        response = self.s3_client.generate_presigned_post(
+            self.bucket,
+            key,
+            Fields={"Content-Type": content_type},
+            Conditions=[
+                ["content-length-range", 0, MAX_PHOTO_BYTES],
+                ["eq", "$Content-Type", content_type],
+            ],
             ExpiresIn=PUT_URL_EXPIRES_SECONDS,
         )
-        return url, key
+        return response["url"], response["fields"], key
 
     def issue_get_url(self, key: str) -> str:
         return self.s3_client.generate_presigned_url(

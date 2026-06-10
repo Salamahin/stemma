@@ -2,6 +2,8 @@ name: CI
 on:
   pull_request:
     branches: [ "master" ]
+  push:
+    branches: [ "master" ]
 permissions:
   contents: read
   pull-requests: read
@@ -29,7 +31,8 @@ jobs:
             - '.github/workflows/ci.yml'
   backend:
     needs: changes
-    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.workflow == 'true'
+    # On push to master always run (gates CD). On PRs run only when relevant paths change.
+    if: github.event_name == 'push' || needs.changes.outputs.backend == 'true' || needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -50,7 +53,7 @@ jobs:
       working-directory: backend
   frontend:
     needs: changes
-    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.workflow == 'true'
+    if: github.event_name == 'push' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -68,7 +71,7 @@ jobs:
       working-directory: frontend
   e2e:
     needs: changes
-    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.e2e == 'true' || needs.changes.outputs.workflow == 'true'
+    if: github.event_name == 'push' || needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.e2e == 'true' || needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4

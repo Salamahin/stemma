@@ -1,7 +1,8 @@
 """Apply a JSON array of pre-shaped DynamoDB items to a Stemma table.
 
 Items in the file must already match the single-table schema (pk, sk, attrs).
-The script does not validate item shape — it just writes them.
+The script validates that `pk` and `sk` use known prefixes (see
+`KNOWN_PK_PREFIXES` / `KNOWN_SK_PREFIXES`), but does not check non-key attrs.
 
 If the file ends with a ``SYSTEM``/``MIGRATION_COMPLETE`` marker, the script
 treats it as a one-shot seed: subsequent invocations short-circuit unless
@@ -29,6 +30,32 @@ import boto3
 
 SEED_MARKER_KEY: dict[str, str] = {"pk": "SYSTEM", "sk": "MIGRATION_COMPLETE"}
 
+KNOWN_PK_PREFIXES: tuple[str, ...] = ("STEMMA#", "USER#EMAIL#", "SESSION#")
+KNOWN_PK_EXACT: frozenset[str] = frozenset({"SYSTEM"})
+KNOWN_SK_PREFIXES: tuple[str, ...] = (
+    "PERSON#",
+    "FAMILY#",
+    "OWNER#STEMMA#",
+    "OWNER#PERSON#",
+    "OWNER#FAMILY#",
+)
+KNOWN_SK_EXACT: frozenset[str] = frozenset({"META", "PROFILE", "MIGRATION_COMPLETE"})
+
+
+def _validate_keys(items: list[dict]) -> list[tuple[int, str]]:
+    bad: list[tuple[int, str]] = []
+    for idx, item in enumerate(items):
+        pk = item.get("pk")
+        sk = item.get("sk")
+        if not isinstance(pk, str) or not isinstance(sk, str):
+            bad.append((idx, f"missing or non-string pk/sk: pk={pk!r} sk={sk!r}"))
+            continue
+        if pk not in KNOWN_PK_EXACT and not any(pk.startswith(p) for p in KNOWN_PK_PREFIXES):
+            bad.append((idx, f"unknown pk prefix: {pk!r}"))
+        if sk not in KNOWN_SK_EXACT and not any(sk.startswith(p) for p in KNOWN_SK_PREFIXES):
+            bad.append((idx, f"unknown sk prefix: {sk!r}"))
+    return bad
+
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
@@ -38,6 +65,20 @@ def main(argv: list[str] | None = None) -> int:
 
     items: list[dict] = json.loads(args.seed.read_text())
     size_kb = args.seed.stat().st_size / 1024
+
+    bad_keys = _validate_keys(items)
+    if bad_keys:
+        print(f"ERROR: {len(bad_keys)} items have unknown pk/sk prefixes:", file=sys.stderr)
+        for idx, msg in bad_keys[:20]:
+            print(f"  [{idx}] {msg}", file=sys.stderr)
+        if len(bad_keys) > 20:
+            print(f"  ... and {len(bad_keys) - 20} more", file=sys.stderr)
+        print(
+            "Known prefixes are defined in apply_seed.py; "
+            "see backend/src/stemma/storage/schema.py for the authoritative encoders.",
+            file=sys.stderr,
+        )
+        return 4
 
     print(f"Seed file:    {args.seed}")
     print(f"Items:        {len(items):,}  ({size_kb:.1f} KB)")

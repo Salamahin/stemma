@@ -23,25 +23,7 @@ new `Request` dataclass + handler branch instead — do not migrate around the A
 
 ## AWS access
 
-Production uses AWS Identity Center (SSO). Profile name is `stemma`. One-time setup:
-
-```sh
-aws configure sso
-# Prompts (values come from your Identity Center portal / admin):
-#   SSO session name        — "stemma"
-#   SSO start URL           — your organisation's Identity Center start URL
-#   SSO region              — region where the SSO directory lives (often us-east-1)
-#   Account + role          — pick from the list shown
-#   CLI default Region      — eu-central-1 for this project
-#   Profile name            — "stemma"
-```
-
-Refresh the SSO session whenever it expires (~8 h):
-
-```sh
-aws sso login --profile stemma
-AWS_PROFILE=stemma aws sts get-caller-identity   # sanity check before any write
-```
+See `CLAUDE.md` § "AWS access (production)" for SSO setup and `aws sso login --profile stemma`. Always run `AWS_PROFILE=stemma aws sts get-caller-identity` as a sanity check before any write.
 
 Discover the DynamoDB table name (CloudFormation generates it; never hardcode):
 

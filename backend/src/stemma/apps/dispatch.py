@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from enum import Enum
 from http.cookies import Morsel, SimpleCookie
 from typing import Any
+from uuid import uuid4
 
 from stemma.apis.request_handler import RequestHandler
 from stemma.domain.codec import decode_request, encode_error, encode_response
@@ -99,17 +100,16 @@ def dispatch_payload(
         logger.exception("Service error")
         return DispatchResult(status_code=200, body=encode_error(e))
     except Exception as e:
-        logger.exception("Unexpected error")
-        return DispatchResult(status_code=200, body=encode_error(UnknownError(cause=repr(e))))
+        error_id = f"error-{uuid4().hex[:8]}"
+        logger.exception("Unexpected error id=%s cause=%r", error_id, e)
+        return DispatchResult(status_code=200, body=encode_error(UnknownError(cause=error_id)))
 
 
 def _origin_allowed(origin: str | None, allowed: set[str]) -> bool:
     if "*" in allowed:
         return True
     if origin is None:
-        # Non-browser callers (curl, Lambda warmup) have no Origin; browsers always
-        # send it on cross-origin POST, which is the CSRF case this check exists for.
-        return True
+        return False
     return origin in allowed
 
 

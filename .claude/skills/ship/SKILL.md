@@ -53,11 +53,12 @@ tests.
 If `git status` shows changes after simplify, stage them and commit. Mirror
 the repository's commit-message style (look at `git log --oneline -5` for
 recent format). Keep the subject ≤72 chars in imperative mood; add a short
-body when the change is non-trivial. Always include the Claude
-co-author trailer:
+body when the change is non-trivial. Always include the canonical Claude
+Code trailer (same one used in the PR body — no model version, no
+separate `Co-Authored-By` line):
 
 ```
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
 
 If the working tree is already clean (everything was committed earlier),

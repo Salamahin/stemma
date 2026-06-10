@@ -1,4 +1,4 @@
-import { SettingsStorage } from "./settingsStroage";
+import { SettingsStorage } from "./settingsStorage";
 import { DEFAULT_SETTINGS, ViewMode } from "./model";
 
 describe("SettingsStorage", () => {

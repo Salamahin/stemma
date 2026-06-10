@@ -32,6 +32,7 @@ class PersonDescription:
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
 class PhotoUploadUrl:
     upload_url: str
+    upload_fields: dict[str, str]
     photo_key: str
     expires_in_seconds: int
     type: Literal["PhotoUploadUrl"] = "PhotoUploadUrl"

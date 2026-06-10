@@ -1,5 +1,5 @@
 # Stemma
-[![Scala CI](https://github.com/Salamahin/stemma/actions/workflows/ci.yml/badge.svg)](https://github.com/Salamahin/stemma/actions/workflows/ci.yml)
+[![CI](https://github.com/Salamahin/stemma/actions/workflows/ci.yml/badge.svg)](https://github.com/Salamahin/stemma/actions/workflows/ci.yml)
 [![Deploy to AWS](https://github.com/Salamahin/stemma/actions/workflows/cd.yml/badge.svg)](https://github.com/Salamahin/stemma/actions/workflows/cd.yml)
 
 Stemma is a collaborative family tree editor. It lets multiple people build and maintain a shared genealogy, with permissions and invitation links.
@@ -14,6 +14,8 @@ Stemma is a collaborative family tree editor. It lets multiple people build and 
 - Frontend: Svelte + Rollup
 - Backend: Python 3.13 (FastAPI, boto3, pydantic), managed with [`uv`](https://docs.astral.sh/uv/)
 - Storage: DynamoDB (single table; DynamoDB Local for dev/e2e)
+
+The API is RPC-shaped, not REST: a single `POST /stemma` endpoint accepts a tagged-union JSON body (`{"type": "<RequestType>", ...}`) dispatched in `apis/request_handler.py`.
 
 ## Repository layout
 - `backend/`: Python backend
