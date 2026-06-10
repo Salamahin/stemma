@@ -156,12 +156,16 @@ def test_decode_set_person_photo_request_with_null_key() -> None:
 
 def test_encode_photo_upload_url_response() -> None:
     response = PhotoUploadUrl(
-        upload_url="https://example/upload", photo_key="some/key", expires_in_seconds=300
+        upload_url="https://example/upload",
+        upload_fields={"key": "some/key", "Content-Type": "image/jpeg"},
+        photo_key="some/key",
+        expires_in_seconds=300,
     )
     encoded = encode_response(response)
     assert encoded == {
         "type": "PhotoUploadUrl",
         "uploadUrl": "https://example/upload",
+        "uploadFields": {"key": "some/key", "Content-Type": "image/jpeg"},
         "photoKey": "some/key",
         "expiresInSeconds": 300,
     }

@@ -4,7 +4,7 @@
     import { ViewMode } from "../model";
     import { StemmaIndex } from "../stemmaIndex";
     import { onMount } from "svelte";
-    import { HiglightLineages } from "../highlight";
+    import { HighlightLineages } from "../highlight";
     import {
         applyLabelLayout,
         configureSimulation,
@@ -31,7 +31,7 @@
         stemma: Stemma;
         currentStemmaId: string;
         stemmaIndex: StemmaIndex;
-        highlight: HiglightLineages;
+        highlight: HighlightLineages;
         pinnedPeople: PinnedPeopleStorage;
         hidden: boolean;
         viewMode: ViewMode;

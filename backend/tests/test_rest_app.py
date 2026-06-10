@@ -146,3 +146,14 @@ def test_warmup_does_not_require_auth(
     response = client.get("/warmup")
     assert response.status_code == 200
     assert response.json() == {"ok": True}
+
+
+def test_missing_origin_blocked_when_origins_configured(
+    storage: StorageService, users: UserService, dynamo_table
+) -> None:
+    client = _client(storage, users, dynamo_table)
+    response = client.post(
+        "/stemma",
+        json={"type": "AuthLoginRequest", "idToken": "user@example.com"},
+    )
+    assert response.status_code == 403

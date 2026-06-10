@@ -8,6 +8,7 @@ s3_prefix = "stemma-app"
 region = "eu-central-1"
 confirm_changeset = false
 capabilities = ["CAPABILITY_NAMED_IAM", "CAPABILITY_AUTO_EXPAND"]
-parameter_overrides = "AppName=\"stemma-app\" Stage=\"dev_local\" cloudFrontAlias=\"stemma.link\""
+# Real env-specific values live here, not in template.yaml defaults.
+parameter_overrides = "AppName=\"stemma-app\" Stage=\"dev_local\" cloudFrontAlias=\"stemma.link\" apiAlias=\"api.stemma.link\" hostedZoneId=\"Z0371539135CFRSV7N3PQ\" certificateArnUsEast1=\"arn:aws:acm:us-east-1:537602986733:certificate/447c1e43-350a-40cf-b971-f6e8a8287982\" certificateArnEurope=\"arn:aws:acm:eu-central-1:537602986733:certificate/6d7733eb-fff5-4c6e-b06d-01868a79e108\" googleAuthClientId=\"584519661541-m7jkpf0o4cu08jpiq4eo4bmaoa6ah7j1.apps.googleusercontent.com\" backendAssetsBucket=\"stemma-app-backend-assets\""
 image_repositories = []
 disable_rollback = false

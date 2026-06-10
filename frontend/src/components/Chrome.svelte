@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { Stemma, StemmaDescription } from "../model";
     import type { StemmaIndex } from "../stemmaIndex";
-    import type { HiglightLineages } from "../highlight";
+    import type { HighlightLineages } from "../highlight";
     import Chip from "./Chip.svelte";
     import LangSwitcher from "./LangSwitcher.svelte";
     import Menu from "./Menu.svelte";
@@ -15,7 +15,7 @@
         isWorking: boolean;
         stemma: Stemma | null;
         stemmaIndex: StemmaIndex | null;
-        highlight: HiglightLineages | null;
+        highlight: HighlightLineages | null;
         highlightVersion: number;
         editMode: boolean;
         panMode: boolean;

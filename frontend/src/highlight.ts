@@ -21,26 +21,26 @@ type LineageData = {
     relatedFamilies: Set<string>
 }
 
-export class HiglightLineages implements Highlight {
+export class HighlightLineages implements Highlight {
     private lineagesData: LineageData[]
     private index: StemmaIndex
 
     private allPeople: Set<string>
     private allFamilies: Set<string>
-    private allMariages: Set<string>
+    private allMarriages: Set<string>
     private allUncleFamilies: Set<string>
 
     constructor(index: StemmaIndex, people: string[]) {
         this.index = index
         this.lineagesData = people.map(personId => this.personToLineageData(personId))
 
-        this.remakeCashes()
+        this.remakeCaches()
     }
 
-    private remakeCashes() {
+    private remakeCaches() {
         this.allPeople = new Set(this.lineagesData.map(d => d.relatedPeople).reduce((acc, next) => [...acc, ...next], []))
         this.allFamilies = new Set(this.lineagesData.map(d => d.relatedFamilies).reduce((acc, next) => [...acc, ...next], []))
-        this.allMariages = new Set(this.index.marriages(this.allPeople))
+        this.allMarriages = new Set(this.index.marriages(this.allPeople))
         this.allUncleFamilies = new Set(this.index.uncleFamilies(this.allPeople))
     }
 
@@ -81,7 +81,7 @@ export class HiglightLineages implements Highlight {
     }
 
     familyIsHighlighted(familyId: string): boolean {
-        return !this.lineagesData.length || this.allFamilies.has(familyId) || this.allMariages.has(familyId) || this.allUncleFamilies.has(familyId)
+        return !this.lineagesData.length || this.allFamilies.has(familyId) || this.allMarriages.has(familyId) || this.allUncleFamilies.has(familyId)
     }
 
     isActive(): boolean {
@@ -93,21 +93,21 @@ export class HiglightLineages implements Highlight {
     }
 
     highlightedFamilyIds(): Set<string> {
-        return new Set([...this.allFamilies, ...this.allMariages, ...this.allUncleFamilies])
+        return new Set([...this.allFamilies, ...this.allMarriages, ...this.allUncleFamilies])
     }
 
     pushPerson(personId: string) {
         this.lineagesData.push(this.personToLineageData(personId))
-        this.remakeCashes()
+        this.remakeCaches()
     }
 
     pushFamily(familyId: string) {
         this.lineagesData.push(this.familyToLineageData(familyId))
-        this.remakeCashes()
+        this.remakeCaches()
     }
 
     pop() {
         this.lineagesData.pop()
-        this.remakeCashes()
+        this.remakeCaches()
     }
 }

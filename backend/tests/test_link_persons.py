@@ -152,6 +152,6 @@ def test_link_persons_requires_person_ownership(storage: StorageService) -> None
     stranger = storage.get_or_create_user("stranger@test.com")
     sid = storage.create_stemma(owner.user_id, "s")
     [jane_id, john_id] = _orphan_ids(storage, owner.user_id, sid, create_jane, create_john)
-    storage.chown(stranger.user_id, sid, jane_id)
+    storage.chown(stranger.user_id, sid, jane_id, authorized=True)
     with pytest.raises(AccessToPersonDenied):
         storage.link_persons(stranger.user_id, sid, jane_id, john_id, "spouse")

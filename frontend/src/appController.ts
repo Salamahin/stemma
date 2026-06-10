@@ -1,10 +1,10 @@
-import { HiglightLineages } from './highlight';
+import { HighlightLineages } from './highlight';
 import { Model } from './model';
 import type { CreateNewPerson, LinkRole, PersonDefinition, Stemma, StemmaDescription } from './model';
 import { PinnedPeopleStorage } from './pinnedPeopleStorage';
 import { StemmaIndex } from './stemmaIndex';
 import { writable, get } from 'svelte/store';
-import { SettingsStorage } from './settingsStroage';
+import { SettingsStorage } from './settingsStorage';
 import { selectStemmaId } from './appControllerSelection';
 
 export type MutationOptions = { silent?: boolean }
@@ -15,7 +15,7 @@ export class AppController {
     stemma = writable<Stemma>(null)
     stemmaIndex = writable<StemmaIndex>(null)
     pinnedStorage = writable<PinnedPeopleStorage>(null)
-    highlight = writable<HiglightLineages>(null)
+    highlight = writable<HighlightLineages>(null)
     ownedStemmas = writable<Array<StemmaDescription>>([])
     currentStemmaId = writable<string>(null)
     isWorking = writable<boolean>(false)
@@ -232,7 +232,7 @@ export class AppController {
             ? this.model
                   .requestPhotoUploadUrl(stemmaId, personId, photoUpload.type)
                   .then((urlInfo) =>
-                      this.model.uploadPhotoToPresignedUrl(urlInfo.uploadUrl, photoUpload).then(() => urlInfo.photoKey),
+                      this.model.uploadPhotoToPresignedUrl(urlInfo.uploadUrl, urlInfo.uploadFields, photoUpload).then(() => urlInfo.photoKey),
                   )
                   .then((photoKey) => this.model.setPersonPhoto(stemmaId, personId, photoKey, get(this.stemmaIndex)))
                   .then((result) => {
@@ -309,7 +309,7 @@ export class AppController {
             if (pinned) u.add(personId)
             else u.remove(personId)
 
-            this.highlight.set(new HiglightLineages(index, u.allPinned()))
+            this.highlight.set(new HighlightLineages(index, u.allPinned()))
 
             return u
         })
@@ -323,7 +323,7 @@ export class AppController {
         ss.load()
 
         let si = new StemmaIndex(stemma)
-        let hg = new HiglightLineages(si, pp.allPinned());
+        let hg = new HighlightLineages(si, pp.allPinned());
 
         this.pinnedStorage.set(pp)
         this.highlight.set(hg)

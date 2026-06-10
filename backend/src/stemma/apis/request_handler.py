@@ -120,7 +120,7 @@ class RequestHandler:
         token = self._users.decode_invite_token(request.encoded_token)
         if token.invitees_email.strip().lower() != user.email.lower():
             raise ForeignInviteToken()
-        self._storage.chown(user.user_id, token.stemma_id, token.target_person_id)
+        self._storage.chown(user.user_id, token.stemma_id, token.target_person_id, authorized=True)
         owned = self._storage.list_owned_stemmas(user.user_id)
         last_stemma = self._storage.stemma(user.user_id, token.stemma_id)
         return TokenAccepted(stemmas=owned, last_stemma=last_stemma)
@@ -200,11 +200,14 @@ class RequestHandler:
             raise RuntimeError("photo_store not configured")
         if not self._storage.owns_person(user.user_id, request.stemma_id, request.person_id):
             raise AccessToPersonDenied(person_id=request.person_id)
-        url, key = self._photo_store.issue_upload_url(
+        url, fields, key = self._photo_store.issue_upload_url(
             request.stemma_id, request.person_id, request.content_type
         )
         return PhotoUploadUrl(
-            upload_url=url, photo_key=key, expires_in_seconds=PUT_URL_EXPIRES_SECONDS
+            upload_url=url,
+            upload_fields=fields,
+            photo_key=key,
+            expires_in_seconds=PUT_URL_EXPIRES_SECONDS,
         )
 
     def _set_person_photo(self, user: User, request: SetPersonPhotoRequest) -> Stemma:

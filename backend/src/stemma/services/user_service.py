@@ -1,5 +1,3 @@
-import secrets
-
 from stemma.domain.user import User
 from stemma.services.invite_tokens import InviteToken, decode_invite_token, encode_invite_token
 from stemma.storage.storage_service import StorageService
@@ -18,7 +16,6 @@ class UserService:
             invitees_email=invitee_email,
             stemma_id=stemma_id,
             target_person_id=target_person_id,
-            entropy=secrets.token_urlsafe(20),
         )
         return encode_invite_token(self._invite_secret, token)
 

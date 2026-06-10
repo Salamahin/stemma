@@ -107,9 +107,10 @@ def test_photo_service_rejects_unsupported_content_type(photo_store: S3PhotoServ
 
 
 def test_photo_service_returns_signed_put_url(photo_store: S3PhotoService) -> None:
-    url, key = photo_store.issue_upload_url("sid", "pid", "image/jpeg")
+    url, fields, key = photo_store.issue_upload_url("sid", "pid", "image/jpeg")
     assert url.startswith("https://")
     assert key == photo_key("sid", "pid")
+    assert isinstance(fields, dict)
 
 
 def test_handler_request_photo_upload_url_owner_check(
@@ -142,6 +143,7 @@ def test_handler_request_photo_upload_url_returns_signed_url(
     assert isinstance(response, PhotoUploadUrl)
     assert response.photo_key == photo_key(sid, pid)
     assert response.upload_url.startswith("https://")
+    assert isinstance(response.upload_fields, dict)
 
 
 def test_handler_set_person_photo_leaves_previous_object_in_s3(

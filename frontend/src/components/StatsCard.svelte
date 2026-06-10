@@ -1,13 +1,13 @@
 <script lang="ts">
     import type { Stemma } from "../model";
     import { StemmaIndex } from "../stemmaIndex";
-    import { HiglightLineages } from "../highlight";
+    import { HighlightLineages } from "../highlight";
     import { t } from "../i18n";
 
     type Props = {
         stemma: Stemma;
         stemmaIndex: StemmaIndex;
-        highlight: HiglightLineages;
+        highlight: HighlightLineages;
         highlightVersion: number;
     };
 

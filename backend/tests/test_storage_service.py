@@ -294,11 +294,9 @@ def test_chown_affects_kinsmen_recursively(storage: StorageService) -> None:
     jess = f3.children[0]
     storage.create_family(creator.user_id, sid, family(create_john)(existing(josh)))
 
-    effect = storage.chown(accessor.user_id, sid, july)
+    storage.chown(accessor.user_id, sid, july, authorized=True)
     expected_families = {f1.id, f2.id, f3.id}
     expected_people = {jabe, jane, jeff, jared, jill, july, josh, jess}
-    assert set(effect.affected_families) == expected_families
-    assert set(effect.affected_people) == expected_people
 
     accessor_stemma = storage.stemma(accessor.user_id, sid)
     editable_people = {p.id for p in accessor_stemma.people if not p.read_only}
@@ -319,9 +317,12 @@ def test_chown_grants_siblings(storage: StorageService) -> None:
     july = f3.parents[1]
     jared = f3.children[0]
 
-    effect = storage.chown(accessor.user_id, sid, james)
-    assert set(effect.affected_families) == {f1.id, f2.id, f3.id}
-    assert set(effect.affected_people) == {jill, josh, july, james, jared}
+    storage.chown(accessor.user_id, sid, james, authorized=True)
+    accessor_stemma = storage.stemma(accessor.user_id, sid)
+    editable_families = {f.id for f in accessor_stemma.families if not f.read_only}
+    editable_people = {p.id for p in accessor_stemma.people if not p.read_only}
+    assert editable_families == {f1.id, f2.id, f3.id}
+    assert editable_people == {jill, josh, july, james, jared}
 
 
 def test_can_chown_multiple_times(storage: StorageService) -> None:
@@ -330,8 +331,8 @@ def test_can_chown_multiple_times(storage: StorageService) -> None:
     sid = storage.create_stemma(creator.user_id, "my first stemma")
     _, fam = storage.create_family(creator.user_id, sid, family(create_jabe, create_jane)(create_jeff, create_july))
     july = fam.children[1]
-    storage.chown(accessor.user_id, sid, july)
-    storage.chown(accessor.user_id, sid, july)
+    storage.chown(accessor.user_id, sid, july, authorized=True)
+    storage.chown(accessor.user_id, sid, july, authorized=True)
 
 
 def test_when_several_owners_stemma_not_removable(storage: StorageService) -> None:
@@ -340,7 +341,7 @@ def test_when_several_owners_stemma_not_removable(storage: StorageService) -> No
     sid = storage.create_stemma(creator.user_id, "my first stemma")
     _, fam = storage.create_family(creator.user_id, sid, family(create_jane)(create_jill))
     jill = fam.children[0]
-    storage.chown(accessor.user_id, sid, jill)
+    storage.chown(accessor.user_id, sid, jill, authorized=True)
 
     assert all(not s.removable for s in storage.list_owned_stemmas(creator.user_id))
     assert all(not s.removable for s in storage.list_owned_stemmas(accessor.user_id))
@@ -359,7 +360,7 @@ def test_rename_stemma_only_affects_caller(storage: StorageService) -> None:
     sid = storage.create_stemma(creator.user_id, "shared name")
     _, fam = storage.create_family(creator.user_id, sid, family(create_jane)(create_jill))
     jill = fam.children[0]
-    storage.chown(accessor.user_id, sid, jill)
+    storage.chown(accessor.user_id, sid, jill, authorized=True)
 
     storage.rename_stemma(accessor.user_id, sid, "my private name")
 
@@ -433,6 +434,24 @@ def test_self_descendant_cycle_prohibited(storage: StorageService) -> None:
     jill_id = f1.children[0]
     with pytest.raises(StemmaHasCycles):
         storage.create_family(user.user_id, sid, family(existing(jill_id))(existing(jane_id)))
+
+
+def test_chown_raises_without_authorization(storage: StorageService) -> None:
+    creator = storage.get_or_create_user("creator@test.com")
+    accessor = storage.get_or_create_user("accessor@test.com")
+    sid = storage.create_stemma(creator.user_id, "stemma")
+    _, fam = storage.create_family(creator.user_id, sid, family(create_jane)(create_jill))
+    jill = fam.children[0]
+    with pytest.raises(PermissionError):
+        storage.chown(accessor.user_id, sid, jill, authorized=False)
+
+
+def test_chown_raises_for_nonexistent_person(storage: StorageService) -> None:
+    creator = storage.get_or_create_user("creator@test.com")
+    accessor = storage.get_or_create_user("accessor@test.com")
+    sid = storage.create_stemma(creator.user_id, "stemma")
+    with pytest.raises(NoSuchPersonId):
+        storage.chown(accessor.user_id, sid, "ghost-person-id", authorized=True)
 
 
 @pytest.mark.parametrize("value", [None, ""])

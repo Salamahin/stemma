@@ -1,4 +1,4 @@
-import { HiglightLineages, HighlightAll } from "./highlight";
+import { HighlightLineages, HighlightAll } from "./highlight";
 import type { Stemma } from "./model";
 import { StemmaIndex } from "./stemmaIndex";
 
@@ -24,17 +24,17 @@ describe("HighlightAll", () => {
     });
 });
 
-describe("HiglightLineages", () => {
+describe("HighlightLineages", () => {
     test("highlights all when no people selected", () => {
         const index = new StemmaIndex(stemma);
-        const highlight = new HiglightLineages(index, []);
+        const highlight = new HighlightLineages(index, []);
         expect(highlight.personIsHighlighted("1")).toBe(true);
         expect(highlight.familyIsHighlighted("f2")).toBe(true);
     });
 
     test("highlights only related people for a selected person", () => {
         const index = new StemmaIndex(stemma);
-        const highlight = new HiglightLineages(index, ["1"]);
+        const highlight = new HighlightLineages(index, ["1"]);
         expect(highlight.personIsHighlighted("1")).toBe(true);
         expect(highlight.personIsHighlighted("2")).toBe(true);
         expect(highlight.personIsHighlighted("3")).toBe(false);
@@ -42,7 +42,7 @@ describe("HiglightLineages", () => {
 
     test("updates highlight set when adding and removing", () => {
         const index = new StemmaIndex(stemma);
-        const highlight = new HiglightLineages(index, ["1"]);
+        const highlight = new HighlightLineages(index, ["1"]);
         expect(highlight.personIsHighlighted("3")).toBe(false);
         highlight.pushPerson("3");
         expect(highlight.personIsHighlighted("3")).toBe(true);
@@ -52,7 +52,7 @@ describe("HiglightLineages", () => {
 
     test("reports inactive when nothing is selected", () => {
         const index = new StemmaIndex(stemma);
-        const highlight = new HiglightLineages(index, []);
+        const highlight = new HighlightLineages(index, []);
         expect(highlight.isActive()).toBe(false);
         expect(highlight.highlightedPeopleIds().size).toBe(0);
         expect(highlight.highlightedFamilyIds().size).toBe(0);
@@ -60,7 +60,7 @@ describe("HiglightLineages", () => {
 
     test("exposes highlighted people and families for active lineage", () => {
         const index = new StemmaIndex(stemma);
-        const highlight = new HiglightLineages(index, ["1"]);
+        const highlight = new HighlightLineages(index, ["1"]);
         expect(highlight.isActive()).toBe(true);
         const people = highlight.highlightedPeopleIds();
         const families = highlight.highlightedFamilyIds();

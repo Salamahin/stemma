@@ -326,7 +326,7 @@ describe("AppController", () => {
 
         test("only photo upload (no field change): upload chain, no updatePerson", async () => {
             const model = {
-                requestPhotoUploadUrl: jest.fn().mockResolvedValue({ uploadUrl: "u", photoKey: "k" }),
+                requestPhotoUploadUrl: jest.fn().mockResolvedValue({ uploadUrl: "u", uploadFields: {}, photoKey: "k" }),
                 uploadPhotoToPresignedUrl: jest.fn().mockResolvedValue(undefined),
                 setPersonPhoto: jest.fn().mockResolvedValue(baseStemma),
                 updatePerson: jest.fn(),
@@ -336,7 +336,7 @@ describe("AppController", () => {
             c.savePerson(personId, sameDescr, false, blob, false);
             await drainAll();
             expect(model.requestPhotoUploadUrl).toHaveBeenCalledWith(stemmaId, personId, "image/jpeg");
-            expect(model.uploadPhotoToPresignedUrl).toHaveBeenCalledWith("u", blob);
+            expect(model.uploadPhotoToPresignedUrl).toHaveBeenCalledWith("u", {}, blob);
             expect(model.setPersonPhoto).toHaveBeenCalledWith(stemmaId, personId, "k", expect.anything());
             expect(model.updatePerson).not.toHaveBeenCalled();
         });
@@ -346,7 +346,7 @@ describe("AppController", () => {
             const model = {
                 requestPhotoUploadUrl: jest.fn().mockImplementation(async () => {
                     order.push("requestPhotoUploadUrl");
-                    return { uploadUrl: "u", photoKey: "k" };
+                    return { uploadUrl: "u", uploadFields: {}, photoKey: "k" };
                 }),
                 uploadPhotoToPresignedUrl: jest.fn().mockImplementation(async () => {
                     order.push("uploadPhotoToPresignedUrl");
@@ -409,7 +409,7 @@ describe("AppController", () => {
 
         test("photoUpload wins over photoRemove when both flags are set", async () => {
             const model = {
-                requestPhotoUploadUrl: jest.fn().mockResolvedValue({ uploadUrl: "u", photoKey: "k" }),
+                requestPhotoUploadUrl: jest.fn().mockResolvedValue({ uploadUrl: "u", uploadFields: {}, photoKey: "k" }),
                 uploadPhotoToPresignedUrl: jest.fn().mockResolvedValue(undefined),
                 setPersonPhoto: jest.fn().mockResolvedValue(baseStemma),
                 updatePerson: jest.fn(),
@@ -425,7 +425,7 @@ describe("AppController", () => {
         test("updatePerson is skipped when photo step fails", async () => {
             const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
             const model = {
-                requestPhotoUploadUrl: jest.fn().mockResolvedValue({ uploadUrl: "u", photoKey: "k" }),
+                requestPhotoUploadUrl: jest.fn().mockResolvedValue({ uploadUrl: "u", uploadFields: {}, photoKey: "k" }),
                 uploadPhotoToPresignedUrl: jest.fn().mockRejectedValue(new Error("boom")),
                 setPersonPhoto: jest.fn(),
                 updatePerson: jest.fn(),

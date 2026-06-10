@@ -25,29 +25,33 @@ Globals:
 
 Parameters:
   hostedZoneId:
-    Description: ""
+    Description: "Route53 hosted zone id for cloudFrontAlias / apiAlias. Set via samconfig.toml parameter_overrides."
     Type: String
-    Default: "Z0371539135CFRSV7N3PQ"
+    Default: "REPLACE_ME"
   cloudFrontAlias:
-    Description: ""
+    Description: "Public domain serving the SPA. Set via samconfig.toml parameter_overrides."
     Type: String
-    Default: "stemma.link"
+    Default: "REPLACE_ME"
   apiAlias:
-    Description: ""
+    Description: "Public domain for the HTTP API. Set via samconfig.toml parameter_overrides."
     Type: String
-    Default: "api.stemma.link"
+    Default: "REPLACE_ME"
   certificateArnUsEast1:
-    Description: ""
+    Description: "ACM certificate ARN in us-east-1 (CloudFront viewer cert). Set via samconfig.toml parameter_overrides."
     Type: String
-    Default: "arn:aws:acm:us-east-1:537602986733:certificate/447c1e43-350a-40cf-b971-f6e8a8287982"
+    Default: "REPLACE_ME"
   certificateArnEurope:
-    Description: ""
+    Description: "ACM certificate ARN in the API region (API Gateway custom domain). Set via samconfig.toml parameter_overrides."
     Type: String
-    Default: "arn:aws:acm:eu-central-1:537602986733:certificate/6d7733eb-fff5-4c6e-b06d-01868a79e108"
+    Default: "REPLACE_ME"
   googleAuthClientId:
-    Description: ""
+    Description: "Google OAuth client id (issued audience). Set via samconfig.toml parameter_overrides."
     Type: String
-    Default: "584519661541-m7jkpf0o4cu08jpiq4eo4bmaoa6ah7j1.apps.googleusercontent.com"
+    Default: "REPLACE_ME"
+  backendAssetsBucket:
+    Description: "Pre-existing S3 bucket holding backend assets the lambda needs full access to. Set via samconfig.toml parameter_overrides."
+    Type: String
+    Default: "REPLACE_ME"
 
 Resources:
   assetsDnsRecord:
@@ -132,7 +136,8 @@ Resources:
       CorsConfiguration:
         CorsRules:
           - AllowedMethods: [PUT, GET]
-            AllowedOrigins: ["*"]
+            AllowedOrigins:
+              - !Sub "https://${cloudFrontAlias}"
             AllowedHeaders: ["*"]
             ExposedHeaders: [ETag]
             MaxAge: 600
@@ -302,7 +307,7 @@ Resources:
             Method: get
       Policies:
         - S3FullAccessPolicy:
-            BucketName: stemma-app-backend-assets
+            BucketName: !Ref backendAssetsBucket
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/invite-*"
         - DynamoDBCrudPolicy:

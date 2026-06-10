@@ -8,7 +8,7 @@
         StemmaDescription,
     } from "./model";
     import { StemmaIndex } from "./stemmaIndex";
-    import { HiglightLineages } from "./highlight";
+    import { HighlightLineages } from "./highlight";
     import { PinnedPeopleStorage } from "./pinnedPeopleStorage";
     import { ViewMode } from "./model";
     import { LocalizedError, t } from "./i18n";
@@ -53,7 +53,7 @@
     let currentStemmaId = $state<string | null>(null);
     let stemma = $state<Stemma | null>(null);
     let stemmaIndex = $state<StemmaIndex | null>(null);
-    let highlight = $state<HiglightLineages | null>(null);
+    let highlight = $state<HighlightLineages | null>(null);
     let pinnedPeople = $state<PinnedPeopleStorage | null>(null);
     let isWorking = $state<boolean>(false);
     let error = $state<Error | null>(null);
