@@ -1,18 +1,13 @@
 import { Model } from "./model";
 import type { Ref } from "./pendingState";
 
-type Listeners = {
-    onSignIn: () => void;
-    onSignOut: () => void;
-};
-
 export class Session {
     readonly e2eAutoLoginEnabled: boolean;
 
     constructor(
         private model: Model,
         private signedInRef: Ref<boolean>,
-        private listeners: Listeners,
+        private onSignIn: () => void,
     ) {
         this.e2eAutoLoginEnabled = typeof E2E_AUTO_LOGIN !== "undefined" && E2E_AUTO_LOGIN === "1";
     }
@@ -27,14 +22,14 @@ export class Session {
     async signIn(idToken: string): Promise<void> {
         await this.model.login(idToken);
         this.signedInRef.set(true);
-        this.listeners.onSignIn();
+        this.onSignIn();
     }
 
     async signInAsE2eUser(): Promise<void> {
         const override = (window as unknown as { __STEMMA_E2E_USER__?: string }).__STEMMA_E2E_USER__;
         await this.model.login(override || "e2e-user@stemma.local");
         this.signedInRef.set(true);
-        this.listeners.onSignIn();
+        this.onSignIn();
     }
 
     async signOut(): Promise<void> {
@@ -44,11 +39,9 @@ export class Session {
             // Even if the logout request fails (network, expired cookie), drop client state.
         }
         this.signedInRef.set(false);
-        this.listeners.onSignOut();
     }
 
     markSignedOut(): void {
         this.signedInRef.set(false);
-        this.listeners.onSignOut();
     }
 }

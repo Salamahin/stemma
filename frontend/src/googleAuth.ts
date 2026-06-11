@@ -16,10 +16,10 @@ type Gsi = {
                 client_id: string;
                 callback: (resp: GsiCredentialResponse) => void;
                 auto_select?: boolean;
+                use_fedcm_for_prompt?: boolean;
             }) => void;
             prompt: (handler?: (n: GsiNotification) => void) => void;
             renderButton: (parent: HTMLElement, opts: Record<string, unknown>) => void;
-            disableAutoSelect: () => void;
         };
     };
 };
@@ -51,6 +51,7 @@ export function initializeGoogleAuth(clientId: string): Promise<void> {
                 for (const l of Array.from(listeners)) l(resp.credential);
             },
             auto_select: true,
+            use_fedcm_for_prompt: true,
         });
     });
     return initPromise;
@@ -70,7 +71,3 @@ export async function promptInitialSignIn(fallbackTarget: HTMLElement | null): P
     });
 }
 
-export function disableAutoSelect(): void {
-    const g = gsi();
-    if (g) g.accounts.id.disableAutoSelect();
-}
