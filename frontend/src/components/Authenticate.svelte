@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { onMount } from "svelte";
     import { initializeGoogleAuth, onCredential, promptInitialSignIn } from "../googleAuth";
 
     type Props = {
@@ -9,8 +10,7 @@
 
     let { google_client_id, onsignIn, showSignIn = true }: Props = $props();
 
-    $effect(() => {
-        if (!showSignIn) return;
+    onMount(() => {
         const unsubscribe = onCredential((credential) => onsignIn?.(credential));
         initializeGoogleAuth(google_client_id)
             .then(() => promptInitialSignIn(document.getElementById("signin")))
@@ -27,11 +27,9 @@
     <div class="d-flex justify-content-center align-items-center flex-column">
         <h1>project stemma</h1>
         <img src="assets/logo_bw_avg.webp" alt="" width="100" height="100" />
-        {#if showSignIn}
-            <div class="mt-5" style="max-width:250px">
-                <div id="signin"></div>
-            </div>
-        {/if}
+        <div class="mt-5 signin-slot" class:signin-hidden={!showSignIn} style="max-width:250px">
+            <div id="signin"></div>
+        </div>
     </div>
 </div>
 
@@ -53,5 +51,9 @@
 
     :global(.abcRioButton) {
         margin: auto;
+    }
+
+    .signin-hidden {
+        visibility: hidden;
     }
 </style>
