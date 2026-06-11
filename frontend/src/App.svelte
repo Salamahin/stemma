@@ -12,7 +12,7 @@
     import { PinnedPeopleStorage } from "./pinnedPeopleStorage";
     import { ViewMode } from "./model";
     import { LocalizedError, t } from "./i18n";
-    import { disableAutoSelect, initializeGoogleAuth } from "./googleAuth";
+    import { initializeGoogleAuth } from "./googleAuth";
     import Authenticate from "./components/Authenticate.svelte";
     import FullStemma from "./components/FullStemma.svelte";
     import Sheet from "./components/Sheet.svelte";
@@ -105,11 +105,8 @@
     const session = new Session(
         controller.model,
         { get: () => signedIn, set: (v) => (signedIn = v) },
-        {
-            onSignIn: () => {
-                void loadStemmasOrSignOut();
-            },
-            onSignOut: () => disableAutoSelect(),
+        () => {
+            void loadStemmasOrSignOut();
         },
     );
 
@@ -236,8 +233,8 @@
             await controller.listStemmas();
             signedIn = true;
         } catch (err) {
+            if (signedIn) return;
             if ((err as { key?: string }).key === "error.sessionExpired") {
-                signedIn = false;
                 fetch(`${stemma_backend_url}/warmup`).catch(() => {});
                 return;
             }
