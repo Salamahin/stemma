@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { initializeGoogleAuth, onCredential, promptInitialSignIn } from "../googleAuth";
+    import { dismissPrompt, initializeGoogleAuth, onCredential, promptInitialSignIn } from "../googleAuth";
 
     type Props = {
         google_client_id: string;
@@ -15,7 +15,10 @@
         initializeGoogleAuth(google_client_id)
             .then(() => promptInitialSignIn(document.getElementById("signin")))
             .catch((err) => console.error("Google Identity init failed", err));
-        return unsubscribe;
+        return () => {
+            unsubscribe();
+            dismissPrompt();
+        };
     });
 </script>
 

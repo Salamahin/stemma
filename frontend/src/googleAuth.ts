@@ -20,6 +20,7 @@ type Gsi = {
             prompt: (handler?: (n: GsiNotification) => void) => void;
             renderButton: (parent: HTMLElement, opts: Record<string, unknown>) => void;
             disableAutoSelect: () => void;
+            cancel: () => void;
         };
     };
 };
@@ -73,4 +74,9 @@ export async function promptInitialSignIn(fallbackTarget: HTMLElement | null): P
 export function disableAutoSelect(): void {
     const g = gsi();
     if (g) g.accounts.id.disableAutoSelect();
+}
+
+export function dismissPrompt(): void {
+    const g = gsi();
+    if (g) g.accounts.id.cancel();
 }
