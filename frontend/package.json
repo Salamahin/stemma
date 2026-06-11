@@ -54,5 +54,8 @@
     "sirv-cli": "^3.0.1",
     "svelte-loading-spinners": "^0.3.6",
     "svelte-select": "^5.8.3"
+  },
+  "overrides": {
+    "d3-color": "^3.1.0"
   }
 }
