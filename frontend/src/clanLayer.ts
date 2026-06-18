@@ -171,9 +171,10 @@ export function updateClanLayer(
         })
         .attr("font-size", d => {
             const len = Math.max(1, d.clan.surname.length);
-            const widthFit = (d.shape.rx * 0.6) / (len * 0.6);
-            const heightFit = d.shape.ry * 0.25;
-            return Math.max(11, Math.min(widthFit, heightFit, 36));
+            // Label is rotated onto the major (rx) axis; target ~80% of each diameter.
+            const widthFit = (1.6 * d.shape.rx) / (len * 0.6);
+            const heightFit = 1.6 * d.shape.ry;
+            return Math.max(11, Math.min(widthFit, heightFit));
         })
         .attr("textLength", null)
         .attr("lengthAdjust", null);
