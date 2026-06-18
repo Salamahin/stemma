@@ -1,4 +1,4 @@
-import { clanShape } from "./clanLayer";
+import { clanShape, inscribedHalfExtents } from "./clanLayer";
 
 describe("clanShape", () => {
     test("empty positions returns minimum-sized shape at origin", () => {
@@ -32,5 +32,34 @@ describe("clanShape", () => {
     test("rx >= ry (major axis convention)", () => {
         const s = clanShape([[-200, 0], [200, 0], [0, 10], [0, -10]]);
         expect(s.rx).toBeGreaterThanOrEqual(s.ry);
+    });
+});
+
+describe("inscribedHalfExtents", () => {
+    test("axis-aligned square around origin yields its half-side on each axis", () => {
+        const square: [number, number][] = [[-100, -50], [100, -50], [100, 50], [-100, 50]];
+        const { halfW, halfH } = inscribedHalfExtents(square, 0, 0, 0);
+        expect(halfW).toBeCloseTo(100, 5);
+        expect(halfH).toBeCloseTo(50, 5);
+    });
+
+    test("rotated square: rotating the frame back to axis-aligned recovers half-sides", () => {
+        const angle = Math.PI / 4;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        // a 200x100 box rotated by +angle in world space; passing angle reverts it
+        const local: [number, number][] = [[-100, -50], [100, -50], [100, 50], [-100, 50]];
+        const world = local.map(([x, y]) => [cos * x - sin * y, sin * x + cos * y] as [number, number]);
+        const { halfW, halfH } = inscribedHalfExtents(world, 0, 0, angle);
+        expect(halfW).toBeCloseTo(100, 5);
+        expect(halfH).toBeCloseTo(50, 5);
+    });
+
+    test("off-center hull: uses min(|max|,|min|) so rect stays inside on both sides", () => {
+        // shifted right so max=150, min=-50 → halfW=50, not 150
+        const hull: [number, number][] = [[-50, -50], [150, -50], [150, 50], [-50, 50]];
+        const { halfW, halfH } = inscribedHalfExtents(hull, 0, 0, 0);
+        expect(halfW).toBeCloseTo(50, 5);
+        expect(halfH).toBeCloseTo(50, 5);
     });
 });
