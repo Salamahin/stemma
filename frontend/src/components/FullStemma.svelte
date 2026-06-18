@@ -276,12 +276,12 @@
         mergeData(svg, nodes, relations, window.innerWidth, window.innerHeight, initialPositions, pinnedPeople);
         initClanLayer(svg);
         updateClanLayer(svg, currentClans, nodes);
-        // Throttle clan-layer updates: SVG blur filter is expensive; refreshing every
-        // physics tick locks the main thread on large stemmas (kings-of-europe ~330 ppl).
+        // Throttle clan re-render to ~10fps during physics so drag updates feel live
+        // without blocking the main thread on big stemmas.
         let lastClanUpdate = 0;
         simulation.on("tick.clans", () => {
             const now = performance.now();
-            if (now - lastClanUpdate < 120) return;
+            if (now - lastClanUpdate < 100) return;
             lastClanUpdate = now;
             updateClanLayer(svg, currentClans, nodes);
         });

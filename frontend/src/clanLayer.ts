@@ -14,9 +14,9 @@ export type ClanNodePosition = { id: string; x: number; y: number };
 
 const MIN_RX = 70;
 const MIN_RY = 50;
-const MEMBER_BLOB_RADIUS = 70;
 const ELLIPSE_PAD = 60;
 const LAYER_BLUR_PX = 22;
+const HULL_PADDING = 55;
 
 export function clanShape(positions: ReadonlyArray<readonly [number, number]>): ClanShape {
     const n = positions.length;
@@ -76,6 +76,37 @@ export function initClanLayer(svg: d3.Selection<SVGSVGElement, unknown, HTMLElem
 
 type ClanRenderData = { clan: Clan; points: [number, number][]; shape: ClanShape };
 
+// Compute a convex hull around the points, then push every hull vertex outward
+// from the cluster centroid by HULL_PADDING so the blob extends beyond the nodes.
+// Collinear or near-degenerate hulls fall back to an ellipse-shaped 12-gon.
+export function paddedHull(
+    points: ReadonlyArray<[number, number]>,
+    shape: ClanShape,
+): Array<[number, number]> {
+    const hull = points.length >= 3 ? d3.polygonHull(points.map(p => [p[0], p[1]] as [number, number])) : null;
+    if (hull && hull.length >= 3) {
+        return hull.map(([x, y]) => {
+            const dx = x - shape.cx;
+            const dy = y - shape.cy;
+            const dist = Math.hypot(dx, dy) || 1;
+            const k = (dist + HULL_PADDING) / dist;
+            return [shape.cx + dx * k, shape.cy + dy * k] as [number, number];
+        });
+    }
+    // Fallback: sample an ellipse from PCA shape so the blob still renders.
+    const steps = 12;
+    const ring: Array<[number, number]> = [];
+    const cos = Math.cos(shape.angle);
+    const sin = Math.sin(shape.angle);
+    for (let i = 0; i < steps; i++) {
+        const t = (i / steps) * 2 * Math.PI;
+        const lx = Math.cos(t) * shape.rx;
+        const ly = Math.sin(t) * shape.ry;
+        ring.push([shape.cx + lx * cos - ly * sin, shape.cy + lx * sin + ly * cos]);
+    }
+    return ring;
+}
+
 export function updateClanLayer(
     svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, any>,
     clans: ReadonlyArray<Clan>,
@@ -100,23 +131,21 @@ export function updateClanLayer(
         })
         .filter((x): x is ClanRenderData => x !== null);
 
+    const pathGen = d3.line<[number, number]>()
+        .x(p => p[0])
+        .y(p => p[1])
+        .curve(d3.curveCatmullRomClosed.alpha(0.7));
+
     const blobs = layer.select("g.blobs")
         .selectAll<SVGPathElement, ClanRenderData>("path.clan-blob")
         .data(data, d => d.clan.surname);
     blobs.enter()
         .append("path")
         .attr("class", "clan-blob")
-        .attr("fill", "none")
-        .attr("stroke-linecap", "round")
-        .attr("stroke-linejoin", "round")
-        .attr("stroke-width", MEMBER_BLOB_RADIUS * 1.05)
-        .attr("opacity", 0.35)
+        .attr("opacity", 0.32)
         .merge(blobs)
-        .attr("stroke", d => d.clan.color)
-        .attr("d", d => {
-            const { cx, cy } = d.shape;
-            return d.points.map(([x, y]) => `M ${cx} ${cy} L ${x} ${y}`).join(" ");
-        });
+        .attr("fill", d => d.clan.color)
+        .attr("d", d => pathGen(paddedHull(d.points, d.shape)) ?? "");
     blobs.exit().remove();
 
     const labels = layer.select("g.labels")
