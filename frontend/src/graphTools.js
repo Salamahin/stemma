@@ -89,7 +89,7 @@ export function configureSimulation(svg, nodes, relations, width, height) {
 
     sim.on("tick", () => {
         svg.select("g.main")
-            .selectAll("g")
+            .selectAll(D3_NODE_SELECTOR)
             .each(function (d) {
                 if (!d) return;
                 sessionPositions.set(d.id, [d.x, d.y]);
@@ -97,7 +97,7 @@ export function configureSimulation(svg, nodes, relations, width, height) {
                 this.setAttribute("transform", `translate(${d.x},${d.y})`);
             });
 
-        svg.selectAll("line").each(function (d) {
+        svg.selectAll("line:not([class])").each(function (d) {
             if (!d) return;
             this.setAttribute("x1", d.source.x);
             this.setAttribute("y1", d.source.y);
@@ -330,7 +330,7 @@ export function renderChart(svg, highlight, stemmaIndex, markers) {
     // never dereference t/line/node on undefined.
     const hasDatum = (d) => d != null;
 
-    svg.selectAll("line")
+    svg.selectAll("line:not([class])")
         .filter((line) => hasDatum(line))
         .attr("stroke", (line) => lineFill(line))
         .attr("stroke-width", (line) => lineWidth(line))
@@ -350,7 +350,7 @@ export function renderChart(svg, highlight, stemmaIndex, markers) {
 
     svg.select("g.main")
         .selectAll("g")
-        .filter((d) => hasDatum(d))
+        .filter((d) => hasDatum(d) && d.type === "person")
         .select("text")
         .style("fill", (node) => (highlight.personIsHighlighted(denormalizeId(node.id)) ? null : shadedNodeColor))
         .attr("cursor", "pointer")
@@ -358,11 +358,11 @@ export function renderChart(svg, highlight, stemmaIndex, markers) {
 
     svg.select("g.main")
         .selectAll("g")
-        .filter((d) => hasDatum(d))
+        .filter((d) => hasDatum(d) && (d.type === "person" || d.type === "family"))
         .attr("cursor", "pointer")
 
     svg.selectAll("text")
-        .filter((node) => hasDatum(node))
+        .filter((node) => hasDatum(node) && node.type === "person")
         .raise()
         .text((node) => node.name)
         .style("font-size", labelFontSize);

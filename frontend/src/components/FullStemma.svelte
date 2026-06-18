@@ -25,7 +25,9 @@
     import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
     import { exportChartSvg } from "../svgExport";
     import { personDisplayName } from "../personDisplayName";
-    import { t } from "../i18n";
+    import { t, locale } from "../i18n";
+    import { computeClans, type Clan } from "../clans";
+    import { initClanLayer, updateClanLayer } from "../clanLayer";
 
     type Props = {
         stemma: Stemma;
@@ -71,6 +73,19 @@
     let layoutCache: NodeLayoutCache | null = null;
     let layoutCacheStemmaId: string | null = null;
     let simulation: any = null;
+    let currentClans: Clan[] = [];
+    let currentNodes: any[] = [];
+
+    const viewSlice = $derived.by(() => {
+        if (!stemma) return { people: [], families: [] };
+        if (viewMode == ViewMode.EDITABLE_ONLY) {
+            return {
+                people: stemma.people.filter((p) => !p.readOnly),
+                families: stemma.families.filter((f) => !f.readOnly),
+            };
+        }
+        return { people: stemma.people, families: stemma.families };
+    });
 
     $effect(() => {
         if (svg && stemma) {
@@ -83,20 +98,21 @@
             setActiveLayoutCache(layoutCache);
             resetSessionPositions(currentStemmaId);
 
-            let people: any[], families: any[];
-
-            if (viewMode == ViewMode.ALL) {
-                people = stemma.people;
-                families = stemma.families;
-            } else if (viewMode == ViewMode.EDITABLE_ONLY) {
-                people = stemma.people.filter((p) => !p.readOnly);
-                families = stemma.families.filter((f) => !f.readOnly);
-            }
-
+            const { people, families } = viewSlice;
             const displayPeople = people.map((p) => ({ ...p, name: personDisplayName(p.name, $t) }));
             const [nodes, relations] = makeNodesAndRelations(displayPeople, families);
             const initialPositions = computeInitialLayout(stemmaIndex, people, families, window.innerWidth, window.innerHeight);
+            currentNodes = nodes;
+            currentClans = computeClans({ type: "Stemma", people, families }, $locale);
             reconfigureGraph(nodes, relations, initialPositions);
+        }
+    });
+
+    $effect(() => {
+        if (svg && stemma) {
+            const { people, families } = viewSlice;
+            currentClans = computeClans({ type: "Stemma", people, families }, $locale);
+            if (currentNodes.length > 0) updateClanLayer(svg, currentClans, currentNodes);
         }
     });
 
@@ -189,11 +205,13 @@
             return null;
         });
         // Foreign lines (ghost edges, drag link-lines) have no datum — d? guards.
-        svg.selectAll("line")
+        // Classed lines (e.g. clan-spoke) carry non-edge data — skip via :not([class]).
+        svg.selectAll("line:not([class])")
             .attr("x1", (d: any) => d?.source?.x ?? 0)
             .attr("y1", (d: any) => d?.source?.y ?? 0)
             .attr("x2", (d: any) => d?.target?.x ?? 0)
             .attr("y2", (d: any) => d?.target?.y ?? 0);
+        updateClanLayer(svg, currentClans, currentNodes);
     }
 
     export function getSimulation(): any {
@@ -256,6 +274,9 @@
         else updateSimulation(simulation, nodes, relations);
 
         mergeData(svg, nodes, relations, window.innerWidth, window.innerHeight, initialPositions, pinnedPeople);
+        initClanLayer(svg);
+        updateClanLayer(svg, currentClans, nodes);
+        simulation.on("tick.clans", () => updateClanLayer(svg, currentClans, nodes));
 
         if (fullyCached) simulation.alphaTarget(0).alpha(0);
         if (!simulationActive) {
