@@ -1,12 +1,3 @@
-type GsiNotification = {
-    isNotDisplayed: () => boolean;
-    isSkippedMoment: () => boolean;
-    isDismissedMoment?: () => boolean;
-    getNotDisplayedReason?: () => string;
-    getSkippedReason?: () => string;
-    getDismissedReason?: () => string;
-};
-
 type GsiCredentialResponse = { credential: string };
 
 type Gsi = {
@@ -18,7 +9,7 @@ type Gsi = {
                 auto_select?: boolean;
                 use_fedcm_for_prompt?: boolean;
             }) => void;
-            prompt: (handler?: (n: GsiNotification) => void) => void;
+            prompt: () => void;
             renderButton: (parent: HTMLElement, opts: Record<string, unknown>) => void;
         };
     };
@@ -64,10 +55,7 @@ export function onCredential(listener: CredentialListener): () => void {
 
 export async function promptInitialSignIn(fallbackTarget: HTMLElement | null): Promise<void> {
     const g = await awaitGsi();
-    g.accounts.id.prompt((notification) => {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            if (fallbackTarget) g.accounts.id.renderButton(fallbackTarget, { theme: "outline", size: "large" });
-        }
-    });
+    if (fallbackTarget) g.accounts.id.renderButton(fallbackTarget, { theme: "outline", size: "large" });
+    g.accounts.id.prompt();
 }
 
