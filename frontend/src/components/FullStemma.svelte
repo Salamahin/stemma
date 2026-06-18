@@ -25,7 +25,7 @@
     import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
     import { exportChartSvg } from "../svgExport";
     import { personDisplayName } from "../personDisplayName";
-    import { t, locale } from "../i18n";
+    import { t } from "../i18n";
     import { computeClans, type Clan } from "../clans";
     import { initClanLayer, updateClanLayer } from "../clanLayer";
 
@@ -103,16 +103,8 @@
             const [nodes, relations] = makeNodesAndRelations(displayPeople, families);
             const initialPositions = computeInitialLayout(stemmaIndex, people, families, window.innerWidth, window.innerHeight);
             currentNodes = nodes;
-            currentClans = computeClans({ type: "Stemma", people, families }, $locale);
+            currentClans = computeClans({ type: "Stemma", people, families });
             reconfigureGraph(nodes, relations, initialPositions);
-        }
-    });
-
-    $effect(() => {
-        if (svg && stemma) {
-            const { people, families } = viewSlice;
-            currentClans = computeClans({ type: "Stemma", people, families }, $locale);
-            if (currentNodes.length > 0) updateClanLayer(svg, currentClans, currentNodes);
         }
     });
 

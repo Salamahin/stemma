@@ -142,7 +142,7 @@ export function updateClanLayer(
     blobs.enter()
         .append("path")
         .attr("class", "clan-blob")
-        .attr("opacity", 0.32)
+        .attr("opacity", 0.22)
         .merge(blobs)
         .attr("fill", d => d.clan.color)
         .attr("d", d => pathGen(paddedHull(d.points, d.shape)) ?? "");
@@ -155,7 +155,7 @@ export function updateClanLayer(
     labels.exit().remove();
     const labelsMerged = labelEntering.merge(labels);
     labelsMerged
-        .text(d => d.clan.plural.toUpperCase())
+        .text(d => d.clan.surname.toUpperCase())
         .attr("text-anchor", "middle")
         .attr("dominant-baseline", "middle")
         .attr("font-family", "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace")
@@ -163,14 +163,14 @@ export function updateClanLayer(
         .attr("font-style", "normal")
         .attr("letter-spacing", "0.1em")
         .attr("fill", "#ffffff")
-        .attr("opacity", 0.7)
+        .attr("opacity", 0.6)
         .attr("pointer-events", "none")
         .attr("transform", d => {
             const deg = (d.shape.angle * 180) / Math.PI;
             return `translate(${d.shape.cx},${d.shape.cy}) rotate(${deg})`;
         })
         .attr("font-size", d => {
-            const len = Math.max(1, d.clan.plural.length);
+            const len = Math.max(1, d.clan.surname.length);
             const widthFit = (d.shape.rx * 0.6) / (len * 0.6);
             const heightFit = d.shape.ry * 0.25;
             return Math.max(11, Math.min(widthFit, heightFit, 36));

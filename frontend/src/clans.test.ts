@@ -1,4 +1,4 @@
-import { clanColor, computeClans, nameTokens, pluralizeSurname } from "./clans";
+import { clanColor, computeClans, nameTokens } from "./clans";
 import type { FamilyDescription, PersonDescription, Stemma } from "./model";
 
 const person = (id: string, name: string): PersonDescription => ({
@@ -35,35 +35,6 @@ describe("nameTokens", () => {
     });
 });
 
-describe("pluralizeSurname (ru)", () => {
-    test.each([
-        ["Иванов", "Ивановы"],
-        ["Иванова", "Ивановы"],
-        ["Медведев", "Медведевы"],
-        ["Медведева", "Медведевы"],
-        ["Пушкин", "Пушкины"],
-        ["Пушкина", "Пушкины"],
-        ["Достоевский", "Достоевские"],
-        ["Достоевская", "Достоевские"],
-        ["Троцкий", "Троцкие"],
-        ["Сидоровы", "Сидоровы"],
-        ["Ивановы", "Ивановы"],
-        ["Достоевские", "Достоевские"],
-        ["Гёте", "Гётеы"],
-    ])("ru: %s → %s", (s, expected) => {
-        expect(pluralizeSurname(s, "ru")).toBe(expected);
-    });
-});
-
-describe("pluralizeSurname (en)", () => {
-    test("appends s", () => {
-        expect(pluralizeSurname("Smith", "en")).toBe("Smiths");
-    });
-    test("empty stays empty", () => {
-        expect(pluralizeSurname("", "en")).toBe("");
-    });
-});
-
 describe("clanColor", () => {
     test("stable per surname", () => {
         expect(clanColor("Иванов")).toBe(clanColor("Иванов"));
@@ -90,7 +61,7 @@ describe("computeClans (≥6 carriers, ≥3-generation chain)", () => {
 
     test("six members across three generations all sharing a surname → clan", () => {
         const { people, families } = dynastySix("Сидоров");
-        const clans = computeClans(stemma(people, families), "ru");
+        const clans = computeClans(stemma(people, families));
         expect(clans).toHaveLength(1);
         expect(clans[0].surname).toBe("Сидоров");
         expect(clans[0].personIds.size).toBe(6);
@@ -104,7 +75,7 @@ describe("computeClans (≥6 carriers, ≥3-generation chain)", () => {
         const e = person("e", "Ольга Сидорова");
         // 5 carriers but only 2 generations → no clan
         const f1 = family("f1", ["a", "b"], ["c", "d", "e"]);
-        expect(computeClans(stemma([a, b, c, d, e], [f1]), "ru")).toEqual([]);
+        expect(computeClans(stemma([a, b, c, d, e], [f1]))).toEqual([]);
     });
 
     test("six carriers in only two generations → no clan (needs three)", () => {
@@ -115,7 +86,7 @@ describe("computeClans (≥6 carriers, ≥3-generation chain)", () => {
         const e = person("e", "Сын2 Сидоров");
         const f = person("f", "Сын3 Сидоров");
         const fam = family("f1", ["a", "b"], ["c", "d", "e", "f"]);
-        expect(computeClans(stemma([a, b, c, d, e, f], [fam]), "ru")).toEqual([]);
+        expect(computeClans(stemma([a, b, c, d, e, f], [fam]))).toEqual([]);
     });
 
     test("dynasty surname persists across in-laws of different surname", () => {
@@ -132,7 +103,7 @@ describe("computeClans (≥6 carriers, ≥3-generation chain)", () => {
         const f1 = family("f1", ["m", "w0"], ["a"]);
         const f2 = family("f2", ["a", "w1"], ["p"]);
         const f3 = family("f3", ["p", "w2"], ["s1", "s2", "s3"]);
-        const clans = computeClans(stemma([m, w0, a, w1, p, w2, s1, s2, s3], [f1, f2, f3]), "ru");
+        const clans = computeClans(stemma([m, w0, a, w1, p, w2, s1, s2, s3], [f1, f2, f3]));
         const rom = clans.find(c => c.surname === "Романов")!;
         expect(rom).toBeDefined();
         expect([...rom.personIds].sort()).toEqual(["a", "m", "p", "s1", "s2", "s3"]);
@@ -145,7 +116,7 @@ describe("computeClans (≥6 carriers, ≥3-generation chain)", () => {
         const d = person("d", "Дочь Мария Сидорова");
         const f1 = family("f1", ["g"], ["m"]);
         const f2 = family("f2", ["m"], ["d"]);
-        const clans = computeClans(stemma([g, m, d], [f1, f2]), "ru");
+        const clans = computeClans(stemma([g, m, d], [f1, f2]));
         expect(clans.find(c => c.surname === "Мария")).toBeUndefined();
     });
 });

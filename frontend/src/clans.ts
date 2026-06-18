@@ -1,9 +1,7 @@
 import type { Stemma } from "./model";
-import type { Locale } from "./i18n";
 
 export type Clan = {
     surname: string;
-    plural: string;
     color: string;
     personIds: ReadonlySet<string>;
 };
@@ -68,30 +66,16 @@ export function canonicalSurname(surname: string): string {
     return s;
 }
 
-export function pluralizeSurname(surname: string, locale: Locale): string {
-    if (!surname) return "";
-    if (locale === "en") return surname + "s";
-    const s = surname;
-    if (/(овы|евы|ёвы|ины|ыны|ские|цкие)$/u.test(s)) return s;
-    if (/(ский|цкий)$/u.test(s)) return s.slice(0, -2) + "ие";
-    if (/(ская|цкая)$/u.test(s)) return s.slice(0, -2) + "ие";
-    if (/(ов|ев|ёв|ын)$/u.test(s)) return s + "ы";
-    if (/(ова|ева|ёва|ына)$/u.test(s)) return s.slice(0, -1) + "ы";
-    if (/ин$/u.test(s)) return s + "ы";
-    if (/ина$/u.test(s)) return s.slice(0, -1) + "ы";
-    return s + "ы";
-}
-
 export function clanColor(surname: string): string {
     let h = 0;
     for (let i = 0; i < surname.length; i++) {
         h = (h * 31 + surname.charCodeAt(i)) | 0;
     }
     const hue = ((h % 360) + 360) % 360;
-    return `hsl(${hue}, 65%, 55%)`;
+    return `hsl(${hue}, 38%, 72%)`;
 }
 
-export function computeClans(stemma: Stemma, locale: Locale): Clan[] {
+export function computeClans(stemma: Stemma): Clan[] {
     // Family-graph adjacency: two persons share an edge if they appear together
     // in any family (spouses, parent-child, or siblings sharing parents).
     const neighbors = new Map<string, Set<string>>();
@@ -184,7 +168,6 @@ export function computeClans(stemma: Stemma, locale: Locale): Clan[] {
             if (!spansGenerations(component, MIN_CLAN_GENERATIONS)) continue;
             clans.push({
                 surname: token,
-                plural: pluralizeSurname(token, locale),
                 color: clanColor(token),
                 personIds: component,
             });
