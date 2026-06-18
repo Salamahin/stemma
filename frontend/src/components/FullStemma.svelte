@@ -276,7 +276,16 @@
         mergeData(svg, nodes, relations, window.innerWidth, window.innerHeight, initialPositions, pinnedPeople);
         initClanLayer(svg);
         updateClanLayer(svg, currentClans, nodes);
-        simulation.on("tick.clans", () => updateClanLayer(svg, currentClans, nodes));
+        // Throttle clan-layer updates: SVG blur filter is expensive; refreshing every
+        // physics tick locks the main thread on large stemmas (kings-of-europe ~330 ppl).
+        let lastClanUpdate = 0;
+        simulation.on("tick.clans", () => {
+            const now = performance.now();
+            if (now - lastClanUpdate < 120) return;
+            lastClanUpdate = now;
+            updateClanLayer(svg, currentClans, nodes);
+        });
+        simulation.on("end.clans", () => updateClanLayer(svg, currentClans, nodes));
 
         if (fullyCached) simulation.alphaTarget(0).alpha(0);
         if (!simulationActive) {

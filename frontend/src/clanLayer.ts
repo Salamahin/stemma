@@ -68,7 +68,7 @@ export function initClanLayer(svg: d3.Selection<SVGSVGElement, unknown, HTMLElem
             .attr("y", "-50%")
             .attr("width", "200%")
             .attr("height", "200%");
-        filter.append("feGaussianBlur").attr("stdDeviation", 26);
+        filter.append("feGaussianBlur").attr("stdDeviation", 16);
     }
     const main = svg.select("g.main");
     let layer = main.select<SVGGElement>("g.clans");
@@ -107,39 +107,25 @@ export function updateClanLayer(
         })
         .filter((x): x is ClanRenderData => x !== null);
 
-    const blobGroups = layer.select("g.blobs")
-        .selectAll<SVGGElement, ClanRenderData>("g.clan-blob")
+    const blobs = layer.select("g.blobs")
+        .selectAll<SVGPathElement, ClanRenderData>("path.clan-blob")
         .data(data, d => d.clan.surname);
-    const blobEntering = blobGroups.enter()
-        .append("g")
+    blobs.enter()
+        .append("path")
         .attr("class", "clan-blob")
-        .attr("filter", `url(#${CLAN_BLUR_ID})`)
-        .attr("opacity", 0.22);
-    blobGroups.exit().remove();
-    const blobsMerged = blobEntering.merge(blobGroups);
-    blobsMerged.attr("fill", d => d.clan.color);
-
-    type Spoke = { p: [number, number]; cx: number; cy: number; color: string };
-    const spokeData = (d: ClanRenderData): Spoke[] =>
-        d.points.map(p => ({ p, cx: d.shape.cx, cy: d.shape.cy, color: d.clan.color }));
-    const spokes = blobsMerged.selectAll<SVGPathElement, Spoke>("path.clan-spoke").data(spokeData);
-    spokes.enter().append("path").attr("class", "clan-spoke")
         .attr("fill", "none")
-        .attr("stroke-width", MEMBER_BLOB_RADIUS * 0.9)
         .attr("stroke-linecap", "round")
-        .merge(spokes)
-        .attr("stroke", s => s.color)
-        .attr("d", s => `M ${s.cx} ${s.cy} L ${s.p[0]} ${s.p[1]}`);
-    spokes.exit().remove();
-
-    const memberCircles = blobsMerged.selectAll<SVGCircleElement, [number, number]>("circle")
-        .data(d => d.points);
-    memberCircles.enter().append("circle")
-        .attr("r", MEMBER_BLOB_RADIUS)
-        .merge(memberCircles)
-        .attr("cx", p => p[0])
-        .attr("cy", p => p[1]);
-    memberCircles.exit().remove();
+        .attr("stroke-linejoin", "round")
+        .attr("stroke-width", MEMBER_BLOB_RADIUS * 1.05)
+        .attr("filter", `url(#${CLAN_BLUR_ID})`)
+        .attr("opacity", 0.22)
+        .merge(blobs)
+        .attr("stroke", d => d.clan.color)
+        .attr("d", d => {
+            const { cx, cy } = d.shape;
+            return d.points.map(([x, y]) => `M ${cx} ${cy} L ${x} ${y}`).join(" ");
+        });
+    blobs.exit().remove();
 
     const labels = layer.select("g.labels")
         .selectAll<SVGTextElement, ClanRenderData>("text.clan-label")
