@@ -122,14 +122,14 @@ export function updateClanLayer(
     type Spoke = { p: [number, number]; cx: number; cy: number; color: string };
     const spokeData = (d: ClanRenderData): Spoke[] =>
         d.points.map(p => ({ p, cx: d.shape.cx, cy: d.shape.cy, color: d.clan.color }));
-    const spokes = blobsMerged.selectAll<SVGLineElement, Spoke>("line.clan-spoke").data(spokeData);
-    spokes.enter().append("line").attr("class", "clan-spoke")
+    const spokes = blobsMerged.selectAll<SVGPathElement, Spoke>("path.clan-spoke").data(spokeData);
+    spokes.enter().append("path").attr("class", "clan-spoke")
+        .attr("fill", "none")
         .attr("stroke-width", MEMBER_BLOB_RADIUS * 0.9)
         .attr("stroke-linecap", "round")
         .merge(spokes)
         .attr("stroke", s => s.color)
-        .attr("x1", s => s.cx).attr("y1", s => s.cy)
-        .attr("x2", s => s.p[0]).attr("y2", s => s.p[1]);
+        .attr("d", s => `M ${s.cx} ${s.cy} L ${s.p[0]} ${s.p[1]}`);
     spokes.exit().remove();
 
     const memberCircles = blobsMerged.selectAll<SVGCircleElement, [number, number]>("circle")
