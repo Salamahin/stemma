@@ -17,6 +17,44 @@ const MIN_RY = 50;
 const ELLIPSE_PAD = 60;
 const LAYER_BLUR_PX = 22;
 const HULL_PADDING = 55;
+const LABEL_BASELINE_FONT_PX = 16;
+const LABEL_FIT_FRACTION = 0.8;
+const LABEL_MIN_FONT_PX = 11;
+
+// In the label's local frame (centered at cx,cy, rotated by -angle), find the
+// largest centered axis-aligned rectangle that fits inside the hull. Returns
+// half-extents so callers can compare against text bbox half-width/height.
+export function inscribedHalfExtents(
+    hull: ReadonlyArray<readonly [number, number]>,
+    cx: number,
+    cy: number,
+    angle: number,
+): { halfW: number; halfH: number } {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    let maxX = 0, minX = 0, maxY = 0, minY = 0;
+    let first = true;
+    for (const [x, y] of hull) {
+        const dx = x - cx;
+        const dy = y - cy;
+        const lx = cos * dx + sin * dy;
+        const ly = -sin * dx + cos * dy;
+        if (first) {
+            maxX = minX = lx;
+            maxY = minY = ly;
+            first = false;
+            continue;
+        }
+        if (lx > maxX) maxX = lx;
+        if (lx < minX) minX = lx;
+        if (ly > maxY) maxY = ly;
+        if (ly < minY) minY = ly;
+    }
+    return {
+        halfW: Math.max(0, Math.min(maxX, -minX)),
+        halfH: Math.max(0, Math.min(maxY, -minY)),
+    };
+}
 
 export function clanShape(positions: ReadonlyArray<readonly [number, number]>): ClanShape {
     const n = positions.length;
@@ -74,7 +112,7 @@ export function initClanLayer(svg: d3.Selection<SVGSVGElement, unknown, HTMLElem
     layer.lower();
 }
 
-type ClanRenderData = { clan: Clan; points: [number, number][]; shape: ClanShape };
+type ClanRenderData = { clan: Clan; points: [number, number][]; shape: ClanShape; hull: [number, number][] };
 
 // Compute a convex hull around the points, then push every hull vertex outward
 // from the cluster centroid by HULL_PADDING so the blob extends beyond the nodes.
@@ -127,7 +165,8 @@ export function updateClanLayer(
                 if (pos) points.push(pos);
             }
             if (points.length < 2) return null;
-            return { clan, points, shape: clanShape(points) };
+            const shape = clanShape(points);
+            return { clan, points, shape, hull: paddedHull(points, shape) };
         })
         .filter((x): x is ClanRenderData => x !== null);
 
@@ -145,7 +184,7 @@ export function updateClanLayer(
         .attr("opacity", 0.22)
         .merge(blobs)
         .attr("fill", d => d.clan.color)
-        .attr("d", d => pathGen(paddedHull(d.points, d.shape)) ?? "");
+        .attr("d", d => pathGen(d.hull) ?? "");
     blobs.exit().remove();
 
     const labels = layer.select("g.labels")
@@ -169,13 +208,21 @@ export function updateClanLayer(
             const deg = (d.shape.angle * 180) / Math.PI;
             return `translate(${d.shape.cx},${d.shape.cy}) rotate(${deg})`;
         })
-        .attr("font-size", d => {
-            const len = Math.max(1, d.clan.surname.length);
-            // Label is rotated onto the major (rx) axis; target ~80% of each diameter.
-            const widthFit = (1.6 * d.shape.rx) / (len * 0.6);
-            const heightFit = 1.6 * d.shape.ry;
-            return Math.max(11, Math.min(widthFit, heightFit));
-        })
+        .attr("font-size", LABEL_BASELINE_FONT_PX)
         .attr("textLength", null)
         .attr("lengthAdjust", null);
+
+    // Measure rendered text against the actual blob (paddedHull) in the label's
+    // local rotated frame, then scale font-size so the text fits on both axes.
+    labelsMerged.each(function (d) {
+        const node = this as SVGTextElement;
+        const bbox = node.getBBox();
+        if (bbox.width <= 0 || bbox.height <= 0) return;
+        const { halfW, halfH } = inscribedHalfExtents(d.hull, d.shape.cx, d.shape.cy, d.shape.angle);
+        const maxW = 2 * halfW * LABEL_FIT_FRACTION;
+        const maxH = 2 * halfH * LABEL_FIT_FRACTION;
+        const scale = Math.min(maxW / bbox.width, maxH / bbox.height);
+        const fontSize = Math.max(LABEL_MIN_FONT_PX, LABEL_BASELINE_FONT_PX * scale);
+        node.setAttribute("font-size", String(fontSize));
+    });
 }
