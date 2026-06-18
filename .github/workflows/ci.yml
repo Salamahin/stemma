@@ -92,15 +92,32 @@ jobs:
       with:
         node-version: '22'
         cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
+        cache-dependency-path: |
+          frontend/package-lock.json
+          e2e/package-lock.json
     - name: Install frontend deps
       run: npm ci
       working-directory: frontend
     - name: Install e2e deps
-      run: npm install
+      run: npm ci
       working-directory: e2e
+    - name: Resolve Playwright version
+      id: pw
+      run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      working-directory: e2e
+    - name: Cache Playwright browsers
+      id: playwright-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
     - name: Install Playwright browser
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
       run: npx playwright install --with-deps chromium
+      working-directory: e2e
+    - name: Install Playwright system deps (cache hit)
+      if: steps.playwright-cache.outputs.cache-hit == 'true'
+      run: npx playwright install-deps chromium
       working-directory: e2e
     - name: Run e2e tests
       run: npm test
