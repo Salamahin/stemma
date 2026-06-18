@@ -12,11 +12,11 @@ export type ClanShape = {
 
 export type ClanNodePosition = { id: string; x: number; y: number };
 
-const CLAN_BLUR_ID = "clan-glow-blur";
 const MIN_RX = 70;
 const MIN_RY = 50;
 const MEMBER_BLOB_RADIUS = 70;
 const ELLIPSE_PAD = 60;
+const LAYER_BLUR_PX = 22;
 
 export function clanShape(positions: ReadonlyArray<readonly [number, number]>): ClanShape {
     const n = positions.length;
@@ -59,24 +59,17 @@ export function clanShape(positions: ReadonlyArray<readonly [number, number]>): 
 }
 
 export function initClanLayer(svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, any>) {
-    let defs = svg.select<SVGDefsElement>("defs");
-    if (defs.empty()) defs = svg.append("defs");
-    if (defs.select(`#${CLAN_BLUR_ID}`).empty()) {
-        const filter = defs.append("filter")
-            .attr("id", CLAN_BLUR_ID)
-            .attr("x", "-50%")
-            .attr("y", "-50%")
-            .attr("width", "200%")
-            .attr("height", "200%");
-        filter.append("feGaussianBlur").attr("stdDeviation", 16);
-    }
     const main = svg.select("g.main");
     let layer = main.select<SVGGElement>("g.clans");
     if (layer.empty()) {
         layer = main.insert("g", ":first-child").attr("class", "clans");
     }
     layer.attr("pointer-events", "none");
-    if (layer.select<SVGGElement>("g.blobs").empty()) layer.append("g").attr("class", "blobs");
+    // CSS filter on the layer is GPU-accelerated; per-element feGaussianBlur on
+    // many paths locked Chrome's main thread on large stemmas.
+    let blobs = layer.select<SVGGElement>("g.blobs");
+    if (blobs.empty()) blobs = layer.append("g").attr("class", "blobs");
+    blobs.style("filter", `blur(${LAYER_BLUR_PX}px)`);
     if (layer.select<SVGGElement>("g.labels").empty()) layer.append("g").attr("class", "labels");
     layer.lower();
 }
@@ -117,8 +110,7 @@ export function updateClanLayer(
         .attr("stroke-linecap", "round")
         .attr("stroke-linejoin", "round")
         .attr("stroke-width", MEMBER_BLOB_RADIUS * 1.05)
-        .attr("filter", `url(#${CLAN_BLUR_ID})`)
-        .attr("opacity", 0.22)
+        .attr("opacity", 0.35)
         .merge(blobs)
         .attr("stroke", d => d.clan.color)
         .attr("d", d => {
