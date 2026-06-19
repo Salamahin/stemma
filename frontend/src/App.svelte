@@ -417,14 +417,14 @@
     />
     <PromptModal bind:this={promptModal} />
     <ConfirmModal bind:this={confirmModal} />
-{:else if bootProbing}
-    <div class="boot-loading vh-100">
-        <Circle2 />
-    </div>
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
-            <Authenticate {google_client_id} onsignIn={handleGoogleSignIn} />
+            <Authenticate
+                {google_client_id}
+                onsignIn={handleGoogleSignIn}
+                initGoogle={!bootProbing}
+            />
         </div>
     </div>
 {/if}
@@ -515,13 +515,6 @@
         align-items: center;
         width: 100%;
         height: 100%;
-    }
-
-    .boot-loading {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background: #f8f9fa;
     }
 
 </style>
