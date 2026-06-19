@@ -1,18 +1,17 @@
 <script lang="ts">
+    import { onMount } from "svelte";
     import { initializeGoogleAuth, onCredential, promptInitialSignIn } from "../googleAuth";
 
     type Props = {
         google_client_id: string;
         onsignIn?: (idToken: string) => void;
-        initGoogle?: boolean;
     };
 
-    let { google_client_id, onsignIn, initGoogle = false }: Props = $props();
+    let { google_client_id, onsignIn }: Props = $props();
 
-    $effect(() => {
-        if (!initGoogle) return;
+    onMount(() => {
         const unsubscribe = onCredential((credential) => onsignIn?.(credential));
-        void initializeGoogleAuth(google_client_id)
+        initializeGoogleAuth(google_client_id)
             .then(() => promptInitialSignIn(document.getElementById("signin")))
             .catch((err) => console.error("Google Identity init failed", err));
         return unsubscribe;
