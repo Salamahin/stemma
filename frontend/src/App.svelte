@@ -81,7 +81,6 @@
     let pendingRemovedFamilyIds = $state<Set<string>>(new Set());
     let signedIn = $state(false);
     let bootProbing = $state(true);
-    let signingIn = $state(false);
 
     const actions = new MutationActions({
         controller,
@@ -125,14 +124,11 @@
 
     async function handleGoogleSignIn(idToken: string) {
         fetch(`${stemma_backend_url}/warmup`).catch(() => {});
-        signingIn = true;
         try {
             await session.signIn(idToken);
         } catch (err) {
             error = err as Error;
             console.error("Sign-in failed", err);
-        } finally {
-            signingIn = false;
         }
     }
 
@@ -421,14 +417,14 @@
     />
     <PromptModal bind:this={promptModal} />
     <ConfirmModal bind:this={confirmModal} />
+{:else if bootProbing}
+    <div class="boot-loading vh-100">
+        <Circle2 />
+    </div>
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
-            {#if bootProbing || signingIn}
-                <Circle2 />
-            {:else}
-                <Authenticate {google_client_id} onsignIn={handleGoogleSignIn} />
-            {/if}
+            <Authenticate {google_client_id} onsignIn={handleGoogleSignIn} />
         </div>
     </div>
 {/if}
@@ -519,6 +515,13 @@
         align-items: center;
         width: 100%;
         height: 100%;
+    }
+
+    .boot-loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #f8f9fa;
     }
 
 </style>
