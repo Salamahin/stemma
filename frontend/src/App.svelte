@@ -12,7 +12,6 @@
     import { PinnedPeopleStorage } from "./pinnedPeopleStorage";
     import { ViewMode } from "./model";
     import { LocalizedError, t } from "./i18n";
-    import { initializeGoogleAuth } from "./googleAuth";
     import Authenticate from "./components/Authenticate.svelte";
     import FullStemma from "./components/FullStemma.svelte";
     import Sheet from "./components/Sheet.svelte";
@@ -82,6 +81,7 @@
     let pendingRemovedFamilyIds = $state<Set<string>>(new Set());
     let signedIn = $state(false);
     let bootProbing = $state(true);
+    let signingIn = $state(false);
 
     const actions = new MutationActions({
         controller,
@@ -124,11 +124,15 @@
     }
 
     async function handleGoogleSignIn(idToken: string) {
+        fetch(`${stemma_backend_url}/warmup`).catch(() => {});
+        signingIn = true;
         try {
             await session.signIn(idToken);
         } catch (err) {
             error = err as Error;
             console.error("Sign-in failed", err);
+        } finally {
+            signingIn = false;
         }
     }
 
@@ -245,10 +249,7 @@
     onMount(() => {
         const boot = session.e2eAutoLoginEnabled
             ? session.signInAsE2eUser()
-            : (initializeGoogleAuth(google_client_id).catch((err) =>
-                  console.error("Google Identity init failed", err),
-              ),
-              probeCookieSession());
+            : probeCookieSession();
         void Promise.resolve(boot).finally(() => (bootProbing = false));
         return () => {
             for (const unsub of subscriptions) unsub();
@@ -423,7 +424,11 @@
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
-            <Authenticate {google_client_id} onsignIn={handleGoogleSignIn} showSignIn={!bootProbing} />
+            {#if bootProbing || signingIn}
+                <Circle2 />
+            {:else}
+                <Authenticate {google_client_id} onsignIn={handleGoogleSignIn} />
+            {/if}
         </div>
     </div>
 {/if}

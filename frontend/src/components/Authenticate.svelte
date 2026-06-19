@@ -5,10 +5,9 @@
     type Props = {
         google_client_id: string;
         onsignIn?: (idToken: string) => void;
-        showSignIn?: boolean;
     };
 
-    let { google_client_id, onsignIn, showSignIn = true }: Props = $props();
+    let { google_client_id, onsignIn }: Props = $props();
 
     onMount(() => {
         const unsubscribe = onCredential((credential) => onsignIn?.(credential));
@@ -27,7 +26,7 @@
     <div class="d-flex justify-content-center align-items-center flex-column">
         <h1>project stemma</h1>
         <img src="assets/logo_bw_avg.webp" alt="" width="100" height="100" />
-        <div class="mt-5 signin-slot" class:signin-hidden={!showSignIn} style="max-width:250px">
+        <div class="mt-5 signin-slot" style="max-width:250px">
             <div id="signin"></div>
         </div>
     </div>
@@ -51,9 +50,5 @@
 
     :global(.abcRioButton) {
         margin: auto;
-    }
-
-    .signin-hidden {
-        visibility: hidden;
     }
 </style>
