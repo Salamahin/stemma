@@ -10,6 +10,7 @@ type Gsi = {
                 use_fedcm_for_prompt?: boolean;
             }) => void;
             prompt: () => void;
+            cancel: () => void;
             renderButton: (parent: HTMLElement, opts: Record<string, unknown>) => void;
         };
     };
@@ -57,5 +58,9 @@ export async function promptInitialSignIn(fallbackTarget: HTMLElement | null): P
     const g = await awaitGsi();
     if (fallbackTarget) g.accounts.id.renderButton(fallbackTarget, { theme: "outline", size: "large" });
     g.accounts.id.prompt();
+}
+
+export function cancelGoogleAuth(): void {
+    gsi()?.accounts.id.cancel();
 }
 

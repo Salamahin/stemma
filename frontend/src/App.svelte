@@ -12,6 +12,7 @@
     import { PinnedPeopleStorage } from "./pinnedPeopleStorage";
     import { ViewMode } from "./model";
     import { LocalizedError, t } from "./i18n";
+    import { cancelGoogleAuth } from "./googleAuth";
     import Authenticate from "./components/Authenticate.svelte";
     import FullStemma from "./components/FullStemma.svelte";
     import Sheet from "./components/Sheet.svelte";
@@ -80,7 +81,6 @@
     let pendingRemovedPersonIds = $state<Set<string>>(new Set());
     let pendingRemovedFamilyIds = $state<Set<string>>(new Set());
     let signedIn = $state(false);
-    let bootProbing = $state(true);
 
     const actions = new MutationActions({
         controller,
@@ -232,6 +232,7 @@
         try {
             await controller.listStemmas();
             signedIn = true;
+            cancelGoogleAuth();
         } catch (err) {
             if (signedIn) return;
             if ((err as { key?: string }).key === "error.sessionExpired") {
@@ -243,10 +244,11 @@
     }
 
     onMount(() => {
-        const boot = session.e2eAutoLoginEnabled
-            ? session.signInAsE2eUser()
-            : probeCookieSession();
-        void Promise.resolve(boot).finally(() => (bootProbing = false));
+        if (session.e2eAutoLoginEnabled) {
+            void session.signInAsE2eUser();
+        } else {
+            void probeCookieSession();
+        }
         return () => {
             for (const unsub of subscriptions) unsub();
         };
@@ -420,11 +422,7 @@
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
-            <Authenticate
-                {google_client_id}
-                onsignIn={handleGoogleSignIn}
-                initGoogle={!bootProbing}
-            />
+            <Authenticate {google_client_id} onsignIn={handleGoogleSignIn} />
         </div>
     </div>
 {/if}
