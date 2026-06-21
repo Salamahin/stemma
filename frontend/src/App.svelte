@@ -81,6 +81,7 @@
     let pendingRemovedPersonIds = $state<Set<string>>(new Set());
     let pendingRemovedFamilyIds = $state<Set<string>>(new Set());
     let signedIn = $state(false);
+    let signingIn = $state(false);
 
     const actions = new MutationActions({
         controller,
@@ -124,11 +125,14 @@
 
     async function handleGoogleSignIn(idToken: string) {
         fetch(`${stemma_backend_url}/warmup`).catch(() => {});
+        signingIn = true;
         try {
             await session.signIn(idToken);
         } catch (err) {
             error = err as Error;
             console.error("Sign-in failed", err);
+        } finally {
+            signingIn = false;
         }
     }
 
@@ -422,7 +426,7 @@
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
-            <Authenticate {google_client_id} onsignIn={handleGoogleSignIn} />
+            <Authenticate {google_client_id} onsignIn={handleGoogleSignIn} {signingIn} />
         </div>
     </div>
 {/if}

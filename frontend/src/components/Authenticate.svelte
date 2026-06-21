@@ -1,13 +1,15 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { Circle2 } from "svelte-loading-spinners";
     import { initializeGoogleAuth, onCredential, promptInitialSignIn } from "../googleAuth";
 
     type Props = {
         google_client_id: string;
         onsignIn?: (idToken: string) => void;
+        signingIn?: boolean;
     };
 
-    let { google_client_id, onsignIn }: Props = $props();
+    let { google_client_id, onsignIn, signingIn = false }: Props = $props();
 
     onMount(() => {
         const unsubscribe = onCredential((credential) => onsignIn?.(credential));
@@ -27,7 +29,13 @@
         <h1>project stemma</h1>
         <img src="assets/logo_bw_avg.webp" alt="" width="100" height="100" />
         <div class="mt-5 signin-slot" style="max-width:250px">
-            <div id="signin"></div>
+            {#if signingIn}
+                <div class="signing-in-spinner">
+                    <Circle2 size="40" />
+                </div>
+            {:else}
+                <div id="signin"></div>
+            {/if}
         </div>
     </div>
 </div>
@@ -50,5 +58,12 @@
 
     :global(.abcRioButton) {
         margin: auto;
+    }
+
+    .signing-in-spinner {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 40px;
     }
 </style>
