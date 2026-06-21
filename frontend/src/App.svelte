@@ -81,6 +81,8 @@
     let pendingRemovedPersonIds = $state<Set<string>>(new Set());
     let pendingRemovedFamilyIds = $state<Set<string>>(new Set());
     let signedIn = $state(false);
+    let signingIn = $state(false);
+    let bootProbing = $state(true);
 
     const actions = new MutationActions({
         controller,
@@ -124,11 +126,14 @@
 
     async function handleGoogleSignIn(idToken: string) {
         fetch(`${stemma_backend_url}/warmup`).catch(() => {});
+        signingIn = true;
         try {
             await session.signIn(idToken);
         } catch (err) {
             error = err as Error;
             console.error("Sign-in failed", err);
+        } finally {
+            signingIn = false;
         }
     }
 
@@ -244,11 +249,10 @@
     }
 
     onMount(() => {
-        if (session.e2eAutoLoginEnabled) {
-            void session.signInAsE2eUser();
-        } else {
-            void probeCookieSession();
-        }
+        const boot = session.e2eAutoLoginEnabled
+            ? session.signInAsE2eUser()
+            : probeCookieSession();
+        void Promise.resolve(boot).finally(() => (bootProbing = false));
         return () => {
             for (const unsub of subscriptions) unsub();
         };
@@ -419,10 +423,15 @@
     />
     <PromptModal bind:this={promptModal} />
     <ConfirmModal bind:this={confirmModal} />
+{:else if bootProbing}
+    <div class="boot-loading vh-100">
+        <Circle2 />
+        <p class="mt-2">{$t("app.loading")}</p>
+    </div>
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
-            <Authenticate {google_client_id} onsignIn={handleGoogleSignIn} />
+            <Authenticate {google_client_id} onsignIn={handleGoogleSignIn} {signingIn} />
         </div>
     </div>
 {/if}
@@ -513,6 +522,14 @@
         align-items: center;
         width: 100%;
         height: 100%;
+    }
+
+    .boot-loading {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background: #f8f9fa;
     }
 
 </style>
