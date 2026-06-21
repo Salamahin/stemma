@@ -11,14 +11,13 @@ type Gsi = {
             }) => void;
             prompt: () => void;
             cancel: () => void;
-            renderButton: (parent: HTMLElement, opts: Record<string, unknown>) => void;
         };
     };
 };
 
 type CredentialListener = (token: string) => void;
 
-let initPromise: Promise<void> | null = null;
+let initPromise: Promise<Gsi> | null = null;
 const listeners = new Set<CredentialListener>();
 
 function gsi(): Gsi | null {
@@ -34,7 +33,7 @@ async function awaitGsi(): Promise<Gsi> {
     return g;
 }
 
-export function initializeGoogleAuth(clientId: string): Promise<void> {
+export function initializeGoogleAuth(clientId: string): Promise<Gsi> {
     if (initPromise) return initPromise;
     initPromise = awaitGsi().then((g) => {
         g.accounts.id.initialize({
@@ -45,6 +44,7 @@ export function initializeGoogleAuth(clientId: string): Promise<void> {
             auto_select: true,
             use_fedcm_for_prompt: true,
         });
+        return g;
     });
     return initPromise;
 }
@@ -54,13 +54,6 @@ export function onCredential(listener: CredentialListener): () => void {
     return () => listeners.delete(listener);
 }
 
-export async function promptInitialSignIn(fallbackTarget: HTMLElement | null): Promise<void> {
-    const g = await awaitGsi();
-    if (fallbackTarget) g.accounts.id.renderButton(fallbackTarget, { theme: "outline", size: "large" });
-    g.accounts.id.prompt();
-}
-
 export function cancelGoogleAuth(): void {
     gsi()?.accounts.id.cancel();
 }
-
