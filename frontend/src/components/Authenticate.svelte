@@ -1,6 +1,8 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { initializeGoogleAuth, onCredential } from "../googleAuth";
+    import { initializeGoogleAuth, onCredential, renderGoogleButton } from "../googleAuth";
+    import { get } from "svelte/store";
+    import { locale } from "../i18n";
 
     type Props = {
         google_client_id: string;
@@ -9,6 +11,7 @@
     };
 
     let { google_client_id, onsignIn, signingIn = false }: Props = $props();
+    let buttonDiv = $state<HTMLDivElement | null>(null);
 
     onMount(() => {
         const unsubscribe = onCredential((credential) => onsignIn?.(credential));
@@ -16,6 +19,13 @@
             .then((g) => g.accounts.id.prompt())
             .catch((err) => console.error("Google Identity init failed", err));
         return unsubscribe;
+    });
+
+    $effect(() => {
+        if (buttonDiv) {
+            renderGoogleButton(buttonDiv, get(locale))
+                .catch((err) => console.error("Google Sign-In button render failed", err));
+        }
     });
 </script>
 
@@ -31,6 +41,8 @@
             <div class="progress mt-5" style="width:250px; height:4px">
                 <div class="progress-bar progress-bar-striped progress-bar-animated w-100"></div>
             </div>
+        {:else}
+            <div bind:this={buttonDiv} class="mt-4"></div>
         {/if}
     </div>
 </div>
