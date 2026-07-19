@@ -86,6 +86,7 @@
     let id = $state("");
     let personReadOnly = $state(false);
     const editingAllowed = $derived(isCreate || (editMode && !personReadOnly));
+    const pinningAllowed = $derived(!isCreate && !personReadOnly);
     const readOnly = $derived(!editingAllowed);
     let photoUrl = $state<string | null>(null);
     let photoErrString = $state<string | null>(null);
@@ -248,6 +249,28 @@
 
     export function dismiss() {
         close();
+    }
+
+    let pinDebounce: ReturnType<typeof setTimeout> | null = null;
+
+    function savePinOnly() {
+        if (pinDebounce !== null) clearTimeout(pinDebounce);
+        pinDebounce = setTimeout(() => {
+            pinDebounce = null;
+            onpersonUpdated?.({
+                id,
+                description: {
+                    type: "CreateNewPerson" as const,
+                    name: unknown ? "" : name,
+                    birthDate: dateToIsoLocalTime(birthDate),
+                    deathDate: dateToIsoLocalTime(deathDate),
+                    bio,
+                },
+                pin: pinned,
+                photoUpload: null,
+                photoRemove: false,
+            });
+        }, 300);
     }
 
     function save() {
@@ -642,7 +665,7 @@
                     {/if}
                 </div>
 
-                {#if editingAllowed}
+                {#if pinningAllowed}
                     <div class="col-pin">
                         <div class="form-check form-switch">
                             <input
@@ -650,6 +673,7 @@
                                 type="checkbox"
                                 id="person-pin"
                                 bind:checked={pinned}
+                                onchange={!editingAllowed ? savePinOnly : undefined}
                             />
                             <label class="form-check-label" for="person-pin">{$t("person.pin")}</label>
                         </div>

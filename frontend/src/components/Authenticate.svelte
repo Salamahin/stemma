@@ -1,7 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { initializeGoogleAuth, onCredential, renderGoogleButton } from "../googleAuth";
-    import { get } from "svelte/store";
     import { locale } from "../i18n";
 
     type Props = {
@@ -23,7 +22,7 @@
 
     $effect(() => {
         if (buttonDiv) {
-            renderGoogleButton(buttonDiv, get(locale))
+            renderGoogleButton(buttonDiv, $locale)
                 .catch((err) => console.error("Google Sign-In button render failed", err));
         }
     });
@@ -42,7 +41,7 @@
                 <div class="progress-bar progress-bar-striped progress-bar-animated w-100"></div>
             </div>
         {:else}
-            <div bind:this={buttonDiv} class="mt-4"></div>
+            <div bind:this={buttonDiv} class="mt-4 d-flex justify-content-center"></div>
         {/if}
     </div>
 </div>
