@@ -217,11 +217,12 @@ export class AppController {
         this.refreshVisual(si, personId, pin);
 
         const original = si.person(personId);
-        const fieldsChanged =
-            original.birthDate != descr.birthDate ||
-            original.deathDate != descr.deathDate ||
-            original.name != descr.name ||
-            original.bio != descr.bio;
+        const n = (s: string | undefined | null) => s ?? "";
+        const fieldsChanged = !original ||
+            n(original.birthDate) != n(descr.birthDate) ||
+            n(original.deathDate) != n(descr.deathDate) ||
+            n(original.name) != n(descr.name) ||
+            n(original.bio) != n(descr.bio);
 
         if (!photoUpload && !photoRemove && !fieldsChanged) return;
 
