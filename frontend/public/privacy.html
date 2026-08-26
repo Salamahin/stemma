@@ -20,158 +20,82 @@
 		<p class="updated">Last updated: 27 August 2026</p>
 
 		<p>
-			Stemma (<a href="https://stemma.link">stemma.link</a>) is a collaborative family tree editor
-			run as a personal, non-commercial project by an individual operator ("we", "us"). This policy
-			explains what personal data the service processes, why, and what rights you have over it.
-			For any question about this policy, or to exercise any of the rights below, write to
+			Stemma (<a href="https://stemma.link">stemma.link</a>) is a family tree editor run as a free,
+			non-commercial hobby project by one person. Questions, corrections, deletion requests — all to
 			<a href="mailto:danilasergeevich@gmail.com?subject=stemma%20privacy">danilasergeevich@gmail.com</a>.
 		</p>
 
-		<h2>1. What we collect</h2>
+		<h2>What is stored</h2>
 		<ul>
 			<li>
-				<b>Your Google account email address.</b> You sign in with Google. We verify the identity
-				token Google issues and keep only the email address it contains — it is your account
-				identifier in Stemma. We do not receive or store your Google password, and we do not
-				request access to Gmail, Drive, Contacts, Calendar or any other Google service.
+				<b>Your Google account email address.</b> You sign in with Google; we verify the identity
+				token it issues and keep only the email address from it, as your account identifier. No
+				password, and no access to Gmail, Drive, Contacts or any other Google service.
 			</li>
 			<li>
-				<b>The family tree content you enter.</b> Names, birth and death dates, free-text
-				biographies, photographs, and the family relationships that connect people. Some of this
-				is data about other people, living or deceased — see section 6.
+				<b>What you type into a tree</b> — names, dates, biographies, photos, and the family links
+				between people.
 			</li>
+			<li><b>A session record</b> so you stay signed in.</li>
 			<li>
-				<b>Session data.</b> A random session identifier, the time the session was created and
-				last used, and the email it belongs to.
-			</li>
-			<li>
-				<b>Technical logs.</b> Our infrastructure providers record ordinary request logs — IP
-				address, timestamp, requested path, user agent, response status — for security,
-				debugging and abuse prevention.
+				<b>Ordinary server logs</b> kept by our hosting provider (IP, time, path, user agent) for
+				security and debugging.
 			</li>
 		</ul>
 		<p>
-			We do not use advertising, analytics, tracking pixels, or third-party profiling of any kind,
-			and we never sell or rent personal data.
+			No advertising, no analytics, no tracking, no profiling, no selling of data. All of it is
+			hosted on Amazon Web Services in the eu-central-1 (Frankfurt) region, over HTTPS, encrypted at
+			rest.
 		</p>
 
-		<h2>2. Why we process it, and on what basis</h2>
-		<ul>
-			<li>
-				<b>To provide the service</b> — authenticate you, store and display your trees, share
-				them with people you invite. Legal basis: performance of a contract with you (GDPR
-				Art. 6(1)(b)).
-			</li>
-			<li>
-				<b>To keep the service secure and working</b> — logs, rate limiting, abuse
-				investigation, backups. Legal basis: our legitimate interests (GDPR Art. 6(1)(f)).
-			</li>
-			<li>
-				<b>To answer your emails</b> when you contact us. Legal basis: legitimate interests.
-			</li>
-		</ul>
-
-		<h2>3. Google sign-in and limited use</h2>
+		<h2>Google sign-in</h2>
 		<p>
-			Authentication uses Google Identity Services. Stemma's use of information received from
-			Google APIs adheres to the
+			Stemma's use of information received from Google APIs adheres to the
 			<a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener noreferrer" target="_blank">Google
-			API Services User Data Policy</a>, including the Limited Use requirements. Concretely: the
-			email address obtained through Google sign-in is used only to identify your account and to
-			address invitations to you. It is not transferred to third parties except as described in
-			section 5, not used for advertising, and not read by humans except where you ask us to for
-			support, or where security or law requires it.
-		</p>
-		<p>
-			You can revoke Stemma's access to your Google account at any time at
+			API Services User Data Policy</a>, including the Limited Use requirements. The email address
+			from Google sign-in identifies your account and lets people address invitations to you.
+			Nothing else. You can revoke access at
 			<a href="https://myaccount.google.com/permissions" rel="noopener noreferrer" target="_blank">myaccount.google.com/permissions</a>.
 		</p>
 
-		<h2>4. Cookies</h2>
+		<h2>Cookies</h2>
 		<p>
-			Stemma sets one cookie, <code>stemma_session</code>. It holds a random session identifier —
-			no personal data is encoded in it. It is <code>HttpOnly</code> and <code>Secure</code>, it
-			expires after 30 days, and it exists solely to keep you signed in. It is strictly necessary
-			for the service to function, so no consent banner is shown. We set no advertising or
-			analytics cookies. Signing out deletes the session on our side; clearing your browser
-			cookies removes it on yours.
+			One cookie, <code>stemma_session</code>, holding a random session id and nothing else. It is
+			<code>HttpOnly</code>, expires after 30 days, and exists only to keep you signed in. No
+			advertising or analytics cookies.
 		</p>
 
-		<h2>5. Who else sees the data</h2>
+		<h2>Who else can see it</h2>
 		<ul>
 			<li>
-				<b>People you invite.</b> Invitation links you create grant the recipient access to the
-				tree (and the subtree) you shared. Anyone holding a link you distribute can use it — treat
-				invitation links as secrets.
+				<b>People you invite.</b> An invitation link grants access to whoever holds it, so treat
+				links as secrets.
 			</li>
 			<li>
-				<b>Infrastructure providers (processors).</b> Amazon Web Services hosts the application,
-				the database and the photo storage in the <b>eu-central-1 (Frankfurt, Germany)</b> region;
-				Google provides sign-in. They process data on our instructions and are bound by their own
-				data-processing terms.
-			</li>
-			<li>
-				<b>AI clients you connect yourself.</b> Stemma exposes a Model Context Protocol (MCP)
-				endpoint. If you add it as a connector in an AI assistant, that assistant can read and
-				modify your trees on your behalf, and the content it reads is then subject to that
-				vendor's own privacy policy. This connection only exists if you create it, and you can
-				remove it at any time.
-			</li>
-			<li>
-				<b>Legal requirements.</b> We may disclose data where we are legally obliged to.
+				<b>AI assistants you connect yourself.</b> If you add Stemma's MCP connector to an AI
+				client, that client can read and edit your trees, under that vendor's own privacy terms.
+				It only exists if you set it up.
 			</li>
 		</ul>
-		<p>We do not sell personal data and we do not share it for advertising.</p>
 
-		<h2>6. Data about other people</h2>
+		<h2>Data about other people</h2>
 		<p>
-			A family tree is, by nature, information about other people. When you enter details about a
-			living relative you are responsible for having a lawful basis to do so, and for telling them
-			if they would reasonably expect to be told. If you are recorded in someone else's Stemma
-			tree and want that removed, email us at
+			A family tree is information about other people. When you enter details about a living
+			relative, that is on you. If you are in someone's tree and want out, email
 			<a href="mailto:danilasergeevich@gmail.com?subject=stemma%20privacy">danilasergeevich@gmail.com</a>
-			and we will act on it.
+			and it will be removed.
 		</p>
 
-		<h2>7. Retention</h2>
+		<h2>Deleting things</h2>
 		<p>
-			Tree content is kept until you delete it or delete your account. Deleting a person, family
-			or tree removes it — and any attached photos — from our storage. Sessions expire 30 days
-			after they were created. Technical logs are kept for a short operational period (typically
-			no more than 90 days) and then rotate out. Backups may retain deleted content for a limited
-			period before being overwritten.
+			Delete a person, a family or a whole tree in the app and its record is gone from the database.
+			For anything else — your account, uploaded photos, a copy of what is stored about you — email
+			<a href="mailto:danilasergeevich@gmail.com?subject=stemma%20privacy">danilasergeevich@gmail.com</a>
+			and it will be handled by hand. Sessions expire on their own after 30 days.
 		</p>
 
-		<h2>8. Your rights</h2>
-		<p>
-			If you are in the EU/EEA or the UK, you have the right to access, correct, delete, export
-			(portability), restrict and object to the processing of your personal data, and to withdraw
-			consent where processing rests on it. Most of this you can do directly in the app: edit or
-			delete any person, family or tree, and export a tree from the menu. For anything else,
-			email <a href="mailto:danilasergeevich@gmail.com?subject=stemma%20privacy">danilasergeevich@gmail.com</a>
-			— including a request to delete your account and everything in it. We aim to reply within
-			30 days. You also have the right to complain to your local data-protection authority.
-		</p>
-
-		<h2>9. Security</h2>
-		<p>
-			Traffic is served over HTTPS only. Data is stored encrypted at rest by our providers. Access
-			to production data is restricted to the operator. No system is perfectly secure, so please
-			do not store information in Stemma that you could not tolerate being exposed.
-		</p>
-
-		<h2>10. Children</h2>
-		<p>
-			Stemma is not directed at children and we do not knowingly create accounts for anyone under
-			16. Children may of course appear as people inside a tree, entered by an adult account
-			holder under section 6.
-		</p>
-
-		<h2>11. Changes</h2>
-		<p>
-			We may update this policy. The "last updated" date above always reflects the current
-			version, and material changes will be announced in the app before they take effect.
-		</p>
+		<h2>Changes</h2>
+		<p>The date at the top is the current version.</p>
 
 		<footer>
 			<a href="/">Back to Stemma</a>
