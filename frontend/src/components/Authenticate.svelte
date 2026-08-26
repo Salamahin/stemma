@@ -38,8 +38,6 @@
         <p class="tagline">{$t("landing.tagline")}</p>
     </header>
 
-    <p class="intro">{$t("about.intro")}</p>
-
     <ul class="features">
         <li>{$t("landing.feature1")}</li>
         <li>{$t("landing.feature2")}</li>
@@ -72,14 +70,8 @@
         opacity: 0.9;
     }
 
-    .intro {
-        margin: 30px 0 0 0;
-        line-height: 1.5;
-        opacity: 0.85;
-    }
-
     .features {
-        margin: 16px 0 0 0;
+        margin: 30px 0 0 0;
         padding-left: 1.2em;
         line-height: 1.5;
         opacity: 0.85;
