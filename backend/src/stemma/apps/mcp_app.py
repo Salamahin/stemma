@@ -250,8 +250,8 @@ def _tools_call(msg_id: object, params: dict, user: User, handler: RequestHandle
     except StemmaError as e:
         return _rpc_result(msg_id, _tool_result(_json_text(encode_error(e)), is_error=True))
     payload = encode_response(response)
-    if spec.trim_response is not None:
-        payload = spec.trim_response(payload)
+    if spec.transform_response is not None:
+        payload = spec.transform_response(arguments, payload)
     return _rpc_result(msg_id, _tool_result(_json_text(payload), is_error=False))
 
 

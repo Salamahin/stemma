@@ -151,6 +151,40 @@ def test_tool_call_creates_and_lists_stemmas(client: TestClient) -> None:
     assert created["result"]["isError"] is False
 
 
+def test_person_navigation_tools(client: TestClient) -> None:
+    import json
+
+    verifier, challenge = _pkce()
+    token = _obtain_token(client, verifier=verifier, challenge=challenge)
+
+    def call(name: str, args: dict) -> dict:
+        reply = _rpc(client, token, "tools/call", {"name": name, "arguments": args})
+        return json.loads(reply["result"]["content"][0]["text"])
+
+    sid = call("create_stemma", {"name": "Nav"})["id"]
+    call("create_person", {"stemma_id": sid, "name": "Grandpa Ivan"})
+    call("create_person", {"stemma_id": sid, "name": "Dad Fedor"})
+
+    found = call("search_people", {"stemma_id": sid, "query": "grand"})
+    assert found["type"] == "PeopleSearch" and found["count"] == 1
+    assert "bio" not in found["people"][0]  # search stays light
+    grandpa_id = found["people"][0]["id"]
+    dad_id = call("search_people", {"stemma_id": sid, "query": "dad"})["people"][0]["id"]
+
+    call("link_persons", {"stemma_id": sid, "from_person_id": grandpa_id, "to_person_id": dad_id, "role": "child"})
+
+    person = call("get_person", {"stemma_id": sid, "person_id": dad_id})
+    assert person["type"] == "Person"
+    assert [p["id"] for p in person["parents"]] == [grandpa_id]
+    assert person["children"] == []
+
+    ancestors = call("get_relatives", {"stemma_id": sid, "person_id": dad_id, "kind": "ancestors", "depth": 2})
+    assert any(r["id"] == grandpa_id and r["generation"] == 1 for r in ancestors["relatives"])
+
+    missing = call("get_person", {"stemma_id": sid, "person_id": "nope"})
+    assert missing["type"] == "PersonNotFound"
+
+
 def test_unknown_tool_returns_invalid_params(client: TestClient) -> None:
     verifier, challenge = _pkce()
     token = _obtain_token(client, verifier=verifier, challenge=challenge)
