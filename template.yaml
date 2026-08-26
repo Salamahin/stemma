@@ -5,9 +5,12 @@ Description: SAM Template for stemma-app
 
 Globals:
   Function:
-    Runtime: python3.13
+    Runtime: python3.14
     Timeout: 20
-    MemorySize: 1024
+    # 512 rather than 1024 mostly to halve the SnapStart snapshot cache below, which is
+    # billed per GB-hour for as long as the published version exists. Per-invocation compute
+    # cost halves too, at roughly double the duration — close to a wash at this traffic.
+    MemorySize: 512
     Architectures:
       - arm64
     Environment:
@@ -209,7 +212,7 @@ Resources:
     Properties:
       ContentUri: .
       CompatibleRuntimes:
-        - python3.13
+        - python3.14
       CompatibleArchitectures:
         - arm64
       RetentionPolicy: Delete
@@ -292,6 +295,15 @@ Resources:
       BuildMethod: makefile
     Properties:
       Handler: stemma.apps.lambda_main.lambda_handler
+      # SnapStart is deliberately only on this function — it fronts the UI. A snapshot is
+      # billed for as long as the version exists (~$0.005 per GB-hour, around the clock), so
+      # every extra published version is a standing charge: VersionDeletionPolicy keeps exactly
+      # one alive, the MCP function opts out entirely, and MemorySize is 512. SnapStart never
+      # applies to $LATEST, hence the alias.
+      AutoPublishAlias: live
+      VersionDeletionPolicy: Delete
+      SnapStart:
+        ApplyOn: PublishedVersions
       Events:
         ApiEvent:
           Type: HttpApi

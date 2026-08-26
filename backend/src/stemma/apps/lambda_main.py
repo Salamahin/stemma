@@ -100,3 +100,13 @@ def lambda_handler(event: dict, context: object) -> dict:
         response["cookies"] = [build_clear_cookie_header(cookie_config)]
 
     return response
+
+
+# SnapStart snapshots the initialization phase, so do the expensive setup here rather than
+# on the first invocation: every environment restored from the snapshot then starts with the
+# Secrets Manager lookup and the boto3 clients already done. Guarded on the Lambda-only env
+# var so importing this module locally (tests, tooling) stays free of AWS calls.
+# Note: the secret payload is baked into the snapshot — rotating it needs a new deploy, which
+# publishes a new version and a fresh snapshot.
+if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+    _build()

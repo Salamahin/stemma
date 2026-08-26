@@ -25,5 +25,5 @@ npm test
 
 ## Notes
 
-- Requires Docker, Python 3.13, `uv`, Node.js.
+- Requires Docker, Python 3.14, `uv`, Node.js.
 - Backend test auth bypass is enabled only when `E2E_AUTH_BYPASS=1`.
