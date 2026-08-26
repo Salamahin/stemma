@@ -70,6 +70,9 @@ Resources:
   # Mail for admin@<domain> is handled by ImprovMX, which forwards it to a private
   # inbox. Only the routing lives here: the destination address is configured in the
   # ImprovMX dashboard, so no personal address reaches this repository.
+  # The apex TXT record carries both the ImprovMX SPF policy and the Google site
+  # verification token: DNS allows only one TXT record set per name, so every string
+  # has to live here together.
   contactMailRecords:
     Type: AWS::Route53::RecordSetGroup
     Properties:
@@ -86,6 +89,7 @@ Resources:
           TTL: "1800"
           ResourceRecords:
             - '"v=spf1 include:spf.improvmx.com ~all"'
+            - '"google-site-verification=mgc8ri3H3xYofHzPxt4uN3mbq2brSjuTXPEcHPuuuig"'
   CloudFrontOriginAccessIdentity:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
