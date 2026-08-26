@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { initializeGoogleAuth, onCredential, renderGoogleButton } from "../googleAuth";
-    import { locale } from "../i18n";
+    import { locale, t } from "../i18n";
 
     type Props = {
         google_client_id: string;
@@ -43,6 +43,10 @@
         {:else}
             <div bind:this={buttonDiv} class="mt-4 d-flex justify-content-center"></div>
         {/if}
+        <div class="legal mt-4">
+            <a href="/privacy.html">{$t("legal.privacy")}</a>
+            <a href="/terms.html">{$t("legal.terms")}</a>
+        </div>
     </div>
 </div>
 
@@ -53,6 +57,23 @@
         text-align: center;
         margin: 0 0 30px 0;
         color: ghostwhite;
+    }
+
+    .legal {
+        display: flex;
+        gap: 20px;
+        font-size: 0.85rem;
+    }
+
+    .legal a {
+        color: ghostwhite;
+        opacity: 0.75;
+        text-decoration: none;
+    }
+
+    .legal a:hover {
+        opacity: 1;
+        text-decoration: underline;
     }
 
     .main-container {
