@@ -32,16 +32,6 @@ AWS_PROFILE=stemma sam deploy                    # local SAM deploys (CI uses ac
 
 Deploys otherwise happen automatically: a merge to `master` runs CI, and on success the `Deploy to AWS` workflow runs `uv export` → `sam build`/`deploy` → uploads the frontend → invalidates CloudFront.
 
-Lambda-only (set in `template.yaml` Globals or by `bootstrap`):
-- `STEMMA_INVITE_SECRET_NAME` — Secrets Manager ID fetched at cold start; its JSON contents (`INVITE_SECRET`, `GOOGLE_OAUTH_CLIENT_SECRET`, …) populate the environment via `os.environ.setdefault`.
-
-## Coding Standards
-
-- Prefer functional programming; side effects at boundaries only. Domain dataclasses are `frozen=True`.
-- Never use generic names (`utils`, `helpers`).
-- Keep diffs minimal and in-scope.
-- For i18n changes, update **both** `en` and `ru` dictionaries in `frontend/src/i18n.ts`.
-- Python: 4-space indent, 120-char lines (`tool.ruff` config), Python 3.13 typing syntax (`X | None`, PEP 695 generics). Module names are snake_case, classes PascalCase.
 
 ## Known Gotchas
 
