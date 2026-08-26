@@ -332,11 +332,6 @@ Resources:
       Environment:
         Variables:
           STEMMA_MCP_ISSUER: !Sub "https://${apiAlias}"
-          # MCP uses its own Google OAuth client (project-stemma), distinct from the SPA's
-          # GOOGLE_CLIENT_ID in Globals, because the MCP flow needs a client secret and a
-          # registered redirect URI. User identity is by email, so a different client still
-          # resolves to the same Stemma user. Overrides the Globals value for this function.
-          GOOGLE_CLIENT_ID: "892655929422-dcdrfg3o02637q2n5h8l1j20hlvm5mib.apps.googleusercontent.com"
       Events:
         McpEvent:
           Type: HttpApi
