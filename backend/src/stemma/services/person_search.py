@@ -1,16 +1,19 @@
 """Fuzzy person-name search, mirroring the frontend (`frontend/src/personSearch.ts`).
 
 Same normalization (lowercase, ё→е, й→и) and Cyrillic→Latin transliteration variants, so a
-query matches across spelling and alphabet. The frontend uses fuse.js; here the fuzzy step
-is stdlib `difflib` (no dependency) — a substring always matches, otherwise a token/full
-similarity ratio must clear a threshold.
+query matches across spelling and alphabet. Both sides score per query token against the
+name tokens (order-free; every query token must match something) — the frontend with
+fuse.js, here with stdlib `difflib`: a substring always matches, otherwise the similarity
+ratio must clear a threshold.
 """
 
 import difflib
+import re
 
 MIN_QUERY_LENGTH = 2
 FUZZY_THRESHOLD = 0.7
 DEFAULT_LIMIT = 20
+_TOKEN = re.compile(r"[^\W_]+", re.UNICODE)
 
 _GOST = {
     "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e", "ж": "zh", "з": "z",
@@ -55,30 +58,51 @@ def search_variants(value: str) -> set[str]:
     return variants
 
 
-def _best_score(query_variants: set[str], name_variants: set[str]) -> float:
+def tokenize(value: str) -> list[str]:
+    """Split a name or query into word tokens, dropping punctuation ("(Романова)" → "Романова")."""
+    return _TOKEN.findall(value)
+
+
+def token_variants(value: str) -> list[set[str]]:
+    return [search_variants(token) for token in tokenize(value)]
+
+
+def _token_score(query_variants: set[str], name_tokens: list[set[str]]) -> float:
     best = 0.0
     for query in query_variants:
-        for name in name_variants:
-            if query in name:
-                return 1.0
-            candidates = [name, *name.split()]
-            best = max(best, *(difflib.SequenceMatcher(None, query, c).ratio() for c in candidates))
+        for name_variants in name_tokens:
+            for name in name_variants:
+                if query in name:
+                    return 1.0
+                best = max(best, difflib.SequenceMatcher(None, query, name).ratio())
     return best
 
 
-def search_people(query: str, people: list[dict], limit: int = DEFAULT_LIMIT) -> list[dict]:
+def _score(query_tokens: list[set[str]], name_tokens: list[set[str]]) -> float:
+    """Score every query token against the name tokens and average. Each query token must
+    find a match of its own, so word order is irrelevant and a second word can no longer
+    drag a good match under the threshold — but a word matching nothing rules the name out."""
+    if not query_tokens or not name_tokens:
+        return 0.0
+    scores = [_token_score(variants, name_tokens) for variants in query_tokens]
+    if min(scores) < FUZZY_THRESHOLD:
+        return 0.0
+    return sum(scores) / len(scores)
+
+
+def search_people(query: str, people: list[dict], limit: int | None = DEFAULT_LIMIT) -> list[dict]:
     """Return the people whose name fuzzily matches `query`, best first. Blank-named
-    (unknown) people are skipped, matching the frontend."""
+    (unknown) people are skipped, matching the frontend. `limit=None` returns every match."""
     if len(query.strip()) < MIN_QUERY_LENGTH:
         return []
-    query_variants = search_variants(query)
+    query_tokens = token_variants(query)
     scored: list[tuple[float, dict]] = []
     for person in people:
         name = person.get("name") or ""
         if not name.strip():
             continue
-        score = _best_score(query_variants, search_variants(name))
+        score = _score(query_tokens, token_variants(name))
         if score >= FUZZY_THRESHOLD:
             scored.append((score, person))
     scored.sort(key=lambda pair: pair[0], reverse=True)
-    return [person for _score, person in scored[:limit]]
+    return [person for _score, person in (scored if limit is None else scored[:limit])]

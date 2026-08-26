@@ -116,6 +116,32 @@ describe("searchPeople", () => {
         expect(searchPeople("Иван", people, 3)).toHaveLength(3);
     });
 
+    const romanovs = () => [
+        person("1", "Ольга Николаевна (Романова)"),
+        person("2", "Михаил Федорович Романов"),
+    ];
+
+    it("ignores word order", () => {
+        expect(searchPeople("Ольга Романова", romanovs()).map((r) => r.item.id)).toEqual(["1"]);
+        expect(searchPeople("Романова Ольга", romanovs()).map((r) => r.item.id)).toEqual(["1"]);
+    });
+
+    it("tolerates a typo in one token of a multi-word query", () => {
+        const people = [
+            person("1", "Николай Александрович Романов"),
+            person("2", "Мария Фёдоровна"),
+        ];
+        expect(searchPeople("Николай Романв", people)[0]?.item.id).toBe("1");
+    });
+
+    it("rules out a person when a query word matches nothing", () => {
+        expect(searchPeople("Ольга Кузнецова", romanovs())).toEqual([]);
+    });
+
+    it("keeps matching while a second word is still being typed", () => {
+        expect(searchPeople("Ольга Н", romanovs()).map((r) => r.item.id)).toEqual(["1"]);
+    });
+
     it("returns match indices into the original name", () => {
         const [result] = searchPeople("Фёдор", [person("1", "Фёдор Иванов")]);
         expect(result.matchedIndices.length).toBeGreaterThan(0);

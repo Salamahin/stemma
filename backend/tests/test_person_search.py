@@ -48,3 +48,27 @@ def test_ranks_stronger_matches_first_and_limits() -> None:
     results = search_people("Иван", people, limit=2)
     assert len(results) == 2
     assert "Совсем другой" not in _names(results)
+
+
+def _romanovs() -> list[dict]:
+    return _people("Ольга Николаевна (Романова)", "Михаил Федорович Романов")
+
+
+def test_word_order_does_not_matter() -> None:
+    assert _names(search_people("Ольга Романова", _romanovs())) == ["Ольга Николаевна (Романова)"]
+    assert _names(search_people("Романова Ольга", _romanovs())) == ["Ольга Николаевна (Романова)"]
+
+
+def test_multi_word_query_tolerates_a_typo_in_one_token() -> None:
+    people = _people("Николай Александрович Романов", "Ольга Николаевна (Романова)")
+    assert _names(search_people("Николай Романв", people))[0] == "Николай Александрович Романов"
+
+
+def test_extra_query_word_must_match_too() -> None:
+    # a second word that matches nothing rules the person out instead of just lowering the score
+    assert search_people("Ольга Кузнецова", _romanovs()) == []
+
+
+def test_partial_second_token_still_matches() -> None:
+    # incremental typing: "Ольга Н" must not drop the person
+    assert _names(search_people("Ольга Н", _romanovs())) == ["Ольга Николаевна (Романова)"]

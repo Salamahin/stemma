@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cache
 
-from stemma.services.person_search import search_people
+from stemma.services.person_search import DEFAULT_LIMIT, search_people
 
 # Only consumed when a user is first provisioned (via the web app), ignored otherwise.
 _SEED_DEFAULT_STEMMA_NAME = "My Stemma"
@@ -41,10 +41,18 @@ def _dedup(ids: list[str]) -> list[str]:
     return list(dict.fromkeys(ids))
 
 
+_MAX_SEARCH_LIMIT = 100
+
+
 def _search_people(args: dict, response: dict) -> dict:
     query = args.get("query", "")
-    matches = [_brief(p) for p in search_people(query, response.get("people", []))]
-    return {"type": "PeopleSearch", "query": query, "count": len(matches), "people": matches}
+    requested = args.get("limit")
+    limit = min(max(int(requested), 1), _MAX_SEARCH_LIMIT) if requested is not None else DEFAULT_LIMIT
+    ranked = search_people(query, response.get("people", []), limit=None)
+    matches = [_brief(p) for p in ranked[:limit]]
+    # `count` is the number of matches, not of returned people: the client needs to know
+    # when its limit truncated the answer.
+    return {"type": "PeopleSearch", "query": query, "count": len(ranked), "people": matches}
 
 
 def _get_person(args: dict, response: dict) -> dict:
@@ -183,12 +191,23 @@ def tool_specs() -> tuple[ToolSpec, ...]:
         ),
         ToolSpec(
             name="search_people",
-            description="Fuzzy-find people in a stemma by name (tolerant of typos, ё/й, and "
-            "Cyrillic/Latin spelling). Returns id, name and dates only — start here, not get_stemma.",
-            input_schema=_string_schema(
-                {"stemma_id": "Id of the stemma", "query": "Name or part of a name to match"},
-                ["stemma_id", "query"],
-            ),
+            description="Fuzzy-find people in a stemma by name (tolerant of typos, ё/й, word order, "
+            "and Cyrillic/Latin spelling). Returns id, name and dates only — start here, not "
+            "get_stemma. `count` is the total number of matches; raise `limit` if it exceeds "
+            "the people returned.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "stemma_id": {"type": "string", "description": "Id of the stemma"},
+                    "query": {"type": "string", "description": "Name or part of a name to match"},
+                    "limit": {
+                        "type": "integer",
+                        "description": f"Max people to return (1-{_MAX_SEARCH_LIMIT}, default {DEFAULT_LIMIT})",
+                    },
+                },
+                "required": ["stemma_id", "query"],
+                "additionalProperties": False,
+            },
             to_payload=lambda args: {"type": "GetStemmaRequest", "stemma_id": args["stemma_id"]},
             transform_response=_search_people,
         ),
