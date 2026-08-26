@@ -67,7 +67,7 @@ Resources:
       AliasTarget:
         HostedZoneId: "Z2FDTNDATAQYW2" #this hardcoded value is always the case https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-route53-aliastarget.html
         DNSName: !GetAtt WebAppCDN.DomainName
-  # Mail for contactus@<domain> is handled by ImprovMX, which forwards it to a private
+  # Mail for admin@<domain> is handled by ImprovMX, which forwards it to a private
   # inbox. Only the routing lives here: the destination address is configured in the
   # ImprovMX dashboard, so no personal address reaches this repository.
   contactMailRecords:

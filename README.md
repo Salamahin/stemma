@@ -119,7 +119,7 @@ Frontend (build-time, substituted by Rollup):
 
 ## Contact mail
 
-`contactus@stemma.link` is the public contact address; no personal address appears on the
+`admin@stemma.link` is the public contact address; no personal address appears on the
 site or in this repository. `template.yaml` publishes the MX and SPF records, and ImprovMX
 forwards the mail to a private inbox configured in its dashboard — the destination is set
 there, not here. Changing the address is a one-line edit in `frontend/src/contact.ts`

@@ -7,11 +7,11 @@ const ANY_EMAIL = /[\w.+-]+@[\w.-]+\.\w+/g;
 
 describe("contactMailto", () => {
     it("targets the public contact address", () => {
-        expect(contactMailto("stemma")).toBe("mailto:contactus@stemma.link?subject=stemma");
+        expect(contactMailto("stemma")).toBe("mailto:admin@stemma.link?subject=stemma");
     });
 
     it("escapes subjects that contain spaces", () => {
-        expect(contactMailto("stemma privacy")).toBe("mailto:contactus@stemma.link?subject=stemma%20privacy");
+        expect(contactMailto("stemma privacy")).toBe("mailto:admin@stemma.link?subject=stemma%20privacy");
     });
 });
 
