@@ -431,7 +431,7 @@
     />
     <PromptModal bind:this={promptModal} />
     <ConfirmModal bind:this={confirmModal} />
-{:else if bootProbing}
+{:else if bootProbing || signingIn}
     <div class="boot-loading vh-100">
         <Circle2 />
         <p class="mt-2">{$t("app.loading")}</p>
@@ -439,7 +439,7 @@
 {:else}
     <div class="authenticate-bg vh-100">
         <div class="authenticate-holder">
-            <Authenticate {google_client_id} onsignIn={handleGoogleSignIn} {signingIn} />
+            <Authenticate {google_client_id} onsignIn={handleGoogleSignIn} />
         </div>
     </div>
 {/if}
