@@ -108,10 +108,10 @@ export const en: Record<string, string> = {
     'about.problemsEmail': 'email',
 
     // Landing
-    'landing.tagline': 'A free, collaborative family tree you build together with your relatives.',
-    'landing.feature1': 'Draw families and relationships on an interactive canvas — the rules of a valid tree are checked for you.',
-    'landing.feature2': 'Invite relatives with a personal link so everyone can fill in the branch they know best.',
-    'landing.feature3': 'Read and edit your trees from an AI assistant over the Model Context Protocol.',
+    'landing.tagline': 'A free family tree you build together with your relatives.',
+    'landing.feature1': 'Draw families and relationships on an interactive canvas.',
+    'landing.feature2': 'Invite relatives by link to edit the tree with you.',
+    'landing.feature3': 'Read and edit your trees from an AI assistant over MCP.',
     'landing.signInHint': 'Sign in with Google to start your own tree.',
 
     // Legal
@@ -315,10 +315,10 @@ export const ru: Record<string, string> = {
     'about.problemsEmail': 'почту',
 
     // Landing
-    'landing.tagline': 'Бесплатное генеалогическое древо, которое вы составляете вместе с родственниками.',
-    'landing.feature1': 'Стройте семьи и связи на интерактивном холсте — система сама проверяет правила корректного древа.',
-    'landing.feature2': 'Приглашайте родственников по персональной ссылке, чтобы каждый дополнил ту ветку, которую знает лучше всех.',
-    'landing.feature3': 'Читайте и редактируйте свои древа из AI-ассистента по протоколу Model Context Protocol.',
+    'landing.tagline': 'Бесплатное генеалогическое древо, которое вы строите вместе с родственниками.',
+    'landing.feature1': 'Стройте семьи и связи на интерактивном холсте.',
+    'landing.feature2': 'Приглашайте родственников по ссылке — редактируйте древо вместе.',
+    'landing.feature3': 'Читайте и редактируйте древа из AI-ассистента по MCP.',
     'landing.signInHint': 'Войдите через Google, чтобы начать своё древо.',
 
     // Legal
