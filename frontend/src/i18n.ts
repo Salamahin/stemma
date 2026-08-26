@@ -107,6 +107,10 @@ export const en: Record<string, string> = {
     'about.problemsText': 'It happens, don\'t worry. You can ask a question, file a complaint, or on the contrary, give us a compliment by writing to ',
     'about.problemsEmail': 'email',
 
+    // Legal
+    'legal.privacy': 'Privacy policy',
+    'legal.terms': 'Terms of service',
+
     // Person details modal
     'person.title': 'Personal information',
     'person.name': 'Name',
@@ -302,6 +306,10 @@ export const ru: Record<string, string> = {
     'about.problemsTitle': 'Возникли проблемы?',
     'about.problemsText': 'Такое бывает, не расстраивайтесь. Можете задать вопрос, пожаловаться, или наоборот, похвалить нас, написав на ',
     'about.problemsEmail': 'почту',
+
+    // Legal
+    'legal.privacy': 'Политика конфиденциальности',
+    'legal.terms': 'Условия использования',
 
     // Person details modal
     'person.title': 'Персональная информация',

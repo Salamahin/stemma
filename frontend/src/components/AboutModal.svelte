@@ -135,6 +135,11 @@
                 <a href="mailto:danilasergeevich@gmail.com?subject=stemma">{$t("about.problemsEmail")}</a>.
             </p>
         </section>
+
+        <section class="legal">
+            <a href="/privacy.html" target="_blank" rel="noopener">{$t("legal.privacy")}</a>
+            <a href="/terms.html" target="_blank" rel="noopener">{$t("legal.terms")}</a>
+        </section>
     {/snippet}
 
     {#snippet footer()}
@@ -165,6 +170,12 @@
         margin-bottom: 8px;
         font-size: var(---fs-body);
         color: var(---text-secondary);
+    }
+
+    section.legal {
+        display: flex;
+        gap: 16px;
+        font-size: var(---fs-body);
     }
 
     .about-diagram {
