@@ -13,7 +13,7 @@ Stemma is a collaborative family tree editor. It lets multiple people build and 
 
 ## Tech stack
 - Frontend: Svelte + Rollup
-- Backend: Python 3.13 (FastAPI, boto3, pydantic), managed with [`uv`](https://docs.astral.sh/uv/)
+- Backend: Python 3.14 (FastAPI, boto3, pydantic), managed with [`uv`](https://docs.astral.sh/uv/)
 - Storage: DynamoDB (single table; DynamoDB Local for dev/e2e)
 
 The API is RPC-shaped, not REST: a single `POST /stemma` endpoint accepts a tagged-union JSON body (`{"type": "<RequestType>", ...}`) dispatched in `apis/request_handler.py`.
@@ -35,7 +35,7 @@ Stemma runs a [Model Context Protocol](https://modelcontextprotocol.io) server a
 ## Quick start (local)
 
 ### Prerequisites
-- Python 3.13 and [`uv`](https://docs.astral.sh/uv/)
+- Python 3.14 and [`uv`](https://docs.astral.sh/uv/)
 - Node.js + npm
 - Docker (for DynamoDB Local)
 
