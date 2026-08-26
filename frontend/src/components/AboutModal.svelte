@@ -7,6 +7,7 @@
         personColor, addArrowMarkers
     } from "../graphStyles";
     import Modal from "./Modal.svelte";
+    import { contactMailto } from "../contact";
 
     let open = $state(false);
     let diagramEl = $state<HTMLDivElement | null>(null);
@@ -132,7 +133,7 @@
             <h6>{$t("about.problemsTitle")}</h6>
             <p>
                 {$t("about.problemsText")}
-                <a href="mailto:danilasergeevich@gmail.com?subject=stemma">{$t("about.problemsEmail")}</a>.
+                <a href={contactMailto("stemma")}>{$t("about.problemsEmail")}</a>.
             </p>
         </section>
 
