@@ -72,10 +72,38 @@ Point MCP Inspector at `http://127.0.0.1:8091/mcp` and complete the (bypassed) O
 Plus the standard backend variables (`STEMMA_TABLE_NAME`, `INVITE_SECRET`, DynamoDB/AWS
 config) — see the root `CLAUDE.md`.
 
-## Deployment (follow-up)
+## Production deployment (AWS)
 
-This change ships the app + local/self-hosted entrypoint (`mcp_main`, Uvicorn on :8091).
-Put it behind a TLS-terminating reverse proxy and set `STEMMA_MCP_ISSUER` to the public URL.
-Wiring it as an additional SAM Lambda (via an ASGI adapter such as Mangum) and registering
-a public Google OAuth redirect URI (`<issuer>/oauth/callback`) is left as a deploy step for
-the maintainer to review separately.
+Deployed as a second Lambda (`McpFunction`, handler `stemma.apps.mcp_lambda`) on the
+**existing** HTTP API — so it reuses the current `api.stemma.link` domain and certificate,
+no new domain/subdomain/cert. The FastAPI app is wrapped by Mangum. `template.yaml` routes
+these paths to it: `/mcp`, `/authorize`, `/token`, `/register`, `/oauth/callback`, and the
+two `/.well-known/oauth-*` documents. `STEMMA_MCP_ISSUER` is set to `https://api.stemma.link`.
+
+Two one-time manual steps before / around the deploy:
+
+1. **Google Console** — add the redirect URI to the OAuth client:
+   ```
+   https://api.stemma.link/oauth/callback
+   ```
+2. **Secrets Manager** — add `GOOGLE_OAUTH_CLIENT_SECRET` to the `prod/invite` secret
+   (whose JSON `bootstrap.populate_env_from_secrets` already exports into the environment):
+   ```sh
+   AWS_PROFILE=stemma aws secretsmanager get-secret-value --secret-id prod/invite \
+     --query SecretString --output text            # inspect current JSON
+   # merge {"GOOGLE_OAUTH_CLIENT_SECRET": "<google client secret>"} into it, then:
+   AWS_PROFILE=stemma aws secretsmanager put-secret-value --secret-id prod/invite \
+     --secret-string '<updated JSON>'
+   ```
+
+Then `AWS_PROFILE=stemma sam build && sam deploy`. Register a Claude custom connector
+against `https://api.stemma.link/mcp`.
+
+> CORS note: the shared HTTP API's CORS is scoped to the SPA origin. That is irrelevant to
+> Claude (a server-side client that sends no `Origin`), but a browser-based MCP client
+> (e.g. the Inspector) would be blocked in prod — use the local server for browser testing.
+
+## Local / self-hosted alternative
+
+`mcp_main` (Uvicorn on :8091) runs the same app outside AWS; put it behind a
+TLS-terminating reverse proxy and set `STEMMA_MCP_ISSUER` to the public URL.

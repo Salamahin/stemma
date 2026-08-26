@@ -25,7 +25,7 @@ Stemma is a collaborative family tree editor. Multiple users build shared geneal
   - `src/stemma/services/` — Pure business logic (`UserService`, `invite_tokens`, `stemma_dfs`, `kinship`).
   - `src/stemma/storage/` — DynamoDB single-table schema (`schema.py`: key encoders) and `StorageService` (boto3 Table-resource-backed).
   - `src/stemma/apis/request_handler.py` — Central dispatcher: takes a `User` + parsed `Request`, returns a `Response`.
-  - `src/stemma/apps/` — Transport adapters: `rest_main`/`rest_app` (local Uvicorn server on :8090), `lambda_main` (HTTP API handler), `mcp_main`/`mcp_app` (Model Context Protocol server on :8091, with its own OAuth 2.1 authorization server federated to Google — see `backend/MCP.md`), and `bootstrap` (Secrets Manager + DynamoDB Table construction).
+  - `src/stemma/apps/` — Transport adapters: `rest_main`/`rest_app` (local Uvicorn server on :8090), `lambda_main` (HTTP API handler), `mcp_main`/`mcp_app`/`mcp_lambda` (Model Context Protocol server — local Uvicorn on :8091 or a Mangum-wrapped Lambda sharing the existing HTTP API — with its own OAuth 2.1 authorization server federated to Google; see `backend/MCP.md`), and `bootstrap` (Secrets Manager + DynamoDB Table construction).
 - `frontend/` — Svelte 5 (runes mode) + TypeScript UI (Rollup bundler).
 - `e2e/` — Playwright end-to-end tests with full local stack orchestration (`scripts/devstack.mjs`).
 - `template.yaml` / `samconfig.toml` — AWS SAM infrastructure (Python 3.13 arm64 Lambda + shared layer + DynamoDB table).

@@ -319,8 +319,78 @@ Resources:
                 - s3:GetObject
                 - s3:DeleteObject
               Resource: !Sub "${PersonPhotoBucket.Arn}/*"
+  McpFunction:
+    # Model Context Protocol server. Shares MyApi (api.stemma.link) with StemmaFunction —
+    # no new domain/certificate. The full FastAPI app is wrapped by Mangum. Its own OAuth
+    # 2.1 authorization server lives at the paths below; GOOGLE_OAUTH_CLIENT_SECRET is
+    # delivered through the prod/invite secret (see bootstrap.populate_env_from_secrets).
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Handler: stemma.apps.mcp_lambda.lambda_handler
+      Environment:
+        Variables:
+          STEMMA_MCP_ISSUER: !Sub "https://${apiAlias}"
+      Events:
+        McpEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyApi
+            Path: /mcp
+            Method: post
+        AuthorizeEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyApi
+            Path: /authorize
+            Method: get
+        TokenEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyApi
+            Path: /token
+            Method: post
+        RegisterEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyApi
+            Path: /register
+            Method: post
+        OauthCallbackEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyApi
+            Path: /oauth/callback
+            Method: get
+        AuthServerMetadataEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyApi
+            Path: /.well-known/oauth-authorization-server
+            Method: get
+        ProtectedResourceMetadataEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyApi
+            Path: /.well-known/oauth-protected-resource
+            Method: get
+        ProtectedResourceMetadataScopedEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyApi
+            Path: /.well-known/oauth-protected-resource/mcp
+            Method: get
+      Policies:
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/invite-*"
+        - DynamoDBCrudPolicy:
+            TableName: !Ref StemmaTable
 
 Outputs:
   ApiEndpoint:
     Description: "HTTP API endpoint URL"
     Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/dev"
+  McpEndpoint:
+    Description: "MCP server endpoint (register a custom connector against this URL)"
+    Value: !Sub "https://${apiAlias}/mcp"
