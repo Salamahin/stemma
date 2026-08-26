@@ -38,7 +38,8 @@
     import { isPendingId, pendingPersonDescription } from "./pendingState";
     import { MutationActions } from "./mutationActions";
     import { ModalActions } from "./modalActions";
-    import { Session } from "./session";
+    import { Session, e2eAutoLoginEnabled } from "./session";
+    import { forgetSession, hasSessionHint, rememberSession } from "./sessionHint";
     import type { PendingAdd, PendingFamily } from "./pendingState";
 
     type Props = { google_client_id: string; stemma_backend_url: string };
@@ -82,7 +83,10 @@
     let pendingRemovedFamilyIds = $state<Set<string>>(new Set());
     let signedIn = $state(false);
     let signingIn = $state(false);
-    let bootProbing = $state(true);
+    // A cached session is worth waiting for behind a spinner; without one the
+    // login screen paints on the first frame and the probe doubles as the
+    // backend wake-up call in the background.
+    let bootProbing = $state(hasSessionHint() || e2eAutoLoginEnabled());
 
     const actions = new MutationActions({
         controller,
@@ -106,21 +110,23 @@
     const session = new Session(
         controller.model,
         { get: () => signedIn, set: (v) => (signedIn = v) },
-        () => {
-            void loadStemmasOrSignOut();
-        },
+        () => loadStemmasOrSignOut(),
     );
 
-    async function loadStemmasOrSignOut(): Promise<void> {
+    async function loadStemmasOrSignOut(): Promise<boolean> {
         try {
             await controller.listStemmas();
+            return true;
         } catch (err) {
             if ((err as { key?: string }).key === "error.sessionExpired") {
                 session.markSignedOut();
-                return;
+                return false;
             }
             error = err as Error;
             console.error("Listing stemmas failed", err);
+            // A stale stemma list is no reason to bounce the user back to the
+            // login screen; the error bar explains what went wrong.
+            return true;
         }
     }
 
@@ -236,12 +242,14 @@
     async function probeCookieSession() {
         try {
             await controller.listStemmas();
+            rememberSession();
             signedIn = true;
             cancelGoogleAuth();
         } catch (err) {
             if (signedIn) return;
+            // The 401 itself woke the backend up, so no separate warmup here.
             if ((err as { key?: string }).key === "error.sessionExpired") {
-                fetch(`${stemma_backend_url}/warmup`).catch(() => {});
+                forgetSession();
                 return;
             }
             error = err as Error;
