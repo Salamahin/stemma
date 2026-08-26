@@ -1,15 +1,6 @@
-"""Pure OAuth 2.1 authorization-server logic for the MCP endpoint.
-
-No I/O, no clock, no entropy here — persistence and id/expiry generation live in
-`services/oauth_repo.py`, and the Google round-trip lives in `apps/mcp_identity.py`.
-This module only holds the immutable OAuth records, PKCE verification, discovery
-metadata, and request validation (raising `OAuthError` on a bad request).
-
-The MCP server is both the OAuth *resource server* (it accepts the bearer token on
-`/mcp`) and its own *authorization server*: MCP clients dynamically register, run the
-authorization-code + PKCE flow, and the user is authenticated by federating to Google.
-The issued access token is the existing Stemma session id, so `AuthService.resolve`
-stays the single place that turns a token into a `User`.
+"""Pure OAuth 2.1 authorization-server logic: OAuth records, PKCE verification, discovery
+metadata, and request validation (raising `OAuthError`). No I/O, clock, or entropy —
+those live in `services/oauth_repo.py`; the Google round-trip in `apps/mcp_identity.py`.
 """
 
 import base64

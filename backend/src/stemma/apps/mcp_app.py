@@ -1,16 +1,9 @@
 """FastAPI app exposing Stemma over the Model Context Protocol.
 
-Two surfaces on one app:
-
-* An OAuth 2.1 authorization server (dynamic client registration + authorization-code +
-  PKCE) that authenticates the user by federating to Google. The access token it hands
-  out is the Stemma session id, so `AuthService.resolve` remains the only token→user step.
-* The MCP endpoint (`POST /mcp`): a minimal JSON-RPC 2.0 handler (Streamable-HTTP
-  transport, single-JSON-response mode) that answers `initialize` / `tools/list` /
-  `tools/call`, mapping each tool onto a `Request` via the shared `domain.codec`.
-
-Only auth + JSON-RPC envelope handling live here; the actual family-tree work is done by
-`RequestHandler`, exactly as on the REST surface.
+One app, two surfaces: an OAuth 2.1 authorization server (DCR + authorization-code + PKCE,
+login federated to Google) and the MCP JSON-RPC endpoint (`POST /mcp`). The access token it
+issues is the Stemma session id, so `AuthService.resolve` stays the only token→user step,
+and tool calls go through the same `domain.codec` + `RequestHandler` as the REST surface.
 """
 
 import asyncio
@@ -49,7 +42,6 @@ DEFAULT_PROTOCOL_VERSION = SUPPORTED_PROTOCOL_VERSIONS[0]
 
 # JSON-RPC 2.0 error codes.
 _PARSE_ERROR = -32700
-_INVALID_REQUEST = -32600
 _METHOD_NOT_FOUND = -32601
 _INVALID_PARAMS = -32602
 
@@ -85,13 +77,10 @@ def build_mcp_app(
     async def authorization_server_discovery(request: FastApiRequest) -> JSONResponse:
         return JSONResponse(authorization_server_metadata(issuer(request)))
 
+    # Bare + resource-scoped paths: different MCP clients probe one or the other.
     @app.get("/.well-known/oauth-protected-resource")
-    async def protected_resource_discovery(request: FastApiRequest) -> JSONResponse:
-        return JSONResponse(protected_resource_metadata(resource(request), issuer(request)))
-
-    # Some MCP clients probe the resource-scoped variant of the well-known path.
     @app.get("/.well-known/oauth-protected-resource/mcp")
-    async def protected_resource_discovery_scoped(request: FastApiRequest) -> JSONResponse:
+    async def protected_resource_discovery(request: FastApiRequest) -> JSONResponse:
         return JSONResponse(protected_resource_metadata(resource(request), issuer(request)))
 
     @app.post("/register")
@@ -255,24 +244,16 @@ def _tools_call(msg_id: object, params: dict, user: User, handler: RequestHandle
     try:
         request = decode_request(spec.to_payload(arguments))
     except (KeyError, ValueError) as e:
-        return _rpc_result(msg_id, _tool_error(f"invalid arguments: {e}"))
+        return _rpc_result(msg_id, _tool_result(f"invalid arguments: {e}", is_error=True))
     try:
         response = handler.handle(user, request)
     except StemmaError as e:
-        return _rpc_result(msg_id, _tool_error_json(encode_error(e)))
-    return _rpc_result(msg_id, _tool_ok(encode_response(response)))
+        return _rpc_result(msg_id, _tool_result(_json_text(encode_error(e)), is_error=True))
+    return _rpc_result(msg_id, _tool_result(_json_text(encode_response(response)), is_error=False))
 
 
-def _tool_ok(payload: dict) -> dict:
-    return {"content": [{"type": "text", "text": _json_text(payload)}], "isError": False}
-
-
-def _tool_error_json(payload: dict) -> dict:
-    return {"content": [{"type": "text", "text": _json_text(payload)}], "isError": True}
-
-
-def _tool_error(text: str) -> dict:
-    return {"content": [{"type": "text", "text": text}], "isError": True}
+def _tool_result(text: str, *, is_error: bool) -> dict:
+    return {"content": [{"type": "text", "text": text}], "isError": is_error}
 
 
 def _json_text(payload: dict) -> str:

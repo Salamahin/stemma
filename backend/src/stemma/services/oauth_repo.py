@@ -1,10 +1,8 @@
 """DynamoDB persistence for the MCP OAuth authorization server.
 
-Mirrors `SessionRepo`: a thin boundary over the shared single table that mints ids +
-TTLs itself (the pure logic in `oauth_service.py` stays free of clock and entropy).
 Registered clients are durable; pending flows and issued codes carry a DynamoDB `ttl`
 attribute so half-finished logins evict themselves. Authorization codes are one-time —
-`take_code` reads and deletes in one step.
+`take_*` reads and deletes in a single call.
 """
 
 import secrets
@@ -53,15 +51,8 @@ class OAuthRepo:
         )
 
     def create_flow(
-        self,
-        *,
-        client_id: str,
-        redirect_uri: str,
-        code_challenge: str,
-        client_state: str | None,
-        now: int | None = None,
+        self, *, client_id: str, redirect_uri: str, code_challenge: str, client_state: str | None
     ) -> PendingFlow:
-        now = int(now if now is not None else time.time())
         flow_id = secrets.token_urlsafe(24)
         self._table.put_item(
             Item={
@@ -71,7 +62,7 @@ class OAuthRepo:
                 "redirect_uri": redirect_uri,
                 "code_challenge": code_challenge,
                 "client_state": client_state,
-                ATTR_TTL: now + FLOW_TTL_SECONDS,
+                ATTR_TTL: int(time.time()) + FLOW_TTL_SECONDS,
             }
         )
         return PendingFlow(
@@ -82,11 +73,9 @@ class OAuthRepo:
             client_state=client_state,
         )
 
-    def take_flow(self, flow_id: str, now: int | None = None) -> PendingFlow | None:
-        now = int(now if now is not None else time.time())
-        item = self._table.get_item(Key={"pk": oauth_flow_pk(flow_id), "sk": SK_META}).get("Item")
-        self._table.delete_item(Key={"pk": oauth_flow_pk(flow_id), "sk": SK_META})
-        if item is None or int(item.get(ATTR_TTL, 0)) <= now:
+    def take_flow(self, flow_id: str) -> PendingFlow | None:
+        item = self._take_once(oauth_flow_pk(flow_id))
+        if item is None:
             return None
         return PendingFlow(
             flow_id=flow_id,
@@ -97,15 +86,8 @@ class OAuthRepo:
         )
 
     def create_code(
-        self,
-        *,
-        client_id: str,
-        redirect_uri: str,
-        code_challenge: str,
-        session_id: str,
-        now: int | None = None,
+        self, *, client_id: str, redirect_uri: str, code_challenge: str, session_id: str
     ) -> AuthCode:
-        now = int(now if now is not None else time.time())
         code = secrets.token_urlsafe(24)
         self._table.put_item(
             Item={
@@ -115,7 +97,7 @@ class OAuthRepo:
                 "redirect_uri": redirect_uri,
                 "code_challenge": code_challenge,
                 "session_id": session_id,
-                ATTR_TTL: now + CODE_TTL_SECONDS,
+                ATTR_TTL: int(time.time()) + CODE_TTL_SECONDS,
             }
         )
         return AuthCode(
@@ -126,11 +108,9 @@ class OAuthRepo:
             session_id=session_id,
         )
 
-    def take_code(self, code: str, now: int | None = None) -> AuthCode | None:
-        now = int(now if now is not None else time.time())
-        item = self._table.get_item(Key={"pk": oauth_code_pk(code), "sk": SK_META}).get("Item")
-        self._table.delete_item(Key={"pk": oauth_code_pk(code), "sk": SK_META})
-        if item is None or int(item.get(ATTR_TTL, 0)) <= now:
+    def take_code(self, code: str) -> AuthCode | None:
+        item = self._take_once(oauth_code_pk(code))
+        if item is None:
             return None
         return AuthCode(
             code=code,
@@ -139,3 +119,12 @@ class OAuthRepo:
             code_challenge=item["code_challenge"],
             session_id=item["session_id"],
         )
+
+    def _take_once(self, pk: str) -> dict | None:
+        """Delete a one-time row and return it, or None if it was missing or expired."""
+        item = self._table.delete_item(
+            Key={"pk": pk, "sk": SK_META}, ReturnValues="ALL_OLD"
+        ).get("Attributes")
+        if item is None or int(item.get(ATTR_TTL, 0)) <= int(time.time()):
+            return None
+        return item

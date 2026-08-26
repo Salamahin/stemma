@@ -1,10 +1,8 @@
 """User authentication for the MCP OAuth flow (a transport boundary).
 
-The MCP authorization server does not check passwords itself — it federates the login
-to Google. `IdentityProvider` is the seam: `authorization_url` is where we send the
-browser, `fetch_email` turns Google's callback into a verified email. `GoogleIdentity`
-runs the real authorization-code exchange; `BypassIdentity` short-circuits it for local
-dev / e2e (mirroring `AllowAnyTokenVerifier` + `E2E_AUTH_BYPASS` on the REST server).
+`IdentityProvider` federates login to Google: `authorization_url` is where we send the
+browser, `fetch_email` turns the callback into a verified email. `GoogleIdentity` runs the
+real authorization-code exchange; `BypassIdentity` short-circuits it for local dev / e2e.
 """
 
 import logging

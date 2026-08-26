@@ -11,9 +11,9 @@ upload (binary) and invitation tokens (privileged) are intentionally left out of
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import cache
 
-# Existing users ignore these seed names; they are only consumed the very first time a
-# user is provisioned, which happens through the web app, not the MCP surface.
+# Only consumed when a user is first provisioned (via the web app), ignored otherwise.
 _SEED_DEFAULT_STEMMA_NAME = "My Stemma"
 _SEED_KINGS_STEMMA_NAME = "European Kings"
 
@@ -65,8 +65,9 @@ def _person_write_schema(extra_required: dict[str, dict]) -> dict:
     }
 
 
-def tool_specs() -> list[ToolSpec]:
-    return [
+@cache
+def tool_specs() -> tuple[ToolSpec, ...]:
+    return (
         ToolSpec(
             name="list_stemmas",
             description="List all family trees (stemmas) the current user owns or can access.",
@@ -218,7 +219,7 @@ def tool_specs() -> list[ToolSpec]:
                 "family_id": args["family_id"],
             },
         ),
-    ]
+    )
 
 
 def _create_family_payload(args: dict) -> dict:
@@ -234,5 +235,6 @@ def _create_family_payload(args: dict) -> dict:
     }
 
 
+@cache
 def tools_by_name() -> dict[str, ToolSpec]:
     return {spec.name: spec for spec in tool_specs()}

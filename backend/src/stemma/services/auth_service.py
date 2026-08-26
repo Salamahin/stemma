@@ -14,13 +14,16 @@ class AuthOutcome:
 
 class AuthService:
     def __init__(
-        self, verifier: TokenVerifier, users: UserService, sessions: SessionRepo
+        self, users: UserService, sessions: SessionRepo, verifier: TokenVerifier | None = None
     ) -> None:
+        # `verifier` is only needed for `login` (cookie/Google id-token exchange). The MCP
+        # surface authenticates through the OAuth flow and omits it.
         self._verifier = verifier
         self._users = users
         self._sessions = sessions
 
     def login(self, id_token: str) -> AuthOutcome:
+        assert self._verifier is not None, "login requires a token verifier"
         return self.begin_session(self._verifier.email_from(id_token))
 
     def begin_session(self, email: str) -> AuthOutcome:

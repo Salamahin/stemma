@@ -12,7 +12,6 @@ import os
 import uvicorn
 
 from stemma.apis.request_handler import RequestHandler
-from stemma.apps.auth import AllowAnyTokenVerifier
 from stemma.apps.bootstrap import dynamo_table_from_env, photo_store_from_env
 from stemma.apps.mcp_app import build_mcp_app
 from stemma.apps.mcp_identity import identity_provider_from_env
@@ -34,9 +33,7 @@ def main() -> None:
     storage = StorageService(table, photo_store=photo_store)
     users = UserService(storage, os.environ["INVITE_SECRET"])
     handler = RequestHandler(storage, users, photo_store=photo_store)
-    # The MCP surface authenticates through the OAuth/Google flow, never `AuthService.login`,
-    # so the token verifier is never exercised here.
-    auth = AuthService(verifier=AllowAnyTokenVerifier(), users=users, sessions=SessionRepo(table))
+    auth = AuthService(users=users, sessions=SessionRepo(table))
     app = build_mcp_app(
         handler,
         auth,

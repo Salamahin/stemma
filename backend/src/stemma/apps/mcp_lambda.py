@@ -1,13 +1,9 @@
 """AWS Lambda entrypoint for the MCP server (API Gateway HTTP API via Mangum).
 
-The MCP app is a full FastAPI app with many routes, so — unlike `lambda_main`, which
-hand-decodes the single `/stemma` route — it is wrapped by Mangum (an ASGI→Lambda
-adapter). `_asgi()` is `@cache`d so warm invocations reuse the boto3 Table handle and the
-Secrets Manager lookup, matching `lambda_main._build()`.
-
-`GOOGLE_OAUTH_CLIENT_SECRET` is delivered through the same Secrets Manager mechanism as
-the invite secret (`bootstrap.populate_env_from_secrets` reads `STEMMA_INVITE_SECRET_NAME`
-and exports every key it finds), so it never appears in the template.
+The MCP app has many routes, so it is wrapped by Mangum (ASGI→Lambda) rather than
+hand-decoded like `lambda_main`. `_asgi()` is `@cache`d to reuse the boto3 Table handle
+and Secrets Manager lookup across warm invocations. `GOOGLE_OAUTH_CLIENT_SECRET` rides the
+`prod/invite` Secrets Manager payload (`bootstrap.populate_env_from_secrets`), never the template.
 """
 
 import os
@@ -16,7 +12,6 @@ from functools import cache
 from mangum import Mangum
 
 from stemma.apis.request_handler import RequestHandler
-from stemma.apps.auth import AllowAnyTokenVerifier
 from stemma.apps.bootstrap import dynamo_table_from_env, photo_store_from_env, populate_env_from_secrets
 from stemma.apps.mcp_app import build_mcp_app
 from stemma.apps.mcp_identity import identity_provider_from_env
@@ -35,9 +30,7 @@ def _asgi() -> Mangum:
     storage = StorageService(table, photo_store=photo_store)
     users = UserService(storage, os.environ["INVITE_SECRET"])
     handler = RequestHandler(storage, users, photo_store=photo_store)
-    # The MCP surface authenticates through the OAuth/Google flow, never AuthService.login,
-    # so the token verifier is never exercised here.
-    auth = AuthService(verifier=AllowAnyTokenVerifier(), users=users, sessions=SessionRepo(table))
+    auth = AuthService(users=users, sessions=SessionRepo(table))
     app = build_mcp_app(
         handler,
         auth,
