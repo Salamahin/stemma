@@ -13,6 +13,9 @@ stemma (or session) a user owns by querying gsi1pk = USER#<user_id>.
     STEMMA#<sid>            | OWNER#PERSON#<pid>#<uid>          | person ownership
     STEMMA#<sid>            | OWNER#FAMILY#<fid>#<uid>          | family ownership
     SESSION#<sid>           | META                              | session (TTL attr drives DynamoDB expiry)
+    OAUTHCLIENT#<cid>       | META                              | dynamically registered MCP OAuth client
+    OAUTHFLOW#<flow_id>     | META                              | pending authorize→IdP round-trip (TTL)
+    OAUTHCODE#<code>        | META                              | issued authorization code (TTL, one-time)
 """
 
 SK_PROFILE = "PROFILE"
@@ -24,6 +27,9 @@ ATTR_TTL = "ttl"
 
 STEMMA_PK_PREFIX = "STEMMA#"
 SESSION_PK_PREFIX = "SESSION#"
+OAUTH_CLIENT_PK_PREFIX = "OAUTHCLIENT#"
+OAUTH_FLOW_PK_PREFIX = "OAUTHFLOW#"
+OAUTH_CODE_PK_PREFIX = "OAUTHCODE#"
 PERSON_PREFIX = "PERSON#"
 FAMILY_PREFIX = "FAMILY#"
 STEMMA_OWNER_PREFIX = "OWNER#STEMMA#"
@@ -96,6 +102,18 @@ def user_gsi_sk(stemma_id: str) -> str:
 
 def session_pk(sid: str) -> str:
     return f"{SESSION_PK_PREFIX}{sid}"
+
+
+def oauth_client_pk(client_id: str) -> str:
+    return f"{OAUTH_CLIENT_PK_PREFIX}{client_id}"
+
+
+def oauth_flow_pk(flow_id: str) -> str:
+    return f"{OAUTH_FLOW_PK_PREFIX}{flow_id}"
+
+
+def oauth_code_pk(code: str) -> str:
+    return f"{OAUTH_CODE_PK_PREFIX}{code}"
 
 
 def parse_id_after_prefix(sk: str, prefix: str) -> str:

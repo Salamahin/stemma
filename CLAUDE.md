@@ -25,7 +25,7 @@ Stemma is a collaborative family tree editor. Multiple users build shared geneal
   - `src/stemma/services/` — Pure business logic (`UserService`, `invite_tokens`, `stemma_dfs`, `kinship`).
   - `src/stemma/storage/` — DynamoDB single-table schema (`schema.py`: key encoders) and `StorageService` (boto3 Table-resource-backed).
   - `src/stemma/apis/request_handler.py` — Central dispatcher: takes a `User` + parsed `Request`, returns a `Response`.
-  - `src/stemma/apps/` — Transport adapters: `rest_main`/`rest_app` (local Uvicorn server on :8090), `lambda_main` (HTTP API handler), and `bootstrap` (Secrets Manager + DynamoDB Table construction).
+  - `src/stemma/apps/` — Transport adapters: `rest_main`/`rest_app` (local Uvicorn server on :8090), `lambda_main` (HTTP API handler), `mcp_main`/`mcp_app`/`mcp_lambda` (MCP server — local Uvicorn on :8091 or a Mangum Lambda on the same HTTP API — with its own Google-federated OAuth 2.1 authorization server), and `bootstrap` (Secrets Manager + DynamoDB Table construction).
 - `frontend/` — Svelte 5 (runes mode) + TypeScript UI (Rollup bundler).
 - `e2e/` — Playwright end-to-end tests with full local stack orchestration (`scripts/devstack.mjs`).
 - `template.yaml` / `samconfig.toml` — AWS SAM infrastructure (Python 3.13 arm64 Lambda + shared layer + DynamoDB table).
@@ -35,14 +35,9 @@ Stemma is a collaborative family tree editor. Multiple users build shared geneal
 
 ## Architecture
 
-- `request_handler.RequestHandler.handle` is the single dispatch point: a `match` on the `Request` union calling the appropriate `StorageService` / `UserService` action and returning a typed `Response`.
-- Both transport adapters (`apps/rest_app.py` and `apps/lambda_main.py`) only handle auth + JSON envelope encode/decode, then hand off to `RequestHandler`. Cross-cutting changes belong in `apis/`/`services/`/`storage/` so REST and Lambda surfaces stay in sync.
-- Frontend talks to a single `POST /stemma` endpoint with a tagged-union JSON body of the form `{"type": "<RequestType>", ...fields}`. `domain/codec.py` (built on `pydantic.TypeAdapter`) decodes the envelope into the right `Request` dataclass and symmetrically encodes responses / errors. **To add an API**: add a dataclass to `domain/requests.py`, add it to the `Request` union, add a response dataclass (and to the `Response` union) in `domain/responses.py`, add a `case` branch in `RequestHandler.handle`, and wire matching types into the frontend client. Do not add new HTTP routes.
-- `StorageService` owns all DynamoDB calls. It works against a `boto3.resource("dynamodb").Table(...)` handle; services and the handler never touch the client directly.
-- Storage layout is single-table. Keys are encoded in `storage/schema.py`: `pk = STEMMA#<sid>` with `sk` prefixes `META`, `PERSON#<pid>`, `FAMILY#<fid>`, `OWNER#STEMMA#<uid>`, `OWNER#PERSON#<pid>#<uid>`, `OWNER#FAMILY#<fid>#<uid>`. User-by-email lookup uses `pk = USER#EMAIL#<email>` / `sk = PROFILE`. Sessions live at `pk = SESSION#<sid>` / `sk = META` with a `ttl` attribute (DynamoDB TTL) for auto-eviction. GSI `UserStemmasIndex` (`gsi1pk = USER#<uid>`, `gsi1sk = STEMMA#<sid>` or `SESSION#<sid>`) backs `list_owned_stemmas` and per-user session revocation. IDs are `uuid4().hex`; session ids are `secrets.token_urlsafe(32)`.
-- Auth is cookie-based via a BFF: `AuthLoginRequest` exchanges a Google id_token for a server-side session row and a `stemma_session` HttpOnly cookie; `AuthLogoutRequest` deletes the row and clears the cookie. Every other request resolves `User` from the cookie. `apps/dispatch.py` is the shared transport-layer dispatcher (cookie read, CSRF `Origin` check, session resolve, `RequestHandler.handle`) used by both `rest_app.py` and `lambda_main.py`.
-- Most mutating operations follow a load-snapshot → plan-in-memory → batch-write pattern (`_load_snapshot` in `storage_service.py`). Cycle detection runs on the planned snapshot before any write so there's no rollback. The recursive CTE that used to compute kinsmen families for `chown` is now `services/kinship.py` — pure Python over the loaded family graph.
-- In Lambda, `_build()` is `@cache`d so warm invocations reuse the boto3 Table handle. `bootstrap.populate_env_from_secrets()` pulls the invite secret from Secrets Manager at cold start (driven by `STEMMA_INVITE_SECRET_NAME`). The Lambda has DynamoDB CRUD permissions on the table referenced by `STEMMA_TABLE_NAME`.
+The API is RPC-shaped: a single `POST /stemma` endpoint takes a tagged-union JSON body (`{"type": "<RequestType>", ...}`). `domain/codec.py` (pydantic `TypeAdapter`) decodes it into a `Request` dataclass; `RequestHandler.handle` is a `match` over the union that calls `StorageService` / `UserService` and returns a typed `Response`. Transport adapters (`apps/rest_app.py`, `apps/lambda_main.py`, sharing `apps/dispatch.py`) only do auth + envelope encode/decode. `StorageService` owns all DynamoDB access against one table (keys in `storage/schema.py`). Auth is cookie/session based: a Google id_token is exchanged for a `stemma_session` HttpOnly cookie, and every other request resolves `User` from it.
+
+**To add an API**: add a dataclass to `domain/requests.py` + the `Request` union, a response in `domain/responses.py` + the `Response` union, a `case` in `RequestHandler.handle`, and wire the frontend client. Do not add new HTTP routes.
 
 ## Build & Test Commands
 
@@ -58,6 +53,7 @@ uv run pytest -k <expr>                        # Filter by test name
 uv run ruff check                              # Lint
 uv run pyright                                 # Type check
 uv run python -m stemma.apps.rest_main         # Start local REST server on :8090
+uv run python -m stemma.apps.mcp_main          # Start local MCP server on :8091
 ```
 
 Always invoke Python through `uv run` — do not call `.venv/bin/python` directly or set `PYTHONPATH` manually; `uv` handles both.
@@ -100,6 +96,9 @@ Optional / context-dependent:
 - `STEMMA_AUTO_CREATE_TABLE` — When `"1"`, `bootstrap.dynamo_table_from_env()` creates the table on startup if missing (local/e2e only — Lambda relies on the SAM stack).
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — Standard boto3 config. For Lambda, the runtime injects these; for local use any non-empty values when pointed at DynamoDB Local.
 - `E2E_AUTH_BYPASS` — When `"1"`, the REST server accepts any id_token (e2e use only) and creates a real session row for it.
+- `GOOGLE_OAUTH_CLIENT_SECRET` — Google OAuth client secret; MCP-server only, needed for the authorization-code exchange (the REST server only verifies id tokens and does not need it).
+- `STEMMA_MCP_ISSUER` — Public base URL of the MCP server; its OAuth discovery documents advertise endpoints under it. Defaults to the request's own base URL.
+- `STEMMA_MCP_AUTH_BYPASS` — When `"1"`, the MCP OAuth flow skips Google and logs in as `STEMMA_MCP_BYPASS_EMAIL` (local/e2e only).
 - `STEMMA_ALLOWED_ORIGINS` — CSV of allowed `Origin` values for the cookie-auth CSRF check + CORS. Required when the frontend lives on a different origin than the API (e.g. `http://localhost:5000` for `npm run dev`). Defaults to `*` (no CSRF check, no credentialled CORS).
 - `STEMMA_COOKIE_DOMAIN` — `Domain` attribute on the session cookie. Set to the apex domain in prod (`stemma.link`); leave empty for host-only cookies in local dev.
 - `STEMMA_COOKIE_SECURE` — `"1"` adds the `Secure` flag; required in prod, must be `"0"` for plain-HTTP local dev.

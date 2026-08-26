@@ -14,14 +14,19 @@ class AuthOutcome:
 
 class AuthService:
     def __init__(
-        self, verifier: TokenVerifier, users: UserService, sessions: SessionRepo
+        self, users: UserService, sessions: SessionRepo, verifier: TokenVerifier | None = None
     ) -> None:
+        # `verifier` is only needed by `login`; the MCP OAuth surface omits it.
         self._verifier = verifier
         self._users = users
         self._sessions = sessions
 
     def login(self, id_token: str) -> AuthOutcome:
-        email = self._verifier.email_from(id_token)
+        assert self._verifier is not None, "login requires a token verifier"
+        return self.begin_session(self._verifier.email_from(id_token))
+
+    def begin_session(self, email: str) -> AuthOutcome:
+        """Provision a user + session for an already-verified email (cookie login or MCP OAuth)."""
         user = self._users.get_or_create_user(email)
         session = self._sessions.create(user.user_id, email)
         return AuthOutcome(session=session, user=user)
