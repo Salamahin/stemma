@@ -38,7 +38,8 @@ def _asgi() -> Mangum:
         identity_provider_from_env(),
         issuer_override=os.environ["STEMMA_MCP_ISSUER"],
     )
-    return Mangum(app, lifespan="off")
+    # The HTTP API stage ("dev") prefixes the request path; strip it so FastAPI routes match.
+    return Mangum(app, lifespan="off", api_gateway_base_path="/dev")
 
 
 def lambda_handler(event: dict, context: object) -> dict:
