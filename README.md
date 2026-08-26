@@ -60,7 +60,7 @@ uv sync
 uv run python -m stemma.apps.rest_main
 ```
 
-The REST API listens on `http://localhost:8090`.
+The REST API listens on `http://localhost:8090`. Use `uv sync --all-groups` for the dev tools (tests, linters), and `uv run python -m stemma.apps.mcp_main` to run the MCP server on `:8091`. Always invoke Python through `uv run` (don't call `.venv/bin/python` or set `PYTHONPATH` — `uv` handles both).
 
 ### 3) Run the frontend
 ```bash
@@ -74,10 +74,14 @@ npm run dev
 
 Open the dev server URL printed by Rollup.
 
-## Tests
+## Tests & checks
 ```bash
 cd backend
-uv run pytest
+uv run pytest                                # all backend tests (in-process moto DynamoDB)
+uv run pytest tests/test_storage_service.py  # a single file
+uv run pytest -k <expr>                       # filter by test name
+uv run ruff check                             # lint
+uv run pyright                                # type check
 ```
 
 ```bash
@@ -99,10 +103,19 @@ Backend:
 - `STEMMA_AUTO_CREATE_TABLE` (optional): when set to `1`, create the table on startup if missing (local/e2e only)
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`: standard AWS SDK config
 - `E2E_AUTH_BYPASS` (optional): when set to `1`, the REST server accepts any bearer token (for E2E only)
+- `STEMMA_ALLOWED_ORIGINS` (optional): CSV of allowed `Origin` values for the cookie-auth CSRF check + CORS; defaults to `*`
+- `STEMMA_COOKIE_DOMAIN` (optional): `Domain` attribute on the session cookie (apex domain in prod, empty for local)
+- `STEMMA_COOKIE_SECURE` (optional): when `1`, adds the `Secure` flag on the cookie (required in prod)
 
-Frontend:
+MCP server (backend, in addition to the above):
+- `GOOGLE_OAUTH_CLIENT_SECRET`: Google OAuth client secret — needed for the MCP authorization-code exchange (the REST server only verifies id tokens and does not need it)
+- `STEMMA_MCP_ISSUER` (optional): public base URL of the MCP server; defaults to the request's own base URL
+- `STEMMA_MCP_AUTH_BYPASS` (optional): when `1`, the MCP login skips Google and uses `STEMMA_MCP_BYPASS_EMAIL` (local/e2e only)
+
+Frontend (build-time, substituted by Rollup):
 - `GOOGLE_CLIENT_ID`: same client ID as backend
 - `STEMMA_BACKEND_URL`: backend base URL (for example `http://localhost:8090`)
+- `E2E_AUTO_LOGIN` (optional): when `1`, auto-signs in without Google OAuth (e2e only)
 
 ## Notes
 - For a clean local slate, stop and re-run the DynamoDB container — its in-memory data is wiped on restart.
