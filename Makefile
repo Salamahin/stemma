@@ -12,3 +12,6 @@ build-MyLayer:
 
 build-StemmaFunction:
 	cp -r backend/src/stemma $(ARTIFACTS_DIR)/
+
+build-McpFunction:
+	cp -r backend/src/stemma $(ARTIFACTS_DIR)/
