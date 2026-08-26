@@ -107,6 +107,13 @@ export const en: Record<string, string> = {
     'about.problemsText': 'It happens, don\'t worry. You can ask a question, file a complaint, or on the contrary, give us a compliment by writing to ',
     'about.problemsEmail': 'email',
 
+    // Landing
+    'landing.tagline': 'A free, collaborative family tree you build together with your relatives.',
+    'landing.feature1': 'Draw families and relationships on an interactive canvas — the rules of a valid tree are checked for you.',
+    'landing.feature2': 'Invite relatives with a personal link so everyone can fill in the branch they know best.',
+    'landing.feature3': 'Read and edit your trees from an AI assistant over the Model Context Protocol.',
+    'landing.signInHint': 'Sign in with Google to start your own tree.',
+
     // Legal
     'legal.privacy': 'Privacy policy',
     'legal.terms': 'Terms of service',
@@ -306,6 +313,13 @@ export const ru: Record<string, string> = {
     'about.problemsTitle': 'Возникли проблемы?',
     'about.problemsText': 'Такое бывает, не расстраивайтесь. Можете задать вопрос, пожаловаться, или наоборот, похвалить нас, написав на ',
     'about.problemsEmail': 'почту',
+
+    // Landing
+    'landing.tagline': 'Бесплатное генеалогическое древо, которое вы составляете вместе с родственниками.',
+    'landing.feature1': 'Стройте семьи и связи на интерактивном холсте — система сама проверяет правила корректного древа.',
+    'landing.feature2': 'Приглашайте родственников по персональной ссылке, чтобы каждый дополнил ту ветку, которую знает лучше всех.',
+    'landing.feature3': 'Читайте и редактируйте свои древа из AI-ассистента по протоколу Model Context Protocol.',
+    'landing.signInHint': 'Войдите через Google, чтобы начать своё древо.',
 
     // Legal
     'legal.privacy': 'Политика конфиденциальности',
