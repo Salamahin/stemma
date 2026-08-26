@@ -138,6 +138,8 @@ def test_tool_call_creates_and_lists_stemmas(client: TestClient) -> None:
 
     payload = json.loads(result["content"][0]["text"])
     assert payload["type"] == "OwnedStemmas"
+    # list_stemmas must not embed the full first tree (a huge payload over MCP).
+    assert "firstStemma" not in payload
 
     created = _rpc(
         client,

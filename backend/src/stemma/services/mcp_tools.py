@@ -20,6 +20,14 @@ class ToolSpec:
     description: str
     input_schema: dict
     to_payload: Callable[[dict], dict]
+    # Optional post-processing of the encoded response before it reaches the client.
+    trim_response: Callable[[dict], dict] | None = None
+
+
+def _stemma_list_only(response: dict) -> dict:
+    """The web app renders the first tree inline; over MCP that is a huge payload the
+    client never needs (it fetches a specific tree with get_stemma), so drop it."""
+    return {k: v for k, v in response.items() if k != "firstStemma"}
 
 
 def _person_descr(args: dict) -> dict:
@@ -71,6 +79,7 @@ def tool_specs() -> tuple[ToolSpec, ...]:
                 "default_stemma_name": _SEED_DEFAULT_STEMMA_NAME,
                 "kings_of_europe_stemma_name": _SEED_KINGS_STEMMA_NAME,
             },
+            trim_response=_stemma_list_only,
         ),
         ToolSpec(
             name="get_stemma",
