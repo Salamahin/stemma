@@ -6,10 +6,9 @@
     type Props = {
         google_client_id: string;
         onsignIn?: (idToken: string) => void;
-        signingIn?: boolean;
     };
 
-    let { google_client_id, onsignIn, signingIn = false }: Props = $props();
+    let { google_client_id, onsignIn }: Props = $props();
     let buttonDiv = $state<HTMLDivElement | null>(null);
 
     onMount(() => {
@@ -36,13 +35,7 @@
     <div class="d-flex justify-content-center align-items-center flex-column">
         <h1>project stemma</h1>
         <img src="assets/logo_bw_avg.webp" alt="" width="100" height="100" />
-        {#if signingIn}
-            <div class="progress mt-5" style="width:250px; height:4px">
-                <div class="progress-bar progress-bar-striped progress-bar-animated w-100"></div>
-            </div>
-        {:else}
-            <div bind:this={buttonDiv} class="mt-4 d-flex justify-content-center"></div>
-        {/if}
+        <div bind:this={buttonDiv} class="mt-4 d-flex justify-content-center"></div>
         <div class="legal mt-4">
             <a href="/privacy.html">{$t("legal.privacy")}</a>
             <a href="/terms.html">{$t("legal.terms")}</a>
