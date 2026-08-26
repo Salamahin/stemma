@@ -67,6 +67,25 @@ Resources:
       AliasTarget:
         HostedZoneId: "Z2FDTNDATAQYW2" #this hardcoded value is always the case https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-route53-aliastarget.html
         DNSName: !GetAtt WebAppCDN.DomainName
+  # Mail for admin@<domain> is handled by ImprovMX, which forwards it to a private
+  # inbox. Only the routing lives here: the destination address is configured in the
+  # ImprovMX dashboard, so no personal address reaches this repository.
+  contactMailRecords:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneId: !Sub "${hostedZoneId}"
+      RecordSets:
+        - Name: !Sub "${cloudFrontAlias}"
+          Type: MX
+          TTL: "1800"
+          ResourceRecords:
+            - "10 mx1.improvmx.com"
+            - "20 mx2.improvmx.com"
+        - Name: !Sub "${cloudFrontAlias}"
+          Type: TXT
+          TTL: "1800"
+          ResourceRecords:
+            - '"v=spf1 include:spf.improvmx.com ~all"'
   CloudFrontOriginAccessIdentity:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:

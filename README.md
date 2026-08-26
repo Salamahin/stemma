@@ -117,5 +117,13 @@ Frontend (build-time, substituted by Rollup):
 - `STEMMA_BACKEND_URL`: backend base URL (for example `http://localhost:8090`)
 - `E2E_AUTO_LOGIN` (optional): when `1`, auto-signs in without Google OAuth (e2e only)
 
+## Contact mail
+
+`admin@stemma.link` is the public contact address; no personal address appears on the
+site or in this repository. `template.yaml` publishes the MX and SPF records, and ImprovMX
+forwards the mail to a private inbox configured in its dashboard — the destination is set
+there, not here. Changing the address is a one-line edit in `frontend/src/contact.ts`
+plus the two static pages under `frontend/public/`, which `contact.test.ts` keeps in sync.
+
 ## Notes
 - For a clean local slate, stop and re-run the DynamoDB container — its in-memory data is wiped on restart.
