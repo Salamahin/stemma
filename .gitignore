@@ -34,3 +34,6 @@ coverage/
 # CSS artifacts (generated)
 .sass-cache/
 *.css.map
+
+# Local Claude Code config (skills, agents) — not shared via the repo
+.claude/
