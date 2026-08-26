@@ -124,6 +124,11 @@
         </section>
 
         <section>
+            <h6>{$t("about.mcpTitle")}</h6>
+            <p>{$t("about.mcpText")}</p>
+        </section>
+
+        <section>
             <h6>{$t("about.problemsTitle")}</h6>
             <p>
                 {$t("about.problemsText")}

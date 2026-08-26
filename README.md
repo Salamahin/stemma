@@ -9,6 +9,7 @@ Stemma is a collaborative family tree editor. It lets multiple people build and 
 - Invite collaborators via shareable links
 - Visual graph rendering of the tree
 - Per-person edit permissions
+- AI access via a Model Context Protocol (MCP) server
 
 ## Tech stack
 - Frontend: Svelte + Rollup
@@ -16,6 +17,10 @@ Stemma is a collaborative family tree editor. It lets multiple people build and 
 - Storage: DynamoDB (single table; DynamoDB Local for dev/e2e)
 
 The API is RPC-shaped, not REST: a single `POST /stemma` endpoint accepts a tagged-union JSON body (`{"type": "<RequestType>", ...}`) dispatched in `apis/request_handler.py`.
+
+## AI access (MCP)
+
+Stemma runs a [Model Context Protocol](https://modelcontextprotocol.io) server at `https://api.stemma.link/mcp`, with its own Google-federated OAuth 2.1 authorization server. Add it as a custom connector in an MCP client (e.g. Claude) to read and edit trees in natural language. Backend lives in `stemma.apps.mcp_app` (served locally by `mcp_main` on :8091, or a Mangum Lambda on the shared HTTP API).
 
 ## Repository layout
 - `backend/`: Python backend
