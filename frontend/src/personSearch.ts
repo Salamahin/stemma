@@ -21,6 +21,17 @@ function searchVariants(value: string): string[] {
     return [...variants];
 }
 
+const NON_WORD = /[^\p{L}\p{N}]+/u;
+
+/** Split a name or query into word tokens, dropping punctuation ("(Романова)" → "Романова"). */
+function tokenize(value: string): string[] {
+    return value.split(NON_WORD).filter(Boolean);
+}
+
+function tokenVariants(value: string): string[] {
+    return [...new Set(tokenize(value).flatMap(searchVariants))];
+}
+
 export type PersonSearchMatch = readonly [number, number];
 
 export type PersonSearchResult = {
@@ -29,7 +40,7 @@ export type PersonSearchResult = {
 };
 
 const FUSE_OPTIONS: IFuseOptions<PersonDescription> = {
-    keys: [{ name: "name", getFn: (person) => searchVariants(person.name) }],
+    keys: [{ name: "name", getFn: (person) => tokenVariants(person.name) }],
     threshold: FUSE_THRESHOLD,
     ignoreLocation: true,
     minMatchCharLength: MIN_QUERY_LENGTH,
@@ -49,24 +60,62 @@ export function searchPeople(
     limit: number = DEFAULT_LIMIT,
 ): PersonSearchResult[] {
     if (query.length < MIN_QUERY_LENGTH) return [];
+    const queryTokens = tokenize(query);
+    if (queryTokens.length === 0) return [];
     const searchable = people.filter((p) => !isUnknownPerson(p.name));
     const fuse = new Fuse(searchable as PersonDescription[], FUSE_OPTIONS);
-    const scored = new Map<string, FuseResult<PersonDescription>>();
-    for (const variant of searchVariants(query)) {
-        for (const result of fuse.search(variant, { limit })) {
-            const prior = scored.get(result.item.id);
-            if (!prior || (result.score ?? 1) < (prior.score ?? 1)) {
-                scored.set(result.item.id, result);
-            }
+    const nameVariants = new Map(searchable.map((p) => [p.id, tokenVariants(p.name)]));
+
+    // Score each query token on its own and keep only people every token matched: word
+    // order stops mattering, and one unmatched word rules a person out instead of merely
+    // worsening the score of a name that matched the rest.
+    let totals: Map<string, number> | null = null;
+    for (const token of queryTokens) {
+        const scores = scoreToken(token, searchable, nameVariants, fuse);
+        const merged = new Map<string, number>();
+        for (const [id, score] of scores) {
+            const prior = totals?.get(id) ?? 0;
+            if (totals === null || totals.has(id)) merged.set(id, prior + score);
+        }
+        totals = merged;
+        if (totals.size === 0) return [];
+    }
+
+    const byId = new Map(searchable.map((p) => [p.id, p]));
+    return [...(totals ?? new Map<string, number>())]
+        .sort((a, b) => a[1] - b[1])
+        .slice(0, limit)
+        .flatMap(([id]) => {
+            const item = byId.get(id);
+            return item ? [{ item, matchedIndices: computeHighlight(item.name, query) }] : [];
+        });
+}
+
+/** Best fuse score per person for one query token (lower is better, 0 = exact substring).
+ *  A token too short for fuse still matches as a substring, so incremental typing works. */
+function scoreToken(
+    token: string,
+    searchable: ReadonlyArray<PersonDescription>,
+    nameVariants: Map<string, string[]>,
+    fuse: Fuse<PersonDescription>,
+): Map<string, number> {
+    const variants = searchVariants(token);
+    const scores = new Map<string, number>();
+    for (const person of searchable) {
+        const names = nameVariants.get(person.id) ?? [];
+        if (names.some((name) => variants.some((v) => name.includes(v)))) {
+            scores.set(person.id, 0);
         }
     }
-    return [...scored.values()]
-        .sort((a, b) => (a.score ?? 1) - (b.score ?? 1))
-        .slice(0, limit)
-        .map((r) => ({
-            item: r.item,
-            matchedIndices: computeHighlight(r.item.name, query),
-        }));
+    if (token.length < MIN_QUERY_LENGTH) return scores;
+    for (const variant of variants) {
+        for (const result of fuse.search(variant)) {
+            const score = result.score ?? 1;
+            const prior = scores.get(result.item.id);
+            if (prior === undefined || score < prior) scores.set(result.item.id, score);
+        }
+    }
+    return scores;
 }
 
 function computeHighlight(
@@ -74,10 +123,11 @@ function computeHighlight(
     query: string,
 ): ReadonlyArray<PersonSearchMatch> {
     if (hasCyrillic(name) !== hasCyrillic(query)) return [];
-    const normalizedName = normalizeRu(name);
-    const normalizedQuery = normalizeRu(query);
-    const fuse = new Fuse([normalizedName], HIGHLIGHT_OPTIONS);
-    return fuse.search(normalizedQuery)[0]?.matches?.[0]?.indices ?? [];
+    const fuse = new Fuse([normalizeRu(name)], HIGHLIGHT_OPTIONS);
+    const indices = tokenize(query).flatMap(
+        (token) => fuse.search(normalizeRu(token))[0]?.matches?.[0]?.indices ?? [],
+    );
+    return [...indices].sort((a, b) => a[0] - b[0]);
 }
 
 export function highlightMatches(
