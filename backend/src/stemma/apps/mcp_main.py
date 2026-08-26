@@ -1,9 +1,7 @@
 """Local / self-hosted entrypoint for the Stemma MCP server (Uvicorn on :8091).
 
-Wires the same `StorageService` / `UserService` / `RequestHandler` the REST server uses,
-plus the OAuth repo and identity provider, into the MCP app. Run behind a TLS-terminating
-reverse proxy for a public deployment; set `STEMMA_MCP_ISSUER` to the public base URL so
-the OAuth discovery documents advertise the right endpoints.
+Run behind a TLS-terminating reverse proxy for a public deployment, with `STEMMA_MCP_ISSUER`
+set to the public base URL so the OAuth discovery documents advertise the right endpoints.
 """
 
 import logging

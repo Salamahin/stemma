@@ -74,11 +74,8 @@ class GoogleIdentity:
 
 
 class BypassIdentity:
-    """Skips Google entirely: the browser bounces straight back to our callback.
-
-    Used only when `STEMMA_MCP_AUTH_BYPASS=1`. The email is taken from the `code`
-    query param when present (so e2e can drive any user) else a fixed dev email.
-    """
+    """Skips Google (only under `STEMMA_MCP_AUTH_BYPASS=1`): bounces back to our callback,
+    taking the email from the `code` param if present, else a fixed dev email."""
 
     def __init__(self, default_email: str) -> None:
         self._default_email = default_email

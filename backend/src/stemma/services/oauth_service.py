@@ -20,8 +20,6 @@ class OAuthClient:
 
 @dataclass(frozen=True)
 class PendingFlow:
-    """An authorization request parked while the user logs in with Google."""
-
     flow_id: str
     client_id: str
     redirect_uri: str
@@ -31,8 +29,6 @@ class PendingFlow:
 
 @dataclass(frozen=True)
 class AuthCode:
-    """A one-time authorization code bound to the session it will hand out."""
-
     code: str
     client_id: str
     redirect_uri: str

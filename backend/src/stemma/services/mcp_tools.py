@@ -1,12 +1,6 @@
-"""The MCP tool catalog: how each tool maps to a Stemma `Request`.
-
-Pure data + transforms. A `ToolSpec` carries the JSON Schema an MCP client sees and a
-`to_payload` that turns the call arguments into a tagged-union request envelope. The app
-layer feeds that envelope through the same `domain.codec.decode_request` the REST surface
-uses, so validation and dispatch are identical — no second request path.
-
-Scope is the safe, text-only subset: stemma + person + family CRUD and linking. Photo
-upload (binary) and invitation tokens (privileged) are intentionally left out of v1.
+"""The MCP tool catalog. Each `ToolSpec` carries a JSON Schema and a `to_payload` that
+builds a tagged-union request envelope, fed through the same `domain.codec` as REST. Scope
+is the text-only subset (stemma/person/family CRUD + linking); no photos or invite tokens.
 """
 
 from collections.abc import Callable
