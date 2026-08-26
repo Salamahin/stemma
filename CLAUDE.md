@@ -25,7 +25,7 @@ Stemma is a collaborative family tree editor. Multiple users build shared geneal
   - `src/stemma/services/` — Pure business logic (`UserService`, `invite_tokens`, `stemma_dfs`, `kinship`).
   - `src/stemma/storage/` — DynamoDB single-table schema (`schema.py`: key encoders) and `StorageService` (boto3 Table-resource-backed).
   - `src/stemma/apis/request_handler.py` — Central dispatcher: takes a `User` + parsed `Request`, returns a `Response`.
-  - `src/stemma/apps/` — Transport adapters: `rest_main`/`rest_app` (local Uvicorn server on :8090), `lambda_main` (HTTP API handler), and `bootstrap` (Secrets Manager + DynamoDB Table construction).
+  - `src/stemma/apps/` — Transport adapters: `rest_main`/`rest_app` (local Uvicorn server on :8090), `lambda_main` (HTTP API handler), `mcp_main`/`mcp_app` (Model Context Protocol server on :8091, with its own OAuth 2.1 authorization server federated to Google — see `backend/MCP.md`), and `bootstrap` (Secrets Manager + DynamoDB Table construction).
 - `frontend/` — Svelte 5 (runes mode) + TypeScript UI (Rollup bundler).
 - `e2e/` — Playwright end-to-end tests with full local stack orchestration (`scripts/devstack.mjs`).
 - `template.yaml` / `samconfig.toml` — AWS SAM infrastructure (Python 3.13 arm64 Lambda + shared layer + DynamoDB table).
@@ -58,6 +58,7 @@ uv run pytest -k <expr>                        # Filter by test name
 uv run ruff check                              # Lint
 uv run pyright                                 # Type check
 uv run python -m stemma.apps.rest_main         # Start local REST server on :8090
+uv run python -m stemma.apps.mcp_main          # Start local MCP server on :8091 (see backend/MCP.md)
 ```
 
 Always invoke Python through `uv run` — do not call `.venv/bin/python` directly or set `PYTHONPATH` manually; `uv` handles both.
@@ -100,6 +101,9 @@ Optional / context-dependent:
 - `STEMMA_AUTO_CREATE_TABLE` — When `"1"`, `bootstrap.dynamo_table_from_env()` creates the table on startup if missing (local/e2e only — Lambda relies on the SAM stack).
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — Standard boto3 config. For Lambda, the runtime injects these; for local use any non-empty values when pointed at DynamoDB Local.
 - `E2E_AUTH_BYPASS` — When `"1"`, the REST server accepts any id_token (e2e use only) and creates a real session row for it.
+- `GOOGLE_OAUTH_CLIENT_SECRET` — Google OAuth client secret; MCP-server only, needed for the authorization-code exchange (the REST server only verifies id tokens and does not need it).
+- `STEMMA_MCP_ISSUER` — Public base URL of the MCP server; its OAuth discovery documents advertise endpoints under it. Defaults to the request's own base URL.
+- `STEMMA_MCP_AUTH_BYPASS` — When `"1"`, the MCP OAuth flow skips Google and logs in as `STEMMA_MCP_BYPASS_EMAIL` (local/e2e only). See `backend/MCP.md`.
 - `STEMMA_ALLOWED_ORIGINS` — CSV of allowed `Origin` values for the cookie-auth CSRF check + CORS. Required when the frontend lives on a different origin than the API (e.g. `http://localhost:5000` for `npm run dev`). Defaults to `*` (no CSRF check, no credentialled CORS).
 - `STEMMA_COOKIE_DOMAIN` — `Domain` attribute on the session cookie. Set to the apex domain in prod (`stemma.link`); leave empty for host-only cookies in local dev.
 - `STEMMA_COOKIE_SECURE` — `"1"` adds the `Secure` flag; required in prod, must be `"0"` for plain-HTTP local dev.

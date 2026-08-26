@@ -21,7 +21,14 @@ class AuthService:
         self._sessions = sessions
 
     def login(self, id_token: str) -> AuthOutcome:
-        email = self._verifier.email_from(id_token)
+        return self.begin_session(self._verifier.email_from(id_token))
+
+    def begin_session(self, email: str) -> AuthOutcome:
+        """Provision a user + session for an already-verified email.
+
+        Used by the cookie login (`login`) and by the MCP OAuth callback, which
+        verifies the email through a Google authorization-code round-trip instead.
+        """
         user = self._users.get_or_create_user(email)
         session = self._sessions.create(user.user_id, email)
         return AuthOutcome(session=session, user=user)
