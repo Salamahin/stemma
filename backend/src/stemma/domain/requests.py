@@ -102,6 +102,14 @@ class CloneStemmaRequest:
 
 
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
+class SetFavouriteStemmaRequest:
+    """Marks a stemma as the one to open by default; ``None`` clears the mark."""
+
+    stemma_id: str | None
+    type: Literal["SetFavouriteStemmaRequest"] = "SetFavouriteStemmaRequest"
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class RenameStemmaRequest:
     stemma_id: str
     new_name: str
@@ -181,6 +189,7 @@ Request = Annotated[
     | ListDescribeStemmasRequest
     | CloneStemmaRequest
     | RenameStemmaRequest
+    | SetFavouriteStemmaRequest
     | DeletePersonRequest
     | UpdatePersonRequest
     | CreateOrphanPersonRequest

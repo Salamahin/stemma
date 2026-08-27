@@ -12,6 +12,7 @@
     type Props = {
         ownedStemmas: StemmaDescription[];
         currentStemmaId: string | null;
+        favouriteStemmaId: string | null;
         isWorking: boolean;
         stemma: Stemma | null;
         stemmaIndex: StemmaIndex | null;
@@ -25,6 +26,7 @@
         onstemmaRename: (s: StemmaDescription) => void;
         onstemmaClone: (s: StemmaDescription) => void;
         onstemmaRemove: (s: StemmaDescription) => void;
+        onstemmaFavourite: (s: StemmaDescription) => void;
         onsearchSelect: (id: string) => void;
         onabout: () => void;
         onsettings: () => void;
@@ -38,6 +40,7 @@
     let {
         ownedStemmas,
         currentStemmaId,
+        favouriteStemmaId,
         isWorking,
         stemma,
         stemmaIndex,
@@ -51,6 +54,7 @@
         onstemmaRename,
         onstemmaClone,
         onstemmaRemove,
+        onstemmaFavourite,
         onsearchSelect,
         onabout,
         onsettings,
@@ -67,12 +71,14 @@
         <Chip
             {ownedStemmas}
             {currentStemmaId}
+            {favouriteStemmaId}
             disabled={isWorking}
             {onstemmaSelect}
             {onstemmaAddNew}
             {onstemmaRename}
             {onstemmaClone}
             {onstemmaRemove}
+            {onstemmaFavourite}
         />
     </div>
 

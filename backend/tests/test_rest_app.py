@@ -157,3 +157,91 @@ def test_missing_origin_blocked_when_origins_configured(
         json={"type": "AuthLoginRequest", "idToken": "user@example.com"},
     )
     assert response.status_code == 403
+
+
+def _favourite(client: TestClient, stemma_id: str | None) -> dict:
+    return client.post(
+        "/stemma",
+        headers={"Origin": ALLOWED_ORIGIN},
+        json={"type": "SetFavouriteStemmaRequest", "stemmaId": stemma_id},
+    ).json()
+
+
+def test_favourite_stemma_is_listed_first_and_returned_as_first_stemma(
+    storage: StorageService, users: UserService, dynamo_table
+) -> None:
+    client = _client(storage, users, dynamo_table)
+    _login(client)
+    seeded = client.post(
+        "/stemma", headers={"Origin": ALLOWED_ORIGIN}, json=_list_payload()
+    ).json()
+    my_stemma = next(s for s in seeded["stemmas"] if s["name"] == "My Stemma")
+
+    marked = _favourite(client, my_stemma["id"])
+    assert marked == {"type": "FavouriteStemma", "stemmaId": my_stemma["id"]}
+
+    listed = client.post(
+        "/stemma", headers={"Origin": ALLOWED_ORIGIN}, json=_list_payload()
+    ).json()
+    assert listed["favouriteStemmaId"] == my_stemma["id"]
+    assert listed["stemmas"][0]["id"] == my_stemma["id"]
+
+
+def test_favourite_stemma_can_be_cleared(
+    storage: StorageService, users: UserService, dynamo_table
+) -> None:
+    client = _client(storage, users, dynamo_table)
+    _login(client)
+    seeded = client.post(
+        "/stemma", headers={"Origin": ALLOWED_ORIGIN}, json=_list_payload()
+    ).json()
+    my_stemma = next(s for s in seeded["stemmas"] if s["name"] == "My Stemma")
+    _favourite(client, my_stemma["id"])
+
+    assert _favourite(client, None) == {"type": "FavouriteStemma", "stemmaId": None}
+
+    listed = client.post(
+        "/stemma", headers={"Origin": ALLOWED_ORIGIN}, json=_list_payload()
+    ).json()
+    assert listed["favouriteStemmaId"] is None
+    # falls back to the seeded default (European Kings)
+    assert listed["stemmas"][0]["name"] == "European Kings"
+
+
+def test_favourite_stemma_of_a_foreign_stemma_is_denied(
+    storage: StorageService, users: UserService, dynamo_table
+) -> None:
+    client = _client(storage, users, dynamo_table)
+    _login(client, "owner@example.com")
+    seeded = client.post(
+        "/stemma", headers={"Origin": ALLOWED_ORIGIN}, json=_list_payload()
+    ).json()
+    foreign_id = seeded["stemmas"][0]["id"]
+
+    client.cookies.clear()
+    _login(client, "intruder@example.com")
+    assert _favourite(client, foreign_id)["type"] == "AccessToStemmaDenied"
+
+
+def test_deleting_the_favourite_stemma_clears_the_mark(
+    storage: StorageService, users: UserService, dynamo_table
+) -> None:
+    client = _client(storage, users, dynamo_table)
+    _login(client)
+    seeded = client.post(
+        "/stemma", headers={"Origin": ALLOWED_ORIGIN}, json=_list_payload()
+    ).json()
+    my_stemma = next(s for s in seeded["stemmas"] if s["name"] == "My Stemma")
+    _favourite(client, my_stemma["id"])
+
+    deleted = client.post(
+        "/stemma",
+        headers={"Origin": ALLOWED_ORIGIN},
+        json={"type": "DeleteStemmaRequest", "stemmaId": my_stemma["id"]},
+    ).json()
+    assert deleted["favouriteStemmaId"] is None
+
+    listed = client.post(
+        "/stemma", headers={"Origin": ALLOWED_ORIGIN}, json=_list_payload()
+    ).json()
+    assert listed["favouriteStemmaId"] is None

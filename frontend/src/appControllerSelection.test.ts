@@ -36,4 +36,12 @@ describe("selectStemmaId", () => {
     test("falls back to first when defaultStemmaId is missing from list", () => {
         expect(selectStemmaId(stemmas, undefined, "zzz")).toBe("a");
     });
+
+    test("favouriteStemmaId wins over lastStemmaId and defaultStemmaId", () => {
+        expect(selectStemmaId(stemmas, "c", "b", "a")).toBe("a");
+    });
+
+    test("falls back to lastStemmaId when the favourite is missing from list", () => {
+        expect(selectStemmaId(stemmas, "c", "b", "zzz")).toBe("c");
+    });
 });

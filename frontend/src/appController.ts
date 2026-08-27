@@ -18,6 +18,7 @@ export class AppController {
     highlight = writable<HighlightLineages>(null)
     ownedStemmas = writable<Array<StemmaDescription>>([])
     currentStemmaId = writable<string>(null)
+    favouriteStemmaId = writable<string | null>(null)
     isWorking = writable<boolean>(false)
     invitationToken = writable<string>(null)
     err = writable<Error>(null)
@@ -34,6 +35,7 @@ export class AppController {
         this.err.set(null)
         try {
             const result = await this.model.listDescribeStemmas()
+            this.favouriteStemmaId.set(result.favouriteStemmaId ?? null)
             if (result.stemmas.length === 0) {
                 this.ownedStemmas.set(result.stemmas)
                 return
@@ -42,6 +44,7 @@ export class AppController {
                 result.stemmas,
                 this.loadLastStemmaId(),
                 result.defaultStemmaId,
+                result.favouriteStemmaId,
             );
             const selectedStemma = result.stemmas.find((s) => s.id === selectedId)!;
             const stemma = selectedStemma.id === result.stemmas[0].id
@@ -106,6 +109,7 @@ export class AppController {
         this.model
             .removeStemma(stemmaId)
             .then((result) => {
+                this.favouriteStemmaId.set(result.favouriteStemmaId ?? null)
                 this.ownedStemmas.set(result.stemmas)
                 if (!wasCurrent) return
                 if (result.stemmas.length === 0) {
@@ -117,7 +121,7 @@ export class AppController {
                     this.setCurrentStemmaId(null)
                     return
                 }
-                const nextId = selectStemmaId(result.stemmas, this.loadLastStemmaId(), null)
+                const nextId = selectStemmaId(result.stemmas, this.loadLastStemmaId(), null, get(this.favouriteStemmaId))
                 return this.model.getStemma(nextId).then((next) => {
                     this.refreshIndexes(next, nextId)
                     this.setCurrentStemmaId(nextId)
@@ -167,6 +171,20 @@ export class AppController {
                 console.error('Err when renaming stemma: ', err.stack);
             })
             .finally(() => this.isWorking.set(false))
+    }
+
+    toggleFavouriteStemma(stemmaId: string) {
+        const previous = get(this.favouriteStemmaId)
+        const next = previous === stemmaId ? null : stemmaId
+        this.err.set(null)
+        this.favouriteStemmaId.set(next)
+        this.model
+            .setFavouriteStemma(next)
+            .catch(err => {
+                this.favouriteStemmaId.set(previous)
+                this.err.set(err)
+                console.error('Err when marking a stemma as favourite: ', err.stack);
+            })
     }
 
     addStemma(stemmaName: string) {

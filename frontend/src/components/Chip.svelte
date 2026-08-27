@@ -5,8 +5,10 @@
     type Props = {
         ownedStemmas: StemmaDescription[];
         currentStemmaId: string | null;
+        favouriteStemmaId: string | null;
         disabled: boolean;
         onstemmaSelect?: (id: string) => void;
+        onstemmaFavourite?: (s: StemmaDescription) => void;
         onstemmaAddNew?: () => void;
         onstemmaRename?: (s: StemmaDescription) => void;
         onstemmaClone?: (s: StemmaDescription) => void;
@@ -16,8 +18,10 @@
     let {
         ownedStemmas,
         currentStemmaId,
+        favouriteStemmaId,
         disabled,
         onstemmaSelect,
+        onstemmaFavourite,
         onstemmaAddNew,
         onstemmaRename,
         onstemmaClone,
@@ -79,6 +83,16 @@
                         role="toolbar"
                         tabindex="-1"
                     >
+                        <button
+                            type="button"
+                            class="row-btn"
+                            class:favourite={s.id === favouriteStemmaId}
+                            aria-label={s.id === favouriteStemmaId ? $t("unfavouriteStemma") : $t("favouriteStemma")}
+                            title={s.id === favouriteStemmaId ? $t("unfavouriteStemma") : $t("favouriteStemma")}
+                            aria-pressed={s.id === favouriteStemmaId}
+                            onclick={(e) => trigger(onstemmaFavourite, s, e)}
+                            data-testid="chip-favourite"
+                        ><i class="bi" class:bi-star-fill={s.id === favouriteStemmaId} class:bi-star={s.id !== favouriteStemmaId}></i></button>
                         <button
                             type="button"
                             class="row-btn"
@@ -235,6 +249,15 @@
     .row-btn:hover {
         background: #e9ecef;
         color: #212529;
+    }
+
+    .row-btn.favourite {
+        color: #f0a500;
+    }
+
+    .row-btn.favourite:hover {
+        background: #fff3cd;
+        color: #f0a500;
     }
 
     .row-btn.danger:hover {

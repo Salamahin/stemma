@@ -58,7 +58,14 @@ class OwnedStemmas:
     stemmas: list[StemmaDescription]
     first_stemma: Stemma | None
     default_stemma_id: str | None = None
+    favourite_stemma_id: str | None = None
     type: Literal["OwnedStemmas"] = "OwnedStemmas"
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
+class FavouriteStemma:
+    stemma_id: str | None
+    type: Literal["FavouriteStemma"] = "FavouriteStemma"
 
 
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
@@ -100,6 +107,7 @@ Response = Annotated[
     | FamilyDescription
     | PersonDescription
     | InviteToken
+    | FavouriteStemma
     | CloneResult
     | TokenAccepted
     | PhotoUploadUrl

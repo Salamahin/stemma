@@ -107,6 +107,74 @@ describe("AppController", () => {
         expect(get(controller.currentStemmaId)).toBe("a");
     });
 
+    test("favouriteStemmaId beats lastStemmaId", async () => {
+        const model = {
+            listDescribeStemmas: jest.fn().mockResolvedValue({
+                stemmas: [stemmaDescA, stemmaDescB],
+                firstStemma: stemmaA,
+                favouriteStemmaId: "b",
+            }),
+            getStemma: jest.fn().mockResolvedValue(stemmaB),
+        };
+
+        localStorage.setItem("stemma_last_stemma_id", "a");
+
+        const controller = new AppController("http://example", model as any);
+        await controller.listStemmas();
+        await drainPromises();
+
+        expect(model.getStemma).toHaveBeenCalledWith("b");
+        expect(get(controller.currentStemmaId)).toBe("b");
+        expect(get(controller.favouriteStemmaId)).toBe("b");
+    });
+
+    test("toggleFavouriteStemma marks and unmarks a stemma", async () => {
+        const model = {
+            listDescribeStemmas: jest.fn().mockResolvedValue({
+                stemmas: [stemmaDescA, stemmaDescB],
+                firstStemma: stemmaA,
+            }),
+            getStemma: jest.fn(),
+            setFavouriteStemma: jest.fn().mockResolvedValue({ type: "FavouriteStemma", stemmaId: "b" }),
+        };
+
+        const controller = new AppController("http://example", model as any);
+        await controller.listStemmas();
+        await drainPromises();
+
+        controller.toggleFavouriteStemma("b");
+        await drainAll();
+        expect(model.setFavouriteStemma).toHaveBeenCalledWith("b");
+        expect(get(controller.favouriteStemmaId)).toBe("b");
+
+        controller.toggleFavouriteStemma("b");
+        await drainAll();
+        expect(model.setFavouriteStemma).toHaveBeenLastCalledWith(null);
+        expect(get(controller.favouriteStemmaId)).toBeNull();
+    });
+
+    test("toggleFavouriteStemma rolls back when the call fails", async () => {
+        const model = {
+            listDescribeStemmas: jest.fn().mockResolvedValue({
+                stemmas: [stemmaDescA, stemmaDescB],
+                firstStemma: stemmaA,
+                favouriteStemmaId: "a",
+            }),
+            getStemma: jest.fn(),
+            setFavouriteStemma: jest.fn().mockRejectedValue(new Error("nope")),
+        };
+
+        const controller = new AppController("http://example", model as any);
+        await controller.listStemmas();
+        await drainPromises();
+
+        controller.toggleFavouriteStemma("b");
+        await drainAll();
+
+        expect(get(controller.favouriteStemmaId)).toBe("a");
+        expect(get(controller.err)).toBeInstanceOf(Error);
+    });
+
     test("empty stemma list leaves controller idle", async () => {
         const model = {
             listDescribeStemmas: jest.fn().mockResolvedValue({
