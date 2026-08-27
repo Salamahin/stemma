@@ -1,6 +1,6 @@
 import logging
 
-from stemma.domain.errors import AccessToPersonDenied, ForeignInviteToken
+from stemma.domain.errors import AccessToPersonDenied, AccessToStemmaDenied, ForeignInviteToken
 from stemma.domain.requests import (
     AuthLoginRequest,
     AuthLogoutRequest,
@@ -19,12 +19,14 @@ from stemma.domain.requests import (
     RenameStemmaRequest,
     Request,
     RequestPhotoUploadUrlRequest,
+    SetFavouriteStemmaRequest,
     SetPersonPhotoRequest,
     UpdateFamilyRequest,
     UpdatePersonRequest,
 )
 from stemma.domain.responses import (
     CloneResult,
+    FavouriteStemma,
     InviteToken,
     OwnedStemmas,
     PhotoUploadUrl,
@@ -85,6 +87,8 @@ class RequestHandler:
                 return self._clone_stemma(user, request)
             case RenameStemmaRequest():
                 return self._rename_stemma(user, request)
+            case SetFavouriteStemmaRequest():
+                return self._set_favourite_stemma(user, request)
             case RequestPhotoUploadUrlRequest():
                 return self._request_photo_upload_url(user, request)
             case SetPersonPhotoRequest():
@@ -96,10 +100,15 @@ class RequestHandler:
         existing = self._storage.list_owned_stemmas(user.user_id)
         if user.default_stemma_id is None and not existing:
             return self._seed_new_user(user, request)
-        ordered = _order_with_default_first(existing, user.default_stemma_id)
+        ordered = _order_with_preferred_first(
+            existing, user.favourite_stemma_id or user.default_stemma_id
+        )
         first = self._storage.stemma(user.user_id, ordered[0].id) if ordered else None
         return OwnedStemmas(
-            stemmas=ordered, first_stemma=first, default_stemma_id=user.default_stemma_id
+            stemmas=ordered,
+            first_stemma=first,
+            default_stemma_id=user.default_stemma_id,
+            favourite_stemma_id=user.favourite_stemma_id,
         )
 
     def _seed_new_user(self, user: User, request: ListDescribeStemmasRequest) -> OwnedStemmas:
@@ -127,8 +136,14 @@ class RequestHandler:
 
     def _delete_stemma(self, user: User, request: DeleteStemmaRequest) -> OwnedStemmas:
         self._storage.remove_stemma(user.user_id, request.stemma_id)
+        favourite_stemma_id = user.favourite_stemma_id
+        if favourite_stemma_id == request.stemma_id:
+            self._storage.set_favourite_stemma_id(user.email, None)
+            favourite_stemma_id = None
         owned = self._storage.list_owned_stemmas(user.user_id)
-        return OwnedStemmas(stemmas=owned, first_stemma=None)
+        return OwnedStemmas(
+            stemmas=owned, first_stemma=None, favourite_stemma_id=favourite_stemma_id
+        )
 
     def _create_new_stemma(self, user: User, request: CreateNewStemmaRequest) -> StemmaDescription:
         new_id = self._storage.create_stemma(user.user_id, request.stemma_name)
@@ -193,6 +208,16 @@ class RequestHandler:
     def _rename_stemma(self, user: User, request: RenameStemmaRequest) -> StemmaDescription:
         return self._storage.rename_stemma(user.user_id, request.stemma_id, request.new_name)
 
+    def _set_favourite_stemma(
+        self, user: User, request: SetFavouriteStemmaRequest
+    ) -> FavouriteStemma:
+        if request.stemma_id is not None and not self._storage.owns_stemma(
+            user.user_id, request.stemma_id
+        ):
+            raise AccessToStemmaDenied(stemma_id=request.stemma_id)
+        self._storage.set_favourite_stemma_id(user.email, request.stemma_id)
+        return FavouriteStemma(stemma_id=request.stemma_id)
+
     def _request_photo_upload_url(
         self, user: User, request: RequestPhotoUploadUrlRequest
     ) -> PhotoUploadUrl:
@@ -217,11 +242,11 @@ class RequestHandler:
         return self._storage.stemma(user.user_id, request.stemma_id)
 
 
-def _order_with_default_first(
-    stemmas: list[StemmaDescription], default_id: str | None
+def _order_with_preferred_first(
+    stemmas: list[StemmaDescription], preferred_id: str | None
 ) -> list[StemmaDescription]:
-    if default_id is None:
+    if preferred_id is None:
         return stemmas
-    head = [s for s in stemmas if s.id == default_id]
-    tail = [s for s in stemmas if s.id != default_id]
+    head = [s for s in stemmas if s.id == preferred_id]
+    tail = [s for s in stemmas if s.id != preferred_id]
     return head + tail

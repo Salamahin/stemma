@@ -23,6 +23,7 @@ SK_META = "META"
 
 ATTR_DISPLAY_NAME = "display_name"
 ATTR_DEFAULT_STEMMA_ID = "default_stemma_id"
+ATTR_FAVOURITE_STEMMA_ID = "favourite_stemma_id"
 ATTR_TTL = "ttl"
 
 STEMMA_PK_PREFIX = "STEMMA#"

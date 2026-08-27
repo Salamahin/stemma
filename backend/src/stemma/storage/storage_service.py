@@ -38,6 +38,7 @@ from stemma.services.stemma_dfs import has_cycles
 from stemma.storage.schema import (
     ATTR_DEFAULT_STEMMA_ID,
     ATTR_DISPLAY_NAME,
+    ATTR_FAVOURITE_STEMMA_ID,
     FAMILY_OWNER_PREFIX,
     FAMILY_PREFIX,
     GSI1_INDEX_NAME,
@@ -105,6 +106,7 @@ class StorageService:
                 user_id=item["user_id"],
                 email=email,
                 default_stemma_id=item.get(ATTR_DEFAULT_STEMMA_ID),
+                favourite_stemma_id=item.get(ATTR_FAVOURITE_STEMMA_ID),
             )
         user_id = uuid.uuid4().hex
         try:
@@ -121,6 +123,7 @@ class StorageService:
                 user_id=existing["user_id"],
                 email=email,
                 default_stemma_id=existing.get(ATTR_DEFAULT_STEMMA_ID),
+                favourite_stemma_id=existing.get(ATTR_FAVOURITE_STEMMA_ID),
             )
 
     def set_default_stemma_id(self, email: str, stemma_id: str) -> None:
@@ -128,6 +131,22 @@ class StorageService:
             Key={"pk": user_email_pk(email), "sk": SK_PROFILE},
             UpdateExpression="SET #d = :v",
             ExpressionAttributeNames={"#d": ATTR_DEFAULT_STEMMA_ID},
+            ExpressionAttributeValues={":v": stemma_id},
+        )
+
+    def set_favourite_stemma_id(self, email: str, stemma_id: str | None) -> None:
+        key = {"pk": user_email_pk(email), "sk": SK_PROFILE}
+        if stemma_id is None:
+            self._table.update_item(
+                Key=key,
+                UpdateExpression="REMOVE #f",
+                ExpressionAttributeNames={"#f": ATTR_FAVOURITE_STEMMA_ID},
+            )
+            return
+        self._table.update_item(
+            Key=key,
+            UpdateExpression="SET #f = :v",
+            ExpressionAttributeNames={"#f": ATTR_FAVOURITE_STEMMA_ID},
             ExpressionAttributeValues={":v": stemma_id},
         )
 
@@ -263,6 +282,9 @@ class StorageService:
         snapshot = self._load_snapshot(stemma_id)
         self._require_stemma_access(snapshot, user_id)
         return _describe_stemma(snapshot, user_id, self._photo_store)
+
+    def owns_stemma(self, user_id: str, stemma_id: str) -> bool:
+        return user_id in self._load_snapshot(stemma_id).stemma_owners
 
     def clone_stemma(self, user_id: str, stemma_id: str, new_stemma_name: str) -> Stemma:
         source = self._load_snapshot(stemma_id)

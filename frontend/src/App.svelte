@@ -52,6 +52,7 @@
 
     let ownedStemmas = $state<StemmaDescription[]>([]);
     let currentStemmaId = $state<string | null>(null);
+    let favouriteStemmaId = $state<string | null>(null);
     let stemma = $state<Stemma | null>(null);
     let stemmaIndex = $state<StemmaIndex | null>(null);
     let highlight = $state<HighlightLineages | null>(null);
@@ -153,6 +154,7 @@
             if (s === null || switchedStemma) actions.reset();
         }),
         controller.ownedStemmas.subscribe((os) => (ownedStemmas = os)),
+        controller.favouriteStemmaId.subscribe((id) => (favouriteStemmaId = id)),
         controller.stemmaIndex.subscribe((si) => (stemmaIndex = si)),
         controller.highlight.subscribe((hg) => (highlight = hg)),
         controller.pinnedStorage.subscribe((pp) => (pinnedPeople = pp)),
@@ -353,6 +355,7 @@
         <Chrome
             {ownedStemmas}
             {currentStemmaId}
+            {favouriteStemmaId}
             {isWorking}
             {stemma}
             {stemmaIndex}
@@ -366,6 +369,7 @@
             onstemmaRename={(s) => modals.renameStemma(s)}
             onstemmaClone={(s) => modals.cloneStemma(s)}
             onstemmaRemove={(s) => modals.removeStemma(s)}
+            onstemmaFavourite={(s) => controller.toggleFavouriteStemma(s.id)}
             onsearchSelect={(id) => stemmaChart?.zoomToNode(id)}
             onabout={() => aboutModal?.show()}
             onsettings={() => settingsModal?.show()}

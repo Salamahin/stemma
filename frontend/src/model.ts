@@ -39,6 +39,7 @@ export type BearInvitationRequest = { type: "BearInvitationRequest", encodedToke
 export type CloneStemmaRequest = { type: "CloneStemmaRequest", stemmaId: string, stemmaName: string }
 export type ListDescribeStemmasRequest = { type: "ListDescribeStemmasRequest", defaultStemmaName: string, kingsOfEuropeStemmaName: string }
 export type RenameStemmaRequest = { type: "RenameStemmaRequest", stemmaId: string, newName: string }
+export type SetFavouriteStemmaRequest = { type: "SetFavouriteStemmaRequest", stemmaId: string | null }
 export type RequestPhotoUploadUrlRequest = { type: "RequestPhotoUploadUrlRequest", stemmaId: string, personId: string, contentType: string }
 export type SetPersonPhotoRequest = { type: "SetPersonPhotoRequest", stemmaId: string, personId: string, photoKey: string | null }
 export type CreateOrphanPersonRequest = { type: "CreateOrphanPersonRequest", stemmaId: string, personDescr: CreateNewPerson }
@@ -61,6 +62,7 @@ type Request =
     | UpdatePersonRequest
     | CloneStemmaRequest
     | RenameStemmaRequest
+    | SetFavouriteStemmaRequest
     | RequestPhotoUploadUrlRequest
     | SetPersonPhotoRequest
     | CreateOrphanPersonRequest
@@ -72,7 +74,8 @@ type Request =
 //responses
 export type FamilyDescription = { type: "FamilyDescription", id: string, parents: Array<string>, children: Array<string>, readOnly: boolean }
 export type InviteToken = { type: "InviteToken", token: string }
-export type OwnedStemmas = { type: "OwnedStemmas", stemmas: Array<StemmaDescription>, firstStemma: Stemma, defaultStemmaId?: string | null }
+export type OwnedStemmas = { type: "OwnedStemmas", stemmas: Array<StemmaDescription>, firstStemma: Stemma, defaultStemmaId?: string | null, favouriteStemmaId?: string | null }
+export type FavouriteStemma = { type: "FavouriteStemma", stemmaId: string | null }
 export type Stemma = { type: "Stemma", people: Array<PersonDescription>, families: Array<FamilyDescription> }
 export type StemmaDescription = { type: "StemmaDescription", id: string, name: string, removable: Boolean }
 export type PersonDescription = { type: "PersonDescription", id: string, name: string, birthDate?: string, deathDate?: string, bio?: string, readOnly: boolean, photoUrl?: string | null }
@@ -103,6 +106,7 @@ export type TooManyParents = { type: "TooManyParents", familyId: string }
 
 export type StemmaResponse =
     | FamilyDescription
+    | FavouriteStemma
     | InviteToken
     | OwnedStemmas
     | Stemma
@@ -230,6 +234,10 @@ export class Model {
 
     async renameStemma(stemmaId: string, newName: string): Promise<StemmaDescription> {
         return this.send<StemmaDescription>({ type: "RenameStemmaRequest", stemmaId, newName }, null)
+    }
+
+    async setFavouriteStemma(stemmaId: string | null): Promise<FavouriteStemma> {
+        return this.send<FavouriteStemma>({ type: "SetFavouriteStemmaRequest", stemmaId }, null)
     }
 
     async requestPhotoUploadUrl(stemmaId: string, personId: string, contentType: string): Promise<PhotoUploadUrl> {
