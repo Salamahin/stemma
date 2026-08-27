@@ -16,12 +16,21 @@ def photo_key(stemma_id: str, person_id: str) -> str:
     return f"stemmas/{stemma_id}/persons/{person_id}/photo"
 
 
+def belongs_to_stemma(stemma_id: str, key: str) -> bool:
+    """Photos are stored under a per-stemma prefix, so a key that does not carry
+    it is owned by another stemma (a clone made before photos were copied) and
+    must not be deleted on this stemma's behalf."""
+    return key.startswith(f"stemmas/{stemma_id}/")
+
+
 class PhotoStore(Protocol):
     def issue_upload_url(
         self, stemma_id: str, person_id: str, content_type: str
     ) -> tuple[str, dict[str, str], str]: ...
 
     def issue_get_url(self, key: str) -> str: ...
+
+    def copy(self, source_key: str, destination_key: str) -> None: ...
 
     def delete(self, keys: Iterable[str]) -> None: ...
 
@@ -54,6 +63,13 @@ class S3PhotoService:
             "get_object",
             Params={"Bucket": self.bucket, "Key": key},
             ExpiresIn=GET_URL_EXPIRES_SECONDS,
+        )
+
+    def copy(self, source_key: str, destination_key: str) -> None:
+        self.s3_client.copy_object(
+            Bucket=self.bucket,
+            CopySource={"Bucket": self.bucket, "Key": source_key},
+            Key=destination_key,
         )
 
     def delete(self, keys: Iterable[str]) -> None:

@@ -1,4 +1,7 @@
 import logging
+from collections.abc import Iterable
+
+from botocore.exceptions import ClientError
 
 from stemma.domain.errors import AccessToPersonDenied, AccessToStemmaDenied, ForeignInviteToken
 from stemma.domain.requests import (
@@ -37,7 +40,11 @@ from stemma.domain.responses import (
 )
 from stemma.domain.user import User
 from stemma.seed.kings_of_europe import load_kings_of_europe
-from stemma.services.photo_service import PUT_URL_EXPIRES_SECONDS, PhotoStore
+from stemma.services.photo_service import (
+    PUT_URL_EXPIRES_SECONDS,
+    PhotoStore,
+    belongs_to_stemma,
+)
 from stemma.services.user_service import UserService
 from stemma.storage.storage_service import StorageService
 
@@ -135,7 +142,8 @@ class RequestHandler:
         return TokenAccepted(stemmas=owned, last_stemma=last_stemma)
 
     def _delete_stemma(self, user: User, request: DeleteStemmaRequest) -> OwnedStemmas:
-        self._storage.remove_stemma(user.user_id, request.stemma_id)
+        removed_photos = self._storage.remove_stemma(user.user_id, request.stemma_id)
+        self._forget_photos(request.stemma_id, removed_photos)
         favourite_stemma_id = user.favourite_stemma_id
         if favourite_stemma_id == request.stemma_id:
             self._storage.set_favourite_stemma_id(user.email, None)
@@ -153,7 +161,10 @@ class RequestHandler:
         return self._storage.stemma(user.user_id, request.stemma_id)
 
     def _delete_person(self, user: User, request: DeletePersonRequest) -> Stemma:
-        self._storage.remove_person(user.user_id, request.stemma_id, request.person_id)
+        removed_photos = self._storage.remove_person(
+            user.user_id, request.stemma_id, request.person_id
+        )
+        self._forget_photos(request.stemma_id, removed_photos)
         return self._storage.stemma(user.user_id, request.stemma_id)
 
     def _update_person(self, user: User, request: UpdatePersonRequest) -> Stemma:
@@ -236,10 +247,26 @@ class RequestHandler:
         )
 
     def _set_person_photo(self, user: User, request: SetPersonPhotoRequest) -> Stemma:
-        self._storage.set_person_photo(
+        previous_key = self._storage.set_person_photo(
             user.user_id, request.stemma_id, request.person_id, request.photo_key
         )
+        if previous_key is not None and previous_key != request.photo_key:
+            self._forget_photos(request.stemma_id, [previous_key])
         return self._storage.stemma(user.user_id, request.stemma_id)
+
+    def _forget_photos(self, stemma_id: str, keys: Iterable[str]) -> None:
+        """Drop the S3 objects behind photos this stemma no longer references.
+        Keys under another stemma's prefix belong to a clone made before photos
+        were copied per stemma, so they are left alone."""
+        if self._photo_store is None:
+            return
+        owned = [k for k in keys if belongs_to_stemma(stemma_id, k)]
+        if not owned:
+            return
+        try:
+            self._photo_store.delete(owned)
+        except ClientError:
+            logger.warning("could not delete photos %s of stemma %s", owned, stemma_id)
 
 
 def _order_with_preferred_first(
