@@ -33,7 +33,7 @@ from stemma.domain.responses import FamilyDescription, PersonDescription, Stemma
 from stemma.domain.user import User
 from stemma.seed.kings_of_europe import SeedStemma
 from stemma.services.kinship import FamilyLink, kinsmen_families, members_of
-from stemma.services.photo_service import PhotoStore
+from stemma.services.photo_service import PhotoStore, photo_key
 from stemma.services.stemma_dfs import has_cycles
 from stemma.storage.schema import (
     ATTR_DEFAULT_STEMMA_ID,
@@ -187,8 +187,9 @@ class StorageService:
         name: str,
         persons: list[_PersonRow],
         families: list[_FamilyRow],
+        stemma_id: str | None = None,
     ) -> tuple[str, Stemma]:
-        stemma_id = uuid.uuid4().hex
+        stemma_id = stemma_id or uuid.uuid4().hex
         with self._table.batch_writer() as batch:
             batch.put_item(Item={"pk": stemma_pk(stemma_id), "sk": SK_META, "name": name})
             batch.put_item(
@@ -289,10 +290,16 @@ class StorageService:
     def clone_stemma(self, user_id: str, stemma_id: str, new_stemma_name: str) -> Stemma:
         source = self._load_snapshot(stemma_id)
         self._require_stemma_access(source, user_id)
+        new_stemma_id = uuid.uuid4().hex
         person_id_map = {old: uuid.uuid4().hex for old in source.people}
         family_id_map = {old: uuid.uuid4().hex for old in source.families}
         persons = [
-            replace(source.people[old], id=new) for old, new in person_id_map.items()
+            replace(
+                source.people[old],
+                id=new,
+                photo_key=self._copy_photo(source.people[old].photo_key, new_stemma_id, new),
+            )
+            for old, new in person_id_map.items()
         ]
         families = [
             _FamilyRow(
@@ -302,8 +309,29 @@ class StorageService:
             )
             for old, new in family_id_map.items()
         ]
-        _, stemma = self._write_owned_stemma(user_id, new_stemma_name, persons, families)
+        _, stemma = self._write_owned_stemma(
+            user_id, new_stemma_name, persons, families, stemma_id=new_stemma_id
+        )
         return stemma
+
+    def _copy_photo(
+        self, source_key: str | None, new_stemma_id: str, new_person_id: str
+    ) -> str | None:
+        """Give the clone its own S3 object so deleting either stemma cannot blank
+        the other one's photo."""
+        if source_key is None or self._photo_store is None:
+            return source_key
+        destination = photo_key(new_stemma_id, new_person_id)
+        try:
+            self._photo_store.copy(source_key, destination)
+        except ClientError:
+            logger.warning(
+                "could not copy photo %s while cloning into %s; the clone keeps no photo",
+                source_key,
+                new_stemma_id,
+            )
+            return None
+        return destination
 
     # ---------- families ----------
 
