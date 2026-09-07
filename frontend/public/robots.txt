@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Invite links carry a single-use token in the query string. They are not
+# content, and the token should not end up in a search index.
+Disallow: /*?inviteToken=
+
+Sitemap: https://stemma.link/sitemap.xml
