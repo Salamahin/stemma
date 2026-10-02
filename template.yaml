@@ -302,12 +302,25 @@ Resources:
         IamRoleArn: !GetAtt BackupRole.Arn
         Resources:
           - !GetAtt StemmaTable.Arn
+  # Explicit log groups for the two app functions so retention is bounded: they carry
+  # per-request usage lines with user emails (see stemma/apps/usage.py).
+  StemmaFunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
+  McpFunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
   StemmaFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: makefile
     Properties:
       Handler: stemma.apps.lambda_main.lambda_handler
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref StemmaFunctionLogs
       # SnapStart is deliberately only on this function — it fronts the UI. A snapshot is
       # billed for as long as the version exists (~$0.005 per GB-hour, around the clock), so
       # every extra published version is a standing charge: VersionDeletionPolicy keeps exactly
@@ -354,6 +367,9 @@ Resources:
       BuildMethod: makefile
     Properties:
       Handler: stemma.apps.mcp_lambda.lambda_handler
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref McpFunctionLogs
       Environment:
         Variables:
           STEMMA_MCP_ISSUER: !Sub "https://${apiAlias}"
@@ -595,6 +611,42 @@ Resources:
                   ["AWS/S3", "BucketSizeBytes", "BucketName", "${PersonPhotoBucket}", "StorageType", "StandardStorage", {"label": "bytes"}],
                   ["AWS/S3", "NumberOfObjects", "BucketName", "${PersonPhotoBucket}", "StorageType", "AllStorageTypes", {"label": "photos"}]
                 ]
+              }
+            },
+            {
+              "type": "log", "x": 0, "y": 24, "width": 12, "height": 8,
+              "properties": {
+                "title": "Top 20 API users",
+                "region": "${AWS::Region}",
+                "view": "table",
+                "query": "SOURCE '${StemmaFunctionLogs}' | filter message = 'usage' | stats count(*) as requests, max(@timestamp) as last_seen by email | sort requests desc | limit 20"
+              }
+            },
+            {
+              "type": "log", "x": 12, "y": 24, "width": 12, "height": 8,
+              "properties": {
+                "title": "Top 20 MCP users",
+                "region": "${AWS::Region}",
+                "view": "table",
+                "query": "SOURCE '${McpFunctionLogs}' | filter message = 'usage' | stats count(*) as requests, max(@timestamp) as last_seen by email | sort requests desc | limit 20"
+              }
+            },
+            {
+              "type": "log", "x": 0, "y": 32, "width": 12, "height": 8,
+              "properties": {
+                "title": "MCP calls by user and tool",
+                "region": "${AWS::Region}",
+                "view": "table",
+                "query": "SOURCE '${McpFunctionLogs}' | filter message = 'usage' | stats count(*) as calls by email, action | sort calls desc | limit 50"
+              }
+            },
+            {
+              "type": "log", "x": 12, "y": 32, "width": 12, "height": 8,
+              "properties": {
+                "title": "Signed-in users per week",
+                "region": "${AWS::Region}",
+                "view": "bar",
+                "query": "SOURCE '${StemmaFunctionLogs}' | SOURCE '${McpFunctionLogs}' | filter message = 'usage' | stats count_distinct(email) as users by bin(1w)"
               }
             }
           ]

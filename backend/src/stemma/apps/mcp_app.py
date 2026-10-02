@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response as FastAp
 
 from stemma.apis.request_handler import RequestHandler
 from stemma.apps.mcp_identity import IdentityProvider
+from stemma.apps.usage import log_usage
 from stemma.domain.codec import decode_request, encode_error, encode_response
 from stemma.domain.errors import StemmaError
 from stemma.domain.user import User
@@ -191,6 +192,7 @@ def build_mcp_app(
             message = await request.json()
         except ValueError:
             return JSONResponse(_rpc_error(None, _PARSE_ERROR, "invalid JSON"))
+        log_usage(transport="mcp", email=outcome.user.email, action=_rpc_action(message))
         reply = await asyncio.to_thread(
             _dispatch_rpc, message, outcome.user, handler, server_version
         )
@@ -219,6 +221,16 @@ def _dispatch_rpc(message: dict, user: User, handler: RequestHandler, server_ver
     if method == "tools/call":
         return _tools_call(msg_id, message.get("params") or {}, user, handler)
     return _rpc_error(msg_id, _METHOD_NOT_FOUND, f"unknown method: {method}")
+
+
+def _rpc_action(message: object) -> str:
+    if not isinstance(message, dict):
+        return "invalid"
+    method = message.get("method")
+    params = message.get("params")
+    if method == "tools/call" and isinstance(params, dict) and isinstance(params.get("name"), str):
+        return params["name"]
+    return method if isinstance(method, str) else "invalid"
 
 
 def _initialize_result(params: dict, server_version: str) -> dict:

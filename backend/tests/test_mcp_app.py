@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import logging
 import secrets
 from urllib.parse import parse_qs, urlparse
 
@@ -239,3 +240,21 @@ def test_authorize_rejects_unknown_client(client: TestClient) -> None:
     )
     assert response.status_code == 400
     assert response.json()["error"] == "unauthorized_client"
+
+
+def test_mcp_calls_are_logged_with_user_email_and_tool(
+    client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    verifier, challenge = _pkce()
+    token = _obtain_token(client, verifier=verifier, challenge=challenge)
+    caplog.set_level(logging.INFO, logger="stemma.usage")
+
+    _rpc(client, token, "tools/list")
+    _rpc(client, token, "tools/call", {"name": "list_stemmas", "arguments": {}}, msg_id=2)
+
+    usage = [
+        (r.transport, r.email, r.action)  # type: ignore[attr-defined]
+        for r in caplog.records
+        if r.name == "stemma.usage"
+    ]
+    assert usage == [("mcp", USER_EMAIL, "tools/list"), ("mcp", USER_EMAIL, "list_stemmas")]
