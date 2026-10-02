@@ -189,7 +189,8 @@ Resources:
   AccessLogs:
     Type: AWS::Logs::LogGroup
     Properties:
-      RetentionInDays: 1
+      # 30 days so the analytics dashboard can count unique visitors per week from these logs.
+      RetentionInDays: 30
   MyApi:
     Type: AWS::Serverless::HttpApi
     Properties:
@@ -216,19 +217,8 @@ Resources:
           HostedZoneId: !Sub "${hostedZoneId}"
       AccessLogSettings:
         DestinationArn: !GetAtt AccessLogs.Arn
-        Format: '{
-        $context.requestId ; $context.authorizer.error ; $context.error.message ; $context.integration.error ; $context.integrationErrorMessage ; $context.integration.integrationStatus
-        "requestId":"$context.requestId", 
-        "ip": "$context.identity.sourceIp",
-         "caller":"$context.identity.caller",
-          "user":"$context.identity.user",
-          "requestTime":"$context.requestTime",
-          "httpMethod":"$context.httpMethod",
-          "resourcePath":"$context.resourcePath",
-          "status":"$context.status",
-          "protocol":"$context.protocol",
-          "responseLength":"$context.responseLength" 
-          }'
+        # Must stay valid JSON: Logs Insights auto-discovers fields (ip, status, ...) only from JSON lines.
+        Format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","userAgent":"$context.identity.userAgent","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","routeKey":"$context.routeKey","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength","integrationStatus":"$context.integration.integrationStatus","integrationError":"$context.integration.error","errorMessage":"$context.error.message"}'
       StageName: dev
   MyLayer:
     Type: AWS::Serverless::LayerVersion
@@ -421,6 +411,193 @@ Resources:
             SecretArn: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/invite-*"
         - DynamoDBCrudPolicy:
             TableName: !Ref StemmaTable
+  TableMetricsFunction:
+    # DynamoDB publishes no table-size metric to CloudWatch; DescribeTable carries size and
+    # item count (refreshed by AWS roughly every 6 hours), so this re-publishes them as two
+    # custom metrics (~$0.30 each per month) for the analytics dashboard.
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Timeout: 10
+      MemorySize: 128
+      InlineCode: |
+        import os
+        import boto3
+
+        dynamodb = boto3.client("dynamodb")
+        cloudwatch = boto3.client("cloudwatch")
+
+
+        def handler(event, context):
+            table = dynamodb.describe_table(TableName=os.environ["STEMMA_TABLE_NAME"])["Table"]
+            dimensions = [{"Name": "TableName", "Value": table["TableName"]}]
+            cloudwatch.put_metric_data(
+                Namespace="Stemma",
+                MetricData=[
+                    {"MetricName": "TableSizeBytes", "Dimensions": dimensions, "Value": table["TableSizeBytes"], "Unit": "Bytes"},
+                    {"MetricName": "ItemCount", "Dimensions": dimensions, "Value": table["ItemCount"], "Unit": "Count"},
+                ],
+            )
+      Events:
+        Every6Hours:
+          Type: Schedule
+          Properties:
+            Schedule: rate(6 hours)
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:DescribeTable
+              Resource: !GetAtt StemmaTable.Arn
+            - Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace: Stemma
+  AnalyticsDashboard:
+    # Unique visitors are distinct client IPs in the API access log: the SPA calls GET /warmup
+    # on every page load, so each visitor hits the API even before signing in.
+    # CloudFront metrics only exist in us-east-1; S3 storage metrics are emitted once a day.
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub "${AWS::StackName}-analytics"
+      DashboardBody: !Sub |
+        {
+          "start": "-P28D",
+          "periodOverride": "inherit",
+          "widgets": [
+            {
+              "type": "log", "x": 0, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "Unique visitors per week (distinct IPs)",
+                "region": "${AWS::Region}",
+                "view": "bar",
+                "query": "SOURCE '${AccessLogs}' | filter ispresent(ip) | stats count_distinct(ip) as visitors by bin(1w)"
+              }
+            },
+            {
+              "type": "log", "x": 12, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "Unique visitors per day (distinct IPs)",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "query": "SOURCE '${AccessLogs}' | filter ispresent(ip) | stats count_distinct(ip) as visitors by bin(1d)"
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 6, "width": 8, "height": 6,
+              "properties": {
+                "title": "Lambda invocations / day",
+                "region": "${AWS::Region}",
+                "view": "timeSeries", "stacked": true, "stat": "Sum", "period": 86400,
+                "metrics": [
+                  ["AWS/Lambda", "Invocations", "FunctionName", "${StemmaFunction}", {"label": "API"}],
+                  ["AWS/Lambda", "Invocations", "FunctionName", "${McpFunction}", {"label": "MCP"}]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 8, "y": 6, "width": 8, "height": 6,
+              "properties": {
+                "title": "Lambda errors & throttles / day",
+                "region": "${AWS::Region}",
+                "view": "timeSeries", "stat": "Sum", "period": 86400,
+                "metrics": [
+                  ["AWS/Lambda", "Errors", "FunctionName", "${StemmaFunction}", {"label": "API errors"}],
+                  ["AWS/Lambda", "Errors", "FunctionName", "${McpFunction}", {"label": "MCP errors"}],
+                  ["AWS/Lambda", "Throttles", "FunctionName", "${StemmaFunction}", {"label": "API throttles"}],
+                  ["AWS/Lambda", "Throttles", "FunctionName", "${McpFunction}", {"label": "MCP throttles"}]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 16, "y": 6, "width": 8, "height": 6,
+              "properties": {
+                "title": "Lambda duration (ms)",
+                "region": "${AWS::Region}",
+                "view": "timeSeries", "period": 86400,
+                "metrics": [
+                  ["AWS/Lambda", "Duration", "FunctionName", "${StemmaFunction}", {"stat": "p50", "label": "API p50"}],
+                  ["AWS/Lambda", "Duration", "FunctionName", "${StemmaFunction}", {"stat": "p95", "label": "API p95"}],
+                  ["AWS/Lambda", "Duration", "FunctionName", "${McpFunction}", {"stat": "p95", "label": "MCP p95"}]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 12, "width": 12, "height": 6,
+              "properties": {
+                "title": "API requests / day",
+                "region": "${AWS::Region}",
+                "view": "timeSeries", "stat": "Sum", "period": 86400,
+                "metrics": [
+                  ["AWS/ApiGateway", "Count", "ApiId", "${MyApi}", {"label": "requests"}],
+                  ["AWS/ApiGateway", "4xx", "ApiId", "${MyApi}", {"label": "4xx"}],
+                  ["AWS/ApiGateway", "5xx", "ApiId", "${MyApi}", {"label": "5xx"}]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 12, "width": 12, "height": 6,
+              "properties": {
+                "title": "CloudFront (site) requests / day",
+                "region": "us-east-1",
+                "view": "timeSeries", "stat": "Sum", "period": 86400,
+                "metrics": [
+                  ["AWS/CloudFront", "Requests", "DistributionId", "${WebAppCDN}", "Region", "Global", {"label": "requests"}],
+                  ["AWS/CloudFront", "BytesDownloaded", "DistributionId", "${WebAppCDN}", "Region", "Global", {"label": "bytes", "yAxis": "right"}]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 18, "width": 6, "height": 6,
+              "properties": {
+                "title": "DynamoDB table size",
+                "region": "${AWS::Region}",
+                "view": "singleValue", "stat": "Maximum", "period": 21600,
+                "metrics": [
+                  ["Stemma", "TableSizeBytes", "TableName", "${StemmaTable}", {"label": "bytes"}],
+                  ["Stemma", "ItemCount", "TableName", "${StemmaTable}", {"label": "items"}]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 6, "y": 18, "width": 6, "height": 6,
+              "properties": {
+                "title": "DynamoDB size over time",
+                "region": "${AWS::Region}",
+                "view": "timeSeries", "stat": "Maximum", "period": 21600,
+                "metrics": [
+                  ["Stemma", "TableSizeBytes", "TableName", "${StemmaTable}", {"label": "bytes"}],
+                  ["Stemma", "ItemCount", "TableName", "${StemmaTable}", {"label": "items", "yAxis": "right"}]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 18, "width": 6, "height": 6,
+              "properties": {
+                "title": "DynamoDB consumed capacity / day",
+                "region": "${AWS::Region}",
+                "view": "timeSeries", "stat": "Sum", "period": 86400,
+                "metrics": [
+                  ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "${StemmaTable}", {"label": "RCU"}],
+                  ["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", "${StemmaTable}", {"label": "WCU"}]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 18, "y": 18, "width": 6, "height": 6,
+              "properties": {
+                "title": "Photo bucket",
+                "region": "${AWS::Region}",
+                "view": "singleValue", "stat": "Average", "period": 86400,
+                "metrics": [
+                  ["AWS/S3", "BucketSizeBytes", "BucketName", "${PersonPhotoBucket}", "StorageType", "StandardStorage", {"label": "bytes"}],
+                  ["AWS/S3", "NumberOfObjects", "BucketName", "${PersonPhotoBucket}", "StorageType", "AllStorageTypes", {"label": "photos"}]
+                ]
+              }
+            }
+          ]
+        }
 
 Outputs:
   ApiEndpoint:
@@ -429,3 +606,6 @@ Outputs:
   McpEndpoint:
     Description: "MCP server endpoint (register a custom connector against this URL)"
     Value: !Sub "https://${apiAlias}/mcp"
+  AnalyticsDashboardUrl:
+    Description: "CloudWatch analytics dashboard"
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards/dashboard/${AWS::StackName}-analytics"
