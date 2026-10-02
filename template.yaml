@@ -413,8 +413,9 @@ Resources:
             TableName: !Ref StemmaTable
   TableMetricsFunction:
     # DynamoDB publishes no table-size metric to CloudWatch; DescribeTable carries size and
-    # item count (refreshed by AWS roughly every 6 hours), so this re-publishes them as two
-    # custom metrics (~$0.30 each per month) for the analytics dashboard.
+    # item count, so this re-publishes them as two custom metrics for the analytics dashboard.
+    # Every 2 days is plenty for a trend line, and custom metrics are billed only for the hours
+    # they receive data, so the sparse schedule keeps them nearly free.
     Type: AWS::Serverless::Function
     Properties:
       Handler: index.handler
@@ -439,10 +440,10 @@ Resources:
                 ],
             )
       Events:
-        Every6Hours:
+        Every2Days:
           Type: Schedule
           Properties:
-            Schedule: rate(6 hours)
+            Schedule: rate(2 days)
       Policies:
         - Statement:
             - Effect: Allow
@@ -553,7 +554,7 @@ Resources:
               "properties": {
                 "title": "DynamoDB table size",
                 "region": "${AWS::Region}",
-                "view": "singleValue", "stat": "Maximum", "period": 21600,
+                "view": "singleValue", "stat": "Maximum", "period": 86400,
                 "metrics": [
                   ["Stemma", "TableSizeBytes", "TableName", "${StemmaTable}", {"label": "bytes"}],
                   ["Stemma", "ItemCount", "TableName", "${StemmaTable}", {"label": "items"}]
@@ -565,7 +566,7 @@ Resources:
               "properties": {
                 "title": "DynamoDB size over time",
                 "region": "${AWS::Region}",
-                "view": "timeSeries", "stat": "Maximum", "period": 21600,
+                "view": "timeSeries", "stat": "Maximum", "period": 86400,
                 "metrics": [
                   ["Stemma", "TableSizeBytes", "TableName", "${StemmaTable}", {"label": "bytes"}],
                   ["Stemma", "ItemCount", "TableName", "${StemmaTable}", {"label": "items", "yAxis": "right"}]
