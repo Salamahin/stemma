@@ -1,3 +1,6 @@
+import logging
+
+import pytest
 from fastapi.testclient import TestClient
 
 from stemma.apis.request_handler import RequestHandler
@@ -245,3 +248,36 @@ def test_deleting_the_favourite_stemma_clears_the_mark(
         "/stemma", headers={"Origin": ALLOWED_ORIGIN}, json=_list_payload()
     ).json()
     assert listed["favouriteStemmaId"] is None
+
+
+def _usage(caplog: pytest.LogCaptureFixture) -> list[tuple[str, str, str]]:
+    return [
+        (r.transport, r.email, r.action)  # type: ignore[attr-defined]
+        for r in caplog.records
+        if r.name == "stemma.usage"
+    ]
+
+
+def test_authenticated_requests_are_logged_with_user_email(
+    storage: StorageService, users: UserService, dynamo_table, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger="stemma.usage")
+    client = _client(storage, users, dynamo_table)
+    _login(client, "bob@example.com")
+    client.post("/stemma", headers={"Origin": ALLOWED_ORIGIN}, json=_list_payload())
+
+    assert _usage(caplog) == [
+        ("api", "bob@example.com", "AuthLoginRequest"),
+        ("api", "bob@example.com", "ListDescribeStemmasRequest"),
+    ]
+
+
+def test_unauthenticated_requests_are_not_logged(
+    storage: StorageService, users: UserService, dynamo_table, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger="stemma.usage")
+    client = _client(storage, users, dynamo_table)
+    response = client.post("/stemma", headers={"Origin": ALLOWED_ORIGIN}, json=_list_payload())
+
+    assert response.status_code == 401
+    assert _usage(caplog) == []

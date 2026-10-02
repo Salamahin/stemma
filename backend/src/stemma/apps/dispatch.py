@@ -15,6 +15,7 @@ from typing import Any
 from uuid import uuid4
 
 from stemma.apis.request_handler import RequestHandler
+from stemma.apps.usage import log_usage
 from stemma.domain.codec import decode_request, encode_error, encode_response
 from stemma.domain.errors import RequestDeserializationProblem, StemmaError, UnknownError
 from stemma.domain.requests import AuthLoginRequest, AuthLogoutRequest
@@ -68,6 +69,7 @@ def dispatch_payload(
         except Exception as e:
             logger.warning("login failed: %s", e)
             return DispatchResult(status_code=401, body=None)
+        log_usage(transport="api", email=outcome.user.email, action=type(request).__name__)
         return DispatchResult(
             status_code=200,
             body=encode_response(
@@ -93,6 +95,7 @@ def dispatch_payload(
     if outcome is None:
         return DispatchResult(status_code=401, body=None)
 
+    log_usage(transport="api", email=outcome.user.email, action=type(request).__name__)
     try:
         response = handler.handle(outcome.user, request)
         return DispatchResult(status_code=200, body=encode_response(response))
