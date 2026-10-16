@@ -22,6 +22,11 @@ export type LayoutWorkerRequest =
           start: boolean;
           /** true: replace unfixed positions with the structured seed (cold start). */
           seed: boolean;
+          /** Clan index per node (-1: none): clan regions for the seed and for weak cross-clan links. */
+          groups: Int32Array;
+          /** Remembered anchors (NaN: none). */
+          ax: Float64Array;
+          ay: Float64Array;
       }
     | { type: "fixed"; gen: number; fx: Float64Array; fy: Float64Array }
     | { type: "pin"; gen: number; index: number; fx: number | null; fy: number | null }
@@ -30,6 +35,18 @@ export type LayoutWorkerRequest =
     | { type: "settle"; gen: number; ticks: number };
 
 export type LayoutWorkerResponse =
-    | { type: "positions"; gen: number; ticks: number; alpha: number; x: Float64Array; y: Float64Array; vx: Float64Array; vy: Float64Array }
+    | {
+          type: "positions";
+          gen: number;
+          ticks: number;
+          alpha: number;
+          x: Float64Array;
+          y: Float64Array;
+          vx: Float64Array;
+          vy: Float64Array;
+          /** Present right after a structured seed: the new anchors. */
+          ax?: Float64Array;
+          ay?: Float64Array;
+      }
     | { type: "end"; gen: number }
     | { type: "error"; message: string };

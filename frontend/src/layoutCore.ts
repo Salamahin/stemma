@@ -55,16 +55,69 @@ export type LayoutNode = {
     fy?: number | null;
     r?: number;
     index?: number;
+    /** Anchor the layout pulls the node towards (see applyLayoutForces). */
+    ax?: number;
+    ay?: number;
+    /** Clan region (structured seed); links across regions pull weakly. */
+    region?: number;
 };
+
+/**
+ * Anchor nodes that have none at their current position. Anchors are stable:
+ * set by the structured seed (or where a node first appeared / was dropped),
+ * remembered with the layout, and not reset when the layout comes to rest —
+ * resetting them would drop the spring tension that balances repulsion and
+ * the graph would grow a little on every refine.
+ */
+export function anchorWhereMissing(nodes: LayoutNode[]) {
+    for (const d of nodes) {
+        if (d.ax == null || !Number.isFinite(d.ax)) d.ax = d.x;
+        if (d.ay == null || !Number.isFinite(d.ay)) d.ay = d.y;
+    }
+}
 
 export type LayoutLink = { source: string | LayoutNode; target: string | LayoutNode };
 
+/**
+ * Pull towards a node's anchor (`ax`/`ay`: where the layout started or last
+ * came to rest). Replaces the old pull to the viewport centre for anchored
+ * nodes: that pull is what squeezed a spread-out layout back into a disc
+ * where the surname clouds merge. Unanchored nodes keep the centre pull.
+ */
+export const LAYOUT_ANCHOR_STRENGTH = 0.05;
+/**
+ * Links between nodes of different clan regions (`region`, set by the
+ * structured seed) pull much more weakly than links inside a region, so
+ * related clans stay next to each other without being dragged into one
+ * another (which is what merged their surname clouds).
+ */
+let crossRegionLinkStrength = 0.005;
+/** Tuning hook for e2e/bench/seedExperiment.mjs. */
+export function setCrossRegionLinkStrength(v: number) {
+    crossRegionLinkStrength = v;
+}
+const LINK_STRENGTH = 2;
+const CENTER_STRENGTH = 0.05;
+
 /** The forces every layout of the stemma uses (main layout and ghost burst alike). */
 export function applyLayoutForces(sim: d3.Simulation<any, any>, links: LayoutLink[], width: number, height: number) {
+    const cx = width * 0.5;
+    const cy = height * 0.5;
     return sim
-        .force("link", d3.forceLink(links as any).id((n: any) => n.id).strength(2).distance(85))
-        .force("x", d3.forceX().x(width * 0.5).strength(0.05))
-        .force("y", d3.forceY().y(height * 0.5).strength(0.05))
+        .force(
+            "link",
+            d3
+                .forceLink(links as any)
+                .id((n: any) => n.id)
+                .strength((l: any) => {
+                    const a = l.source?.region;
+                    const b = l.target?.region;
+                    return a != null && b != null && a >= 0 && b >= 0 && a !== b ? crossRegionLinkStrength : LINK_STRENGTH;
+                })
+                .distance(85),
+        )
+        .force("x", d3.forceX<any>().x((d) => d.ax ?? cx).strength((d) => (d.ax != null ? LAYOUT_ANCHOR_STRENGTH : CENTER_STRENGTH)))
+        .force("y", d3.forceY<any>().y((d) => d.ay ?? cy).strength((d) => (d.ay != null ? LAYOUT_ANCHOR_STRENGTH : CENTER_STRENGTH)))
         .force("collide", forceCollideSized((d: any) => d.r * 20) as any)
         .force("repelForce", d3.forceManyBody().strength(-1500).distanceMin(85).theta(LAYOUT_THETA));
 }

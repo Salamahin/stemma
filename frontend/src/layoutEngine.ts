@@ -8,9 +8,9 @@
  * writes positions into them as the layout progresses, except for nodes the
  * main thread holds fixed (fx/fy), which stay main-thread authoritative.
  */
-import { createLayoutSimulation, LayoutLoop, type LayoutNode, type Scheduler } from "./layoutCore";
+import { anchorWhereMissing, createLayoutSimulation, LayoutLoop, type LayoutNode, type Scheduler } from "./layoutCore";
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from "./layoutProtocol";
-import { applyStructuredSeed } from "./structuredLayout";
+import { applyStructuredSeed, clanRegions } from "./structuredLayout";
 
 export type EngineNode = LayoutNode;
 export type EngineLink = { source: string | EngineNode; target: string | EngineNode };
@@ -30,7 +30,7 @@ export interface LayoutEngine {
      * With `seed`, unfixed nodes first get the structured starting layout
      * (cold start); `onTick(0)` reports the seeded positions.
      */
-    setGraph(nodes: EngineNode[], links: EngineLink[], alpha: number, start?: boolean, seed?: boolean): void;
+    setGraph(nodes: EngineNode[], links: EngineLink[], alpha: number, start?: boolean, seed?: boolean, groups?: Int32Array): void;
     /** Re-send every node's fx/fy after the caller changed pins in bulk. */
     syncFixed(): void;
     /** Re-send one node's fx/fy (drag). */
@@ -60,18 +60,15 @@ export class InlineLayoutEngine implements LayoutEngine {
 
     constructor(readonly center: [number, number], private cb: LayoutCallbacks, private scheduler: Scheduler = mainThreadScheduler) {}
 
-    setGraph(nodes: EngineNode[], links: EngineLink[], alpha: number, start = true, seed = false) {
-        if (seed) {
-            const index = new Map(nodes.map((d, i) => [d.id, i]));
-            const idOf = (e: string | EngineNode) => (typeof e === "string" ? e : e.id);
-            const pairs: number[] = [];
-            for (const l of links) {
-                const s = index.get(idOf(l.source));
-                const t = index.get(idOf(l.target));
-                if (s != null && t != null) pairs.push(s, t);
-            }
-            applyStructuredSeed(nodes, pairs, this.center);
+    setGraph(nodes: EngineNode[], links: EngineLink[], alpha: number, start = true, seed = false, groups?: Int32Array) {
+        const pairs = linkPairs(nodes, links);
+        const g = groups && groups.length === nodes.length ? groups : undefined;
+        if (seed) applyStructuredSeed(nodes, pairs, this.center, g);
+        else if (g) {
+            const region = clanRegions(nodes.length, pairs, g);
+            nodes.forEach((d, i) => (d.region = region[i]));
         }
+        anchorWhereMissing(nodes);
         if (!this.sim) {
             this.sim = createLayoutSimulation(nodes, links as any, this.center[0] * 2, this.center[1] * 2);
             this.loop = new LayoutLoop(this.sim, this.scheduler, INLINE_BUDGET_MS, (t) => this.cb.onTick(t), () => this.cb.onEnd());
@@ -89,7 +86,13 @@ export class InlineLayoutEngine implements LayoutEngine {
         // Nodes are shared with the caller: nothing to send.
     }
 
-    pin(_node: EngineNode) {}
+    pin(node: EngineNode) {
+        // released after a drag: it now belongs where it was dropped
+        if (node.fx == null) {
+            node.ax = node.x;
+            node.ay = node.y;
+        }
+    }
 
     run(opts: { alpha?: number; alphaTarget?: number }) {
         if (!this.sim || !this.loop) return;
@@ -130,6 +133,7 @@ export class WorkerLayoutEngine implements LayoutEngine {
     private running = false;
     private alpha = 1;
     private fallback: InlineLayoutEngine | null = null;
+    private groups: Int32Array | undefined;
 
     constructor(readonly center: [number, number], private cb: LayoutCallbacks, private worker: Worker) {
         worker.onmessage = (e: MessageEvent<LayoutWorkerResponse>) => this.receive(e.data);
@@ -155,7 +159,7 @@ export class WorkerLayoutEngine implements LayoutEngine {
         this.fallback = new InlineLayoutEngine(this.center, this.cb);
         if (this.nodes.length) {
             this.resolveLinksInPlace();
-            this.fallback.setGraph(this.nodes, this.links, this.running ? Math.max(this.alpha, 0.1) : 0);
+            this.fallback.setGraph(this.nodes, this.links, this.running ? Math.max(this.alpha, 0.1) : 0, true, false, this.groups);
             if (!this.running) this.fallback.stop();
         }
     }
@@ -179,12 +183,13 @@ export class WorkerLayoutEngine implements LayoutEngine {
         return { fx, fy };
     }
 
-    setGraph(nodes: EngineNode[], links: EngineLink[], alpha: number, start = true, seed = false) {
+    setGraph(nodes: EngineNode[], links: EngineLink[], alpha: number, start = true, seed = false, groups?: Int32Array) {
         this.nodes = nodes;
         this.links = links;
         this.alpha = alpha;
         this.running = start;
-        if (this.fallback) return this.fallback.setGraph(nodes, links, alpha, start, seed);
+        this.groups = groups;
+        if (this.fallback) return this.fallback.setGraph(nodes, links, alpha, start, seed, groups);
         this.gen++;
         const n = nodes.length;
         const index = new Map(nodes.map((d, i) => [d.id, i]));
@@ -207,6 +212,9 @@ export class WorkerLayoutEngine implements LayoutEngine {
             if (s != null && t != null) pairs.push(s, t);
         }
         const linkIdx = new Int32Array(pairs);
+        const groupArr = groups && groups.length === n ? Int32Array.from(groups) : new Int32Array(0);
+        const axArr = Float64Array.from(nodes, (d) => (d.ax != null && Number.isFinite(d.ax) ? d.ax : NaN));
+        const ayArr = Float64Array.from(nodes, (d) => (d.ay != null && Number.isFinite(d.ay) ? d.ay : NaN));
         this.post(
             {
                 type: "graph",
@@ -219,8 +227,11 @@ export class WorkerLayoutEngine implements LayoutEngine {
                 alpha,
                 start,
                 seed,
+                groups: groupArr,
+                ax: axArr,
+                ay: ayArr,
             },
-            [x.buffer, y.buffer, vx.buffer, vy.buffer, fx.buffer, fy.buffer, linkIdx.buffer],
+            [x.buffer, y.buffer, vx.buffer, vy.buffer, fx.buffer, fy.buffer, linkIdx.buffer, groupArr.buffer, axArr.buffer, ayArr.buffer],
         );
     }
 
@@ -231,7 +242,12 @@ export class WorkerLayoutEngine implements LayoutEngine {
     }
 
     pin(node: EngineNode) {
-        if (this.fallback) return;
+        // released after a drag: it now belongs where it was dropped
+        if (node.fx == null) {
+            node.ax = node.x;
+            node.ay = node.y;
+        }
+        if (this.fallback) return this.fallback.pin(node);
         const i = this.nodes.indexOf(node);
         if (i < 0) return;
         this.post({ type: "pin", gen: this.gen, index: i, fx: node.fx ?? null, fy: node.fy ?? null });
@@ -282,6 +298,13 @@ export class WorkerLayoutEngine implements LayoutEngine {
                     d.vy = vy[i];
                 }
             }
+            if (msg.ax && msg.ay) {
+                // positions right after a structured seed: also the anchors
+                for (let i = 0; i < nodes.length && i < msg.ax.length; i++) {
+                    if (Number.isFinite(msg.ax[i])) nodes[i].ax = msg.ax[i];
+                    if (Number.isFinite(msg.ay[i])) nodes[i].ay = msg.ay[i];
+                }
+            }
             this.alpha = msg.alpha;
             this.cb.onTick(msg.ticks);
         } else if (msg.type === "end") {
@@ -298,6 +321,19 @@ export class WorkerLayoutEngine implements LayoutEngine {
         }
         this.fallback?.destroy();
     }
+}
+
+/** [source, target] node-index pairs of `links`. */
+function linkPairs(nodes: EngineNode[], links: EngineLink[]): number[] {
+    const index = new Map(nodes.map((d, i) => [d.id, i]));
+    const idOf = (e: string | EngineNode) => (typeof e === "string" ? e : e.id);
+    const pairs: number[] = [];
+    for (const l of links) {
+        const s = index.get(idOf(l.source));
+        const t = index.get(idOf(l.target));
+        if (s != null && t != null) pairs.push(s, t);
+    }
+    return pairs;
 }
 
 /**

@@ -133,6 +133,21 @@ describe("NodeLayoutCache", () => {
         }
     });
 
+    test("layout anchors are remembered with the positions (and shifted with the centre)", () => {
+        const cache = new NodeLayoutCache("stemma-a");
+        cache.load([500, 400]);
+        cache.set("n1", 10, 20, 0, 0, 100, 200);
+        cache.set("n2", 30, 40);
+        cache.save();
+        const same = new NodeLayoutCache("stemma-a");
+        same.load([500, 400]);
+        expect(same.get("n1")).toEqual({ x: 10, y: 20, vx: 0, vy: 0, ax: 100, ay: 200 });
+        expect(same.get("n2")).toEqual({ x: 30, y: 40, vx: 0, vy: 0 });
+        const moved = new NodeLayoutCache("stemma-a");
+        moved.load([600, 400]);
+        expect(moved.get("n1")).toEqual({ x: 110, y: 20, vx: 0, vy: 0, ax: 200, ay: 200 });
+    });
+
     test("retain prunes nodes that no longer exist (removed people do not linger)", () => {
         const cache = new NodeLayoutCache("stemma-1");
         cache.set("keep", 1, 1);

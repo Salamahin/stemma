@@ -184,7 +184,7 @@ describe("LayoutWorkerHost", () => {
     test("reports thrown errors instead of dying silently", () => {
         const out: LayoutWorkerResponse[] = [];
         const host = new LayoutWorkerHost((m) => out.push(m), manualScheduler().scheduler);
-        host.handle({ type: "graph", gen: 1, ids: ["a"], x: null as any, y: null as any, vx: null as any, vy: null as any, fx: null as any, fy: null as any, links: new Int32Array(), width: 1, height: 1, alpha: 1, start: true, seed: false });
+        host.handle({ type: "graph", gen: 1, ids: ["a"], x: null as any, y: null as any, vx: null as any, vy: null as any, fx: null as any, fy: null as any, links: new Int32Array(), width: 1, height: 1, alpha: 1, start: true, seed: false, groups: new Int32Array(), ax: new Float64Array(), ay: new Float64Array() });
         expect(out[0].type).toBe("error");
     });
 });

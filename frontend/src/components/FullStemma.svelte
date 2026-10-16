@@ -25,7 +25,7 @@
     import { exportChartSvg } from "../svgExport";
     import { personDisplayName } from "../personDisplayName";
     import { t } from "../i18n";
-    import { computeClans } from "../clans";
+    import { computeClans, type Clan } from "../clans";
     import { CanvasChart, type ChartNode, type ChartLink } from "../canvasChart";
 
     type Props = {
@@ -105,7 +105,8 @@
             const displayPeople = people.map((p) => ({ ...p, name: personDisplayName(p.name, $t) }));
             const [nodes, relations] = makeNodesAndRelations(displayPeople, families);
             const initialPositions = computeInitialLayout(stemmaIndex, people, families, window.innerWidth, window.innerHeight);
-            reconfigureGraph(chart, nodes, relations, initialPositions, computeClans({ type: "Stemma", people, families }));
+            const clans = computeClans({ type: "Stemma", people, families });
+            reconfigureGraph(chart, nodes, relations, initialPositions, clans, clanGroups(nodes, clans));
         }
     });
 
@@ -300,6 +301,38 @@
         if (!chart) return;
         chart.layoutLabels();
         chart.updateClans();
+        if (revealAfterLayout) {
+            revealAfterLayout = false;
+            revealNearestNode(chart);
+        }
+    }
+
+    /** Set on a cold start: once laid out, make sure the view is not empty. */
+    let revealAfterLayout = false;
+    let revealedStemmaId: string | null = null;
+
+    /**
+     * A freshly laid-out stemma can leave the viewport centre in a gap
+     * between clan regions; pan (keeping the zoom) to the nearest person.
+     */
+    function revealNearestNode(c: CanvasChart) {
+        const t = c.transform;
+        const [x0, y0] = t.invert([0, 0]);
+        const [x1, y1] = t.invert([c.width, c.height]);
+        const cx = (x0 + x1) / 2;
+        const cy = (y0 + y1) / 2;
+        let best: ChartNode | null = null;
+        let bestD = Infinity;
+        for (const n of c.nodes) {
+            if (n.x >= x0 && n.x <= x1 && n.y >= y0 && n.y <= y1) return;
+            if (n.type !== "person") continue;
+            const d = (n.x - cx) ** 2 + (n.y - cy) ** 2;
+            if (d < bestD) {
+                bestD = d;
+                best = n;
+            }
+        }
+        if (best) applyZoomTranslate(c.width / 2 - t.k * best.x, c.height / 2 - t.k * best.y);
     }
 
     /** d3.forceLink used to swap link ids for node objects; the renderer relies on that. */
@@ -318,7 +351,20 @@
      */
     const WARM_START_MIN_KNOWN = 0.5;
 
-    function reconfigureGraph(chart: CanvasChart, nodes: any[], relations: any[], initialPositions: any, clans: any[]) {
+    /** Clan index per node (largest clan for people in several, -1 for none). */
+    function clanGroups(nodes: ChartNode[], clans: Clan[]): Int32Array {
+        const best = new Map<string, number>();
+        clans.forEach((c, i) => {
+            for (const pid of c.personIds) {
+                const id = normalizeId("person", pid);
+                const prev = best.get(id);
+                if (prev == null || clans[prev].personIds.size < c.personIds.size) best.set(id, i);
+            }
+        });
+        return Int32Array.from(nodes, (n) => best.get(n.id) ?? -1);
+    }
+
+    function reconfigureGraph(chart: CanvasChart, nodes: any[], relations: any[], initialPositions: any, clans: Clan[], groups: Int32Array) {
         assignInitialPositions(nodes, window.innerWidth, window.innerHeight, initialPositions, pinnedPeople);
 
         // Reopened / edited stemma: nodes with a remembered position (pin,
@@ -359,9 +405,18 @@
         // Cold start: the engine (worker) computes a structured starting
         // layout first; draw nothing until those positions arrive.
         const seed = !warm;
-        if (seed) chart.hold();
+        // A newly opened stemma must not open on an empty patch of canvas:
+        // remembered layouts can be checked right away, fresh ones once laid out.
+        const opened = revealedStemmaId !== currentStemmaId;
+        revealedStemmaId = currentStemmaId;
+        if (seed) {
+            chart.hold();
+            revealAfterLayout = opened || revealAfterLayout;
+        } else if (opened) {
+            revealNearestNode(chart);
+        }
         if (simulationActive) {
-            engine.setGraph(nodes, links, alpha, true, seed);
+            engine.setGraph(nodes, links, alpha, true, seed, groups);
         } else {
             // Sim inactive (edit mode): pin every node that already had a known
             // position so the 80-tick settle only lays out genuinely new nodes,
@@ -372,7 +427,7 @@
                     d.fy = d.y;
                 }
             }
-            engine.setGraph(nodes, links, alpha, false, seed);
+            engine.setGraph(nodes, links, alpha, false, seed, groups);
             engine.settle(80);
         }
     }

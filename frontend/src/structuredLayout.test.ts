@@ -1,4 +1,4 @@
-import { structuredLayout } from "./structuredLayout";
+import { structuredLayout, clanRegions } from "./structuredLayout";
 import { createLayoutSimulation } from "./layoutCore";
 import { syntheticGraph } from "./layoutTestFixtures";
 
@@ -107,5 +107,75 @@ describe("structuredLayout", () => {
         const rows = run("rows");
         const structured = run("structured");
         expect(structured).toBeLessThan(rows * 0.6);
+    });
+});
+
+describe("clan regions", () => {
+    // Two lineages (clans A and B) joined by one marriage: a0 (A) marries b0 (B).
+    function twoClans(size: number) {
+        const ids: string[] = [];
+        const pairs: number[] = [];
+        const groups: number[] = [];
+        const add = (id: string, g: number) => {
+            ids.push(id);
+            groups.push(g);
+            return ids.length - 1;
+        };
+        const lineage = (tag: string, g: number) => {
+            let parent = add(`person_${tag}0`, g);
+            const first = parent;
+            for (let i = 1; i < size; i++) {
+                const spouse = add(`person_${tag}s${i}`, -1);
+                const fam = add(`family_${tag}${i}`, -1);
+                const child = add(`person_${tag}${i}`, g);
+                pairs.push(parent, fam, spouse, fam, fam, child);
+                parent = child;
+            }
+            return first;
+        };
+        const a = lineage("a", 0);
+        const b = lineage("b", 1);
+        const m = add("family_ab", -1);
+        pairs.push(a, m, b, m);
+        return { ids, links: Int32Array.from(pairs), groups: Int32Array.from(groups) };
+    }
+
+    test("the layout opens on people: a node sits exactly at the requested centre", () => {
+        const { ids, links, groups } = twoClans(80);
+        const { x, y } = structuredLayout({ ids, links, center: [700, 450], groups });
+        let best = Infinity;
+        for (let i = 0; i < ids.length; i++) best = Math.min(best, Math.hypot(x[i] - 700, y[i] - 450));
+        expect(best).toBeLessThan(1e-6);
+    });
+
+    test("clanRegions: every node joins the nearest clan", () => {
+        const { ids, links, groups } = twoClans(5);
+        const region = clanRegions(ids.length, links, groups);
+        ids.forEach((id, i) => {
+            if (id.startsWith("person_as") || (id.startsWith("family_a") && id !== "family_ab")) expect(region[i]).toBe(0);
+            if (id.startsWith("person_bs") || id.startsWith("family_b")) expect(region[i]).toBe(1);
+        });
+        expect(Array.from(region).every((r) => r >= 0)).toBe(true);
+    });
+
+    test("clans mode keeps each clan in its own region, apart from the other", () => {
+        const { ids, links, groups } = twoClans(120);
+        const { x, y, region } = structuredLayout({ ids, links, center: [0, 0], groups });
+        const box = (g: number) => {
+            const xs: number[] = [];
+            const ys: number[] = [];
+            ids.forEach((_, i) => {
+                if (groups[i] === g) {
+                    xs.push(x[i]);
+                    ys.push(y[i]);
+                }
+            });
+            return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+        };
+        const A = box(0);
+        const B = box(1);
+        const disjoint = A.x1 < B.x0 || B.x1 < A.x0 || A.y1 < B.y0 || B.y1 < A.y0;
+        expect(disjoint).toBe(true);
+        expect(new Set(Array.from(region)).size).toBe(2);
     });
 });

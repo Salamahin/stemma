@@ -150,3 +150,55 @@ describe("LayoutLoop", () => {
         expect(loop.isRunning).toBe(false);
     });
 });
+
+describe("anchors and clan regions in the layout forces", () => {
+    const pair = (regionA?: number, regionB?: number) => {
+        const a: any = { id: "person_a", x: 0, y: 0, region: regionA };
+        const b: any = { id: "family_b", x: 1000, y: 0, region: regionB };
+        const sim = createLayoutSimulation([a, b], [{ source: "person_a", target: "family_b" }], 0, 0);
+        sim.alpha(1).tick();
+        return Math.abs(a.x); // how far the link dragged `a` towards `b`
+    };
+
+    test("links across clan regions pull far more weakly than links inside one", () => {
+        const inside = pair(1, 1);
+        const across = pair(1, 2);
+        expect(across).toBeLessThan(inside / 20);
+    });
+
+    test("an anchored node is pulled to its anchor, not to the viewport centre", () => {
+        const lone: any = { id: "person_x", x: 5000, y: 5000, ax: 5000, ay: 5000 };
+        const free: any = { id: "person_y", x: -5000, y: -5000 };
+        const sim = createLayoutSimulation([lone, free], [], 0, 0);
+        for (let i = 0; i < 50; i++) sim.tick();
+        // the free node drifts towards the centre (0,0); the anchored one stays home
+        expect(Math.hypot(free.x, free.y)).toBeLessThan(Math.hypot(5000, 5000) * 0.9);
+        expect(Math.hypot(lone.x - 5000, lone.y - 5000)).toBeLessThan(Math.hypot(free.x + 5000, free.y + 5000));
+    });
+
+    test("engines anchor nodes where they start; anchors stay put when the layout comes to rest", () => {
+        const m = manualScheduler(1);
+        const engine = new InlineLayoutEngine([0, 0], { onTick: () => {}, onEnd: () => {} }, m.scheduler);
+        const { nodes, links } = syntheticGraph(40);
+        const start = nodes.map((n: any) => [n.x, n.y]);
+        engine.setGraph(nodes, links, 1);
+        expect(nodes.every((n: any, i: number) => n.ax === start[i][0] && n.ay === start[i][1])).toBe(true);
+        m.runAll();
+        expect(engine.isRunning()).toBe(false);
+        expect(nodes.every((n: any, i: number) => n.ax === start[i][0] && n.ay === start[i][1])).toBe(true);
+        // a remembered anchor is kept as is
+        const kept: any = nodes[1];
+        kept.ax = 4242;
+        kept.ay = 2424;
+        engine.setGraph(nodes, links, 0.02);
+        expect([kept.ax, kept.ay]).toEqual([4242, 2424]);
+        // a node released after a drag stays where it was dropped
+        const dragged: any = nodes[0];
+        dragged.fx = dragged.x = 777;
+        dragged.fy = dragged.y = 888;
+        dragged.fx = null;
+        dragged.fy = null;
+        engine.pin(dragged);
+        expect([dragged.ax, dragged.ay]).toEqual([777, 888]);
+    });
+});

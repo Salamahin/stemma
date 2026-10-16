@@ -37,10 +37,11 @@ function quality(snap) {
   const lens = segs.map((g) => Math.hypot(g.x2 - g.x1, g.y2 - g.y1)).sort((a, b) => a - b);
   const bucket = Math.max(200, lens[Math.floor(lens.length * 0.9)] || 200);
   const sg = new Map();
+  const longSegs = [];
   segs.forEach((g, i) => {
     const x0 = Math.floor(Math.min(g.x1, g.x2) / bucket), x1 = Math.floor(Math.max(g.x1, g.x2) / bucket);
     const y0 = Math.floor(Math.min(g.y1, g.y2) / bucket), y1 = Math.floor(Math.max(g.y1, g.y2) / bucket);
-    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 400) return; // absurdly long edge: skip bucketing cost
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 400) { longSegs.push(i); return; } // long edge: checked against all edges below // absurdly long edge: skip bucketing cost
     for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
       const k = `${x}:${y}`;
       (sg.get(k) ?? sg.set(k, []).get(k)).push(i);
@@ -61,6 +62,13 @@ function quality(snap) {
       const o3 = orient(q.x1, q.y1, q.x2, q.y2, p.x1, p.y1), o4 = orient(q.x1, q.y1, q.x2, q.y2, p.x2, p.y2);
       if (o1 * o2 < 0 && o3 * o4 < 0) crossings++;
     }
+  }
+  const longSet = new Set(longSegs);
+  for (const i of longSegs) for (let j = 0; j < segs.length; j++) {
+    if (j === i || (longSet.has(j) && j < i)) continue;
+    const p = segs[i], q = segs[j];
+    if (p.s === q.s || p.s === q.t || p.t === q.s || p.t === q.t) continue;
+    if (orient(p.x1, p.y1, p.x2, p.y2, q.x1, q.y1) * orient(p.x1, p.y1, p.x2, p.y2, q.x2, q.y2) < 0 && orient(q.x1, q.y1, q.x2, q.y2, p.x1, p.y1) * orient(q.x1, q.y1, q.x2, q.y2, p.x2, p.y2) < 0) crossings++;
   }
   const xs = snap.nodes.map((n) => n.x), ys = snap.nodes.map((n) => n.y);
   return {

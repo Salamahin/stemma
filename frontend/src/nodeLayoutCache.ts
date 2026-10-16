@@ -3,6 +3,9 @@ export type CachedNodeState = {
     y: number;
     vx: number;
     vy: number;
+    /** Layout anchor (see layoutCore.anchorWhereMissing); absent in older payloads. */
+    ax?: number;
+    ay?: number;
 };
 
 const SAVE_DEBOUNCE_MS = 500;
@@ -61,12 +64,17 @@ export class NodeLayoutCache {
                 if (!entry || typeof entry !== "object") continue;
                 const e = entry as Partial<CachedNodeState>;
                 if (!finiteIn(e.x, MAX_ABS_COORD) || !finiteIn(e.y, MAX_ABS_COORD)) continue;
-                this.items.set(id, {
+                const state: CachedNodeState = {
                     x: e.x + dx,
                     y: e.y + dy,
                     vx: finiteIn(e.vx, MAX_ABS_VELOCITY) ? e.vx : 0,
                     vy: finiteIn(e.vy, MAX_ABS_VELOCITY) ? e.vy : 0,
-                });
+                };
+                if (finiteIn(e.ax, MAX_ABS_COORD) && finiteIn(e.ay, MAX_ABS_COORD)) {
+                    state.ax = e.ax + dx;
+                    state.ay = e.ay + dy;
+                }
+                this.items.set(id, state);
             }
         } catch {
             // ignore corrupted storage
@@ -99,14 +107,19 @@ export class NodeLayoutCache {
         return this.items.get(nodeId) ?? null;
     }
 
-    set(nodeId: string, x: number, y: number, vx = 0, vy = 0) {
+    set(nodeId: string, x: number, y: number, vx = 0, vy = 0, ax?: number, ay?: number) {
         if (!finiteIn(x, MAX_ABS_COORD) || !finiteIn(y, MAX_ABS_COORD)) return;
-        this.items.set(nodeId, {
+        const state: CachedNodeState = {
             x,
             y,
             vx: finiteIn(vx, MAX_ABS_VELOCITY) ? vx : 0,
             vy: finiteIn(vy, MAX_ABS_VELOCITY) ? vy : 0,
-        });
+        };
+        if (finiteIn(ax, MAX_ABS_COORD) && finiteIn(ay, MAX_ABS_COORD)) {
+            state.ax = ax;
+            state.ay = ay;
+        }
+        this.items.set(nodeId, state);
         this.scheduleSave();
     }
 

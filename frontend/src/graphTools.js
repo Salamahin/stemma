@@ -34,6 +34,8 @@ export function makeNodesAndRelations(people, families) {
 }
 
 let sessionPositions = new Map()
+/** Layout anchors seen this session (see layoutCore.anchorWhereMissing). */
+let sessionAnchors = new Map()
 let cachedStemmaId = null
 let activeLayoutCache = null
 
@@ -44,6 +46,7 @@ export function setSessionPosition(nodeId, x, y) {
 export function resetSessionPositions(stemmaId) {
     if (cachedStemmaId !== stemmaId) {
         sessionPositions = new Map()
+        sessionAnchors = new Map()
         cachedStemmaId = stemmaId
     }
 }
@@ -57,7 +60,8 @@ export function recordPositions(nodes) {
     for (const d of nodes) {
         if (d.type !== "person" && d.type !== "family") continue;
         sessionPositions.set(d.id, [d.x, d.y]);
-        if (activeLayoutCache) activeLayoutCache.set(d.id, d.x, d.y, d.vx ?? 0, d.vy ?? 0);
+        if (d.ax != null && d.ay != null) sessionAnchors.set(d.id, [d.ax, d.ay]);
+        if (activeLayoutCache) activeLayoutCache.set(d.id, d.x, d.y, d.vx ?? 0, d.vy ?? 0, d.ax, d.ay);
     }
 }
 
@@ -104,10 +108,19 @@ export function assignInitialPositions(nodes, width, height, initialPositions, p
                 const cached = activeLayoutCache.get(n.id);
                 pos = [cached.x, cached.y];
                 vel = [cached.vx, cached.vy];
+                if (cached.ax != null && cached.ay != null) {
+                    n.ax = cached.ax;
+                    n.ay = cached.ay;
+                }
                 n.hadKnownPosition = true;
             }
             if (!pos && sessionPositions.has(n.id)) {
                 pos = sessionPositions.get(n.id);
+                const anchor = sessionAnchors.get(n.id);
+                if (anchor) {
+                    n.ax = anchor[0];
+                    n.ay = anchor[1];
+                }
                 n.hadKnownPosition = true;
             }
             if (!pos && initialPositions && initialPositions.has(n.id)) {

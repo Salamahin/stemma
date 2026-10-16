@@ -18,7 +18,7 @@
  *
  * Pure and index-based so it runs in the layout worker.
  */
-import { packSiblings } from "d3";
+import { packSiblings, forceSimulation, forceLink, forceCollide, forceX, forceY } from "d3";
 
 export type StructuredLayoutOptions = {
     /** Arc length between neighbouring people on a ring. */
@@ -31,6 +31,19 @@ export type StructuredLayoutOptions = {
     sweeps?: number;
     /** Gap between packed components. */
     componentGap?: number;
+    /**
+     * "clans": every surname clan gets its own region (laid out with rings),
+     * regions kept apart; "rings": one set of generation rings per component.
+     */
+    mode?: "clans" | "rings";
+    /** Clans: clear space between neighbouring clan regions. */
+    regionGap?: number;
+    /** Clans: ticks of the small region-graph layout that places the regions. */
+    regionTicks?: number;
+    /** Clans: start regions packed ("pack") or at their rings-layout centroids ("rings"). */
+    regionStart?: "pack" | "rings";
+    /** Clans: components smaller than this use plain rings. */
+    minClanComponent?: number;
 };
 
 // Tuned with e2e/bench/seedExperiment.mjs: the seed is somewhat denser than
@@ -41,6 +54,11 @@ const DEFAULTS: Required<StructuredLayoutOptions> = {
     generationGap: 110,
     sweeps: 4,
     componentGap: 150,
+    mode: "clans",
+    regionGap: 500,
+    regionTicks: 100,
+    regionStart: "rings",
+    minClanComponent: 200,
 };
 
 export type StructuredLayoutInput = {
@@ -49,15 +67,23 @@ export type StructuredLayoutInput = {
     /** Flattened [source, target] index pairs: person→family (parent), family→person (child). */
     links: ArrayLike<number>;
     center: [number, number];
+    /** Optional clan index per node (-1: none), for the "clans" mode. */
+    groups?: ArrayLike<number>;
 };
 
-export function structuredLayout(input: StructuredLayoutInput, options: StructuredLayoutOptions = {}): { x: Float64Array; y: Float64Array } {
+export function structuredLayout(
+    input: StructuredLayoutInput,
+    options: StructuredLayoutOptions = {},
+): { x: Float64Array; y: Float64Array; region: Int32Array } {
     const opt = { ...DEFAULTS, ...options };
     const n = input.ids.length;
     const x = new Float64Array(n);
     const y = new Float64Array(n);
-    if (n === 0) return { x, y };
+    /** Clan region per node (clans mode), -1 elsewhere. */
+    const regionOf = new Int32Array(n).fill(-1);
+    if (n === 0) return { x, y, region: regionOf };
     const isFamily = new Uint8Array(n);
+    const inUnit = new Uint8Array(n); // membership of the node set being laid out
     input.ids.forEach((id, i) => (isFamily[i] = id.startsWith("family_") ? 1 : 0));
 
     // --- structure ---------------------------------------------------------
@@ -86,6 +112,9 @@ export function structuredLayout(input: StructuredLayoutInput, options: Structur
         nbrs[t].push(s);
         uf[find(s)] = find(t);
     }
+
+    // --- clan regions (every node joins the clan nearest to it) ---------------
+    if (input.groups) regionOf.set(clanRegions(n, input.links, input.groups));
 
     // --- generations ---------------------------------------------------------
     // familyRank(f) = max over parents p of (familyRank(parentFamily(p)) + 1), 0 for roots.
@@ -143,10 +172,22 @@ export function structuredLayout(input: StructuredLayoutInput, options: Structur
 
     const circles: Array<{ r: number; x: number; y: number; members: number[] }> = [];
     for (const members of compOf.values()) {
-        circles.push(layoutComponent(members));
+        circles.push(
+            opt.mode === "clans" ? clansComponent(members) : layoutComponent(members),
+        );
     }
 
+    /** Generation-rings layout of `members` (relative to 0,0); only edges inside the set count. */
     function layoutComponent(members: number[]) {
+        for (const v of members) inUnit[v] = 1;
+        try {
+            return ringsOf(members);
+        } finally {
+            for (const v of members) inUnit[v] = 0;
+        }
+    }
+
+    function ringsOf(members: number[]) {
         let minL = Infinity;
         let maxL = -Infinity;
         for (const v of members) {
@@ -164,7 +205,7 @@ export function structuredLayout(input: StructuredLayoutInput, options: Structur
                 if (seen.has(v)) continue;
                 seen.add(v);
                 layers[layer[v] - minL].push(v);
-                for (let k = nbrs[v].length - 1; k >= 0; k--) if (!seen.has(nbrs[v][k])) stack.push(nbrs[v][k]);
+                for (let k = nbrs[v].length - 1; k >= 0; k--) if (inUnit[nbrs[v][k]] && !seen.has(nbrs[v][k])) stack.push(nbrs[v][k]);
             }
         };
         for (const r of roots) visit(r);
@@ -176,7 +217,7 @@ export function structuredLayout(input: StructuredLayoutInput, options: Structur
             if (isFamily[v]) continue;
             for (const f of ownFamilies[v]) {
                 for (const p of parentsOf[f]) {
-                    if (p !== v && layer[p] === layer[v]) {
+                    if (p !== v && inUnit[p] && layer[p] === layer[v]) {
                         const a = blockOf.get(v) ?? v;
                         const b = blockOf.get(p) ?? p;
                         if (a !== b) {
@@ -205,6 +246,7 @@ export function structuredLayout(input: StructuredLayoutInput, options: Structur
                 let sum = 0;
                 let cnt = 0;
                 for (const u of nbrs[v]) {
+                    if (!inUnit[u]) continue;
                     const lu = layer[u] - minL;
                     if (towards < 0 ? lu < l : lu > l) {
                         sum += pos[u];
@@ -255,6 +297,118 @@ export function structuredLayout(input: StructuredLayoutInput, options: Structur
         return { r: maxR + opt.componentGap / 2, x: 0, y: 0, members };
     }
 
+    /**
+     * Clan regions: every node joins the clan nearest to it in the family
+     * graph (multi-source BFS from the clan members); each region is laid
+     * out with generation rings, and the regions are packed as circles with
+     * `regionGap` between them, related regions first (BFS over the region
+     * graph from the biggest one) so they end up next to each other. A
+     * surname cloud is the hull of its members, so keeping each clan inside
+     * its own disc keeps the clouds apart.
+     */
+    function clansComponent(members: number[]) {
+        if (!input.groups || members.length < opt.minClanComponent || !members.some((v) => regionOf[v] >= 0)) return layoutComponent(members);
+        const region = { get: (v: number) => regionOf[v] };
+        const byRegion = new Map<number, number[]>();
+        for (const v of members) {
+            const g = regionOf[v];
+            let arr = byRegion.get(g);
+            if (!arr) byRegion.set(g, (arr = []));
+            arr.push(v);
+        }
+        // region adjacency, for a neighbour-preserving packing order
+        const adj = new Map<number, Map<number, number>>();
+        for (const v of members) {
+            const a = region.get(v) ?? -1;
+            for (const u of nbrs[v]) {
+                const b = region.get(u) ?? -1;
+                if (a === b) continue;
+                let m = adj.get(a);
+                if (!m) adj.set(a, (m = new Map()));
+                m.set(b, (m.get(b) ?? 0) + 1);
+            }
+        }
+        const regions = [...byRegion.keys()];
+        regions.sort((p, q) => byRegion.get(q)!.length - byRegion.get(p)!.length);
+        const orderRegions: number[] = [];
+        const seenRegion = new Set<number>();
+        for (const start of regions) {
+            if (seenRegion.has(start)) continue;
+            const queue = [start];
+            seenRegion.add(start);
+            for (let h = 0; h < queue.length; h++) {
+                const r = queue[h];
+                orderRegions.push(r);
+                const ns = [...(adj.get(r) ?? new Map()).entries()].sort((p, q) => q[1] - p[1]).map(([k]) => k);
+                for (const k of ns) {
+                    if (seenRegion.has(k)) continue;
+                    seenRegion.add(k);
+                    queue.push(k);
+                }
+            }
+        }
+        const discs = orderRegions.map((r) => {
+            const nodes = byRegion.get(r)!;
+            const local = layoutComponent(nodes);
+            return { nodes, lx: nodes.map((v) => x[v]), ly: nodes.map((v) => y[v]), r: local.r + opt.regionGap / 2, x: 0, y: 0 };
+        });
+        if (opt.regionStart === "rings") {
+            // Start every region where the (low-crossing) rings layout of the
+            // whole component puts the clan's centroid, scaled up so the discs
+            // fit; the region layout below then only separates them.
+            layoutComponent(members);
+            let area = 0;
+            let ringsR = 1;
+            for (const v of members) ringsR = Math.max(ringsR, Math.hypot(x[v], y[v]));
+            for (const d of discs) area += d.r * d.r;
+            const scale = Math.max(1, (1.3 * Math.sqrt(area)) / ringsR);
+            for (const d of discs) {
+                let cx = 0;
+                let cy = 0;
+                for (const v of d.nodes) {
+                    cx += x[v];
+                    cy += y[v];
+                }
+                d.x = (cx / d.nodes.length) * scale;
+                d.y = (cy / d.nodes.length) * scale;
+            }
+        } else {
+            packSiblings(discs as any);
+        }
+        // Pull connected regions next to each other (links weighted by how many
+        // family edges join them), discs kept apart by collision: inter-clan
+        // relatives end up close and their connecting lines short.
+        const regionIndex = new Map(orderRegions.map((r, i) => [r, i]));
+        const regionLinks: Array<{ source: number; target: number; w: number }> = [];
+        for (const [a, m] of adj) {
+            for (const [b, w] of m) {
+                if (a < b) regionLinks.push({ source: regionIndex.get(a)!, target: regionIndex.get(b)!, w });
+            }
+        }
+        const maxW = Math.max(1, ...regionLinks.map((l) => l.w));
+        const regionSim = forceSimulation(discs as any)
+            .force(
+                "link",
+                forceLink(regionLinks)
+                    .distance((l: any) => discs[l.source.index].r + discs[l.target.index].r)
+                    .strength((l: any) => 0.05 + 0.6 * (l.w / maxW)),
+            )
+            .force("collide", forceCollide((d: any) => d.r).iterations(3))
+            .force("x", forceX(0).strength(0.02))
+            .force("y", forceY(0).strength(0.02))
+            .stop();
+        for (let i = 0; i < opt.regionTicks; i++) regionSim.tick();
+        let extent = 0;
+        for (const d of discs) {
+            d.nodes.forEach((v, j) => {
+                x[v] = d.x + d.lx[j];
+                y[v] = d.y + d.ly[j];
+            });
+            extent = Math.max(extent, Math.hypot(d.x, d.y) + d.r);
+        }
+        return { r: extent + opt.componentGap / 2, x: 0, y: 0, members };
+    }
+
     // --- pack components ----------------------------------------------------------
     circles.sort((a, b) => b.r - a.r);
     packSiblings(circles as any);
@@ -264,7 +418,28 @@ export function structuredLayout(input: StructuredLayoutInput, options: Structur
             y[v] += c.y + input.center[1];
         }
     }
-    return { x, y };
+    // Open on people, not on a gap between regions: put the node closest to
+    // the median position at the centre.
+    const xsSorted = Array.from(x).sort((a, b) => a - b);
+    const ysSorted = Array.from(y).sort((a, b) => a - b);
+    const mx = xsSorted[n >> 1];
+    const my = ysSorted[n >> 1];
+    let nearest = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < n; i++) {
+        const dd = (x[i] - mx) ** 2 + (y[i] - my) ** 2;
+        if (dd < bestD) {
+            bestD = dd;
+            nearest = i;
+        }
+    }
+    const dx = input.center[0] - x[nearest];
+    const dy = input.center[1] - y[nearest];
+    for (let i = 0; i < n; i++) {
+        x[i] += dx;
+        y[i] += dy;
+    }
+    return { x, y, region: regionOf };
 }
 
 /**
@@ -272,15 +447,58 @@ export function structuredLayout(input: StructuredLayoutInput, options: Structur
  * position and zeroes its velocity. `links` are [source, target] index pairs.
  */
 export function applyStructuredSeed(
-    nodes: Array<{ id: string; x: number; y: number; vx?: number; vy?: number; fx?: number | null; fy?: number | null }>,
+    nodes: Array<{ id: string; x: number; y: number; vx?: number; vy?: number; fx?: number | null; fy?: number | null; region?: number; ax?: number; ay?: number }>,
     links: ArrayLike<number>,
     center: [number, number],
+    groups?: ArrayLike<number>,
 ) {
-    const { x, y } = structuredLayout({ ids: nodes.map((d) => d.id), links, center });
+    const { x, y, region } = structuredLayout({ ids: nodes.map((d) => d.id), links, center, groups });
     nodes.forEach((d, i) => {
         if (d.fx == null) d.x = x[i];
         if (d.fy == null) d.y = y[i];
         d.vx = 0;
         d.vy = 0;
+        d.region = region[i];
+        // the seed is where every node belongs: it becomes the anchor
+        d.ax = d.x;
+        d.ay = d.y;
     });
+}
+
+/**
+ * Clan region of every node: clan members (`groups[v] >= 0`) seed a
+ * multi-source BFS over the family graph, so every other person and family
+ * joins the clan nearest to it (-1 where no clan is reachable).
+ * `links` are [source, target] index pairs.
+ */
+export function clanRegions(n: number, links: ArrayLike<number>, groups: ArrayLike<number>): Int32Array {
+    const out = new Int32Array(n).fill(-1);
+    const nbrs: number[][] = Array.from({ length: n }, () => []);
+    for (let i = 0; i + 1 < links.length; i += 2) {
+        const s = links[i];
+        const t = links[i + 1];
+        if (s < 0 || t < 0 || s >= n || t >= n) continue;
+        nbrs[s].push(t);
+        nbrs[t].push(s);
+    }
+    let frontier: number[] = [];
+    for (let v = 0; v < n; v++) {
+        const g = groups[v];
+        if (g != null && g >= 0) {
+            out[v] = g;
+            frontier.push(v);
+        }
+    }
+    while (frontier.length) {
+        const next: number[] = [];
+        for (const v of frontier) {
+            for (const u of nbrs[v]) {
+                if (out[u] >= 0) continue;
+                out[u] = out[v];
+                next.push(u);
+            }
+        }
+        frontier = next;
+    }
+    return out;
 }

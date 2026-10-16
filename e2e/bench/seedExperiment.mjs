@@ -1,8 +1,9 @@
-// Seed experiments: current generational-row seed vs the structured seed,
-// each followed by the force refine, on a synthetic size or a Stemma JSON.
-//   (cd ../frontend && npx rollup -c bench.rollup.config.mjs) is NOT needed:
-//   this script bundles frontend/src/{structuredLayout,layoutCore}.ts itself.
-//   node bench/seedExperiment.mjs <people|stemma.json>
+// Starting-layout experiments: seed variants, each followed by the force
+// refine, on a synthetic size or a Stemma JSON path (read at runtime only).
+// Bundles the real frontend modules (structuredLayout, layoutCore, clans…).
+//   node bench/seedExperiment.mjs <people|stemma.json> [variant,variant] [pngPrefix]
+// Reports surname-cloud overlap (share of cloud area covered by ≥2 clouds),
+// edge crossings, person overlaps, link lengths and overall size.
 import { rollup } from "../../frontend/node_modules/rollup/dist/es/rollup.js";
 import typescript from "../../frontend/node_modules/@rollup/plugin-typescript/dist/es/index.js";
 import resolve from "../../frontend/node_modules/@rollup/plugin-node-resolve/dist/es/index.js";
@@ -16,11 +17,14 @@ const here = dirname(fileURLToPath(import.meta.url));
 const frontend = resolvePath(here, "../../frontend");
 const tmp = mkdtempSync(join(tmpdir(), "seed-exp-"));
 const entry = join(tmp, "entry.ts");
-writeFileSync(entry, `export { structuredLayout } from ${JSON.stringify(join(frontend, "src/structuredLayout.ts"))};
-export { createLayoutSimulation } from ${JSON.stringify(join(frontend, "src/layoutCore.ts"))};
-export { computeInitialLayout } from ${JSON.stringify(join(frontend, "src/initialLayout.ts"))};
-export { StemmaIndex } from ${JSON.stringify(join(frontend, "src/stemmaIndex.ts"))};
-export { makeNodesAndRelations } from ${JSON.stringify(join(frontend, "src/graphTools.js"))};
+const src = (f) => JSON.stringify(join(frontend, "src", f));
+writeFileSync(entry, `export { structuredLayout } from ${src("structuredLayout.ts")};
+export { createLayoutSimulation, setCrossRegionLinkStrength } from ${src("layoutCore.ts")};
+export { computeInitialLayout } from ${src("initialLayout.ts")};
+export { StemmaIndex } from ${src("stemmaIndex.ts")};
+export { makeNodesAndRelations } from ${src("graphTools.js")};
+export { computeClans } from ${src("clans.ts")};
+export { clanShape, paddedHull } from ${src("clanLayer.ts")};
 `);
 const bundle = await rollup({
   input: entry,
@@ -32,11 +36,54 @@ await bundle.write({ file: out, format: "es" });
 const lib = await import(out);
 
 const stemma = loadStemma(process.argv[2] ?? "1000");
+const only = process.argv[3] ? process.argv[3].split(",") : null;
+const pngPrefix = process.argv[4] ?? null;
 const W = 1440, H = 900;
+const clans = lib.computeClans(stemma);
+if (process.env.CROSS) lib.setCrossRegionLinkStrength(Number(process.env.CROSS));
 
 function graph() {
   const [nodes, links] = lib.makeNodesAndRelations(stemma.people, stemma.families);
   return { nodes, links };
+}
+
+function inPoly(px, py, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** Share of the clouds' area that is covered by two or more clouds (grid sampled). */
+function cloudOverlap(nodes) {
+  const pos = new Map(nodes.map((n) => [n.id, [n.x, n.y]]));
+  const polys = [];
+  for (const c of clans) {
+    const pts = [...c.personIds].map((id) => pos.get("person_" + id)).filter(Boolean);
+    if (pts.length < 2) continue;
+    const hull = lib.paddedHull(pts, lib.clanShape(pts));
+    const xs = hull.map((p) => p[0]), ys = hull.map((p) => p[1]);
+    polys.push({ hull, x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) });
+  }
+  if (!polys.length) return { clouds: 0, overlapShare: 0 };
+  const X0 = Math.min(...polys.map((p) => p.x0)), X1 = Math.max(...polys.map((p) => p.x1));
+  const Y0 = Math.min(...polys.map((p) => p.y0)), Y1 = Math.max(...polys.map((p) => p.y1));
+  const N = 500;
+  const sx = (X1 - X0) / N, sy = (Y1 - Y0) / N;
+  let covered = 0, multi = 0;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    const x = X0 + (i + 0.5) * sx, y = Y0 + (j + 0.5) * sy;
+    let k = 0;
+    for (const p of polys) {
+      if (x < p.x0 || x > p.x1 || y < p.y0 || y > p.y1) continue;
+      if (inPoly(x, y, p.hull) && ++k >= 2) break;
+    }
+    if (k >= 1) covered++;
+    if (k >= 2) multi++;
+  }
+  return { clouds: polys.length, overlapShare: Math.round((multi / covered) * 1000) / 1000 };
 }
 
 function quality(nodes, links) {
@@ -53,10 +100,11 @@ function quality(nodes, links) {
   const lens = segs.map((g) => Math.hypot(g.x2 - g.x1, g.y2 - g.y1)).sort((a, b) => a - b);
   const bucket = Math.max(200, lens[Math.floor(lens.length * 0.9)] || 200);
   const sg = new Map();
+  const longSegs = [];
   segs.forEach((g, i) => {
     const x0 = Math.floor(Math.min(g.x1, g.x2) / bucket), x1 = Math.floor(Math.max(g.x1, g.x2) / bucket);
     const y0 = Math.floor(Math.min(g.y1, g.y2) / bucket), y1 = Math.floor(Math.max(g.y1, g.y2) / bucket);
-    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 400) return;
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 400) { longSegs.push(i); return; } // long edge: checked against all edges below
     for (let xx = x0; xx <= x1; xx++) for (let yy = y0; yy <= y1; yy++) { const k = `${xx}:${yy}`; (sg.get(k) ?? sg.set(k, []).get(k)).push(i); }
   });
   const orient = (ax, ay, bx, by, cx, cy) => Math.sign((bx - ax) * (cy - ay) - (by - ay) * (cx - ax));
@@ -68,11 +116,19 @@ function quality(nodes, links) {
     if (p.s === q.s || p.s === q.t || p.t === q.s || p.t === q.t) continue;
     if (orient(p.x1, p.y1, p.x2, p.y2, q.x1, q.y1) * orient(p.x1, p.y1, p.x2, p.y2, q.x2, q.y2) < 0 && orient(q.x1, q.y1, q.x2, q.y2, p.x1, p.y1) * orient(q.x1, q.y1, q.x2, q.y2, p.x2, p.y2) < 0) crossings++;
   }
+  const longSet = new Set(longSegs);
+  for (const i of longSegs) for (let j = 0; j < segs.length; j++) {
+    if (j === i || (longSet.has(j) && j < i)) continue;
+    const p = segs[i], q = segs[j];
+    if (p.s === q.s || p.s === q.t || p.t === q.s || p.t === q.t) continue;
+    if (orient(p.x1, p.y1, p.x2, p.y2, q.x1, q.y1) * orient(p.x1, p.y1, p.x2, p.y2, q.x2, q.y2) < 0 && orient(q.x1, q.y1, q.x2, q.y2, p.x1, p.y1) * orient(q.x1, q.y1, q.x2, q.y2, p.x2, p.y2) < 0) crossings++;
+  }
   const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
-  return { overlaps, crossings, medianLink: Math.round(lens[lens.length >> 1]), p95Link: Math.round(lens[Math.floor(lens.length * 0.95)]), w: Math.round(Math.max(...xs) - Math.min(...xs)), h: Math.round(Math.max(...ys) - Math.min(...ys)) };
+  return { ...cloudOverlap(nodes), crossings, overlaps, medianLink: Math.round(lens[lens.length >> 1]), p95Link: Math.round(lens[Math.floor(lens.length * 0.95)]), w: Math.round(Math.max(...xs) - Math.min(...xs)), h: Math.round(Math.max(...ys) - Math.min(...ys)) };
 }
 
-function refine(nodes, links, alpha) {
+function refine(nodes, links, alpha, anchored) {
+  if (anchored) for (const n of nodes) { n.ax = n.x; n.ay = n.y; }
   const sim = lib.createLayoutSimulation(nodes, links, W, H);
   sim.alpha(alpha);
   const t0 = performance.now();
@@ -81,47 +137,77 @@ function refine(nodes, links, alpha) {
   return { ticks, ms: Math.round(performance.now() - t0) };
 }
 
-function seedCurrent() {
-  const g = graph();
-  const index = new lib.StemmaIndex({ type: "Stemma", people: stemma.people, families: stemma.families });
-  const t0 = performance.now();
-  const init = lib.computeInitialLayout(index, stemma.people, stemma.families, W, H);
-  const ms = Math.round(performance.now() - t0);
-  for (const n of g.nodes) [n.x, n.y] = init.get(n.id) ?? [W / 2, H / 2];
-  return { ...g, seedMs: ms };
-}
-
-function seedStructured(options) {
+function seedStructured(options, withRegions = true) {
   const g = graph();
   const idx = new Map(g.nodes.map((n, i) => [n.id, i]));
   const pairs = [];
   for (const l of g.links) pairs.push(idx.get(l.source), idx.get(l.target));
   const t0 = performance.now();
-  const { x, y } = lib.structuredLayout({ ids: g.nodes.map((n) => n.id), links: Int32Array.from(pairs), center: [W / 2, H / 2] }, options);
+  const groups = new Int32Array(g.nodes.length).fill(-1);
+  const clanSize = clans.map((c) => c.personIds.size);
+  clans.forEach((c, ci) => {
+    for (const pid of c.personIds) {
+      const i = idx.get("person_" + pid);
+      if (i == null) continue;
+      if (groups[i] < 0 || clanSize[ci] > clanSize[groups[i]]) groups[i] = ci;
+    }
+  });
+  const { x, y, region } = lib.structuredLayout({ ids: g.nodes.map((n) => n.id), links: Int32Array.from(pairs), center: [W / 2, H / 2], groups }, options);
+  if (withRegions) g.nodes.forEach((n, i) => (n.region = region[i]));
   const ms = Math.round(performance.now() - t0);
   g.nodes.forEach((n, i) => { n.x = x[i]; n.y = y[i]; });
   return { ...g, seedMs: ms };
 }
 
-console.log(`people=${stemma.people.length} families=${stemma.families.length}`);
-const variants = process.env.SPACING
-  ? [
-      ["structured default, alpha 1", () => seedStructured(), 1],
-      ["spacing 70/30/140, alpha 1", () => seedStructured({ personSpacing: 70, familySpacing: 30, generationGap: 140 }), 1],
-      ["spacing 50/20/110, alpha 1", () => seedStructured({ personSpacing: 50, familySpacing: 20, generationGap: 110 }), 1],
-      ["spacing 70/30/140, alpha 0.5", () => seedStructured({ personSpacing: 70, familySpacing: 30, generationGap: 140 }), 0.5],
-      ["sweeps 2, alpha 1", () => seedStructured({ sweeps: 2 }), 1],
-      ["sweeps 0, alpha 1", () => seedStructured({ sweeps: 0 }), 1],
-    ]
-  : [
-      ["current seed, alpha 1", () => seedCurrent(), 1],
-      ["structured seed (no refine)", () => seedStructured(), 0],
-      ["structured, alpha 1", () => seedStructured(), 1],
-      ["structured, alpha 0.3", () => seedStructured(), 0.3],
-      ["structured, alpha 0.1", () => seedStructured(), 0.1],
-    ];
-for (const [name, seed, alpha] of variants) {
-  const g = seed();
-  const r = alpha > 0 ? refine(g.nodes, g.links, alpha) : { ticks: 0, ms: 0 };
-  console.log(name.padEnd(30), `seed ${String(g.seedMs).padStart(5)} ms  refine ${String(r.ticks).padStart(3)} ticks ${String(r.ms).padStart(6)} ms `, JSON.stringify(quality(g.nodes, g.links)));
+async function savePng(nodes, links, file) {
+  const { chromium } = await import("@playwright/test");
+  const pos = new Map(nodes.map((n) => [n.id, n]));
+  const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const S = 1000, pad = 10, k = (S - 2 * pad) / Math.max(maxX - minX, maxY - minY);
+  const tx = (v) => pad + (v - minX) * k, ty = (v) => pad + (v - minY) * k;
+  let svg = "";
+  for (const c of clans) {
+    const pts = [...c.personIds].map((id) => pos.get("person_" + id)).filter(Boolean).map((n) => [n.x, n.y]);
+    if (pts.length < 2) continue;
+    const hull = lib.paddedHull(pts, lib.clanShape(pts));
+    svg += `<polygon points="${hull.map((p) => `${tx(p[0])},${ty(p[1])}`).join(" ")}" fill="${c.color}" fill-opacity="0.35"/>`;
+  }
+  for (const l of links) {
+    const a = pos.get(typeof l.source === "string" ? l.source : l.source.id), b = pos.get(typeof l.target === "string" ? l.target : l.target.id);
+    svg += `<line x1="${tx(a.x)}" y1="${ty(a.y)}" x2="${tx(b.x)}" y2="${ty(b.y)}" stroke="#777" stroke-width="0.4"/>`;
+  }
+  for (const n of nodes) if (n.type === "person") svg += `<circle cx="${tx(n.x)}" cy="${ty(n.y)}" r="0.9" fill="#2b1d7a"/>`;
+  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const page = await browser.newPage({ viewport: { width: S, height: S } });
+  await page.setContent(`<body style="margin:0;background:#fff"><svg xmlns="http://www.w3.org/2000/svg" width="${S}" height="${S}">${svg}</svg></body>`);
+  await page.screenshot({ path: file });
+  await browser.close();
+}
+
+const VARIANTS = {
+  // before 47e12c0: one row per generation + global centring forces
+  rows: () => {
+    const g = graph();
+    const index = new lib.StemmaIndex({ type: "Stemma", people: stemma.people, families: stemma.families });
+    const t0 = performance.now();
+    const init = lib.computeInitialLayout(index, stemma.people, stemma.families, W, H);
+    for (const n of g.nodes) [n.x, n.y] = init.get(n.id) ?? [W / 2, H / 2];
+    return { g: { ...g, seedMs: Math.round(performance.now() - t0) }, alpha: 1, anchored: false };
+  },
+  // 47e12c0: generation rings + global centring forces
+  rings: () => ({ g: seedStructured({ mode: "rings" }, false), alpha: 1, anchored: false }),
+  // clan regions (current default) + anchored refine with weak cross-region links
+  clans: () => ({ g: seedStructured({ mode: "clans" }), alpha: 1, anchored: true }),
+  clansSeedOnly: () => ({ g: seedStructured({ mode: "clans" }), alpha: 0, anchored: true }),
+  clansPacked: () => ({ g: seedStructured({ mode: "clans", regionStart: "pack" }), alpha: 1, anchored: true }),
+};
+
+console.log(`people=${stemma.people.length} families=${stemma.families.length} clans=${clans.length}`);
+for (const [name, make] of Object.entries(VARIANTS)) {
+  if (only && !only.includes(name)) continue;
+  const { g, alpha, anchored } = make();
+  const r = alpha > 0 ? refine(g.nodes, g.links, alpha, anchored) : { ticks: 0, ms: 0 };
+  console.log(name.padEnd(16), `seed ${String(g.seedMs).padStart(5)} ms  refine ${String(r.ticks).padStart(3)} ticks ${String(r.ms).padStart(6)} ms `, JSON.stringify(quality(g.nodes, g.links)));
+  if (pngPrefix) await savePng(g.nodes, g.links, `${pngPrefix}-${name}.png`);
 }

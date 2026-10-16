@@ -2,8 +2,8 @@
  * Worker-side message handling, kept separate from the worker entry so it can
  * be unit-tested with a fake `post`/scheduler.
  */
-import { createLayoutSimulation, LayoutLoop, type LayoutNode, type Scheduler } from "./layoutCore";
-import { applyStructuredSeed } from "./structuredLayout";
+import { anchorWhereMissing, createLayoutSimulation, LayoutLoop, type LayoutNode, type Scheduler } from "./layoutCore";
+import { applyStructuredSeed, clanRegions } from "./structuredLayout";
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from "./layoutProtocol";
 
 /** Worker time per batch before positions are posted back (≈ one frame). */
@@ -43,6 +43,11 @@ export class LayoutWorkerHost {
                 if (d) {
                     d.fx = msg.fx;
                     d.fy = msg.fy;
+                    // released after a drag: it now belongs where it was dropped
+                    if (msg.fx == null) {
+                        d.ax = d.x;
+                        d.ay = d.y;
+                    }
                 }
                 break;
             }
@@ -73,8 +78,16 @@ export class LayoutWorkerHost {
             vy: msg.vy[i],
             fx: Number.isNaN(msg.fx[i]) ? null : msg.fx[i],
             fy: Number.isNaN(msg.fy[i]) ? null : msg.fy[i],
+            ax: msg.ax && Number.isFinite(msg.ax[i]) ? msg.ax[i] : undefined,
+            ay: msg.ay && Number.isFinite(msg.ay[i]) ? msg.ay[i] : undefined,
         }));
-        if (msg.seed) applyStructuredSeed(this.nodes, msg.links, [msg.width / 2, msg.height / 2]);
+        const groups = msg.groups && msg.groups.length === this.nodes.length ? msg.groups : undefined;
+        if (msg.seed) applyStructuredSeed(this.nodes, msg.links, [msg.width / 2, msg.height / 2], groups);
+        else if (groups) {
+            const region = clanRegions(this.nodes.length, msg.links, groups);
+            this.nodes.forEach((d, i) => (d.region = region[i]));
+        }
+        anchorWhereMissing(this.nodes);
         const links = [];
         for (let i = 0; i < msg.links.length; i += 2) {
             links.push({ source: this.nodes[msg.links[i]], target: this.nodes[msg.links[i + 1]] });
@@ -90,11 +103,11 @@ export class LayoutWorkerHost {
             () => this.post({ type: "end", gen }, []),
         );
         // show the seed straight away, before the first refine batch
-        if (msg.seed) this.postPositions(gen, 0);
+        if (msg.seed) this.postPositions(gen, 0, true);
         if (msg.start) this.loop.start();
     }
 
-    private postPositions(gen: number, ticks: number) {
+    private postPositions(gen: number, ticks: number, withAnchors = false) {
         const n = this.nodes.length;
         const x = new Float64Array(n);
         const y = new Float64Array(n);
@@ -106,6 +119,12 @@ export class LayoutWorkerHost {
             vx[i] = d.vx ?? 0;
             vy[i] = d.vy ?? 0;
         });
+        if (withAnchors) {
+            const ax = Float64Array.from(this.nodes, (d) => d.ax ?? NaN);
+            const ay = Float64Array.from(this.nodes, (d) => d.ay ?? NaN);
+            this.post({ type: "positions", gen, ticks, alpha: this.sim!.alpha(), x, y, vx, vy, ax, ay }, [x.buffer, y.buffer, vx.buffer, vy.buffer, ax.buffer, ay.buffer]);
+            return;
+        }
         this.post({ type: "positions", gen, ticks, alpha: this.sim!.alpha(), x, y, vx, vy }, [x.buffer, y.buffer, vx.buffer, vy.buffer]);
     }
 }
