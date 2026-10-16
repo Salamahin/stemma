@@ -299,10 +299,19 @@ export class CanvasChart {
         return this.nodeById.get(id);
     }
 
+    private positionListeners = new Set<() => void>();
+
+    /** Subscribe to node movement (layout batches, drags); returns an unsubscribe. */
+    onPositionsChanged(fn: () => void): () => void {
+        this.positionListeners.add(fn);
+        return () => this.positionListeners.delete(fn);
+    }
+
     /** Positions moved (sim tick, manual placement). */
     positionsChanged() {
         this.quadtreeDirty = true;
         this.requestRender();
+        for (const fn of this.positionListeners) fn();
     }
 
     setStyleInputs(highlight: Highlighter | null, generations: GenerationIndex | null, pinnedPersonIds: Iterable<string>) {

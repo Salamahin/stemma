@@ -7,17 +7,18 @@
     import { HighlightLineages } from "../highlight";
     import {
         assignInitialPositions,
-        configureSimulation,
         resetSessionPositions,
         setActiveLayoutCache,
         setSessionPosition,
         makeNodesAndRelations,
         normalizeId,
-        updateSimulation,
         denormalizeId,
-        LAYOUT_REHEAT_ALPHA,
-        LAYOUT_REFINE_ALPHA,
+        recordPositions,
+        saveLayoutCache,
     } from "../graphTools";
+    import { LAYOUT_REHEAT_ALPHA, LAYOUT_REFINE_ALPHA } from "../layoutCore";
+    import { createLayoutEngine, type LayoutEngine } from "../layoutEngine";
+    import layoutWorkerSource from "virtual:layout-worker";
     import { computeInitialLayout, seedFromKnown } from "../initialLayout";
     import { NodeLayoutCache } from "../nodeLayoutCache";
     import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
@@ -25,7 +26,7 @@
     import { personDisplayName } from "../personDisplayName";
     import { t } from "../i18n";
     import { computeClans } from "../clans";
-    import { CanvasChart, type ChartNode } from "../canvasChart";
+    import { CanvasChart, type ChartNode, type ChartLink } from "../canvasChart";
 
     type Props = {
         stemma: Stemma;
@@ -69,7 +70,8 @@
     let isDragging = false;
     let layoutCache: NodeLayoutCache | null = null;
     let layoutCacheStemmaId: string | null = null;
-    let simulation: any = null;
+    /** The force layout; runs in a Web Worker when available. */
+    let engine: LayoutEngine | null = null;
     let lastPointer: { x: number; y: number } | null = null;
     /** Node whose lineage the hover pushed onto the highlight stack. */
     let hoverPushedId: string | null = null;
@@ -140,6 +142,7 @@
         }
         // Pinning only freezes nodes where they are; it does not need the
         // layout to run again (it used to restart a never-ending sim here).
+        engine?.syncFixed();
     }
 
     const zoomHandler = d3
@@ -173,9 +176,9 @@
     }
 
     export function setSimulationActive(active: boolean) {
-        if (!simulation) return;
-        if (active) simulation.alphaTarget(0).alpha(Math.max(simulation.alpha(), LAYOUT_REHEAT_ALPHA)).restart();
-        else simulation.alphaTarget(0).stop();
+        if (!engine) return;
+        if (active) engine.run({ alpha: LAYOUT_REHEAT_ALPHA, alphaTarget: 0 });
+        else engine.stop();
     }
 
     export function applyManualPositions() {
@@ -184,12 +187,13 @@
         chart.updateClans();
     }
 
-    export function getSimulation(): any {
-        return simulation;
+    /** Point the layout forces pull towards (the ghost burst uses the same forces). */
+    export function getLayoutCenter(): [number, number] {
+        return engine?.center ?? [window.innerWidth / 2, window.innerHeight / 2];
     }
 
     $effect(() => {
-        if (!simulation || !chart) return;
+        if (!engine || !chart) return;
         const wasActive = lastSimulationActive;
         lastSimulationActive = simulationActive;
         if (simulationActive) {
@@ -199,9 +203,10 @@
                     d.fy = null;
                 }
             }
+            engine.syncFixed();
             // Leaving edit mode: let the freshly unpinned graph relax a little.
             // Nothing to do on first mount — the initial layout is already running.
-            if (wasActive === false) simulation.alphaTarget(0).alpha(Math.max(simulation.alpha(), LAYOUT_REHEAT_ALPHA)).restart();
+            if (wasActive === false) engine.run({ alpha: LAYOUT_REHEAT_ALPHA, alphaTarget: 0 });
         } else {
             for (const d of chart.nodes) {
                 if (d.x != null && d.y != null) {
@@ -209,7 +214,8 @@
                     d.fy = d.y;
                 }
             }
-            simulation.alphaTarget(0).stop();
+            engine.syncFixed();
+            engine.stop();
         }
     });
 
@@ -275,9 +281,12 @@
         layoutStats.ticks++;
         layoutStats.lastTickAt = performance.now();
         if (!chart) return;
+        recordPositions(chart.nodes);
         chart.positionsChanged();
         const now = performance.now();
-        if (now - lastClanUpdate >= CLAN_UPDATE_INTERVAL_MS) {
+        // While the layout runs, clouds are re-rasterised ≤10×/s; a one-off
+        // update (edit-mode settle) gets them straight away.
+        if (!engine?.isRunning() || now - lastClanUpdate >= CLAN_UPDATE_INTERVAL_MS) {
             lastClanUpdate = now;
             chart.updateClans();
         }
@@ -286,9 +295,20 @@
     function onSimEnd() {
         layoutStats.ends++;
         layoutStats.lastEndAt = performance.now();
+        saveLayoutCache();
         if (!chart) return;
         chart.layoutLabels();
         chart.updateClans();
+    }
+
+    /** d3.forceLink used to swap link ids for node objects; the renderer relies on that. */
+    function resolveLinks(nodes: ChartNode[], relations: any[]): ChartLink[] {
+        const byId = new Map(nodes.map((n) => [n.id, n]));
+        for (const l of relations) {
+            if (typeof l.source === "string") l.source = byId.get(l.source) ?? l.source;
+            if (typeof l.target === "string") l.target = byId.get(l.target) ?? l.target;
+        }
+        return relations.filter((l) => typeof l.source === "object" && typeof l.target === "object");
     }
 
     /**
@@ -322,21 +342,22 @@
             }
         }
         layoutCache?.retain(nodes.map((n) => n.id));
+        const links = resolveLinks(nodes, relations);
 
-        if (!simulation) simulation = configureSimulation(nodes, relations, window.innerWidth, window.innerHeight, onSimTick, onSimEnd, () => simulationActive && !isDragging);
-        else updateSimulation(simulation, nodes, relations);
+        chart.setData(nodes, links);
+        chart.setClans(clans);
+        applyStyle();
+        if (knownFrac === 1) chart.layoutLabels();
+        if (!engine) return;
+
         // Everything remembered: only a gentle refine. Mostly remembered: heat
         // proportional to the share of newcomers (they are already seeded next
         // to their relatives), so a few additions do not reshuffle the graph.
         // Otherwise: a full layout.
-        simulation.alpha(warm ? Math.min(LAYOUT_REHEAT_ALPHA, LAYOUT_REFINE_ALPHA + (1 - knownFrac)) : 1);
-
-        chart.setData(nodes, relations);
-        chart.setClans(clans);
-        applyStyle();
-        if (knownFrac === 1) chart.layoutLabels();
-
-        if (!simulationActive) {
+        const alpha = warm ? Math.min(LAYOUT_REHEAT_ALPHA, LAYOUT_REFINE_ALPHA + (1 - knownFrac)) : 1;
+        if (simulationActive) {
+            engine.setGraph(nodes, links, alpha);
+        } else {
             // Sim inactive (edit mode): pin every node that already had a known
             // position so the 80-tick settle only lays out genuinely new nodes,
             // leaving existing positions stable across data changes.
@@ -346,9 +367,8 @@
                     d.fy = d.y;
                 }
             }
-            simulation.tick(80);
-            applyManualPositions();
-            simulation.alphaTarget(0).stop();
+            engine.setGraph(nodes, links, alpha, false);
+            engine.settle(80);
         }
     }
 
@@ -369,25 +389,31 @@
             })
             .on("start", (event: any) => {
                 const node: ChartNode = event.subject.node;
-                if (!event.active) simulation?.alphaTarget(0.3).restart();
                 node.fx = node.x;
                 node.fy = node.y;
+                engine?.pin(node);
+                if (!event.active) engine?.run({ alphaTarget: 0.3 });
                 isDragging = true;
             })
             .on("drag", (event: any) => {
                 const node: ChartNode = event.subject.node;
                 node.fx = c.transform.invertX(event.x);
                 node.fy = c.transform.invertY(event.y);
-                // A settled sim has stopped; keep the dragged node following the pointer.
-                simulation?.restart();
+                // The dragged node is main-thread authoritative: draw it under
+                // the pointer now, the worker catches up with its neighbours.
+                node.x = node.fx;
+                node.y = node.fy;
+                engine?.pin(node);
+                c.positionsChanged();
             })
             .on("end", (event: any) => {
                 const node: ChartNode = event.subject.node;
-                if (!event.active) simulation?.alphaTarget(0);
                 if (!node.fixed) {
                     node.fx = null;
                     node.fy = null;
                 }
+                engine?.pin(node);
+                if (!event.active) engine?.run({ alphaTarget: 0 });
                 if (pinnedPeople && node.type === "person") {
                     const personId = denormalizeId(node.id);
                     if (pinnedPeople.isPinned(personId)) pinnedPeople.updatePosition(personId, node.x, node.y);
@@ -424,15 +450,21 @@
 
     onMount(() => {
         const c = new CanvasChart(canvasEl);
+        engine = createLayoutEngine(
+            [window.innerWidth / 2, window.innerHeight / 2],
+            { onTick: onSimTick, onEnd: onSimEnd },
+            layoutWorkerSource,
+        );
         setupInteractions(c);
         (window as any).__stemmaChart = {
             snapshot: () => c.snapshot(),
-            layout: () => ({ ...layoutStats, firstDrawAt: c.firstDrawAt }),
+            layout: () => ({ ...layoutStats, firstDrawAt: c.firstDrawAt, engine: engine?.kind ?? null, running: engine?.isRunning() ?? false }),
         };
         chart = c;
         onchartReady?.(c);
         return () => {
-            simulation?.stop();
+            engine?.destroy();
+            engine = null;
             c.destroy();
             onchartReady?.(null);
             delete (window as any).__stemmaChart;

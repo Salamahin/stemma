@@ -317,8 +317,7 @@
             {focusedId}
             stemmaIndex={displayedStemmaIndex}
             {chart}
-            getSimulation={() => stemmaChart?.getSimulation() ?? null}
-            applyManualPositions={() => stemmaChart?.applyManualPositions()}
+            getLayoutCenter={() => stemmaChart?.getLayoutCenter() ?? [window.innerWidth / 2, window.innerHeight / 2]}
             onghostClick={(kind, focused, pins, existingFamilyId) => actions.onGhostClick(kind, focused, pins, existingFamilyId)}
             onpositionsChange={(p) => (ghostSimPositions = p)}
         />
@@ -351,8 +350,7 @@
         <Minimap
             bind:this={minimap}
             {editMode}
-            stemmaChartReady={!!chart}
-            getSimulation={() => stemmaChart?.getSimulation() ?? null}
+            {chart}
             getZoomTransform={() => stemmaChart?.getZoomTransform() ?? null}
             applyZoomTranslate={(tx, ty) => stemmaChart?.applyZoomTranslate(tx, ty)}
         />

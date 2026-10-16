@@ -1,6 +1,7 @@
 <script lang="ts">
     import * as d3 from "d3";
     import { normalizeId } from "../graphTools";
+    import { applyLayoutForces } from "../layoutCore";
     import { personColor } from "../graphStyles";
     import { t } from "../i18n";
     import type { StemmaIndex } from "../stemmaIndex";
@@ -24,8 +25,8 @@
         focusedId: FocusedId | null;
         stemmaIndex: StemmaIndex | null;
         chart: CanvasChart | null;
-        getSimulation: () => any;
-        applyManualPositions: () => void;
+        /** Where the main layout's centring forces pull (same forces here). */
+        getLayoutCenter: () => [number, number];
         onghostClick: (
             kind: GhostKind,
             focused: FocusedId,
@@ -39,8 +40,7 @@
         focusedId,
         stemmaIndex,
         chart,
-        getSimulation,
-        applyManualPositions,
+        getLayoutCenter,
         onghostClick,
         onpositionsChange,
     }: Props = $props();
@@ -63,8 +63,6 @@
     $effect(() => {
         if (!chart || !focusedId || !stemmaIndex) return;
         const c = chart;
-        const sim = getSimulation();
-        if (!sim) return;
 
         const focusDomId = normalizeId(focusedId.kind, focusedId.id);
         const focusNode = c.node(focusDomId);
@@ -122,40 +120,33 @@
             personPositionById,
         });
 
-        // All real datums stay frozen during the ghost burst. Real neighbours
-        // give real datums a temporary `r` so the main sim's collide force
-        // (`radius((d) => d.r * 20)`, which only sees datums with an `r`)
-        // registers the pair properly — without `r`, the ghost would pass
-        // straight through. Frozen + sized = ghost gets pushed around a
-        // rigid real graph; only ghost positions move, no cascade jitter when
-        // the focused node has many children or sits in a dense cluster.
+        // The ghost burst runs on the main thread in its own simulation: it is
+        // short (~55 ticks), interactive (focus, hover and ghost clicks need the
+        // positions synchronously) and every real node is frozen during it, so
+        // it shares nothing with the (worker) layout, which is stopped in edit
+        // mode anyway. Real nodes join as frozen copies, with all real links,
+        // so charge/collide/link (incl. d3's degree-based link bias) act on the
+        // ghosts exactly as when they were injected into the main simulation.
         const neighborDomIds = ghostSimNeighborDomIds(focusedId, stemmaIndex);
-        const realRSnapshots = new Map<string, number | undefined>();
-        const baseNodes = sim.nodes() as Array<any>;
-        const baseLinks = (sim.force("link") as d3.ForceLink<any, any>).links() as Array<any>;
         const datumById = new Map<string, any>();
-        for (const n of baseNodes) datumById.set(n.id, n);
+        const realCopies = c.nodes.map((n) => {
+            const copy: any = { id: n.id, type: n.type, x: n.x, y: n.y, fx: n.x, fy: n.y, vx: 0, vy: 0 };
+            datumById.set(n.id, copy);
+            return copy;
+        });
+        const realLinks = c.links
+            .filter((l) => typeof l.source === "object" && typeof l.target === "object")
+            .map((l) => ({ source: (l.source as any).id as string, target: (l.target as any).id as string }));
 
-        const assignCollideR = (id: string) => {
+        // Real neighbours (and the focused node) get a collide radius so the
+        // collide force — which only sees datums with an `r` — keeps ghosts off
+        // them. Frozen + sized = ghosts get pushed around a rigid real graph.
+        for (const id of neighborDomIds) {
             const d = datumById.get(id);
-            if (!d) return;
-            realRSnapshots.set(id, d.r);
-            d.r = GHOST_NEIGHBOUR_COLLIDE_R;
-        };
-        for (const id of neighborDomIds) assignCollideR(id);
-
-        // Hard-pin the focused datum. Edit-mode normally freezes every node,
-        // but a mid-focus re-render can clear fx/fy. Snapshot + force-pin
-        // guarantees the focus origin never shifts while ghosts are alive.
-        const focusedDatum = datumById.get(focusDomId);
-        const focusedSnapshot = focusedDatum
-            ? { fx: focusedDatum.fx, fy: focusedDatum.fy }
-            : null;
-        if (focusedDatum) {
-            focusedDatum.fx = focusedDatum.x;
-            focusedDatum.fy = focusedDatum.y;
-            assignCollideR(focusDomId);
+            if (d) d.r = GHOST_NEIGHBOUR_COLLIDE_R;
         }
+        const focusedDatum = datumById.get(focusDomId);
+        if (focusedDatum) focusedDatum.r = GHOST_NEIGHBOUR_COLLIDE_R;
 
         // Pin ghost y to the seed value: the schema (spouse east of focus at
         // same y, child below east family, parent above) is the affordance
@@ -169,13 +160,9 @@
             if (extra.type === "ghost-family") (extra as any).fx = extra.x;
         }
 
-        // Append ghost datums to main sim. d3.forceLink re-resolves string
-        // source/target via the node-id accessor configured in
-        // graphTools.configureSimulation.
-        sim.nodes([...baseNodes, ...injection.extraNodes]);
-        (sim.force("link") as d3.ForceLink<any, any>).links([...baseLinks, ...injection.extraLinks]);
-        const savedVelocityDecay = sim.velocityDecay();
-        const savedAlphaDecay = sim.alphaDecay();
+        const [cx, cy] = getLayoutCenter();
+        const sim = d3.forceSimulation([...realCopies, ...injection.extraNodes] as any[]).stop();
+        applyLayoutForces(sim, [...realLinks, ...injection.extraLinks] as any[], cx * 2, cy * 2);
         sim.velocityDecay(GHOST_VELOCITY_DECAY);
         sim.alphaDecay(GHOST_ALPHA_DECAY);
         sim.alphaTarget(0).alpha(GHOST_ALPHA_KICK).restart();
@@ -253,40 +240,10 @@
             c.canvas.removeEventListener("pointerup", onPointerUp);
             sim.on("tick.ghost", null);
             sim.on("end.ghost", null);
-
-            // Strip ghost datums out of the main sim arrays.
-            const ghostIds = new Set(injection.extraNodes.map((n) => n.id));
-            const survivingNodes = (sim.nodes() as Array<any>).filter((n) => !ghostIds.has(n.id));
-            const survivingLinks = ((sim.force("link") as d3.ForceLink<any, any>).links() as Array<any>).filter((l) => {
-                const src = typeof l.source === "string" ? l.source : (l.source as any).id;
-                const tgt = typeof l.target === "string" ? l.target : (l.target as any).id;
-                return !ghostIds.has(src) && !ghostIds.has(tgt);
-            });
-
-            // Strip temporary `r` from real datums so post-blur edit-mode
-            // collide behaviour is identical to pre-focus. Positions don't
-            // need restoring — neighbours were pinned the whole time.
-            for (const [id, prevR] of realRSnapshots) {
-                const d = datumById.get(id);
-                if (!d) continue;
-                d.r = prevR;
-            }
-            sim.nodes(survivingNodes);
-            (sim.force("link") as d3.ForceLink<any, any>).links(survivingLinks);
-
-            // Restore focused datum's original fx/fy snapshot. Edit-mode's
-            // re-pin path picks it back up via hadKnownPosition.
-            if (focusedDatum && focusedSnapshot) {
-                focusedDatum.fx = focusedSnapshot.fx;
-                focusedDatum.fy = focusedSnapshot.fy;
-            }
-
-            sim.alphaTarget(0).stop();
-            sim.velocityDecay(savedVelocityDecay);
-            sim.alphaDecay(savedAlphaDecay);
-            applyManualPositions();
+            sim.stop();
             onpositionsChange([]);
             hideGhosts();
         };
     });
 </script>
+

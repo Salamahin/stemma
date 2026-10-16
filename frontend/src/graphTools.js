@@ -1,5 +1,3 @@
-import * as d3 from "d3";
-
 export function makeNodesAndRelations(people, families) {
     let nodes = [
         ...people.map((p) => ({
@@ -54,109 +52,17 @@ export function setActiveLayoutCache(cache) {
     activeLayoutCache = cache || null
 }
 
-/**
- * forceCollide restricted to datums that carry an explicit `r`.
- *
- * Real nodes have no `r`; only ghost nodes and their focused neighbours get
- * one (see ghostSim.ts). The previous `forceCollide().radius(d => d.r * 20)`
- * produced NaN radii for every real node: such pairs never collided, but NaN
- * also disabled the quadtree pruning, turning every tick into an O(n²) walk
- * (~70% of main-thread time on a 1000-person stemma). Filtering the datums at
- * initialize() time keeps the exact same collision pairs without the cost.
- */
-export function forceCollideSized(radius) {
-    const inner = d3.forceCollide().radius(radius);
-    let active = false;
-    function force(alpha) {
-        if (active) inner(alpha);
+/** Remembers where every node is (this session + the per-stemma layout cache). */
+export function recordPositions(nodes) {
+    for (const d of nodes) {
+        if (d.type !== "person" && d.type !== "family") continue;
+        sessionPositions.set(d.id, [d.x, d.y]);
+        if (activeLayoutCache) activeLayoutCache.set(d.id, d.x, d.y, d.vx ?? 0, d.vy ?? 0);
     }
-    force.initialize = (nodes, random) => {
-        const sized = nodes.filter((n) => n.r != null);
-        active = sized.length > 1;
-        inner.initialize(sized, random);
-    };
-    force.radius = (...args) => (args.length ? (inner.radius(...args), force) : inner.radius());
-    return force;
 }
 
-/** Ticks with every |velocity| below this many world units before a self-sustaining sim is let to settle. */
-const SETTLE_VELOCITY = 0.02;
-const SETTLE_TICKS = 30;
-
-/**
- * Layout tuning (see e2e/bench/layoutExperiment.mjs). The old setup —
- * velocityDecay 0.8 plus a permanent alphaTarget 0.1 — crept towards its
- * equilibrium for minutes and never stopped. Lower friction reaches nearly the
- * same picture (size, aspect, overlaps) in ~200 ticks and then ends.
- */
-export const LAYOUT_TICKS = 200;
-export const LAYOUT_VELOCITY_DECAY = 0.3;
-export const LAYOUT_ALPHA_DECAY = 1 - Math.pow(0.001, 1 / LAYOUT_TICKS);
-export const LAYOUT_THETA = 1.2;
-/** Reheat for data changes / leaving edit mode: a gentle refine, not a full relayout. */
-export const LAYOUT_REHEAT_ALPHA = 0.3;
-/** Start alpha when every node has a remembered position: a short, gentle refine. */
-export const LAYOUT_REFINE_ALPHA = 0.02;
-/** Main-thread time per animation frame the layout may spend on extra ticks. */
-const BURST_BUDGET_MS = 8;
-
-export function configureSimulation(nodes, relations, width, height, onTick, onEnd, canBurst) {
-    const sim = d3
-        .forceSimulation(nodes)
-        .force(
-            "link",
-            d3.forceLink(relations).id((node) => node.id).strength(2).distance(85)
-        )
-        .force("x", d3.forceX().x(width * 0.5).strength(0.05))
-        .force("y", d3.forceY().y(height * 0.5).strength(0.05))
-        .force("collide", forceCollideSized((d) => d.r * 20))
-        .force("repelForce", d3.forceManyBody().strength(-1500).distanceMin(85).theta(LAYOUT_THETA))
-        .velocityDecay(LAYOUT_VELOCITY_DECAY)
-        .alphaDecay(LAYOUT_ALPHA_DECAY);
-
-    let calmTicks = 0;
-    sim.on("tick", () => {
-        // d3's timer gives one tick per frame. While a layout is settling (no
-        // drag, no ghost burst) spend a small frame budget on extra ticks so
-        // it converges in about a second instead of ~3.5 s of frames.
-        if (canBurst?.() && sim.alphaTarget() === 0) {
-            const start = performance.now();
-            while (sim.alpha() >= sim.alphaMin() && performance.now() - start < BURST_BUDGET_MS) sim.tick();
-        }
-        let maxV = 0;
-        for (const d of sim.nodes()) {
-            if (d.type !== "person" && d.type !== "family") continue;
-            sessionPositions.set(d.id, [d.x, d.y]);
-            if (activeLayoutCache) activeLayoutCache.set(d.id, d.x, d.y, d.vx ?? 0, d.vy ?? 0);
-            const v = Math.max(Math.abs(d.vx ?? 0), Math.abs(d.vy ?? 0));
-            if (v > maxV) maxV = v;
-        }
-        // A positive alphaTarget keeps the sim alive forever, re-rendering a
-        // graph that no longer moves. Once nothing has moved for a while, let
-        // alpha decay so the normal "end" path (label layout, cache save) runs.
-        calmTicks = maxV < SETTLE_VELOCITY ? calmTicks + 1 : 0;
-        if (calmTicks >= SETTLE_TICKS && sim.alphaTarget() > 0) {
-            calmTicks = 0;
-            sim.alphaTarget(0).alpha(0);
-        }
-        onTick?.();
-    });
-
-    sim.on("end", () => {
-        calmTicks = 0;
-        onEnd?.();
-        if (activeLayoutCache) activeLayoutCache.save();
-    });
-
-    return sim;
-}
-
-export function updateSimulation(simulation, nodes, relations) {
-    simulation.nodes(nodes)
-    simulation.force("link").links(relations)
-    simulation.velocityDecay(LAYOUT_VELOCITY_DECAY)
-    simulation.alphaDecay(LAYOUT_ALPHA_DECAY)
-    simulation.alphaTarget(0).alpha(Math.max(simulation.alpha(), LAYOUT_REHEAT_ALPHA)).restart()
+export function saveLayoutCache() {
+    if (activeLayoutCache) activeLayoutCache.save();
 }
 
 export const PERSON_PREFIX = "person_";
