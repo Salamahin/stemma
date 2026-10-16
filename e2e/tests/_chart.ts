@@ -13,6 +13,7 @@ export type ChartNode = {
   r: number;
   drawn: boolean;
   pending: boolean;
+  labelHidden: boolean;
   clientX: number;
   clientY: number;
 };
@@ -35,12 +36,14 @@ export type ChartSnapshot = {
   ghosts: ChartGhost[];
   edges: ChartEdge[];
   stats: { edges: number; arrows: number; nodes: number };
+  /** How many times person labels were (re)placed — label layout runs when the layout rests. */
+  labelLayouts: number;
 };
 
 export async function chartSnapshot(page: Page): Promise<ChartSnapshot> {
   return await page.evaluate(() => {
     const api = (window as unknown as { __stemmaChart?: { snapshot(): unknown } }).__stemmaChart;
-    if (!api) return { nodes: [], ghosts: [], edges: [], stats: { edges: 0, arrows: 0, nodes: 0 } };
+    if (!api) return { nodes: [], ghosts: [], edges: [], stats: { edges: 0, arrows: 0, nodes: 0 }, labelLayouts: 0 };
     return api.snapshot();
   }) as ChartSnapshot;
 }
