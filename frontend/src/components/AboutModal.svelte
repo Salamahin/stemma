@@ -111,8 +111,14 @@
         </section>
 
         <section>
-            <h6>{$t("about.namesakesTitle")}</h6>
-            <p>{$t("about.namesakesText")}</p>
+            <h6>{$t("about.editingTitle")}</h6>
+            <p>{$t("about.editingText1")}</p>
+            <p>{$t("about.editingText2")}</p>
+        </section>
+
+        <section>
+            <h6>{$t("about.viewingTitle")}</h6>
+            <p>{$t("about.viewingText")}</p>
         </section>
 
         <section>
