@@ -84,6 +84,7 @@ class CloneResult:
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
 class TokenAccepted:
     stemmas: list[StemmaDescription]
+    stemma_id: str
     last_stemma: Stemma
     type: Literal["TokenAccepted"] = "TokenAccepted"
 

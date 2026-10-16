@@ -31,7 +31,7 @@
     import Chrome from "./components/Chrome.svelte";
     import PendingVisuals from "./components/PendingVisuals.svelte";
     import Minimap from "./components/Minimap.svelte";
-    import { buildInviteLink } from "./inviteLinkBuilder";
+    import { capturePendingInvite, takePendingInvite } from "./inviteLinkBuilder";
     import { Circle2 } from "svelte-loading-spinners";
     import { normalizeId } from "./graphTools";
     import type { CanvasChart } from "./canvasChart";
@@ -60,6 +60,8 @@
     let pinnedPeople = $state<PinnedPeopleStorage | null>(null);
     let isWorking = $state<boolean>(false);
     let error = $state<Error | null>(null);
+    let invitationLink = $state<string | null>(null);
+    let invitationPending = $state(false);
     let highlightVersion = $state(0);
 
     let selectedFamilyId = $state<string | null>(null);
@@ -162,12 +164,8 @@
         controller.pinnedStorage.subscribe((pp) => (pinnedPeople = pp)),
         controller.isWorking.subscribe((iw) => (isWorking = iw)),
         controller.err.subscribe((e) => (error = e)),
-        controller.invitationToken.subscribe((tkn) => {
-            if (!tkn) return;
-            const link = buildInviteLink(window.location.origin, tkn);
-            void navigator.clipboard?.writeText(link).catch(() => {});
-            shareAccessModal?.dismiss();
-        }),
+        controller.invitationLink.subscribe((link) => (invitationLink = link)),
+        controller.invitationPending.subscribe((p) => (invitationPending = p)),
     ];
 
     const displayedStemma = $derived.by<Stemma | null>(() => {
@@ -261,6 +259,20 @@
             error = err as Error;
         }
     }
+
+    // An invite link may be opened signed out: keep the token across sign-in
+    // and accept it once the session is up.
+    capturePendingInvite(
+        window.location.href,
+        (url) => window.history.replaceState(window.history.state, "", url),
+        window.sessionStorage,
+    );
+
+    $effect(() => {
+        if (!signedIn) return;
+        const token = takePendingInvite(window.sessionStorage);
+        if (token) untrack(() => void controller.bearInvitationToken(token));
+    });
 
     onMount(() => {
         const boot = session.e2eAutoLoginEnabled
@@ -434,6 +446,8 @@
     <SettingsModal bind:this={settingsModal} />
     <ShareAccessModal
         bind:this={shareAccessModal}
+        link={invitationLink}
+        pending={invitationPending}
         oncreate={(p) => controller.createInvitationToken(p.personId, p.email)}
     />
     <PromptModal bind:this={promptModal} />
