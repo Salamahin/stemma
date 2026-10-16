@@ -1,10 +1,20 @@
 # Frontend — editor UI
 
-Single-version Svelte 5 (runes) UI. `main.ts` mounts `App.svelte` at every path. Edit mode toggles drag gestures + ghost affordances on the SVG canvas.
+Single-version Svelte 5 (runes) UI. `main.ts` mounts `App.svelte` at every path. Edit mode toggles drag gestures + ghost affordances on the chart canvas.
+
+## Chart rendering
+
+The family graph is drawn on `<canvas id="chart">` by `canvasChart.ts` (Canvas2D), not SVG — there is no per-node DOM.
+
+- `FullStemma.svelte` owns the d3-force simulation (`graphTools.configureSimulation`), d3.zoom/d3.drag on the canvas, and hover highlight; it hands the `CanvasChart` to the other components via `onchartReady` → `chart` prop.
+- The renderer draws on demand (one rAF per invalidation: sim tick, zoom, hover/style change, running fade/pulse) and culls off-screen nodes. Edges/arrows are batched per style; the blurred clan clouds are rasterised into an offscreen bitmap and only re-rasterised when positions change (≤10/s during the sim).
+- Hit-testing goes through `chart.hitNode(clientX, clientY)` (quadtree; circle or name label, like the old `<g>`), `chart.hitGhost`, `chart.clientToWorld`. Visual states that used to be CSS classes are renderer state: `setPendingMarks`, `setDropClasses`, `setDropTarget`, `setGestureSource`, `setOverlay`, `showGhosts`.
+- The main sim's collide force only sees datums with an `r` (`forceCollideSized`); real nodes have none, ghosts and their focused neighbours get one. Do not go back to `forceCollide().radius(d => d.r * 20)` over all nodes — NaN radii disable quadtree pruning and made every tick O(n²).
+- Tests/debug: `window.__stemmaChart.snapshot()` returns drawn nodes, ghosts, edges (with arrow kind) and per-frame stats; e2e helpers in `e2e/tests/_chart.ts`. Perf scripts: `e2e/bench/` (`renderBench.mjs`, `profileBench.mjs`, synthetic stemmas, mocked backend).
 
 ## Drag scenario matrix
 
-Edit-mode pointer drag on the SVG canvas (`DragGestures.svelte`). The user presses mouse-down on a node (or empty canvas), drags, and releases on a node (or empty canvas). Source kind × target kind determines outcome.
+Edit-mode pointer drag on the chart canvas (`DragGestures.svelte`). The user presses mouse-down on a node (or empty canvas), drags, and releases on a node (or empty canvas). Source kind × target kind determines outcome.
 
 Six valid gestures exist. Any other (FROM, TO) pair is a no-op.
 
@@ -49,7 +59,7 @@ No-op gestures (explicitly): person→person, family→family, empty→empty.
 ### Notes
 
 - "Silent" means no modal — the link or pending family appears immediately. Pending visuals come from `pendingAdds` / `pendingFamilies` in `App.svelte`.
-- Disallowed links (cycle, duplicate spouse, too many parents, member already in pending family) are filtered via `StemmaIndex.canAddParent` / `canAddChild` and `findPendingFamily` membership checks. Hovering an invalid target shows the `drop-disallowed` class.
+- Disallowed links (cycle, duplicate spouse, too many parents, member already in pending family) are filtered via `StemmaIndex.canAddParent` / `canAddChild` and `findPendingFamily` membership checks. Hovering an invalid target shows the `drop-disallowed` state (faded, not hit-testable).
 
 ### Code locations
 

@@ -1,7 +1,7 @@
 /**
  * Pure helpers for the focus state machine.
  *
- * Desktop: mousemove with distance-based hit detection (150 px radius in SVG
+ * Desktop: mousemove with distance-based hit detection (150 px radius in chart
  * user-space) -> focus; mouseleave from SVG -> debounced clear (150 ms).
  * Mobile: pointerdown starts a tap timer; pointerup within TAP_MAX_MS and
  * TAP_MAX_MOVE_PX -> short-tap -> focus. Movement or timeout = drag, no focus.
@@ -82,26 +82,38 @@ export function closestNodeG(target: EventTarget | null): SVGGElement | null {
 }
 
 /**
- * Derives a FocusedId from a DOM `<g>` element produced by the chart, or
- * returns null if the element is a pending node (which should not receive focus).
+ * Derives a FocusedId from a chart node id ("person_<id>" / "family_<id>"),
+ * or returns null if it is a pending node (which should not receive focus).
  */
-export function focusedIdFromG(
-    g: SVGGElement,
+export function focusedIdFromNodeId(
+    nodeId: string,
     isPendingId: (id: string) => boolean,
 ): FocusedId | null {
-    const kind: NodeKind = g.id.startsWith("person_") ? "person" : "family";
-    const id = g.id.split("_")[1];
+    const kind: NodeKind = nodeId.startsWith("person_") ? "person" : "family";
+    const id = nodeId.split("_")[1];
     if (isPendingId(id)) return null;
     return { kind, id };
 }
 
 /**
+ * Derives a FocusedId from a DOM `<g>` element whose id follows the chart
+ * node-id scheme, or returns null if the element is a pending node.
+ */
+export function focusedIdFromG(
+    g: SVGGElement,
+    isPendingId: (id: string) => boolean,
+): FocusedId | null {
+    return focusedIdFromNodeId(g.id, isPendingId);
+}
+
+export type PositionedNode = { id: string; x?: number | null; y?: number | null };
+
+/**
  * Finds the nearest real (non-pending) person or family node whose center is
- * within `acquireRadius` SVG user-space units of `(cursorSvgX, cursorSvgY)`.
+ * within `acquireRadius` user-space units of `(cursorX, cursorY)`.
  *
- * Each candidate <g> element must carry a d3 datum with `x` and `y` fields
- * (the same format d3-force populates).  Real node <g> elements have ids
- * starting with "person_" or "family_".
+ * `nodes` are the chart's real-node datums (ids starting with "person_" or
+ * "family_", positions as populated by d3-force).
  *
  * Hysteresis: if `currentFocus` is supplied and the cursor is still within
  * `stickyRadius` of that node, focus is held even when no other node is in
@@ -111,9 +123,9 @@ export function focusedIdFromG(
  * Returns null when no node is within range and no sticky candidate exists.
  */
 export function nearestNodeWithinRadius(
-    mainG: SVGGElement,
-    cursorSvgX: number,
-    cursorSvgY: number,
+    nodes: Iterable<PositionedNode>,
+    cursorX: number,
+    cursorY: number,
     acquireRadius: number,
     isPendingId: (id: string) => boolean,
     currentFocus: FocusedId | null = null,
@@ -123,13 +135,12 @@ export function nearestNodeWithinRadius(
     let bestDist = acquireRadius;
     let currentDist = Infinity;
 
-    const candidates = mainG.querySelectorAll<SVGGElement>("g[id^='person_'], g[id^='family_']");
-    for (const g of candidates) {
-        const datum = (g as SVGGElement & { __data__?: { x?: number; y?: number } }).__data__;
-        if (!datum || datum.x == null || datum.y == null) continue;
-        const focused = focusedIdFromG(g, isPendingId);
+    for (const datum of nodes) {
+        if (!datum.id.startsWith("person_") && !datum.id.startsWith("family_")) continue;
+        if (datum.x == null || datum.y == null) continue;
+        const focused = focusedIdFromNodeId(datum.id, isPendingId);
         if (!focused) continue;
-        const dist = Math.hypot(datum.x - cursorSvgX, datum.y - cursorSvgY);
+        const dist = Math.hypot(datum.x - cursorX, datum.y - cursorY);
         if (dist <= bestDist) {
             bestDist = dist;
             bestInAcquire = focused;

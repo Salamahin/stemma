@@ -96,23 +96,6 @@ export function clanShape(positions: ReadonlyArray<readonly [number, number]>): 
     return { cx, cy, rx, ry, angle };
 }
 
-export function initClanLayer(svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, any>) {
-    const main = svg.select("g.main");
-    let layer = main.select<SVGGElement>("g.clans");
-    if (layer.empty()) {
-        layer = main.insert("g", ":first-child").attr("class", "clans");
-    }
-    layer.attr("pointer-events", "none");
-    // CSS filter on the layer is GPU-accelerated; per-element feGaussianBlur on
-    // many paths locked Chrome's main thread on large stemmas.
-    let blobs = layer.select<SVGGElement>("g.blobs");
-    if (blobs.empty()) blobs = layer.append("g").attr("class", "blobs");
-    blobs.style("filter", `blur(${LAYER_BLUR_PX}px)`);
-    if (layer.select<SVGGElement>("g.labels").empty()) layer.append("g").attr("class", "labels");
-    layer.lower();
-}
-
-type ClanRenderData = { clan: Clan; points: [number, number][]; shape: ClanShape; hull: [number, number][] };
 
 // Compute a convex hull around the points, then push every hull vertex outward
 // from the cluster centroid by HULL_PADDING so the blob extends beyond the nodes.
@@ -145,84 +128,77 @@ export function paddedHull(
     return ring;
 }
 
-export function updateClanLayer(
-    svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, any>,
-    clans: ReadonlyArray<Clan>,
-    nodes: ReadonlyArray<ClanNodePosition>,
-) {
-    const layer = svg.select<SVGGElement>("g.main > g.clans");
-    if (layer.empty()) return;
-    layer.lower();
+export type ClanRenderData = {
+    clan: Clan;
+    points: [number, number][];
+    shape: ClanShape;
+    hull: [number, number][];
+    /** Font size (px, user space) at which the label fits inside the hull. */
+    labelFontSize: number;
+};
 
-    const positionById = new Map<string, [number, number]>();
-    for (const n of nodes) positionById.set(n.id, [n.x, n.y]);
+export const CLAN_BLOB_OPACITY = 0.22;
+export const CLAN_LABEL_OPACITY = 0.6;
+export const CLAN_LABEL_FONT_FAMILY = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+export const CLAN_LABEL_LETTER_SPACING_EM = 0.1;
+export { LAYER_BLUR_PX as CLAN_BLUR_PX, LABEL_BASELINE_FONT_PX as CLAN_LABEL_BASELINE_FONT_PX };
 
-    const data: ClanRenderData[] = clans
-        .map(clan => {
-            const points: [number, number][] = [];
-            for (const pid of clan.personIds) {
-                const pos = positionById.get(normalizeId("person", pid));
-                if (pos) points.push(pos);
-            }
-            if (points.length < 2) return null;
-            const shape = clanShape(points);
-            return { clan, points, shape, hull: paddedHull(points, shape) };
-        })
-        .filter((x): x is ClanRenderData => x !== null);
+export function clanLabelText(clan: Clan): string {
+    return clan.surname.toUpperCase();
+}
 
-    const pathGen = d3.line<[number, number]>()
+/**
+ * Scale the label font so the text fits inside the blob on both axes, measured
+ * in the label's local rotated frame. `measure` returns the label's width and
+ * height at LABEL_BASELINE_FONT_PX.
+ */
+export function fitClanLabelFont(
+    hull: ReadonlyArray<readonly [number, number]>,
+    shape: ClanShape,
+    measured: { width: number; height: number },
+): number {
+    if (measured.width <= 0 || measured.height <= 0) return LABEL_BASELINE_FONT_PX;
+    const { halfW, halfH } = inscribedHalfExtents(hull, shape.cx, shape.cy, shape.angle);
+    const maxW = 2 * halfW * LABEL_FIT_FRACTION;
+    const maxH = 2 * halfH * LABEL_FIT_FRACTION;
+    const scale = Math.min(maxW / measured.width, maxH / measured.height);
+    return Math.max(LABEL_MIN_FONT_PX, LABEL_BASELINE_FONT_PX * scale);
+}
+
+/** Smooth closed outline through the padded hull (same curve as the old SVG path). */
+export function clanBlobPath(hull: Array<[number, number]>, context: CanvasRenderingContext2D | null = null): string | null {
+    const gen = d3.line<[number, number]>()
         .x(p => p[0])
         .y(p => p[1])
         .curve(d3.curveCatmullRomClosed.alpha(0.7));
+    if (context) {
+        gen.context(context);
+        gen(hull);
+        return null;
+    }
+    return gen(hull) ?? "";
+}
 
-    const blobs = layer.select("g.blobs")
-        .selectAll<SVGPathElement, ClanRenderData>("path.clan-blob")
-        .data(data, d => d.clan.surname);
-    blobs.enter()
-        .append("path")
-        .attr("class", "clan-blob")
-        .attr("opacity", 0.22)
-        .merge(blobs)
-        .attr("fill", d => d.clan.color)
-        .attr("d", d => pathGen(d.hull) ?? "");
-    blobs.exit().remove();
+export function computeClanRenderData(
+    clans: ReadonlyArray<Clan>,
+    nodes: ReadonlyArray<ClanNodePosition>,
+    measureLabel: (text: string) => { width: number; height: number },
+): ClanRenderData[] {
+    const positionById = new Map<string, [number, number]>();
+    for (const n of nodes) positionById.set(n.id, [n.x, n.y]);
 
-    const labels = layer.select("g.labels")
-        .selectAll<SVGTextElement, ClanRenderData>("text.clan-label")
-        .data(data, d => d.clan.surname);
-    const labelEntering = labels.enter().append("text").attr("class", "clan-label");
-    labels.exit().remove();
-    const labelsMerged = labelEntering.merge(labels);
-    labelsMerged
-        .text(d => d.clan.surname.toUpperCase())
-        .attr("text-anchor", "middle")
-        .attr("dominant-baseline", "middle")
-        .attr("font-family", "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace")
-        .attr("font-weight", "600")
-        .attr("font-style", "normal")
-        .attr("letter-spacing", "0.1em")
-        .attr("fill", "#ffffff")
-        .attr("opacity", 0.6)
-        .attr("pointer-events", "none")
-        .attr("transform", d => {
-            const deg = (d.shape.angle * 180) / Math.PI;
-            return `translate(${d.shape.cx},${d.shape.cy}) rotate(${deg})`;
-        })
-        .attr("font-size", LABEL_BASELINE_FONT_PX)
-        .attr("textLength", null)
-        .attr("lengthAdjust", null);
-
-    // Measure rendered text against the actual blob (paddedHull) in the label's
-    // local rotated frame, then scale font-size so the text fits on both axes.
-    labelsMerged.each(function (d) {
-        const node = this as SVGTextElement;
-        const bbox = node.getBBox();
-        if (bbox.width <= 0 || bbox.height <= 0) return;
-        const { halfW, halfH } = inscribedHalfExtents(d.hull, d.shape.cx, d.shape.cy, d.shape.angle);
-        const maxW = 2 * halfW * LABEL_FIT_FRACTION;
-        const maxH = 2 * halfH * LABEL_FIT_FRACTION;
-        const scale = Math.min(maxW / bbox.width, maxH / bbox.height);
-        const fontSize = Math.max(LABEL_MIN_FONT_PX, LABEL_BASELINE_FONT_PX * scale);
-        node.setAttribute("font-size", String(fontSize));
-    });
+    const out: ClanRenderData[] = [];
+    for (const clan of clans) {
+        const points: [number, number][] = [];
+        for (const pid of clan.personIds) {
+            const pos = positionById.get(normalizeId("person", pid));
+            if (pos) points.push(pos);
+        }
+        if (points.length < 2) continue;
+        const shape = clanShape(points);
+        const hull = paddedHull(points, shape);
+        const labelFontSize = fitClanLabelFont(hull, shape, measureLabel(clanLabelText(clan)));
+        out.push({ clan, points, shape, hull, labelFontSize });
+    }
+    return out;
 }

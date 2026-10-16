@@ -1,16 +1,7 @@
 <script lang="ts">
     import * as d3 from "d3";
     import { normalizeId } from "../graphTools";
-    import {
-        personR,
-        familyR,
-        labelFontSize,
-        familyRelationWidth,
-        childRelationWidth,
-        arrowPath,
-        personColor,
-        defaultFamilyColor,
-    } from "../graphStyles";
+    import { personColor } from "../graphStyles";
     import { t } from "../i18n";
     import type { StemmaIndex } from "../stemmaIndex";
     import type { FocusedId } from "../focusGesture";
@@ -20,21 +11,19 @@
         realFamilyIdFromRef,
         type GhostKind,
     } from "../ghostHelpers";
-    import { nodeCenter } from "../domGeometry";
-    import { trimToCircle, GHOST_EDGE_GAP } from "../ghostEdgeGeometry";
     import {
         buildGhostInjection,
         ghostSimNeighborDomIds,
         resolveAnchorSimId,
         GHOST_NEIGHBOUR_COLLIDE_R,
-        type GhostExtraLink,
         type GhostExtraNode,
     } from "../ghostSim";
+    import type { CanvasChart, GhostEdgeView, GhostNodeView } from "../canvasChart";
 
     type Props = {
         focusedId: FocusedId | null;
         stemmaIndex: StemmaIndex | null;
-        stemmaChartReady: boolean;
+        chart: CanvasChart | null;
         getSimulation: () => any;
         applyManualPositions: () => void;
         onghostClick: (
@@ -49,7 +38,7 @@
     let {
         focusedId,
         stemmaIndex,
-        stemmaChartReady,
+        chart,
         getSimulation,
         applyManualPositions,
         onghostClick,
@@ -58,11 +47,6 @@
 
     type Pos = { x: number; y: number };
 
-    const SVG_NS = "http://www.w3.org/2000/svg";
-    const GHOST_FADE_MS = 200;
-    const GHOST_COLOR = "#6c757d";
-    const GHOST_ARROW_TO_FAMILY_ID = "ghost-arrow-to-family";
-    const GHOST_ARROW_TO_PERSON_ID = "ghost-arrow-to-person";
     /**
      * Springy-bounce profile: one strong energy burst that decays fast.
      * - alpha kicked to 0.6 on focus so charge + collide push hard up front.
@@ -76,54 +60,15 @@
     const GHOST_ALPHA_DECAY = 0.12;
     const GHOST_VELOCITY_DECAY = 0.6;
 
-    let fadingOutGhostEls: Element[] = [];
-
-    function fadeOutAndRemove(els: Element[]): void {
-        if (els.length === 0) return;
-        for (const el of els) (el as HTMLElement | SVGElement).style.opacity = "0";
-        fadingOutGhostEls = [...fadingOutGhostEls, ...els];
-        setTimeout(() => {
-            for (const el of els) el.parentNode?.removeChild(el);
-            fadingOutGhostEls = fadingOutGhostEls.filter((e) => !els.includes(e));
-        }, GHOST_FADE_MS);
-    }
-
-    function ensureGhostMarkers(svgEl: SVGSVGElement): void {
-        if (svgEl.querySelector(`marker#${GHOST_ARROW_TO_FAMILY_ID}`)) return;
-        let defs = svgEl.querySelector("defs") as SVGDefsElement | null;
-        if (!defs) {
-            defs = document.createElementNS(SVG_NS, "defs") as SVGDefsElement;
-            svgEl.insertBefore(defs, svgEl.firstChild);
-        }
-        for (const id of [GHOST_ARROW_TO_FAMILY_ID, GHOST_ARROW_TO_PERSON_ID]) {
-            const marker = document.createElementNS(SVG_NS, "marker") as SVGMarkerElement;
-            marker.setAttribute("id", id);
-            marker.setAttribute("viewBox", "0 0 10 6");
-            marker.setAttribute("refX", "10");
-            marker.setAttribute("refY", "3");
-            marker.setAttribute("markerWidth", "10");
-            marker.setAttribute("markerHeight", "6");
-            marker.setAttribute("markerUnits", "userSpaceOnUse");
-            marker.setAttribute("orient", "auto");
-            const path = document.createElementNS(SVG_NS, "path") as SVGPathElement;
-            path.setAttribute("d", arrowPath);
-            path.style.fill = GHOST_COLOR;
-            marker.appendChild(path);
-            defs.appendChild(marker);
-        }
-    }
-
     $effect(() => {
-        if (!stemmaChartReady) return;
-        const svgEl = document.getElementById("chart") as unknown as SVGSVGElement | null;
-        const mainG = svgEl?.querySelector("g.main") as SVGGElement | null;
-        if (!svgEl || !mainG || !focusedId || !stemmaIndex) return;
+        if (!chart || !focusedId || !stemmaIndex) return;
+        const c = chart;
         const sim = getSimulation();
         if (!sim) return;
 
         const focusDomId = normalizeId(focusedId.kind, focusedId.id);
-        const focusEl = mainG.querySelector(`#${CSS.escape(focusDomId)}`) as SVGGElement | null;
-        const origin = focusEl ? nodeCenter(focusEl) : null;
+        const focusNode = c.node(focusDomId);
+        const origin: Pos | null = focusNode ? { x: focusNode.x, y: focusNode.y } : null;
         if (!origin) return;
 
         const layout = deriveGhostLayout(focusedId, stemmaIndex);
@@ -144,13 +89,11 @@
             return personColor(ratio);
         };
 
-        ensureGhostMarkers(svgEl);
         const labels = $t;
-        const allGhostEls: SVGElement[] = [];
 
         const nodeCenterById = (kind: "person" | "family", id: string): Pos | null => {
-            const el = mainG.querySelector(`#${CSS.escape(normalizeId(kind, id))}`) as SVGGElement | null;
-            return el ? nodeCenter(el) : null;
+            const n = c.node(normalizeId(kind, id));
+            return n ? { x: n.x, y: n.y } : null;
         };
 
         const familyAnchorByRef = new Map<string, Pos>();
@@ -181,9 +124,9 @@
 
         // All real datums stay frozen during the ghost burst. Real neighbours
         // give real datums a temporary `r` so the main sim's collide force
-        // (`radius((d) => d.r * 20)`) registers the pair properly — without
-        // `r`, the focused/neighbour side returns NaN and the ghost would
-        // pass straight through. Frozen + sized = ghost gets pushed around a
+        // (`radius((d) => d.r * 20)`, which only sees datums with an `r`)
+        // registers the pair properly — without `r`, the ghost would pass
+        // straight through. Frozen + sized = ghost gets pushed around a
         // rigid real graph; only ghost positions move, no cascade jitter when
         // the focused node has many children or sits in a dense cluster.
         const neighborDomIds = ghostSimNeighborDomIds(focusedId, stemmaIndex);
@@ -237,141 +180,64 @@
         sim.alphaDecay(GHOST_ALPHA_DECAY);
         sim.alphaTarget(0).alpha(GHOST_ALPHA_KICK).restart();
 
-        type GhostEdgeRef = {
-            line: SVGLineElement;
-            sourceId: string;
-            targetId: string;
-            edgeKind: "focusToFamily" | "familyToPerson";
-        };
-        const edgeRefs: GhostEdgeRef[] = [];
-
-        const applyEdgeEndpoints = (ref: GhostEdgeRef, source: Pos, target: Pos): void => {
-            const sourceR = ref.edgeKind === "focusToFamily" ? personR : familyR;
-            const targetR = ref.edgeKind === "focusToFamily" ? familyR : personR;
-            const tip = trimToCircle(source.x, source.y, target.x, target.y, targetR + GHOST_EDGE_GAP);
-            const tail = trimToCircle(target.x, target.y, source.x, source.y, sourceR + GHOST_EDGE_GAP);
-            ref.line.setAttribute("x1", String(tail.x));
-            ref.line.setAttribute("y1", String(tail.y));
-            ref.line.setAttribute("x2", String(tip.x));
-            ref.line.setAttribute("y2", String(tip.y));
-        };
-
-        const makeLine = (
-            sourceId: string,
-            targetId: string,
-            sourcePos: Pos,
-            targetPos: Pos,
-            edgeKind: "focusToFamily" | "familyToPerson",
-        ): void => {
-            const line = document.createElementNS(SVG_NS, "line") as SVGLineElement;
-            line.setAttribute("class", "ghost-edge");
-            if (edgeKind === "focusToFamily") {
-                line.setAttribute("stroke-width", familyRelationWidth);
-                line.setAttribute("marker-end", `url(#${GHOST_ARROW_TO_FAMILY_ID})`);
-            } else {
-                line.setAttribute("stroke-width", childRelationWidth);
-                line.setAttribute("marker-end", `url(#${GHOST_ARROW_TO_PERSON_ID})`);
-            }
-            line.style.opacity = "0";
-            mainG.appendChild(line);
-            allGhostEls.push(line);
-            const ref: GhostEdgeRef = { line, sourceId, targetId, edgeKind };
-            edgeRefs.push(ref);
-            applyEdgeEndpoints(ref, sourcePos, targetPos);
-        };
-
-        const ghostFamilyEls = new Map<string, SVGGElement>();
-        const ghostPersonEls = new Map<string, SVGGElement>();
-
-        const makeGhostFamilyEl = (id: string, pos: Pos): void => {
-            const g = document.createElementNS(SVG_NS, "g") as SVGGElement;
-            g.setAttribute("id", id);
-            g.setAttribute("class", "ghost-family");
-            g.setAttribute("transform", `translate(${pos.x},${pos.y})`);
-            g.style.opacity = "0";
-            g.style.pointerEvents = "none";
-            const c = document.createElementNS(SVG_NS, "circle") as SVGCircleElement;
-            c.setAttribute("r", String(familyR));
-            c.style.fill = defaultFamilyColor;
-            g.appendChild(c);
-            mainG.appendChild(g);
-            allGhostEls.push(g);
-            ghostFamilyEls.set(id, g);
-        };
-
-        const makeGhostPersonEl = (extra: GhostExtraNode, pos: Pos): void => {
-            if (extra.kind == null || extra.labelKey == null || extra.anchorSimId == null) return;
-            const g = document.createElementNS(SVG_NS, "g") as SVGGElement;
-            g.setAttribute("id", extra.id);
-            g.setAttribute("class", "ghost");
-            g.setAttribute("transform", `translate(${pos.x},${pos.y})`);
-            g.style.opacity = "0";
-            const c = document.createElementNS(SVG_NS, "circle") as SVGCircleElement;
-            c.setAttribute("r", String(personR));
-            c.style.fill = ghostPersonColor(extra.kind);
-            g.appendChild(c);
-            const label = document.createElementNS(SVG_NS, "text") as SVGTextElement;
-            label.setAttribute("class", "ghost-label");
-            label.setAttribute("dx", String(-personR));
-            label.setAttribute("dy", "40");
-            label.style.fontSize = labelFontSize;
-            label.textContent = labels(extra.labelKey);
-            g.appendChild(label);
-            mainG.appendChild(g);
-            allGhostEls.push(g);
-            ghostPersonEls.set(extra.id, g);
-
-            const capturedFocused = focusedId;
-            const capturedKind = extra.kind;
-            const capturedExistingFamilyId = extra.existingFamilyId;
-            const capturedAnchorSimId = extra.anchorSimId;
-            g.addEventListener("pointerup", (ev: PointerEvent) => {
-                ev.stopPropagation();
-                const personNode = ghostNodeById.get(extra.id);
-                const famNode = ghostNodeById.get(capturedAnchorSimId) ?? datumById.get(capturedAnchorSimId);
-                const personPosNow = personNode ?? pos;
-                const famPosNow = famNode ? { x: famNode.x, y: famNode.y } : null;
-                onghostClick(capturedKind, capturedFocused, {
-                    person: { x: personPosNow.x, y: personPosNow.y },
-                    family: famPosNow,
-                }, capturedExistingFamilyId);
-            });
-        };
-
+        // The ghost datums double as the renderer's view objects: the sim
+        // moves them, the canvas reads their live x/y every frame.
         const ghostNodeById = new Map<string, GhostExtraNode>();
         for (const n of injection.extraNodes) ghostNodeById.set(n.id, n);
 
+        const views: GhostNodeView[] = [];
         for (const f of layout.families) {
-            const pos = familyAnchorByRef.get(f.id);
-            if (pos) makeGhostFamilyEl(f.id, pos);
+            const extra = ghostNodeById.get(f.id);
+            if (extra && familyAnchorByRef.has(f.id)) views.push(extra as GhostNodeView);
         }
         for (const extra of injection.extraNodes) {
             if (extra.type !== "ghost-person") continue;
-            const pos = personPositionById.get(extra.id);
-            if (!pos) continue;
-            makeGhostPersonEl(extra, pos);
+            if (!personPositionById.has(extra.id)) continue;
+            if (extra.kind == null || extra.labelKey == null || extra.anchorSimId == null) continue;
+            const view = extra as GhostExtraNode & GhostNodeView;
+            view.color = ghostPersonColor(extra.kind);
+            view.label = labels(extra.labelKey);
+            views.push(view);
         }
 
+        const edges: GhostEdgeView[] = [];
         for (const a of layout.anchorEdges) {
-            const familyPos = familyAnchorByRef.get(a.familyId);
-            if (!familyPos) continue;
+            if (!familyAnchorByRef.has(a.familyId)) continue;
             if (a.focusedRole === "parent") {
-                makeLine(focusDomId, a.familyId, origin, familyPos, "focusToFamily");
+                edges.push({ sourceId: focusDomId, targetId: a.familyId, edgeKind: "focusToFamily" });
             } else {
-                makeLine(a.familyId, focusDomId, familyPos, origin, "familyToPerson");
+                edges.push({ sourceId: a.familyId, targetId: focusDomId, edgeKind: "familyToPerson" });
             }
         }
         for (const p of layout.persons) {
-            const pos = personPositionById.get(p.id);
-            const anchorRef = familyAnchorByRef.get(p.familyId);
-            if (!pos || !anchorRef) continue;
+            if (!personPositionById.has(p.id) || !familyAnchorByRef.has(p.familyId)) continue;
             const anchorSimId = resolveAnchorSimId(focusDomId, p.familyId);
             if (p.role === "parent") {
-                makeLine(p.id, anchorSimId, pos, anchorRef, "focusToFamily");
+                edges.push({ sourceId: p.id, targetId: anchorSimId, edgeKind: "focusToFamily" });
             } else {
-                makeLine(anchorSimId, p.id, anchorRef, pos, "familyToPerson");
+                edges.push({ sourceId: anchorSimId, targetId: p.id, edgeKind: "familyToPerson" });
             }
         }
+
+        const hideGhosts = c.showGhosts({ nodes: views, edges });
+
+        const capturedFocused = focusedId;
+        // Ghost click: pointerup over a ghost person. Stopping propagation keeps
+        // the window-level gesture handler from treating it as a canvas tap.
+        const onPointerUp = (ev: PointerEvent) => {
+            const hit = c.hitGhost(ev.clientX, ev.clientY);
+            if (!hit) return;
+            const extra = ghostNodeById.get(hit.id);
+            if (!extra || extra.kind == null || extra.anchorSimId == null) return;
+            ev.stopPropagation();
+            const famNode = ghostNodeById.get(extra.anchorSimId) ?? datumById.get(extra.anchorSimId);
+            const famPosNow = famNode ? { x: famNode.x, y: famNode.y } : null;
+            onghostClick(extra.kind, capturedFocused, {
+                person: { x: extra.x, y: extra.y },
+                family: famPosNow,
+            }, extra.existingFamilyId);
+        };
+        c.canvas.addEventListener("pointerup", onPointerUp);
 
         const emitPositions = () => {
             const live: Pos[] = [];
@@ -380,38 +246,11 @@
         };
         emitPositions();
 
-        const resolveEndpoint = (id: string): Pos | null => {
-            const ghost = ghostNodeById.get(id);
-            if (ghost) return ghost;
-            const real = datumById.get(id);
-            if (real) return real;
-            return null;
-        };
-
-        sim.on("tick.ghost", () => {
-            for (const extra of injection.extraNodes) {
-                const el = extra.type === "ghost-family"
-                    ? ghostFamilyEls.get(extra.id)
-                    : ghostPersonEls.get(extra.id);
-                if (el) el.setAttribute("transform", `translate(${extra.x},${extra.y})`);
-            }
-            for (const e of edgeRefs) {
-                const s = resolveEndpoint(e.sourceId);
-                const t = resolveEndpoint(e.targetId);
-                if (s && t) applyEdgeEndpoints(e, s, t);
-            }
-        });
-
+        sim.on("tick.ghost", () => c.requestRender());
         sim.on("end.ghost", emitPositions);
 
-        let fadeInCancelled = false;
-        requestAnimationFrame(() => {
-            if (fadeInCancelled) return;
-            for (const el of allGhostEls) el.style.opacity = "";
-        });
-
         return () => {
-            fadeInCancelled = true;
+            c.canvas.removeEventListener("pointerup", onPointerUp);
             sim.on("tick.ghost", null);
             sim.on("end.ghost", null);
 
@@ -423,8 +262,6 @@
                 const tgt = typeof l.target === "string" ? l.target : (l.target as any).id;
                 return !ghostIds.has(src) && !ghostIds.has(tgt);
             });
-            sim.nodes(survivingNodes);
-            (sim.force("link") as d3.ForceLink<any, any>).links(survivingLinks);
 
             // Strip temporary `r` from real datums so post-blur edit-mode
             // collide behaviour is identical to pre-focus. Positions don't
@@ -434,6 +271,8 @@
                 if (!d) continue;
                 d.r = prevR;
             }
+            sim.nodes(survivingNodes);
+            (sim.force("link") as d3.ForceLink<any, any>).links(survivingLinks);
 
             // Restore focused datum's original fx/fy snapshot. Edit-mode's
             // re-pin path picks it back up via hadKnownPosition.
@@ -447,60 +286,7 @@
             sim.alphaDecay(savedAlphaDecay);
             applyManualPositions();
             onpositionsChange([]);
-            fadeOutAndRemove(allGhostEls);
+            hideGhosts();
         };
     });
 </script>
-
-<style>
-    :global(g.ghost) {
-        opacity: 0.6;
-        cursor: pointer;
-        transition: opacity 200ms ease;
-    }
-
-    :global(g.ghost > circle) {
-        fill-opacity: 0.25;
-        stroke: #6c757d;
-        stroke-width: 1.5px;
-        stroke-dasharray: 5 3;
-        pointer-events: all;
-        transition: fill-opacity 150ms ease;
-    }
-
-    :global(g.ghost:hover > circle) {
-        fill-opacity: 0.85;
-    }
-
-    :global(g.ghost:hover) {
-        opacity: 1;
-    }
-
-    :global(g.ghost .ghost-label) {
-        fill: #6c757d;
-        pointer-events: none;
-    }
-
-    :global(line.ghost-edge) {
-        stroke: #6c757d;
-        stroke-dasharray: 4 3;
-        opacity: 0.5;
-        pointer-events: none;
-        transition: opacity 200ms ease;
-    }
-
-    :global(g.ghost-family) {
-        opacity: 0.5;
-        cursor: default;
-        transition: opacity 200ms ease;
-        pointer-events: none;
-    }
-
-    :global(g.ghost-family > circle) {
-        fill-opacity: 0.3;
-        stroke: #6c757d;
-        stroke-width: 1.5px;
-        stroke-dasharray: 5 3;
-        pointer-events: none;
-    }
-</style>

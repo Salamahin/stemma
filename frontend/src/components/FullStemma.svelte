@@ -6,17 +6,13 @@
     import { onMount } from "svelte";
     import { HighlightLineages } from "../highlight";
     import {
-        applyLabelLayout,
+        assignInitialPositions,
         configureSimulation,
         resetSessionPositions,
         setActiveLayoutCache,
         setSessionPosition,
-        initChart,
-        makeDrag,
         makeNodesAndRelations,
-        mergeData,
         normalizeId,
-        renderChart,
         updateSimulation,
         denormalizeId,
     } from "../graphTools";
@@ -26,8 +22,8 @@
     import { exportChartSvg } from "../svgExport";
     import { personDisplayName } from "../personDisplayName";
     import { t } from "../i18n";
-    import { computeClans, type Clan } from "../clans";
-    import { initClanLayer, updateClanLayer } from "../clanLayer";
+    import { computeClans } from "../clans";
+    import { CanvasChart, type ChartNode } from "../canvasChart";
 
     type Props = {
         stemma: Stemma;
@@ -43,6 +39,7 @@
         onfamilySelected?: (family: any) => void;
         onhighlightChanged?: () => void;
         onzoomChanged?: () => void;
+        onchartReady?: (chart: CanvasChart | null) => void;
     };
 
     let {
@@ -59,22 +56,21 @@
         onfamilySelected,
         onhighlightChanged,
         onzoomChanged,
+        onchartReady,
     }: Props = $props();
 
-    const hoveredPersonR = 25;
-    const hoveredFamilyR = 10;
-    const pin =
-        "M4.146.146A.5.5 0 0 1 4.5 0h7a.5.5 0 0 1 .5.5c0 .68-.342 1.174-.646 1.479-.126.125-.25.224-.354.298v4.431l.078.048c.203.127.476.314.751.555C12.36 7.775 13 8.527 13 9.5a.5.5 0 0 1-.5.5h-4v4.5c0 .276-.224 1.5-.5 1.5s-.5-1.224-.5-1.5V10h-4a.5.5 0 0 1-.5-.5c0-.973.64-1.725 1.17-2.189A5.921 5.921 0 0 1 5 6.708V2.277a2.77 2.77 0 0 1-.354-.298C4.342 1.674 4 1.179 4 .5a.5.5 0 0 1 .146-.354z";
+    /** Clan clouds are re-rasterized at most this often while the sim moves nodes. */
+    const CLAN_UPDATE_INTERVAL_MS = 100;
 
-    let svg = $state<any>(null);
-    let markers: any = null;
+    let canvasEl: HTMLCanvasElement;
+    let chart = $state<CanvasChart | null>(null);
     let isDragging = false;
-    let pendingMouseLeave = false;
     let layoutCache: NodeLayoutCache | null = null;
     let layoutCacheStemmaId: string | null = null;
     let simulation: any = null;
-    let currentClans: Clan[] = [];
-    let currentNodes: any[] = [];
+    let lastPointer: { x: number; y: number } | null = null;
+    /** Node whose lineage the hover pushed onto the highlight stack. */
+    let hoverPushedId: string | null = null;
 
     const viewSlice = $derived.by(() => {
         if (!stemma) return { people: [], families: [] };
@@ -88,7 +84,7 @@
     });
 
     $effect(() => {
-        if (svg && stemma) {
+        if (chart && stemma) {
             if (layoutCacheStemmaId !== currentStemmaId) {
                 if (layoutCache) layoutCache.save();
                 layoutCache = new NodeLayoutCache(currentStemmaId);
@@ -102,86 +98,74 @@
             const displayPeople = people.map((p) => ({ ...p, name: personDisplayName(p.name, $t) }));
             const [nodes, relations] = makeNodesAndRelations(displayPeople, families);
             const initialPositions = computeInitialLayout(stemmaIndex, people, families, window.innerWidth, window.innerHeight);
-            currentNodes = nodes;
-            currentClans = computeClans({ type: "Stemma", people, families });
-            reconfigureGraph(nodes, relations, initialPositions);
+            reconfigureGraph(chart, nodes, relations, initialPositions, computeClans({ type: "Stemma", people, families }));
         }
     });
 
     $effect(() => {
-        if (highlight && pinnedPeople && stemmaIndex && svg) {
+        if (highlight && pinnedPeople && stemmaIndex && chart) {
             renderFullStemma();
         }
     });
 
+    function applyStyle() {
+        chart?.setStyleInputs(highlight, stemmaIndex, pinnedPeople.allPinned());
+    }
+
+    /** Restyle + re-apply pins (pinned people are frozen at their position). */
     function renderFullStemma() {
-        renderChart(svg, highlight, stemmaIndex, markers);
-
-        d3.selectAll("path.pin").remove();
-        d3.select("g.main")
-            .selectAll("g")
-            .each((d) => {
-                if (d) d.fixed = false;
-            });
-
-        pinnedPeople
-            .allPinned()
-            .forEach((personId) => {
-                const nodeId = normalizeId("person", personId);
-                d3.select(`#${nodeId}`)
-                    .append("path")
-                    .attr("d", pin)
-                    .attr("class", "pin")
-                    .attr("transform", "translate(-8.25, -6)")
-                    .attr("fill", "white")
-                    .each((d) => {
-                        if (!d) return;
-                        d.fixed = true;
-                        d.fx = d.x;
-                        d.fy = d.y;
-                        if (!pinnedPeople.getPosition(personId)) {
-                            pinnedPeople.updatePosition(personId, d.x, d.y);
-                        }
-                    });
-            });
-
-        d3.select("g.main")
-            .selectAll("g")
-            .each((d) => {
-                if (d && !d.fixed && simulationActive) {
-                    d.fx = null;
-                    d.fy = null;
-                }
-            });
-
+        if (!chart) return;
+        applyStyle();
+        const pinned = new Set(pinnedPeople.allPinned());
+        for (const d of chart.nodes) {
+            d.fixed = false;
+            if (d.type !== "person") continue;
+            const personId = denormalizeId(d.id);
+            if (!pinned.has(personId)) continue;
+            d.fixed = true;
+            d.fx = d.x;
+            d.fy = d.y;
+            if (!pinnedPeople.getPosition(personId)) pinnedPeople.updatePosition(personId, d.x, d.y);
+        }
+        for (const d of chart.nodes) {
+            if (!d.fixed && simulationActive) {
+                d.fx = null;
+                d.fy = null;
+            }
+        }
+        if (!simulation) return;
         if (simulationActive) simulation.alphaTarget(0.1).restart();
         else simulation.alphaTarget(0).stop();
     }
 
-    const zoomHandler = d3.zoom().on("zoom", (e) => {
-        svg.select("g.main").attr("transform", e.transform);
-        onzoomChanged?.();
-    });
+    const zoomHandler = d3
+        .zoom<HTMLCanvasElement, unknown>()
+        .on("zoom", (e) => {
+            if (!chart) return;
+            chart.transform = e.transform;
+            chart.requestRender();
+            onzoomChanged?.();
+        });
+
+    export function getChart(): CanvasChart | null {
+        return chart;
+    }
 
     export function exportSvg(filename: string) {
-        if (!svg) return;
-        const node = svg.node() as SVGSVGElement | null;
-        if (node) exportChartSvg(node, filename);
+        if (!chart) return;
+        exportChartSvg(chart.exportModel(), filename);
     }
 
     export function getZoomTransform(): d3.ZoomTransform {
-        const node = svg?.node() as SVGSVGElement | null;
-        if (!node) return d3.zoomIdentity;
-        return d3.zoomTransform(node);
+        if (!canvasEl) return d3.zoomIdentity;
+        return d3.zoomTransform(canvasEl);
     }
 
     export function applyZoomTranslate(tx: number, ty: number) {
-        if (!svg) return;
-        const node = svg.node() as SVGSVGElement | null;
-        if (!node) return;
-        const current = d3.zoomTransform(node);
+        if (!canvasEl) return;
+        const current = d3.zoomTransform(canvasEl);
         const next = d3.zoomIdentity.translate(tx, ty).scale(current.k);
-        svg.call(zoomHandler.transform, next as d3.ZoomTransform);
+        d3.select(canvasEl).call(zoomHandler.transform, next);
     }
 
     export function setSimulationActive(active: boolean) {
@@ -191,19 +175,9 @@
     }
 
     export function applyManualPositions() {
-        if (!svg) return;
-        svg.select("g.main").selectAll("g").attr("transform", (d: any) => {
-            if (d && d.x != null && d.y != null) return `translate(${d.x},${d.y})`;
-            return null;
-        });
-        // Foreign lines (ghost edges, drag link-lines) have no datum — d? guards.
-        // Classed lines (e.g. clan-spoke) carry non-edge data — skip via :not([class]).
-        svg.selectAll("line:not([class])")
-            .attr("x1", (d: any) => d?.source?.x ?? 0)
-            .attr("y1", (d: any) => d?.source?.y ?? 0)
-            .attr("x2", (d: any) => d?.target?.x ?? 0)
-            .attr("y2", (d: any) => d?.target?.y ?? 0);
-        updateClanLayer(svg, currentClans, currentNodes);
+        if (!chart) return;
+        chart.positionsChanged();
+        chart.updateClans();
     }
 
     export function getSimulation(): any {
@@ -211,24 +185,28 @@
     }
 
     $effect(() => {
-        if (!simulation) return;
+        if (!simulation || !chart) return;
         if (simulationActive) {
-            d3.select("g.main").selectAll<SVGGElement, any>("g").each((d: any) => {
-                if (d && !d.fixed) {
+            for (const d of chart.nodes) {
+                if (!d.fixed) {
                     d.fx = null;
                     d.fy = null;
                 }
-            });
+            }
             simulation.alphaTarget(0.1).restart();
         } else {
-            d3.select("g.main").selectAll<SVGGElement, any>("g").each((d: any) => {
-                if (d && d.x != null && d.y != null) {
+            for (const d of chart.nodes) {
+                if (d.x != null && d.y != null) {
                     d.fx = d.x;
                     d.fy = d.y;
                 }
-            });
+            }
             simulation.alphaTarget(0).stop();
         }
+    });
+
+    $effect(() => {
+        if (!hoverHighlight) clearHover();
     });
 
     export function setNodePosition(nodeId: string, x: number, y: number) {
@@ -236,144 +214,197 @@
     }
 
     export function popHover() {
-        if (!highlight || !svg) return;
-        highlight.pop();
-        renderFullStemma();
+        clearHover();
     }
 
     export function zoomToNode(id: string) {
         const scaleZoom = 2;
-        const node = d3.select("#" + normalizeId("person", id));
-        if (node.size()) {
-            const nodeDatum = node.datum() as any;
+        const node = chart?.node(normalizeId("person", id));
+        if (!node) return;
+        d3.select(canvasEl)
+            .transition()
+            .duration(750)
+            .call(
+                zoomHandler.transform,
+                d3.zoomIdentity
+                    .translate(window.innerWidth * 0.5 - scaleZoom * node.x, window.innerHeight * 0.5 - scaleZoom * node.y)
+                    .scale(scaleZoom),
+            );
+    }
 
-            svg.transition()
-                .duration(750)
-                .call(
-                    zoomHandler.transform,
-                    d3.zoomIdentity
-                        .translate(window.innerWidth * 0.5 - scaleZoom * nodeDatum.x, window.innerHeight * 0.5 - scaleZoom * nodeDatum.y)
-                        .scale(scaleZoom)
-                );
+    function hoverEnter(node: ChartNode) {
+        if (!chart) return;
+        if (node.type == "person") highlight.pushPerson(denormalizeId(node.id));
+        else highlight.pushFamily(denormalizeId(node.id));
+        hoverPushedId = node.id;
+        chart.setHovered(node.id);
+        applyStyle();
+        onhighlightChanged?.();
+    }
+
+    function clearHover() {
+        if (!chart || hoverPushedId === null) return;
+        hoverPushedId = null;
+        highlight.pop();
+        chart.setHovered(null);
+        applyStyle();
+        onhighlightChanged?.();
+    }
+
+    function updateHover(clientX: number, clientY: number) {
+        if (!chart || isDragging) return;
+        if (document.body.classList.contains("linking")) return;
+        if (!hoverHighlight) return;
+        const hit = chart.hitNode(clientX, clientY);
+        const hitId = hit?.id ?? null;
+        if (hitId === hoverPushedId) return;
+        clearHover();
+        if (hit) hoverEnter(hit);
+    }
+
+    let lastClanUpdate = 0;
+    function onSimTick() {
+        if (!chart) return;
+        chart.positionsChanged();
+        const now = performance.now();
+        if (now - lastClanUpdate >= CLAN_UPDATE_INTERVAL_MS) {
+            lastClanUpdate = now;
+            chart.updateClans();
         }
     }
 
-    function reconfigureGraph(nodes: any[], relations: any[], initialPositions: any) {
+    function onSimEnd() {
+        if (!chart) return;
+        chart.layoutLabels();
+        chart.updateClans();
+    }
+
+    function reconfigureGraph(chart: CanvasChart, nodes: any[], relations: any[], initialPositions: any, clans: any[]) {
         const fullyCached =
             !!layoutCache && nodes.length > 0 && layoutCache.coverage(nodes.map((n) => n.id)) === 1;
 
-        if (!simulation) simulation = configureSimulation(svg, nodes, relations, window.innerWidth, window.innerHeight);
+        assignInitialPositions(nodes, window.innerWidth, window.innerHeight, initialPositions, pinnedPeople);
+
+        if (!simulation) simulation = configureSimulation(nodes, relations, window.innerWidth, window.innerHeight, onSimTick, onSimEnd);
         else updateSimulation(simulation, nodes, relations);
 
-        mergeData(svg, nodes, relations, window.innerWidth, window.innerHeight, initialPositions, pinnedPeople);
-        initClanLayer(svg);
-        updateClanLayer(svg, currentClans, nodes);
-        // Throttle clan re-render to ~10fps during physics so drag updates feel live
-        // without blocking the main thread on big stemmas.
-        let lastClanUpdate = 0;
-        simulation.on("tick.clans", () => {
-            const now = performance.now();
-            if (now - lastClanUpdate < 100) return;
-            lastClanUpdate = now;
-            updateClanLayer(svg, currentClans, nodes);
-        });
-        simulation.on("end.clans", () => updateClanLayer(svg, currentClans, nodes));
+        chart.setData(nodes, relations);
+        chart.setClans(clans);
+        applyStyle();
 
         if (fullyCached) simulation.alphaTarget(0).alpha(0);
         if (!simulationActive) {
             // Sim inactive (edit mode): pin every node that already had a known
             // position so the 80-tick settle only lays out genuinely new nodes,
             // leaving existing positions stable across data changes.
-            d3.select("g.main").selectAll<SVGGElement, any>("g").each((d: any) => {
-                if (d && d.hadKnownPosition && d.x != null && d.y != null) {
+            for (const d of nodes) {
+                if (d.hadKnownPosition && d.x != null && d.y != null) {
                     d.fx = d.x;
                     d.fy = d.y;
                 }
-            });
+            }
             simulation.tick(80);
             applyManualPositions();
             simulation.alphaTarget(0).stop();
         }
+        if (fullyCached) chart.layoutLabels();
+    }
 
-        svg.select("g.main")
-            .selectAll("g")
-            .on("mouseenter", function (event: any, node: any) {
-                if (isDragging) {
-                    pendingMouseLeave = false;
-                    return;
-                }
-                if (document.body.classList.contains("linking")) return;
-                if (!hoverHighlight) return;
-                if (node.type == "person") {
-                    highlight.pushPerson(denormalizeId(node.id));
-                    renderFullStemma();
-                    onhighlightChanged?.();
-                    d3.select(this).select("circle").attr("r", hoveredPersonR);
-                    d3.select(this).select("text").attr("font-weight", "bold");
-                }
-                if (node.type == "family") {
-                    highlight.pushFamily(denormalizeId(node.id));
-                    renderFullStemma();
-                    onhighlightChanged?.();
-                    d3.select(this).select("circle").attr("r", hoveredFamilyR);
-                }
-            })
-            .on("mouseleave", (_event: any, _node: any) => {
-                if (isDragging) {
-                    if (hoverHighlight) pendingMouseLeave = true;
-                    return;
-                }
-                if (document.body.classList.contains("linking")) return;
-                if (!hoverHighlight) return;
-                highlight.pop();
-                renderFullStemma();
-                onhighlightChanged?.();
-            })
-            .on("click", (_event: any, node: any) => {
-                if (node.type == "person") {
-                    const selectedPerson = stemmaIndex.person(denormalizeId(node.id));
-                    onpersonSelected?.(selectedPerson);
-                }
+    function setupInteractions(c: CanvasChart) {
+        const selection = d3.select(canvasEl);
 
-                if (node.type == "family") {
-                    const selectedFamily = stemmaIndex.family(denormalizeId(node.id));
-                    onfamilySelected?.(selectedFamily);
+        // Node dragging (view mode). Registered before zoom: when the press
+        // lands on a node, d3.drag claims it and the zoom never starts a pan.
+        const drag = d3
+            .drag<HTMLCanvasElement, unknown, any>()
+            .container(canvasEl)
+            .subject((event: any) => {
+                const rect = canvasEl.getBoundingClientRect();
+                const node = c.hitNode(event.x + rect.left, event.y + rect.top);
+                if (!node) return null;
+                const tr = c.transform;
+                return { node, x: tr.applyX(node.x), y: tr.applyY(node.y) };
+            })
+            .on("start", (event: any) => {
+                const node: ChartNode = event.subject.node;
+                if (!event.active) simulation?.alphaTarget(0.3).restart();
+                node.fx = node.x;
+                node.fy = node.y;
+                isDragging = true;
+            })
+            .on("drag", (event: any) => {
+                const node: ChartNode = event.subject.node;
+                node.fx = c.transform.invertX(event.x);
+                node.fy = c.transform.invertY(event.y);
+                // A settled sim has stopped; keep the dragged node following the pointer.
+                simulation?.restart();
+            })
+            .on("end", (event: any) => {
+                const node: ChartNode = event.subject.node;
+                if (!event.active) simulation?.alphaTarget(0);
+                if (!node.fixed) {
+                    node.fx = null;
+                    node.fy = null;
                 }
+                if (pinnedPeople && node.type === "person") {
+                    const personId = denormalizeId(node.id);
+                    if (pinnedPeople.isPinned(personId)) pinnedPeople.updatePosition(personId, node.x, node.y);
+                }
+                isDragging = false;
+                if (lastPointer) updateHover(lastPointer.x, lastPointer.y);
             });
 
-        renderChart(svg, highlight, stemmaIndex, markers);
-        if (fullyCached) applyLabelLayout(svg, nodes);
-        makeDrag(
-            svg,
-            simulation,
-            pinnedPeople,
-            () => {
-                isDragging = true;
-            },
-            () => {
-                isDragging = false;
-                if (pendingMouseLeave) {
-                    pendingMouseLeave = false;
-                    highlight.pop();
-                    renderFullStemma();
-                    onhighlightChanged?.();
-                }
-            }
-        );
+        selection.call(drag).call(zoomHandler);
+
+        canvasEl.addEventListener("mousemove", (e) => {
+            lastPointer = { x: e.clientX, y: e.clientY };
+            updateHover(e.clientX, e.clientY);
+            const ghost = c.hitGhost(e.clientX, e.clientY);
+            c.setHoveredGhost(ghost?.id ?? null);
+            const overNode = ghost || c.hitNode(e.clientX, e.clientY);
+            canvasEl.style.cursor = overNode ? "pointer" : "";
+        });
+        canvasEl.addEventListener("mouseleave", () => {
+            lastPointer = null;
+            c.setHoveredGhost(null);
+            if (isDragging) return;
+            if (document.body.classList.contains("linking")) return;
+            if (!hoverHighlight) return;
+            clearHover();
+        });
+        canvasEl.addEventListener("click", (e) => {
+            const node = c.hitNode(e.clientX, e.clientY);
+            if (!node) return;
+            if (node.type == "person") onpersonSelected?.(stemmaIndex.person(denormalizeId(node.id)));
+            else onfamilySelected?.(stemmaIndex.family(denormalizeId(node.id)));
+        });
     }
 
     onMount(() => {
-        ({ svg, markers } = initChart("#chart"));
-        svg.call(zoomHandler);
+        const c = new CanvasChart(canvasEl);
+        setupInteractions(c);
+        (window as any).__stemmaChart = {
+            snapshot: () => c.snapshot(),
+        };
+        chart = c;
+        onchartReady?.(c);
+        return () => {
+            simulation?.stop();
+            c.destroy();
+            onchartReady?.(null);
+            delete (window as any).__stemmaChart;
+        };
     });
 </script>
 
 <div {hidden}>
-    <svg id="chart" class="w-100 p-3 fullHeight" />
+    <canvas id="chart" class="chart-canvas" bind:this={canvasEl}></canvas>
 </div>
 
 <style lang="less">
-    .fullHeight {
-        min-height: calc(~"100vh - 56px");
+    .chart-canvas {
+        display: block;
+        width: 100%;
+        height: calc(~"100vh - 56px");
     }
 </style>

@@ -1,11 +1,4 @@
 import * as d3 from "d3";
-import { layoutGreedy, layoutRemoveOverlaps } from "d3fc-label-layout";
-import {
-    personR, familyR, defaultFamilyColor, shadedNodeColor,
-    relationsColor, shadedRelationColor, childRelationWidth,
-    familyRelationWidth, shadedRelationWidth, labelFontSize,
-    personColor, addArrowMarkers
-} from "./graphStyles";
 
 export function makeNodesAndRelations(people, families) {
     let nodes = [
@@ -42,16 +35,6 @@ export function makeNodesAndRelations(people, families) {
     return [nodes, relations]
 }
 
-export function initChart(svgSelector) {
-    let svg = d3.select(svgSelector);
-    const markers = addArrowMarkers(svg);
-
-    svg.append("g").attr("class", "main");
-
-    return { svg, markers };
-}
-
-
 let sessionPositions = new Map()
 let cachedStemmaId = null
 let activeLayoutCache = null
@@ -71,7 +54,36 @@ export function setActiveLayoutCache(cache) {
     activeLayoutCache = cache || null
 }
 
-export function configureSimulation(svg, nodes, relations, width, height) {
+/**
+ * forceCollide restricted to datums that carry an explicit `r`.
+ *
+ * Real nodes have no `r`; only ghost nodes and their focused neighbours get
+ * one (see ghostSim.ts). The previous `forceCollide().radius(d => d.r * 20)`
+ * produced NaN radii for every real node: such pairs never collided, but NaN
+ * also disabled the quadtree pruning, turning every tick into an O(n²) walk
+ * (~70% of main-thread time on a 1000-person stemma). Filtering the datums at
+ * initialize() time keeps the exact same collision pairs without the cost.
+ */
+export function forceCollideSized(radius) {
+    const inner = d3.forceCollide().radius(radius);
+    let active = false;
+    function force(alpha) {
+        if (active) inner(alpha);
+    }
+    force.initialize = (nodes, random) => {
+        const sized = nodes.filter((n) => n.r != null);
+        active = sized.length > 1;
+        inner.initialize(sized, random);
+    };
+    force.radius = (...args) => (args.length ? (inner.radius(...args), force) : inner.radius());
+    return force;
+}
+
+/** Ticks with every |velocity| below this many world units before a self-sustaining sim is let to settle. */
+const SETTLE_VELOCITY = 0.02;
+const SETTLE_TICKS = 30;
+
+export function configureSimulation(nodes, relations, width, height, onTick, onEnd) {
     const sim = d3
         .forceSimulation(nodes)
         .force(
@@ -80,78 +92,38 @@ export function configureSimulation(svg, nodes, relations, width, height) {
         )
         .force("x", d3.forceX().x(width * 0.5).strength(0.05))
         .force("y", d3.forceY().y(height * 0.5).strength(0.05))
-        .force(
-            "collide",
-            d3.forceCollide().radius((d) => d.r * 20)
-        )
+        .force("collide", forceCollideSized((d) => d.r * 20))
         .force("repelForce", d3.forceManyBody().strength(-1500).distanceMin(85))
         .velocityDecay(0.8);
 
+    let calmTicks = 0;
     sim.on("tick", () => {
-        svg.select("g.main")
-            .selectAll(D3_NODE_SELECTOR)
-            .each(function (d) {
-                if (!d) return;
-                sessionPositions.set(d.id, [d.x, d.y]);
-                if (activeLayoutCache) activeLayoutCache.set(d.id, d.x, d.y, d.vx ?? 0, d.vy ?? 0);
-                this.setAttribute("transform", `translate(${d.x},${d.y})`);
-            });
-
-        svg.selectAll("line:not([class])").each(function (d) {
-            if (!d) return;
-            this.setAttribute("x1", d.source.x);
-            this.setAttribute("y1", d.source.y);
-            this.setAttribute("x2", d.target.x);
-            this.setAttribute("y2", d.target.y);
-        });
+        let maxV = 0;
+        for (const d of sim.nodes()) {
+            if (d.type !== "person" && d.type !== "family") continue;
+            sessionPositions.set(d.id, [d.x, d.y]);
+            if (activeLayoutCache) activeLayoutCache.set(d.id, d.x, d.y, d.vx ?? 0, d.vy ?? 0);
+            const v = Math.max(Math.abs(d.vx ?? 0), Math.abs(d.vy ?? 0));
+            if (v > maxV) maxV = v;
+        }
+        // A positive alphaTarget keeps the sim alive forever, re-rendering a
+        // graph that no longer moves. Once nothing has moved for a while, let
+        // alpha decay so the normal "end" path (label layout, cache save) runs.
+        calmTicks = maxV < SETTLE_VELOCITY ? calmTicks + 1 : 0;
+        if (calmTicks >= SETTLE_TICKS && sim.alphaTarget() > 0) {
+            calmTicks = 0;
+            sim.alphaTarget(0).alpha(0);
+        }
+        onTick?.();
     });
 
     sim.on("end", () => {
-        applyLabelLayout(svg, sim.nodes());
+        calmTicks = 0;
+        onEnd?.();
         if (activeLayoutCache) activeLayoutCache.save();
     });
 
     return sim;
-}
-
-export function applyLabelLayout(svg, nodes) {
-    const persons = nodes.filter((n) => n.type === "person");
-    if (persons.length === 0) return;
-
-    const rects = persons.map((p) => {
-        const t = document.querySelector(`#${CSS.escape(p.id)} text`);
-        let w = 80, h = 20;
-        if (t) {
-            const bb = t.getBBox();
-            w = bb.width + 4;
-            h = bb.height + 4;
-        }
-        return {
-            hidden: false,
-            x: p.x - personR,
-            y: p.y + 20,
-            width: w,
-            height: h,
-            _origin: p,
-            _w: w,
-            _h: h,
-        };
-    });
-
-    const strategy = layoutRemoveOverlaps(layoutGreedy());
-    const placed = strategy(rects);
-
-    persons.forEach((p, i) => {
-        const slot = placed[i];
-        const before = rects[i];
-        const dx = slot.x - p.x;
-        const dy = slot.y - p.y;
-        const node = svg.select(`#${CSS.escape(p.id)}`);
-        node.select("text")
-            .attr("dx", dx)
-            .attr("dy", dy + before._h * 0.7)
-            .style("display", slot.hidden ? "none" : null);
-    });
 }
 
 export function updateSimulation(simulation, nodes, relations) {
@@ -161,45 +133,8 @@ export function updateSimulation(simulation, nodes, relations) {
     simulation.alphaTarget(0.3).restart()
 }
 
-export function makeDrag(svg, simulation, pinnedPeople, onDragStart, onDragEnd) {
-    function drag() {
-        function dragstarted(event) {
-            if (!event.active) simulation.alphaTarget(0.3).restart();
-            event.subject.fx = event.subject.x;
-            event.subject.fy = event.subject.y;
-            if (onDragStart) onDragStart();
-        }
-
-        function dragged(event) {
-            event.subject.fx = event.x;
-            event.subject.fy = event.y;
-        }
-
-        function dragended(event) {
-            if (!event.active) simulation.alphaTarget(0);
-            if (!event.subject.fixed) {
-                event.subject.fx = null;
-                event.subject.fy = null;
-            }
-
-            if (pinnedPeople && event.subject.type === "person") {
-                const personId = denormalizeId(event.subject.id);
-                if (pinnedPeople.isPinned(personId)) {
-                    pinnedPeople.updatePosition(personId, event.subject.x, event.subject.y);
-                }
-            }
-            if (onDragEnd) onDragEnd();
-        }
-
-        return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
-    }
-
-    svg.select("g.main").selectAll(D3_NODE_SELECTOR).call(drag());
-}
-
 export const PERSON_PREFIX = "person_";
 export const FAMILY_PREFIX = "family_";
-const D3_NODE_SELECTOR = `g[id^='${PERSON_PREFIX}'], g[id^='${FAMILY_PREFIX}']`;
 
 export function normalizeId(suffix, id) {
     return `${suffix}_${id}`
@@ -209,19 +144,12 @@ export function denormalizeId(id) {
     return id.split("_")[1]
 }
 
-export function mergeData(svg, nodes, relations, width, height, initialPositions, pinnedPeople, ignoreCache) {
-    // Foreign DOM (ghost edges/nodes, drag link-lines) lives in g.main too.
-    // selectAll must match only d3-bound elements or the join's keyFn dereferences
-    // `undefined` and exit.remove() wipes the decorations.
-    svg.select("g.main")
-        .selectAll("line:not([class])")
-        .data(relations, (r) => r.id)
-        .join(
-            (enter) => enter.append("line").lower(),
-            (update) => update,
-            (exit) => exit.remove()
-        );
-
+/**
+ * Assigns starting coordinates to every node: pinned position, then cached
+ * layout, then this session's last position, then the generational initial
+ * layout, then the viewport centre.
+ */
+export function assignInitialPositions(nodes, width, height, initialPositions, pinnedPeople, ignoreCache) {
     nodes.forEach(n => {
         let pos;
         let vel;
@@ -265,105 +193,4 @@ export function mergeData(svg, nodes, relations, width, height, initialPositions
             n.vy = vel[1];
         }
     })
-
-    svg.select("g.main")
-        .selectAll(D3_NODE_SELECTOR)
-        .data(nodes, (n) => n.id)
-        .join(
-            (enter) => {
-                let people = enter
-                    .filter(n => n.type == "person")
-                    .append("g")
-                    .attr("id", n => n.id);
-                people.append("circle");
-                people.append("text")
-                    .attr("dx", -personR)
-                    .attr("dy", 40);
-
-                enter
-                    .filter(n => n.type == "family")
-                    .append("g")
-                    .attr("id", n => n.id)
-                    .append("circle");
-            },
-            (update) => {
-                update.select("text").text((node) => node.name);
-            },
-            (exit) => exit.remove()
-        );
-}
-
-export function renderChart(svg, highlight, stemmaIndex, markers) {
-    function getNodeColor(node) {
-        if (node.type == "person") {
-            let d = stemmaIndex.lineage(denormalizeId(node.id)).generation / stemmaIndex.maxGeneration();
-            return personColor(d);
-        } else {
-            return defaultFamilyColor;
-        }
-    }
-
-    function lineHighlighted(line) {
-        let relatesToSelectedFamilies = highlight.familyIsHighlighted(denormalizeId(line.source.id)) || highlight.familyIsHighlighted(denormalizeId(line.target.id));
-        let relatesToSelectedPeople = highlight.personIsHighlighted(denormalizeId(line.source.id)) || highlight.personIsHighlighted(denormalizeId(line.target.id));
-
-        return relatesToSelectedFamilies && relatesToSelectedPeople;
-    }
-
-    function lineFill(line) {
-        if (!lineHighlighted(line)) return shadedRelationColor;
-        else return relationsColor;
-    }
-
-    function lineWidth(line) {
-        if (!lineHighlighted(line)) return shadedRelationWidth;
-        else if (line.type == "familyToChild") return childRelationWidth;
-        else return familyRelationWidth;
-    }
-
-    function markerEnd(line) {
-        if (line.type == "familyToChild") return markers.person;
-        else return markers.family;
-    }
-
-    // Ghost elements live inside g.main but have no datum; skip them so we
-    // never dereference t/line/node on undefined.
-    const hasDatum = (d) => d != null;
-
-    svg.selectAll("line:not([class])")
-        .filter((line) => hasDatum(line))
-        .attr("stroke", (line) => lineFill(line))
-        .attr("stroke-width", (line) => lineWidth(line))
-        .attr("marker-end", (line) => markerEnd(line));
-
-    let circles = svg.selectAll("circle").filter((t) => hasDatum(t))
-
-    circles
-        .filter((t) => t.type == "person")
-        .attr("fill", (node) => (highlight.personIsHighlighted(denormalizeId(node.id)) ? getNodeColor(node) : shadedNodeColor))
-        .attr("r", personR)
-
-    circles
-        .filter((t) => t.type == "family")
-        .attr("fill", (node) => (highlight.familyIsHighlighted(denormalizeId(node.id)) ? defaultFamilyColor : shadedNodeColor))
-        .attr("r", familyR)
-
-    svg.select("g.main")
-        .selectAll("g")
-        .filter((d) => hasDatum(d) && d.type === "person")
-        .select("text")
-        .style("fill", (node) => (highlight.personIsHighlighted(denormalizeId(node.id)) ? null : shadedNodeColor))
-        .attr("cursor", "pointer")
-        .attr("font-weight", null);
-
-    svg.select("g.main")
-        .selectAll("g")
-        .filter((d) => hasDatum(d) && (d.type === "person" || d.type === "family"))
-        .attr("cursor", "pointer")
-
-    svg.selectAll("text")
-        .filter((node) => hasDatum(node) && node.type === "person")
-        .raise()
-        .text((node) => node.name)
-        .style("font-size", labelFontSize);
 }
