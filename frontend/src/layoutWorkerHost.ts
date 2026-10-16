@@ -3,6 +3,7 @@
  * be unit-tested with a fake `post`/scheduler.
  */
 import { createLayoutSimulation, LayoutLoop, type LayoutNode, type Scheduler } from "./layoutCore";
+import { applyStructuredSeed } from "./structuredLayout";
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from "./layoutProtocol";
 
 /** Worker time per batch before positions are posted back (≈ one frame). */
@@ -73,6 +74,7 @@ export class LayoutWorkerHost {
             fx: Number.isNaN(msg.fx[i]) ? null : msg.fx[i],
             fy: Number.isNaN(msg.fy[i]) ? null : msg.fy[i],
         }));
+        if (msg.seed) applyStructuredSeed(this.nodes, msg.links, [msg.width / 2, msg.height / 2]);
         const links = [];
         for (let i = 0; i < msg.links.length; i += 2) {
             links.push({ source: this.nodes[msg.links[i]], target: this.nodes[msg.links[i + 1]] });
@@ -87,6 +89,8 @@ export class LayoutWorkerHost {
             (ticks) => this.postPositions(gen, ticks),
             () => this.post({ type: "end", gen }, []),
         );
+        // show the seed straight away, before the first refine batch
+        if (msg.seed) this.postPositions(gen, 0);
         if (msg.start) this.loop.start();
     }
 

@@ -10,6 +10,7 @@
  */
 import { createLayoutSimulation, LayoutLoop, type LayoutNode, type Scheduler } from "./layoutCore";
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from "./layoutProtocol";
+import { applyStructuredSeed } from "./structuredLayout";
 
 export type EngineNode = LayoutNode;
 export type EngineLink = { source: string | EngineNode; target: string | EngineNode };
@@ -24,8 +25,12 @@ export type LayoutCallbacks = {
 export interface LayoutEngine {
     readonly kind: "worker" | "inline";
     readonly center: [number, number];
-    /** Replace the graph and (unless `start` is false) lay it out from `alpha`. */
-    setGraph(nodes: EngineNode[], links: EngineLink[], alpha: number, start?: boolean): void;
+    /**
+     * Replace the graph and (unless `start` is false) lay it out from `alpha`.
+     * With `seed`, unfixed nodes first get the structured starting layout
+     * (cold start); `onTick(0)` reports the seeded positions.
+     */
+    setGraph(nodes: EngineNode[], links: EngineLink[], alpha: number, start?: boolean, seed?: boolean): void;
     /** Re-send every node's fx/fy after the caller changed pins in bulk. */
     syncFixed(): void;
     /** Re-send one node's fx/fy (drag). */
@@ -55,7 +60,18 @@ export class InlineLayoutEngine implements LayoutEngine {
 
     constructor(readonly center: [number, number], private cb: LayoutCallbacks, private scheduler: Scheduler = mainThreadScheduler) {}
 
-    setGraph(nodes: EngineNode[], links: EngineLink[], alpha: number, start = true) {
+    setGraph(nodes: EngineNode[], links: EngineLink[], alpha: number, start = true, seed = false) {
+        if (seed) {
+            const index = new Map(nodes.map((d, i) => [d.id, i]));
+            const idOf = (e: string | EngineNode) => (typeof e === "string" ? e : e.id);
+            const pairs: number[] = [];
+            for (const l of links) {
+                const s = index.get(idOf(l.source));
+                const t = index.get(idOf(l.target));
+                if (s != null && t != null) pairs.push(s, t);
+            }
+            applyStructuredSeed(nodes, pairs, this.center);
+        }
         if (!this.sim) {
             this.sim = createLayoutSimulation(nodes, links as any, this.center[0] * 2, this.center[1] * 2);
             this.loop = new LayoutLoop(this.sim, this.scheduler, INLINE_BUDGET_MS, (t) => this.cb.onTick(t), () => this.cb.onEnd());
@@ -64,6 +80,7 @@ export class InlineLayoutEngine implements LayoutEngine {
             (this.sim.force("link") as any).links(links);
         }
         this.sim.alphaTarget(0).alpha(alpha);
+        if (seed) this.cb.onTick(0);
         if (start) this.loop!.start();
         else this.loop!.stop();
     }
@@ -162,12 +179,12 @@ export class WorkerLayoutEngine implements LayoutEngine {
         return { fx, fy };
     }
 
-    setGraph(nodes: EngineNode[], links: EngineLink[], alpha: number, start = true) {
+    setGraph(nodes: EngineNode[], links: EngineLink[], alpha: number, start = true, seed = false) {
         this.nodes = nodes;
         this.links = links;
         this.alpha = alpha;
         this.running = start;
-        if (this.fallback) return this.fallback.setGraph(nodes, links, alpha, start);
+        if (this.fallback) return this.fallback.setGraph(nodes, links, alpha, start, seed);
         this.gen++;
         const n = nodes.length;
         const index = new Map(nodes.map((d, i) => [d.id, i]));
@@ -201,6 +218,7 @@ export class WorkerLayoutEngine implements LayoutEngine {
                 height: this.center[1] * 2,
                 alpha,
                 start,
+                seed,
             },
             [x.buffer, y.buffer, vx.buffer, vy.buffer, fx.buffer, fy.buffer, linkIdx.buffer],
         );

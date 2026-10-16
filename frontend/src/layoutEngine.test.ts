@@ -145,11 +145,46 @@ describe("WorkerLayoutEngine", () => {
     });
 });
 
+describe("structured seed on cold start", () => {
+    test("worker engine: seeded positions arrive before any refine tick; pinned nodes keep theirs", () => {
+        const fake = new FakeWorker();
+        const ticks: number[] = [];
+        const engine = new WorkerLayoutEngine([500, 400], { onTick: (t) => ticks.push(t), onEnd: () => {} }, fake as unknown as Worker);
+        const { nodes, links } = syntheticGraph(80);
+        nodes.forEach((n: any) => {
+            n.x = 500;
+            n.y = 400; // everyone stacked, like an uncached stemma
+        });
+        const pinned: any = nodes[5];
+        pinned.fx = pinned.x = 42;
+        pinned.fy = pinned.y = 43;
+        engine.setGraph(nodes, links, 1, true, true);
+        expect(ticks[0]).toBe(0); // the seed itself, posted synchronously by the host
+        const spread = new Set(nodes.map((n: any) => `${Math.round(n.x)}:${Math.round(n.y)}`)).size;
+        expect(spread).toBeGreaterThan(nodes.length * 0.9);
+        expect([pinned.x, pinned.y]).toEqual([42, 43]);
+    });
+
+    test("inline engine seeds synchronously too", () => {
+        const ticks: number[] = [];
+        const m = manualScheduler();
+        const engine = new InlineLayoutEngine([500, 400], { onTick: (t) => ticks.push(t), onEnd: () => {} }, m.scheduler);
+        const { nodes, links } = syntheticGraph(50);
+        nodes.forEach((n: any) => {
+            n.x = 0;
+            n.y = 0;
+        });
+        engine.setGraph(nodes, links, 1, true, true);
+        expect(ticks).toEqual([0]);
+        expect(new Set(nodes.map((n: any) => `${n.x}:${n.y}`)).size).toBe(nodes.length);
+    });
+});
+
 describe("LayoutWorkerHost", () => {
     test("reports thrown errors instead of dying silently", () => {
         const out: LayoutWorkerResponse[] = [];
         const host = new LayoutWorkerHost((m) => out.push(m), manualScheduler().scheduler);
-        host.handle({ type: "graph", gen: 1, ids: ["a"], x: null as any, y: null as any, vx: null as any, vy: null as any, fx: null as any, fy: null as any, links: new Int32Array(), width: 1, height: 1, alpha: 1, start: true });
+        host.handle({ type: "graph", gen: 1, ids: ["a"], x: null as any, y: null as any, vx: null as any, vy: null as any, fx: null as any, fy: null as any, links: new Int32Array(), width: 1, height: 1, alpha: 1, start: true, seed: false });
         expect(out[0].type).toBe("error");
     });
 });

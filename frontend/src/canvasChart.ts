@@ -640,6 +640,24 @@ export class CanvasChart {
 
     // ------------------------------------------------------------ render
 
+    private held = false;
+
+    /**
+     * Hold drawing (blank canvas) until the next `release()` — e.g. while the
+     * layout worker computes the starting layout of a fresh stemma, so a pile
+     * of unplaced nodes never flashes on screen.
+     */
+    hold() {
+        this.held = true;
+        this.requestRender();
+    }
+
+    release() {
+        if (!this.held) return;
+        this.held = false;
+        this.requestRender();
+    }
+
     requestRender() {
         if (this.frameRequested || this.destroyed) return;
         this.frameRequested = true;
@@ -658,6 +676,7 @@ export class CanvasChart {
 
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        if (this.held) return;
         ctx.setTransform(dpr * t.k, 0, 0, dpr * t.k, dpr * t.x, dpr * t.y);
 
         // visible world rect (with margin for labels)

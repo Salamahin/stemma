@@ -20,6 +20,8 @@ export type LayoutWorkerRequest =
           alpha: number;
           /** false: load only (edit mode follows up with "settle"). */
           start: boolean;
+          /** true: replace unfixed positions with the structured seed (cold start). */
+          seed: boolean;
       }
     | { type: "fixed"; gen: number; fx: Float64Array; fy: Float64Array }
     | { type: "pin"; gen: number; index: number; fx: number | null; fy: number | null }

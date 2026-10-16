@@ -281,6 +281,7 @@
         layoutStats.ticks++;
         layoutStats.lastTickAt = performance.now();
         if (!chart) return;
+        chart.release();
         recordPositions(chart.nodes);
         chart.positionsChanged();
         const now = performance.now();
@@ -355,8 +356,12 @@
         // to their relatives), so a few additions do not reshuffle the graph.
         // Otherwise: a full layout.
         const alpha = warm ? Math.min(LAYOUT_REHEAT_ALPHA, LAYOUT_REFINE_ALPHA + (1 - knownFrac)) : 1;
+        // Cold start: the engine (worker) computes a structured starting
+        // layout first; draw nothing until those positions arrive.
+        const seed = !warm;
+        if (seed) chart.hold();
         if (simulationActive) {
-            engine.setGraph(nodes, links, alpha);
+            engine.setGraph(nodes, links, alpha, true, seed);
         } else {
             // Sim inactive (edit mode): pin every node that already had a known
             // position so the 80-tick settle only lays out genuinely new nodes,
@@ -367,7 +372,7 @@
                     d.fy = d.y;
                 }
             }
-            engine.setGraph(nodes, links, alpha, false);
+            engine.setGraph(nodes, links, alpha, false, seed);
             engine.settle(80);
         }
     }
