@@ -39,8 +39,13 @@ export type PersonSearchResult = {
     matchedIndices: ReadonlyArray<PersonSearchMatch>;
 };
 
+/** Every name a person is known under: maiden, married and variant names count like the primary one. */
+function allNames(person: PersonDescription): string[] {
+    return [person.name, ...(person.altNames ?? []).map((a) => a.name)].filter(Boolean);
+}
+
 const FUSE_OPTIONS: IFuseOptions<PersonDescription> = {
-    keys: [{ name: "name", getFn: (person) => tokenVariants(person.name) }],
+    keys: [{ name: "name", getFn: (person) => allNames(person).flatMap(tokenVariants) }],
     threshold: FUSE_THRESHOLD,
     ignoreLocation: true,
     minMatchCharLength: MIN_QUERY_LENGTH,
@@ -64,7 +69,7 @@ export function searchPeople(
     if (queryTokens.length === 0) return [];
     const searchable = people.filter((p) => !isUnknownPerson(p.name));
     const fuse = new Fuse(searchable as PersonDescription[], FUSE_OPTIONS);
-    const nameVariants = new Map(searchable.map((p) => [p.id, tokenVariants(p.name)]));
+    const nameVariants = new Map(searchable.map((p) => [p.id, allNames(p).flatMap(tokenVariants)]));
 
     // Score each query token on its own and keep only people every token matched: word
     // order stops mattering, and one unmatched word rules a person out instead of merely

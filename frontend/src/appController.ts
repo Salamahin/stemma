@@ -1,6 +1,6 @@
 import { HighlightLineages } from './highlight';
 import { Model } from './model';
-import type { CreateNewPerson, LinkRole, PersonDefinition, Stemma, StemmaDescription } from './model';
+import type { AltName, CreateNewPerson, LinkRole, PersonDefinition, Stemma, StemmaDescription } from './model';
 import { PinnedPeopleStorage } from './pinnedPeopleStorage';
 import { StemmaIndex } from './stemmaIndex';
 import { writable, get } from 'svelte/store';
@@ -9,6 +9,10 @@ import { selectStemmaId } from './appControllerSelection';
 
 export type MutationOptions = { silent?: boolean }
 export type MutationResult = { newPersonIds: string[]; newFamilyIds: string[] }
+
+function altNamesKey(names: AltName[] | undefined | null): string {
+    return JSON.stringify((names ?? []).map((a) => [a.name, a.kind]))
+}
 
 export class AppController {
     private static readonly LAST_STEMMA_KEY = "stemma_last_stemma_id";
@@ -238,7 +242,8 @@ export class AppController {
             n(original.birthDate) != n(descr.birthDate) ||
             n(original.deathDate) != n(descr.deathDate) ||
             n(original.name) != n(descr.name) ||
-            n(original.bio) != n(descr.bio);
+            n(original.bio) != n(descr.bio) ||
+            altNamesKey(original.altNames) != altNamesKey(descr.altNames);
 
         if (!photoUpload && !photoRemove && !fieldsChanged) return;
 

@@ -45,7 +45,7 @@
     import { formatPartialDate, isBefore, parseDateInput, toDateInput } from "../partialDate";
     import { renderBioMarkdown } from "../bioMarkdown";
     import { isUnknownPerson } from "../personDisplayName";
-    import type { CreateNewPerson } from "../model";
+    import type { AltName, AltNameKind, CreateNewPerson } from "../model";
     import Modal from "./Modal.svelte";
 
     export type CreatePersonPayload = {
@@ -86,6 +86,8 @@
     let birthText = $state("");
     let deathText = $state("");
     let bio = $state("");
+    let altNames = $state<AltName[]>([]);
+    const ALT_NAME_KINDS: AltNameKind[] = ["maiden", "married", "variant", "other"];
     let id = $state("");
     let personReadOnly = $state(false);
     const editingAllowed = $derived(isCreate || (editMode && !personReadOnly));
@@ -143,6 +145,18 @@
         deathDateErrString = invalid ? $t("person.invalidDateRange") : null;
     }
 
+    function cleanAltNames(): AltName[] {
+        return altNames.map((a) => ({ name: a.name.trim(), kind: a.kind })).filter((a) => a.name !== "");
+    }
+
+    function addAltName() {
+        altNames = [...altNames, { name: "", kind: "maiden" }];
+    }
+
+    function removeAltName(i: number) {
+        altNames = altNames.filter((_, j) => j !== i);
+    }
+
     function resetFormState(p: ShowPerson | null) {
         id = p?.description.id ?? "";
         name = p?.description.name ?? "";
@@ -152,6 +166,7 @@
         birthText = toDateInput(birthDate);
         deathText = toDateInput(deathDate);
         bio = p?.description.bio ?? "";
+        altNames = (p?.description.altNames ?? []).map((a) => ({ ...a }));
         pinned = p?.pin ?? false;
         personReadOnly = p?.description.readOnly ?? false;
         bioTab = p ? "preview" : "edit";
@@ -204,6 +219,7 @@
                     birthDate,
                     deathDate,
                     bio,
+                    altNames: cleanAltNames(),
                 },
                 pin: pinned,
                 photoUpload: null,
@@ -220,6 +236,7 @@
             birthDate,
             deathDate,
             bio,
+            altNames: cleanAltNames(),
         };
         if (mode === "create") {
             const cb = activeCreateCallback;
@@ -535,6 +552,47 @@
                         {/if}
                     </div>
 
+                    {#if !readOnly || altNames.length > 0}
+                        <div class="field-row" data-testid="person-alt-names">
+                            <span class="field-label">{$t("person.altNames")}</span>
+                            {#if readOnly}
+                                <ul class="alt-names-view">
+                                    {#each altNames as alt}
+                                        <li><span class="alt-kind">{$t(`person.altKind.${alt.kind}`)}</span> {alt.name}</li>
+                                    {/each}
+                                </ul>
+                            {:else}
+                                {#each altNames as alt, i}
+                                    <div class="alt-name-row">
+                                        <select class="form-select alt-kind-select" bind:value={alt.kind} data-testid="person-alt-kind">
+                                            {#each ALT_NAME_KINDS as kind}
+                                                <option value={kind}>{$t(`person.altKind.${kind}`)}</option>
+                                            {/each}
+                                        </select>
+                                        <input
+                                            class="form-control"
+                                            bind:value={alt.name}
+                                            placeholder={$t("namePlaceholder")}
+                                            data-testid="person-alt-name-input"
+                                        />
+                                        <button
+                                            type="button"
+                                            class="btn btn-outline-secondary"
+                                            aria-label={$t("person.removeAltName")}
+                                            onclick={() => removeAltName(i)}
+                                        ><i class="bi bi-x"></i></button>
+                                    </div>
+                                {/each}
+                                <button
+                                    type="button"
+                                    class="btn btn-link btn-sm p-0"
+                                    onclick={addAltName}
+                                    data-testid="person-add-alt-name"
+                                >{$t("person.addAltName")}</button>
+                            {/if}
+                        </div>
+                    {/if}
+
                     <div class="field-row">
                         <span class="field-label">{$t("person.lifeYears")}</span>
                         <div class="dates-row">
@@ -707,6 +765,27 @@
         font-size: var(---fs-label);
         color: var(---text-secondary);
         font-weight: var(---fw-label);
+    }
+
+    .alt-name-row {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+
+    .alt-kind-select {
+        flex: 0 0 auto;
+        width: auto;
+    }
+
+    .alt-names-view {
+        margin: 0;
+        padding-left: 0;
+        list-style: none;
+    }
+
+    .alt-kind {
+        color: var(---text-muted);
     }
 
     .dates-row {

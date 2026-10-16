@@ -6,6 +6,7 @@ from pydantic.dataclasses import dataclass
 
 from stemma.domain._config import DOMAIN_CONFIG
 from stemma.domain.dates import PartialDate
+from stemma.domain.names import AltName
 
 
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
@@ -26,6 +27,7 @@ class PersonDescription:
     bio: str | None
     read_only: bool
     photo_url: str | None = None
+    alt_names: list[AltName] = field(default_factory=list)
     type: Literal["PersonDescription"] = "PersonDescription"
 
 

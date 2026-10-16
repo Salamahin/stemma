@@ -97,6 +97,7 @@ def test_encode_owned_stemmas_response_tags_with_type_field() -> None:
                     "bio": None,
                     "readOnly": False,
                     "photoUrl": None,
+                    "altNames": [],
                 }
             ],
             "families": [
