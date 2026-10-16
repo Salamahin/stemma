@@ -2,12 +2,12 @@ import logging
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, replace
-from datetime import date
 from typing import Any
 
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
+from stemma.domain.dates import parse_partial_date
 from stemma.domain.errors import (
     AccessToFamilyDenied,
     AccessToPersonDenied,
@@ -68,8 +68,8 @@ logger = logging.getLogger(__name__)
 class _PersonRow:
     id: str
     name: str
-    birth_date: date | None
-    death_date: date | None
+    birth_date: str | None
+    death_date: str | None
     bio: str | None
     photo_key: str | None = None
 
@@ -901,9 +901,9 @@ def _person_item(stemma_id: str, person: _PersonRow) -> dict:
         "name": person.name,
     }
     if person.birth_date is not None:
-        item["birth_date"] = person.birth_date.isoformat()
+        item["birth_date"] = person.birth_date
     if person.death_date is not None:
-        item["death_date"] = person.death_date.isoformat()
+        item["death_date"] = person.death_date
     if person.bio is not None:
         item["bio"] = person.bio
     if person.photo_key is not None:
@@ -920,10 +920,16 @@ def _family_item(stemma_id: str, family: _FamilyRow) -> dict:
     }
 
 
-def _parse_date(value: str | None) -> date | None:
+def _parse_date(value: str | None) -> str | None:
+    # Stored values were written through PartialDate; anything else is
+    # dropped rather than breaking the whole stemma.
     if not value:
         return None
-    return date.fromisoformat(value)
+    try:
+        parse_partial_date(value)
+    except ValueError:
+        return None
+    return value
 
 
 def _describe_stemma(

@@ -42,6 +42,10 @@ def _dedup(ids: list[str]) -> list[str]:
 
 
 _MAX_SEARCH_LIMIT = 100
+_DATE_HELP = (
+    "{what} date with the precision you actually know: YYYY, YYYY-MM or YYYY-MM-DD, "
+    "prefixed with ~ for approximately (e.g. 1899, 1899-03, 1899-03-16, ~1820). Optional."
+)
 
 
 def _search_people(args: dict, response: dict) -> dict:
@@ -156,8 +160,8 @@ def _person_write_schema(extra_required: dict[str, dict]) -> dict:
     props = {
         **extra_required,
         "name": {"type": "string", "description": "Full name of the person"},
-        "birth_date": {"type": "string", "description": "ISO date, e.g. 1901-05-06 (optional)"},
-        "death_date": {"type": "string", "description": "ISO date (optional)"},
+        "birth_date": {"type": "string", "description": _DATE_HELP.format(what="Birth")},
+        "death_date": {"type": "string", "description": _DATE_HELP.format(what="Death")},
         "bio": {"type": "string", "description": "Free-text biography (optional)"},
     }
     return {

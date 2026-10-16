@@ -41,8 +41,8 @@
 </script>
 
 <script lang="ts">
-    import { imask } from "@imask/svelte";
-    import { t } from "../i18n";
+    import { locale, t } from "../i18n";
+    import { formatPartialDate, isBefore, parseDateInput, toDateInput } from "../partialDate";
     import { renderBioMarkdown } from "../bioMarkdown";
     import { isUnknownPerson } from "../personDisplayName";
     import type { CreateNewPerson } from "../model";
@@ -80,8 +80,11 @@
     let pinned = $state(false);
     let unknown = $state(false);
     let name = $state("");
-    let birthDate = $state<Date | null>(null);
-    let deathDate = $state<Date | null>(null);
+    // Stored form ("1899", "1899-03", "~1899-03-16") and what is typed in the field.
+    let birthDate = $state<string | null>(null);
+    let deathDate = $state<string | null>(null);
+    let birthText = $state("");
+    let deathText = $state("");
     let bio = $state("");
     let id = $state("");
     let personReadOnly = $state(false);
@@ -117,97 +120,37 @@
 
     const saveDisabled = $derived(birthDateErrString != null || deathDateErrString != null);
 
-    function dateToIsoLocalTime(d: Date | null) {
-        if (!d) return null;
-        const date = d.getDate();
-        const month = d.getMonth() + 1;
-        const year = d.getFullYear();
-        const dateStr = date < 10 ? "0" + date : date.toString();
-        const monthStr = month < 10 ? "0" + month : month.toString();
-        return `${year}-${monthStr}-${dateStr}`;
-    }
-
-    function parseMaskedDateStr(str: string) {
-        const [day, month, year] = str.split(".");
-        return new Date(Number(year), Number(month) - 1, Number(day));
-    }
-
-    function dateToMaskedDateStr(date: Date | null) {
-        if (!date) return null;
-        const day = date.getDate();
-        const month = date.getMonth() + 1;
-        const year = date.getFullYear();
-        const dayStr = day < 10 ? "0" + day : day.toString();
-        const monthStr = month < 10 ? "0" + month : month.toString();
-        return [dayStr, monthStr, year.toString()].join(".");
-    }
-
-    const dateMaskingOpts = {
-        mask: Date,
-        lazy: true,
-        max: new Date(),
-        format: dateToMaskedDateStr,
-        parse: parseMaskedDateStr,
-    };
-
-    function attachMaskedDateListeners(
-        el: HTMLInputElement,
-        setErr: (err: string | null) => void,
-        setDate: (d: Date) => void,
-    ) {
-        function onAccept(e: Event) {
-            const maskRef = (e as CustomEvent).detail;
-            setErr(maskRef.unmaskedValue ? $t("person.incompleteDate") : null);
+    function onDateInput(which: "birth" | "death", text: string) {
+        const parsed = parseDateInput(text);
+        const err = parsed.ok ? null : $t("person.incompleteDate");
+        if (which === "birth") {
+            birthText = text;
+            birthDateErrString = err;
+            if (parsed.ok) birthDate = parsed.value;
+        } else {
+            deathText = text;
+            deathDateErrString = err;
+            if (parsed.ok) deathDate = parsed.value;
         }
-        function onComplete(e: Event) {
-            const maskRef = (e as CustomEvent).detail;
-            setErr(null);
-            setDate(parseMaskedDateStr(maskRef.value));
-            validateLifetimeRange();
-        }
-        el.addEventListener("accept", onAccept);
-        el.addEventListener("complete", onComplete);
-        return () => {
-            el.removeEventListener("accept", onAccept);
-            el.removeEventListener("complete", onComplete);
-        };
+        if (parsed.ok) validateLifetimeRange();
     }
-
-    $effect(() => {
-        if (!birthInputEl) return;
-        return attachMaskedDateListeners(
-            birthInputEl,
-            (err) => (birthDateErrString = err),
-            (d) => (birthDate = d),
-        );
-    });
-
-    $effect(() => {
-        if (!deathInputEl) return;
-        return attachMaskedDateListeners(
-            deathInputEl,
-            (err) => (deathDateErrString = err),
-            (d) => (deathDate = d),
-        );
-    });
 
     function validateLifetimeRange() {
-        if (!birthDate || !deathDate) return;
-        if (deathDate < birthDate) {
-            birthDateErrString = $t("person.invalidDateRange");
-            deathDateErrString = $t("person.invalidDateRange");
-        } else {
-            birthDateErrString = null;
-            deathDateErrString = null;
-        }
+        if (birthDateErrString && birthDateErrString !== $t("person.invalidDateRange")) return;
+        if (deathDateErrString && deathDateErrString !== $t("person.invalidDateRange")) return;
+        const invalid = !!birthDate && !!deathDate && isBefore(deathDate, birthDate);
+        birthDateErrString = invalid ? $t("person.invalidDateRange") : null;
+        deathDateErrString = invalid ? $t("person.invalidDateRange") : null;
     }
 
     function resetFormState(p: ShowPerson | null) {
         id = p?.description.id ?? "";
         name = p?.description.name ?? "";
         unknown = p ? isUnknownPerson(p.description.name) : false;
-        birthDate = p?.description.birthDate ? new Date(p.description.birthDate) : null;
-        deathDate = p?.description.deathDate ? new Date(p.description.deathDate) : null;
+        birthDate = p?.description.birthDate ?? null;
+        deathDate = p?.description.deathDate ?? null;
+        birthText = toDateInput(birthDate);
+        deathText = toDateInput(deathDate);
         bio = p?.description.bio ?? "";
         pinned = p?.pin ?? false;
         personReadOnly = p?.description.readOnly ?? false;
@@ -220,10 +163,6 @@
         resetPendingPhoto();
         birthDateErrString = null;
         deathDateErrString = null;
-        queueMicrotask(() => {
-            if (birthInputEl) birthInputEl.value = dateToMaskedDateStr(birthDate) ?? "";
-            if (deathInputEl) deathInputEl.value = dateToMaskedDateStr(deathDate) ?? "";
-        });
     }
 
     export function showPersonDetails(p: ShowPerson) {
@@ -262,8 +201,8 @@
                 description: {
                     type: "CreateNewPerson" as const,
                     name: unknown ? "" : name,
-                    birthDate: dateToIsoLocalTime(birthDate),
-                    deathDate: dateToIsoLocalTime(deathDate),
+                    birthDate,
+                    deathDate,
                     bio,
                 },
                 pin: pinned,
@@ -278,8 +217,8 @@
         const description = {
             type: "CreateNewPerson" as const,
             name: unknown ? "" : name,
-            birthDate: dateToIsoLocalTime(birthDate),
-            deathDate: dateToIsoLocalTime(deathDate),
+            birthDate,
+            deathDate,
             bio,
         };
         if (mode === "create") {
@@ -602,8 +541,8 @@
                             <div class="date-cell">
                                 <input
                                     bind:this={birthInputEl}
-                                    value={dateToMaskedDateStr(birthDate)}
-                                    use:imask={dateMaskingOpts}
+                                    value={readOnly ? formatPartialDate(birthDate, $locale) : birthText}
+                                    oninput={(e) => onDateInput("birth", e.currentTarget.value)}
                                     class="form-control {birthDateErrString ? 'is-invalid' : ''}"
                                     readonly={readOnly}
                                     placeholder={$t("person.datePlaceholder")}
@@ -616,8 +555,8 @@
                             <div class="date-cell">
                                 <input
                                     bind:this={deathInputEl}
-                                    value={dateToMaskedDateStr(deathDate)}
-                                    use:imask={dateMaskingOpts}
+                                    value={readOnly ? formatPartialDate(deathDate, $locale) : deathText}
+                                    oninput={(e) => onDateInput("death", e.currentTarget.value)}
                                     class="form-control {deathDateErrString ? 'is-invalid' : ''}"
                                     readonly={readOnly}
                                     placeholder={$t("person.datePlaceholder")}

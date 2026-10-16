@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { PersonDescription } from "../model";
-    import { t } from "../i18n";
+    import { locale, t } from "../i18n";
+    import { formatPartialDate } from "../partialDate";
     import { highlightMatches, searchPeople } from "../personSearch";
 
     type Props = {
@@ -28,7 +29,7 @@
     });
 
     function lifespan(p: PersonDescription): string {
-        const parts = [p.birthDate || "?", p.deathDate].filter(Boolean);
+        const parts = [formatPartialDate(p.birthDate, $locale) || "?", formatPartialDate(p.deathDate, $locale)].filter(Boolean);
         return parts.length ? parts.join(" – ") : "";
     }
 

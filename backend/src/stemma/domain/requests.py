@@ -1,11 +1,11 @@
 from dataclasses import field
-from datetime import date
 from typing import Annotated, Literal
 
 from pydantic import Discriminator
 from pydantic.dataclasses import dataclass
 
 from stemma.domain._config import DOMAIN_CONFIG
+from stemma.domain.dates import PartialDate
 
 
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
@@ -17,8 +17,8 @@ class ExistingPerson:
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
 class CreateNewPerson:
     name: str
-    birth_date: date | None = None
-    death_date: date | None = None
+    birth_date: PartialDate | None = None
+    death_date: PartialDate | None = None
     bio: str | None = None
     type: Literal["CreateNewPerson"] = "CreateNewPerson"
 
