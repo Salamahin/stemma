@@ -139,7 +139,7 @@ class RequestHandler:
         self._storage.chown(user.user_id, token.stemma_id, token.target_person_id, authorized=True)
         owned = self._storage.list_owned_stemmas(user.user_id)
         last_stemma = self._storage.stemma(user.user_id, token.stemma_id)
-        return TokenAccepted(stemmas=owned, last_stemma=last_stemma)
+        return TokenAccepted(stemmas=owned, stemma_id=token.stemma_id, last_stemma=last_stemma)
 
     def _delete_stemma(self, user: User, request: DeleteStemmaRequest) -> OwnedStemmas:
         removed_photos = self._storage.remove_stemma(user.user_id, request.stemma_id)

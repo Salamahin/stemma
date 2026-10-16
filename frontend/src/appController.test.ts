@@ -508,4 +508,73 @@ describe("AppController", () => {
             errSpy.mockRestore();
         });
     });
+    describe("invitations", () => {
+        test("publishes the link from the model as is and ignores repeated clicks while in flight", async () => {
+            let resolve: (link: string) => void = () => {};
+            const model = {
+                createInvintation: jest.fn().mockReturnValue(new Promise<string>((r) => (resolve = r))),
+            };
+            const c = new AppController("http://example", model as any);
+            c.currentStemmaId.set("s1");
+
+            c.createInvitationToken("p1", "a@b.c");
+            c.createInvitationToken("p1", "a@b.c");
+            c.createInvitationToken("p1", "a@b.c");
+            expect(model.createInvintation).toHaveBeenCalledTimes(1);
+            expect(get(c.invitationPending)).toBe(true);
+
+            resolve("https://stemma.link/?inviteToken=tok");
+            await drainAll();
+
+            expect(get(c.invitationLink)).toBe("https://stemma.link/?inviteToken=tok");
+            expect(get(c.invitationPending)).toBe(false);
+        });
+
+        test("surfaces a failed invitation as an error", async () => {
+            const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+            const model = { createInvintation: jest.fn().mockRejectedValue(new Error("boom")) };
+            const c = new AppController("http://example", model as any);
+
+            c.createInvitationToken("p1", "a@b.c");
+            await drainAll();
+
+            expect(get(c.err)).toBeInstanceOf(Error);
+            expect(get(c.invitationLink)).toBeNull();
+            expect(get(c.invitationPending)).toBe(false);
+            errSpy.mockRestore();
+        });
+
+        test("bearing a token switches to the shared stemma", async () => {
+            const model = {
+                bearInvitationToken: jest.fn().mockResolvedValue({
+                    stemmas: [stemmaDescA, stemmaDescB],
+                    stemmaId: "b",
+                    lastStemma: stemmaB,
+                }),
+            };
+            const c = new AppController("http://example", model as any);
+
+            await c.bearInvitationToken("tok");
+
+            expect(model.bearInvitationToken).toHaveBeenCalledWith("tok");
+            expect(get(c.currentStemmaId)).toBe("b");
+            expect(get(c.stemma)).toEqual(stemmaB);
+        });
+
+        test("bearing a token selects the shared stemma even when it is not listed last", async () => {
+            const model = {
+                bearInvitationToken: jest.fn().mockResolvedValue({
+                    stemmas: [stemmaDescB, stemmaDescA],
+                    stemmaId: "b",
+                    lastStemma: stemmaB,
+                }),
+            };
+            const c = new AppController("http://example", model as any);
+
+            await c.bearInvitationToken("tok");
+
+            expect(get(c.currentStemmaId)).toBe("b");
+            expect(get(c.ownedStemmas)).toEqual([stemmaDescB, stemmaDescA]);
+        });
+    });
 });
