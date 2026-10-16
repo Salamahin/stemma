@@ -20,7 +20,8 @@ export class AppController {
     currentStemmaId = writable<string>(null)
     favouriteStemmaId = writable<string | null>(null)
     isWorking = writable<boolean>(false)
-    invitationToken = writable<string>(null)
+    invitationLink = writable<string>(null)
+    invitationPending = writable<boolean>(false)
     err = writable<Error>(null)
     settingsStorage = writable<SettingsStorage>(null);
 
@@ -59,22 +60,19 @@ export class AppController {
         }
     }
 
-    bearInvitationToken(token: string) {
+    bearInvitationToken(token: string): Promise<void> {
         this.isWorking.set(true)
         this.err.set(null)
 
-        this.model
+        return this.model
             .bearInvitationToken(token)
             .then((result) => {
-                let selectedStemma = result.stemmas.slice(-1)[0]
-                let stemma = result.lastStemma
+                const stemma = result.lastStemma
 
-                this.refreshIndexes(stemma, selectedStemma.id)
+                this.refreshIndexes(stemma, result.stemmaId)
                 this.ownedStemmas.set(result.stemmas)
-                this.setCurrentStemmaId(selectedStemma.id)
+                this.setCurrentStemmaId(result.stemmaId)
                 this.stemma.set(stemma)
-
-                this.isWorking.set(false)
             })
             .catch(err => {
                 this.err.set(err)
@@ -285,10 +283,19 @@ export class AppController {
     }
 
     createInvitationToken(personId: string, email: string) {
-        this.invitationToken.set(null)
+        // One click must mint one token; ignore repeats while the request is in flight.
+        if (get(this.invitationPending)) return
+        this.invitationPending.set(true)
+        this.invitationLink.set(null)
+        this.err.set(null)
         this.model
             .createInvintation(get(this.currentStemmaId), personId, email, get(this.stemmaIndex))
-            .then(tkn => this.invitationToken.set(tkn))
+            .then(link => this.invitationLink.set(link))
+            .catch(err => {
+                this.err.set(err)
+                console.error('Err when creating an invitation: ', err.stack);
+            })
+            .finally(() => this.invitationPending.set(false))
     }
 
     private manipulateStemma(
