@@ -4,7 +4,7 @@
 
     type Props = {
         open: boolean;
-        anchorEl?: Element | null;
+        anchorEl?: { getBoundingClientRect(): DOMRect } | null;
         onclose?: () => void;
         body: Snippet;
         footer?: Snippet;

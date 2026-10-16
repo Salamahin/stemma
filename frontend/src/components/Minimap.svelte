@@ -1,6 +1,7 @@
 <script lang="ts">
     import * as d3 from "d3";
     import { t } from "../i18n";
+    import type { CanvasChart } from "../canvasChart";
     import {
         computeBounds,
         computeLayout,
@@ -11,21 +12,16 @@
         type MinimapLayout,
     } from "../minimapProjection";
 
-    type SimNode = { x?: number | null; y?: number | null; type?: string };
-    type Sim = d3.Simulation<SimNode, undefined>;
-
     type Props = {
         editMode: boolean;
-        stemmaChartReady: boolean;
-        getSimulation: () => Sim | null;
+        chart: CanvasChart | null;
         getZoomTransform: () => d3.ZoomTransform | null | undefined;
         applyZoomTranslate: (tx: number, ty: number) => void;
     };
 
     let {
         editMode,
-        stemmaChartReady,
-        getSimulation,
+        chart,
         getZoomTransform,
         applyZoomTranslate,
     }: Props = $props();
@@ -49,9 +45,9 @@
         contentHeight: 0,
     });
 
-    function readSimNodes(sim: Sim): NodeDot[] {
+    function readChartNodes(c: CanvasChart): NodeDot[] {
         const out: NodeDot[] = [];
-        for (const n of sim.nodes()) {
+        for (const n of c.nodes) {
             if ((n.type === "person" || n.type === "family") && n.x != null && n.y != null) {
                 out.push({ x: n.x, y: n.y, type: n.type });
             }
@@ -60,8 +56,7 @@
     }
 
     export function refresh() {
-        const sim = getSimulation();
-        const raw = sim ? readSimNodes(sim) : [];
+        const raw = chart ? readChartNodes(chart) : [];
         const bounds = computeBounds(raw);
         layout = computeLayout(bounds, CANVAS_W, CANVAS_H);
         const paths = projectAndBuildPaths(raw, layout, PERSON_R, FAMILY_R);
@@ -71,7 +66,7 @@
     }
 
     $effect(() => {
-        if (!editMode || !stemmaChartReady) return;
+        if (!editMode || !chart) return;
 
         viewWidth = window.innerWidth;
         viewHeight = window.innerHeight;
@@ -82,9 +77,7 @@
             rafHandle = requestAnimationFrame(refresh);
         };
 
-        const sim = getSimulation();
-        sim?.on("tick.minimap", scheduleRefresh);
-        sim?.on("end.minimap", scheduleRefresh);
+        const unsubscribe = chart.onPositionsChanged(scheduleRefresh);
 
         const onResize = () => {
             viewWidth = window.innerWidth;
@@ -96,8 +89,7 @@
 
         return () => {
             cancelAnimationFrame(rafHandle);
-            sim?.on("tick.minimap", null);
-            sim?.on("end.minimap", null);
+            unsubscribe();
             window.removeEventListener("resize", onResize);
         };
     });

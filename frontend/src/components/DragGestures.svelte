@@ -1,9 +1,8 @@
 <script lang="ts">
     import { denormalizeId } from "../graphTools";
-    import { arrowPath } from "../graphStyles";
     import { t } from "../i18n";
     import type { StemmaIndex } from "../stemmaIndex";
-    import { focusedIdFromG, isShortTap, TAP_MAX_MS, TAP_MAX_MOVE_PX, type FocusedId } from "../focusGesture";
+    import { focusedIdFromNodeId, isShortTap, TAP_MAX_MS, TAP_MAX_MOVE_PX, type FocusedId } from "../focusGesture";
     import {
         isPendingFamilyId,
         isPendingId,
@@ -11,12 +10,10 @@
         type FamilyRole,
         type PendingFamily,
     } from "../pendingState";
-    import {
-        clientToSvgPoint,
-        findNodeUnder,
-        nodeCenter,
-        type NodeRef,
-    } from "../domGeometry";
+    import type { CanvasChart, ChartNode, DropClass } from "../canvasChart";
+
+    type NodeRef = { kind: "person" | "family"; id: string };
+    type NodeHit = { ref: NodeRef; node: ChartNode };
 
     type SourceRef = { kind: "person"; id: string } | { kind: "family"; id: string } | { kind: "empty" };
 
@@ -24,7 +21,7 @@
         editMode: boolean;
         panActive: boolean;
         panMode: boolean;
-        stemmaChartReady: boolean;
+        chart: CanvasChart | null;
         displayedStemmaIndex: StemmaIndex | null;
         findPendingFamily: (id: string) => PendingFamily | undefined;
         popHover: () => void;
@@ -57,7 +54,7 @@
         editMode,
         panActive,
         panMode,
-        stemmaChartReady,
+        chart,
         displayedStemmaIndex,
         findPendingFamily,
         popHover,
@@ -73,7 +70,6 @@
     }: Props = $props();
 
     const PERSON_DRAG_MIME = "application/x-stemma-person";
-    const SVG_NS = "http://www.w3.org/2000/svg";
 
     let activeGestureSource = $state<SourceRef | null>(null);
     let dragTip = $state<{ text: string; x: number; y: number } | null>(null);
@@ -109,9 +105,31 @@
         return { names: familyChildrenNames(familyId), via: "children" };
     }
 
-    function classifyForDrop(src: SourceRef, g: Element): "drop-allowed" | "drop-disallowed" | null {
-        const id = denormalizeId(g.id);
-        const kind: "person" | "family" = g.id.startsWith("person_") ? "person" : "family";
+    function nodeKind(nodeId: string): "person" | "family" {
+        return nodeId.startsWith("person_") ? "person" : "family";
+    }
+
+    let dropClasses = new Map<string, DropClass>();
+
+    /**
+     * Real node under a client point, as the old DOM hit-test saw it: pending
+     * people and drop-disallowed nodes (pointer-events: none) are transparent,
+     * and a ghost on top hides whatever is under it.
+     */
+    function findNodeUnder(c: CanvasChart, clientX: number, clientY: number): NodeHit | null {
+        if (c.hitGhost(clientX, clientY)) return null;
+        const disallowed = dropClasses;
+        const node = c.hitNode(clientX, clientY, { skip: (n) => disallowed.get(n.id) === "drop-disallowed" });
+        if (!node) return null;
+        const kind = nodeKind(node.id);
+        const id = denormalizeId(node.id);
+        if (kind === "person" && isPendingId(id)) return null;
+        return { ref: { kind, id }, node };
+    }
+
+    function classifyForDrop(src: SourceRef, nodeId: string): DropClass | null {
+        const id = denormalizeId(nodeId);
+        const kind = nodeKind(nodeId);
         if (kind === "person" && isPendingPersonId(id)) return null;
         if (src.kind === "person") {
             if (kind !== "family") return null;
@@ -146,50 +164,53 @@
 
     // HTML5 DnD: tray chip → canvas family target. Tray person becomes spouse (parent).
     $effect(() => {
-        if (!stemmaChartReady) return;
-        const svgEl = document.getElementById("chart") as unknown as SVGSVGElement | null;
-        if (!svgEl) return;
+        if (!chart) return;
+        const c = chart;
+        const canvasEl = c.canvas;
+        const familyUnder = (e: DragEvent) => {
+            const n = c.hitNode(e.clientX, e.clientY);
+            return n && n.type === "family" ? n : null;
+        };
 
         const onDragOver = (e: DragEvent) => {
             if (!e.dataTransfer || !Array.from(e.dataTransfer.types).includes(PERSON_DRAG_MIME)) return;
-            const g = (e.target as Element | null)?.closest?.("g[id^='family_']") as SVGGElement | null;
+            const g = familyUnder(e);
+            c.setDropTarget(g?.id ?? null);
             if (!g) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = "link";
-            g.classList.add("drop-target");
         };
-        const onDragLeave = (e: DragEvent) => {
-            const g = (e.target as Element | null)?.closest?.("g[id^='family_']") as SVGGElement | null;
-            g?.classList.remove("drop-target");
+        const onDragLeave = (_e: DragEvent) => {
+            c.setDropTarget(null);
         };
         const onDrop = (e: DragEvent) => {
-            const g = (e.target as Element | null)?.closest?.("g[id^='family_']") as SVGGElement | null;
+            const g = familyUnder(e);
+            c.setDropTarget(null);
             if (!g || !e.dataTransfer) return;
             const pid = e.dataTransfer.getData(PERSON_DRAG_MIME);
             const fid = denormalizeId(g.id);
-            g.classList.remove("drop-target");
             if (!pid || !fid) return;
             if (isPendingId(pid)) return;
             e.preventDefault();
-            const dropSvg = clientToSvgPoint(svgEl, e.clientX, e.clientY);
+            const dropSvg = c.clientToWorld(e.clientX, e.clientY);
             onattachPersonToFamily(pid, fid, "parent", dropSvg);
         };
 
-        svgEl.addEventListener("dragover", onDragOver);
-        svgEl.addEventListener("dragleave", onDragLeave);
-        svgEl.addEventListener("drop", onDrop);
+        canvasEl.addEventListener("dragover", onDragOver);
+        canvasEl.addEventListener("dragleave", onDragLeave);
+        canvasEl.addEventListener("drop", onDrop);
         return () => {
-            svgEl.removeEventListener("dragover", onDragOver);
-            svgEl.removeEventListener("dragleave", onDragLeave);
-            svgEl.removeEventListener("drop", onDrop);
+            canvasEl.removeEventListener("dragover", onDragOver);
+            canvasEl.removeEventListener("dragleave", onDragLeave);
+            canvasEl.removeEventListener("drop", onDrop);
         };
     });
 
     // Canvas pointer gesture: drag person↔family. Empty source/target supported.
     $effect(() => {
-        if (!editMode || !stemmaChartReady) return;
-        const svgEl = document.getElementById("chart") as unknown as SVGSVGElement | null;
-        if (!svgEl) return;
+        if (!editMode || !chart) return;
+        const c = chart;
+        const canvasEl = c.canvas;
 
         const PERSON_PREVIEW_R = 15;
         const FAMILY_PREVIEW_R = 7;
@@ -201,11 +222,11 @@
             startClientY: number;
             startMs: number;
             active: boolean;
-            sourceGEl: SVGGElement | null;
-            sourceMarker: SVGCircleElement | null;
-            line: SVGLineElement | null;
-            endpointPreview: SVGCircleElement | null;
-            lastTarget: SVGGElement | null;
+            sourceNodeId: string | null;
+            sourceMarker: { x: number; y: number } | null;
+            line: { x1: number; y1: number; x2: number; y2: number } | null;
+            endpointPreview: { x: number; y: number; r: number } | null;
+            lastTarget: string | null;
         } | null = null;
 
         let longPressTimer: ReturnType<typeof setTimeout> | null = null;
@@ -217,54 +238,29 @@
             }
         };
 
-        const clearTargetHighlight = () => {
-            if (gesture?.lastTarget) gesture.lastTarget.classList.remove("drop-target");
-        };
-
-        const removeSvgEl = (el: Element | null) => {
-            if (el && el.parentNode) el.parentNode.removeChild(el);
-        };
-
-        const ensureArrowMarker = () => {
-            if (svgEl.querySelector("defs > marker#-arrow")) return;
-            let defs = svgEl.querySelector("defs") as SVGDefsElement | null;
-            if (!defs) {
-                defs = document.createElementNS(SVG_NS, "defs") as SVGDefsElement;
-                svgEl.insertBefore(defs, svgEl.firstChild);
-            }
-            const marker = document.createElementNS(SVG_NS, "marker");
-            marker.setAttribute("id", "arrow");
-            marker.setAttribute("viewBox", "0 0 10 6");
-            marker.setAttribute("refX", "10");
-            marker.setAttribute("refY", "3");
-            marker.setAttribute("markerWidth", "10");
-            marker.setAttribute("markerHeight", "6");
-            marker.setAttribute("markerUnits", "userSpaceOnUse");
-            marker.setAttribute("orient", "auto");
-            marker.setAttribute("fill", "#0d6efd");
-            const path = document.createElementNS(SVG_NS, "path");
-            path.setAttribute("d", arrowPath);
-            marker.appendChild(path);
-            defs.appendChild(marker);
+        const syncOverlay = () => {
+            c.setOverlay({
+                line: gesture?.line ?? null,
+                sourceMarker: gesture?.sourceMarker ?? null,
+                preview: gesture?.endpointPreview ?? null,
+            });
         };
 
         const cleanup = () => {
             cancelLongPress();
             document.body.classList.remove("linking");
             if (!gesture) return;
-            clearTargetHighlight();
-            removeSvgEl(gesture.line);
-            removeSvgEl(gesture.sourceMarker);
-            removeSvgEl(gesture.endpointPreview);
-            gesture.sourceGEl?.classList.remove("gesture-source");
+            c.setDropTarget(null);
+            c.setGestureSource(null);
             gesture = null;
+            syncOverlay();
             dragTip = null;
             activeGestureSource = null;
         };
 
         const targetCompatibility = (
             source: SourceRef,
-            overInfo: { ref: NodeRef } | null,
+            overInfo: NodeHit | null,
         ): "valid" | "noop" | "create-empty" => {
             if (source.kind === "person") {
                 if (overInfo?.ref.kind === "family") {
@@ -317,23 +313,21 @@
         };
 
         const onPointerStart = (e: PointerEvent) => {
-            const targetG = (e.target as Element | null)?.closest?.("g[id^='person_'], g[id^='family_']") as SVGGElement | null;
+            const targetNode = c.hitGhost(e.clientX, e.clientY) ? null : c.hitNode(e.clientX, e.clientY);
             let source: SourceRef;
             let center: { x: number; y: number };
-            let sourceGEl: SVGGElement | null = null;
-            if (targetG) {
-                const kind = targetG.id.startsWith("person_") ? "person" : "family";
-                const sourceId = denormalizeId(targetG.id);
+            let sourceNodeId: string | null = null;
+            if (targetNode) {
+                const kind = nodeKind(targetNode.id);
+                const sourceId = denormalizeId(targetNode.id);
                 if (kind === "person" && isPendingPersonId(sourceId)) return;
-                const c = nodeCenter(targetG);
-                if (!c) return;
                 source = { kind, id: sourceId };
-                center = c;
-                sourceGEl = targetG;
+                center = { x: targetNode.x, y: targetNode.y };
+                sourceNodeId = targetNode.id;
                 popHover();
             } else {
                 source = { kind: "empty" };
-                center = clientToSvgPoint(svgEl, e.clientX, e.clientY);
+                center = c.clientToWorld(e.clientX, e.clientY);
             }
             gesture = {
                 source,
@@ -342,7 +336,7 @@
                 startClientY: e.clientY,
                 startMs: Date.now(),
                 active: false,
-                sourceGEl,
+                sourceNodeId,
                 sourceMarker: null,
                 line: null,
                 endpointPreview: null,
@@ -351,12 +345,12 @@
             document.body.classList.add("linking");
             e.preventDefault();
 
-            if (e.pointerType !== "mouse" && sourceGEl) {
-                const capturedG = sourceGEl;
+            if (e.pointerType !== "mouse" && sourceNodeId) {
+                const capturedId = sourceNodeId;
                 longPressTimer = setTimeout(() => {
                     longPressTimer = null;
                     if (!gesture || gesture.active) return;
-                    const focused = focusedIdFromG(capturedG, isPendingId);
+                    const focused = focusedIdFromNodeId(capturedId, isPendingId);
                     if (focused) {
                         cleanup();
                         onlongPress(focused);
@@ -365,7 +359,7 @@
             }
         };
 
-        const computeTipText = (overInfo: { ref: NodeRef } | null, source: SourceRef): string | null => {
+        const computeTipText = (overInfo: NodeHit | null, source: SourceRef): string | null => {
             if (source.kind === "person") {
                 if (overInfo?.ref.kind === "family") {
                     const anchor = familyAnchor(overInfo.ref.id);
@@ -409,15 +403,11 @@
         };
 
         const updateEndpointPreview = (
-            mainG: SVGGElement | null,
             svgPt: { x: number; y: number },
-            overInfo: { ref: NodeRef } | null,
+            overInfo: NodeHit | null,
         ) => {
             if (!gesture) return;
             const src = gesture.source;
-            const hidePreview = () => {
-                if (gesture?.endpointPreview) gesture.endpointPreview.style.display = "none";
-            };
             let previewKind: "person" | "family" | null = null;
             if (!overInfo) {
                 if (src.kind === "family") previewKind = "person";
@@ -426,27 +416,11 @@
                 previewKind = "family";
             }
             if (!previewKind) {
-                hidePreview();
+                gesture.endpointPreview = null;
                 return;
             }
             const r = previewKind === "person" ? PERSON_PREVIEW_R : FAMILY_PREVIEW_R;
-            const previewClass = `endpoint-preview endpoint-${previewKind}`;
-            if (gesture.endpointPreview && gesture.endpointPreview.getAttribute("class") !== previewClass) {
-                gesture.endpointPreview.parentNode?.removeChild(gesture.endpointPreview);
-                gesture.endpointPreview = null;
-            }
-            if (!gesture.endpointPreview && mainG) {
-                const p = document.createElementNS(SVG_NS, "circle") as SVGCircleElement;
-                p.setAttribute("class", previewClass);
-                mainG.appendChild(p);
-                gesture.endpointPreview = p;
-            }
-            if (gesture.endpointPreview) {
-                gesture.endpointPreview.style.display = "";
-                gesture.endpointPreview.setAttribute("cx", String(svgPt.x));
-                gesture.endpointPreview.setAttribute("cy", String(svgPt.y));
-                gesture.endpointPreview.setAttribute("r", String(r));
-            }
+            gesture.endpointPreview = { x: svgPt.x, y: svgPt.y, r };
         };
 
         const onPointerMove = (e: PointerEvent) => {
@@ -459,48 +433,28 @@
                 gesture.active = true;
                 cancelLongPress();
                 activeGestureSource = gesture.source;
-                const mainG = svgEl.querySelector("g.main") as SVGGElement | null;
-                if (mainG) {
-                    ensureArrowMarker();
-                    const line = document.createElementNS(SVG_NS, "line") as SVGLineElement;
-                    line.setAttribute("class", "link-line");
-                    line.setAttribute("x1", String(gesture.sourceCenter.x));
-                    line.setAttribute("y1", String(gesture.sourceCenter.y));
-                    line.setAttribute("x2", String(gesture.sourceCenter.x));
-                    line.setAttribute("y2", String(gesture.sourceCenter.y));
-                    line.setAttribute("marker-end", "url(#-arrow)");
-                    mainG.appendChild(line);
-                    gesture.line = line;
-                    if (gesture.source.kind === "empty") {
-                        const marker = document.createElementNS(SVG_NS, "circle") as SVGCircleElement;
-                        marker.setAttribute("class", "empty-source-marker");
-                        marker.setAttribute("cx", String(gesture.sourceCenter.x));
-                        marker.setAttribute("cy", String(gesture.sourceCenter.y));
-                        marker.setAttribute("r", "8");
-                        mainG.appendChild(marker);
-                        gesture.sourceMarker = marker;
-                    }
+                gesture.line = {
+                    x1: gesture.sourceCenter.x,
+                    y1: gesture.sourceCenter.y,
+                    x2: gesture.sourceCenter.x,
+                    y2: gesture.sourceCenter.y,
+                };
+                if (gesture.source.kind === "empty") {
+                    gesture.sourceMarker = { x: gesture.sourceCenter.x, y: gesture.sourceCenter.y };
                 }
-                gesture.sourceGEl?.classList.add("gesture-source");
+                c.setGestureSource(gesture.sourceNodeId);
             }
-            const svgPt = clientToSvgPoint(svgEl, e.clientX, e.clientY);
-            if (gesture.line) {
-                gesture.line.setAttribute("x2", String(svgPt.x));
-                gesture.line.setAttribute("y2", String(svgPt.y));
-            }
-            const overInfo = findNodeUnder(e.clientX, e.clientY);
-            const overG = overInfo?.el ?? null;
+            const svgPt = c.clientToWorld(e.clientX, e.clientY);
+            if (gesture.line) gesture.line = { ...gesture.line, x2: svgPt.x, y2: svgPt.y };
+            const overInfo = findNodeUnder(c, e.clientX, e.clientY);
+            const overId = overInfo?.node.id ?? null;
             const compat = targetCompatibility(gesture.source, overInfo);
-            if (overG !== gesture.lastTarget) {
-                gesture.lastTarget?.classList.remove("drop-target");
-                gesture.lastTarget = null;
-                if (overG && compat === "valid") {
-                    overG.classList.add("drop-target");
-                    gesture.lastTarget = overG;
-                }
+            if (overId !== gesture.lastTarget) {
+                gesture.lastTarget = overId && compat === "valid" ? overId : null;
+                c.setDropTarget(gesture.lastTarget);
             }
-            const mainG = svgEl.querySelector("g.main") as SVGGElement | null;
-            updateEndpointPreview(mainG, svgPt, overInfo);
+            updateEndpointPreview(svgPt, overInfo);
+            syncOverlay();
             const tipText = compat === "noop" ? null : computeTipText(overInfo, gesture.source);
             dragTip = tipText ? { text: tipText, x: e.clientX, y: e.clientY } : null;
         };
@@ -510,24 +464,24 @@
             const wasActive = gesture.active;
             const source = gesture.source;
             const startCenter = gesture.sourceCenter;
-            const sourceGEl = gesture.sourceGEl;
+            const sourceNodeId = gesture.sourceNodeId;
             const elapsed = Date.now() - gesture.startMs;
             const moved = Math.hypot(e.clientX - gesture.startClientX, e.clientY - gesture.startClientY);
-            const overInfo = findNodeUnder(e.clientX, e.clientY);
+            const overInfo = findNodeUnder(c, e.clientX, e.clientY);
             cleanup();
             if (!wasActive) {
                 if (e.pointerType !== "mouse") {
                     if (isShortTap(elapsed, moved)) {
-                        if (sourceGEl) {
-                            onshortTapFocus(focusedIdFromG(sourceGEl, isPendingId));
+                        if (sourceNodeId) {
+                            onshortTapFocus(focusedIdFromNodeId(sourceNodeId, isPendingId));
                         } else {
                             onshortTapFocus(null);
                         }
                     }
                     return;
                 }
-                if (sourceGEl) {
-                    const focused = focusedIdFromG(sourceGEl, isPendingId);
+                if (sourceNodeId) {
+                    const focused = focusedIdFromNodeId(sourceNodeId, isPendingId);
                     if (focused) ondesktopNodeClick(focused);
                 }
                 return;
@@ -545,7 +499,7 @@
                 return;
             }
             if (source.kind === "family" && overInfo?.ref.kind === "person") {
-                const tgtCenter = nodeCenter(overInfo.el) ?? undefined;
+                const tgtCenter = { x: overInfo.node.x, y: overInfo.node.y };
                 onattachPersonToFamily(overInfo.ref.id, source.id, "child", tgtCenter);
                 return;
             }
@@ -558,13 +512,13 @@
                 return;
             }
             if (source.kind === "family" && !overInfo) {
-                const releaseSvg = clientToSvgPoint(svgEl, e.clientX, e.clientY);
+                const releaseSvg = c.clientToWorld(e.clientX, e.clientY);
                 const title = $t("createChildTitleOf", { names: joinNames(familyParentNames(source.id)) });
                 oncreatePersonInFamily(source.id, "child", title, releaseSvg);
                 return;
             }
             if (source.kind === "person" && !overInfo) {
-                const releaseSvg = clientToSvgPoint(svgEl, e.clientX, e.clientY);
+                const releaseSvg = c.clientToWorld(e.clientX, e.clientY);
                 oncreatePendingFamily(source.id, "parent", releaseSvg);
                 return;
             }
@@ -583,7 +537,7 @@
         };
 
         const onCancel = () => cleanup();
-        // d3.drag attaches a pointerdown listener to each node g and restarts
+        // d3.drag attaches a mousedown listener to the canvas and restarts
         // the force simulation on press, which would scramble pinned positions
         // mid-gesture. Capturing pointerdown at the svg root and stopping
         // propagation prevents the d3 handler from ever seeing it.
@@ -616,10 +570,10 @@
             if (panActive) return;
             e.stopImmediatePropagation();
         };
-        svgEl.addEventListener("pointerdown", onPointerDownCapture, true);
-        svgEl.addEventListener("touchstart", onTouchStartCapture, true);
-        svgEl.addEventListener("mousedown", onMouseDownCapture, true);
-        svgEl.addEventListener("click", onClickCapture, true);
+        canvasEl.addEventListener("pointerdown", onPointerDownCapture, true);
+        canvasEl.addEventListener("touchstart", onTouchStartCapture, true);
+        canvasEl.addEventListener("mousedown", onMouseDownCapture, true);
+        canvasEl.addEventListener("click", onClickCapture, true);
         window.addEventListener("pointermove", onPointerMove);
         window.addEventListener("pointerup", onPointerEnd);
         window.addEventListener("pointercancel", onCancel);
@@ -627,10 +581,10 @@
         window.addEventListener("contextmenu", onCancel);
         window.addEventListener("blur", onCancel);
         return () => {
-            svgEl.removeEventListener("pointerdown", onPointerDownCapture, true);
-            svgEl.removeEventListener("touchstart", onTouchStartCapture, true);
-            svgEl.removeEventListener("mousedown", onMouseDownCapture, true);
-            svgEl.removeEventListener("click", onClickCapture, true);
+            canvasEl.removeEventListener("pointerdown", onPointerDownCapture, true);
+            canvasEl.removeEventListener("touchstart", onTouchStartCapture, true);
+            canvasEl.removeEventListener("mousedown", onMouseDownCapture, true);
+            canvasEl.removeEventListener("click", onClickCapture, true);
             window.removeEventListener("pointermove", onPointerMove);
             window.removeEventListener("pointerup", onPointerEnd);
             window.removeEventListener("pointercancel", onCancel);
@@ -643,20 +597,20 @@
 
     $effect(() => {
         const src = activeGestureSource;
-        if (!src || src.kind === "empty") return;
+        if (!src || src.kind === "empty" || !chart) return;
+        const c = chart;
         // Read so the effect tracks index rebuilds (pending add/remove etc).
         void displayedStemmaIndex;
-        const svgEl = document.getElementById("chart");
-        if (!svgEl) return;
-        svgEl.querySelectorAll("g[id^='person_'], g[id^='family_']").forEach((g) => {
-            g.classList.remove("drop-allowed", "drop-disallowed");
-            const cls = classifyForDrop(src, g);
-            if (cls) g.classList.add(cls);
-        });
+        const classes = new Map<string, DropClass>();
+        for (const n of c.nodes) {
+            const cls = classifyForDrop(src, n.id);
+            if (cls) classes.set(n.id, cls);
+        }
+        dropClasses = classes;
+        c.setDropClasses(classes);
         return () => {
-            svgEl.querySelectorAll("g.drop-allowed, g.drop-disallowed").forEach((g) => {
-                g.classList.remove("drop-allowed", "drop-disallowed");
-            });
+            dropClasses = new Map();
+            c.setDropClasses(new Map());
         };
     });
 
@@ -722,60 +676,6 @@
 {/if}
 
 <style>
-    :global(g.drop-disallowed) {
-        opacity: 0.3;
-        filter: saturate(0.2);
-        pointer-events: none;
-    }
-
-    :global(g.drop-allowed > circle) {
-        animation: drop-allowed-pulse 1.8s ease-in-out infinite;
-    }
-
-    @keyframes drop-allowed-pulse {
-        0%, 100% { stroke-opacity: 1; }
-        50% { stroke-opacity: 0.45; }
-    }
-
-    :global(g.drop-target > circle) {
-        stroke: #0d6efd;
-        stroke-width: 3px;
-        stroke-dasharray: 4 2;
-        filter: drop-shadow(0 0 6px rgba(13, 110, 253, 0.55));
-    }
-
-    :global(g.gesture-source > circle) {
-        stroke: #0d6efd;
-        stroke-width: 2.5px;
-        filter: drop-shadow(0 0 8px rgba(13, 110, 253, 0.65));
-    }
-
-    :global(.empty-source-marker) {
-        fill: rgba(13, 110, 253, 0.08);
-        stroke: #0d6efd;
-        stroke-width: 1.5;
-        stroke-dasharray: 4 3;
-        opacity: 0.7;
-        pointer-events: none;
-    }
-
-    :global(.endpoint-preview) {
-        fill: rgba(13, 110, 253, 0.08);
-        stroke: #0d6efd;
-        stroke-width: 1.5;
-        stroke-dasharray: 4 3;
-        opacity: 0.75;
-        pointer-events: none;
-    }
-
-    :global(.link-line) {
-        stroke: #0d6efd;
-        stroke-width: 2px;
-        stroke-dasharray: 5 4;
-        pointer-events: none;
-        opacity: 0.7;
-    }
-
     :global(body.linking),
     :global(body.linking *) {
         cursor: crosshair !important;

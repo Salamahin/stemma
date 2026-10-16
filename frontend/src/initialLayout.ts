@@ -102,3 +102,112 @@ export function computeInitialLayout(
 
     return positions;
 }
+
+type SeedNode = { id: string };
+type SeedLink = { source: string | { id: string }; target: string | { id: string } };
+
+/** Spacing for nodes seeded next to an already placed relative (≈ link distance). */
+const SEED_STEP = 85;
+
+function stableHash(s: string): number {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+    return (h >>> 0) / 2 ** 32;
+}
+
+/**
+ * Starting positions for nodes that have no remembered position, placed next
+ * to relatives that do (a reopened stemma with a few new people). Grows
+ * outward from the known nodes: a node below its source relative (child under
+ * its family, family under its spouse) or above its target relative, with a
+ * small deterministic sideways spread so siblings do not coincide. Components
+ * with no known relative use `fallback` (the generational layout), shifted to
+ * sit to the right of the known layout.
+ */
+export function seedFromKnown(
+    nodes: ReadonlyArray<SeedNode>,
+    links: ReadonlyArray<SeedLink>,
+    known: ReadonlyMap<string, [number, number]>,
+    fallback?: ReadonlyMap<string, [number, number]>,
+): Map<string, [number, number]> {
+    const idOf = (e: string | { id: string }) => (typeof e === "string" ? e : e.id);
+    const out = new Map<string, [number, number]>();
+    const placed = (id: string) => known.get(id) ?? out.get(id);
+    const nbrs = new Map<string, Array<{ id: string; below: boolean }>>();
+    const add = (a: string, b: string, below: boolean) => {
+        let arr = nbrs.get(a);
+        if (!arr) nbrs.set(a, (arr = []));
+        arr.push({ id: b, below });
+    };
+    for (const l of links) {
+        const s = idOf(l.source);
+        const t = idOf(l.target);
+        add(t, s, true); // target sits below its source
+        add(s, t, false); // source sits above its target
+    }
+
+    let frontier = nodes.filter((n) => !known.has(n.id)).map((n) => n.id);
+    let progress = true;
+    while (frontier.length && progress) {
+        progress = false;
+        const next: string[] = [];
+        const batch: Array<[string, [number, number]]> = [];
+        const siblingsAt = new Map<string, number>();
+        for (const id of frontier) {
+            const rel = (nbrs.get(id) ?? []).filter((r) => placed(r.id));
+            if (rel.length === 0) {
+                next.push(id);
+                continue;
+            }
+            let x = 0;
+            let y = 0;
+            let dir = 0;
+            for (const r of rel) {
+                const p = placed(r.id)!;
+                x += p[0];
+                y += p[1];
+                dir += r.below ? 1 : -1;
+            }
+            x /= rel.length;
+            y /= rel.length;
+            // Fan out nodes that hang off the same relatives (siblings), plus a
+            // little hash jitter so the sim never starts from exact symmetry.
+            const anchorKey = rel.map((r) => r.id).sort().join("|") + (dir >= 0 ? "v" : "^");
+            const k = siblingsAt.get(anchorKey) ?? 0;
+            siblingsAt.set(anchorKey, k + 1);
+            const fan = (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * SEED_STEP;
+            const jitter = (stableHash(id) - 0.5) * 0.4 * SEED_STEP;
+            batch.push([id, [x + fan + jitter, y + (dir >= 0 ? SEED_STEP : -SEED_STEP)]]);
+        }
+        if (batch.length) progress = true;
+        for (const [id, p] of batch) out.set(id, p);
+        frontier = next;
+    }
+
+    if (frontier.length) {
+        let maxX = -Infinity;
+        let minY = Infinity;
+        for (const p of [...known.values(), ...out.values()]) {
+            maxX = Math.max(maxX, p[0]);
+            minY = Math.min(minY, p[1]);
+        }
+        if (!Number.isFinite(maxX)) {
+            maxX = 0;
+            minY = 0;
+        }
+        const rest = frontier.map((id) => [id, fallback?.get(id)] as const);
+        let fMinX = Infinity;
+        let fMinY = Infinity;
+        for (const [, p] of rest) {
+            if (!p) continue;
+            fMinX = Math.min(fMinX, p[0]);
+            fMinY = Math.min(fMinY, p[1]);
+        }
+        const gap = 300;
+        rest.forEach(([id, p], i) => {
+            if (p && Number.isFinite(fMinX)) out.set(id, [maxX + gap + (p[0] - fMinX), minY + (p[1] - fMinY)]);
+            else out.set(id, [maxX + gap + (i % 10) * SEED_STEP * 2, minY + Math.floor(i / 10) * SEED_STEP * 2]);
+        });
+    }
+    return out;
+}
