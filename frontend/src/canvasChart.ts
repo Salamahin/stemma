@@ -135,6 +135,21 @@ const PIN_PATH =
 const CLAN_BITMAP_MAX = 2048;
 /** Below this on-screen font size labels are unreadable; skip drawing them. */
 const MIN_LABEL_SCREEN_PX = 2.5;
+/** Arrowheads (10 units long) smaller than this many device pixels are not drawn. */
+const MIN_ARROW_DEVICE_PX = 2;
+/**
+ * Max sub-shapes per filled path. One path with thousands of tiny triangles
+ * or circles is pathological for Chrome's GPU rasteriser (16k arrowheads in a
+ * single fill cost ~300 ms per frame on an 11k-person stemma).
+ */
+const FILL_BATCH = 64;
+/** Clan labels smaller than this (device px font size) are not drawn. */
+const CLAN_LABEL_MIN_DEVICE_PX = 3;
+/** Clan-label sprites: largest rasterised font size (bigger labels are scaled up), max cached sprites. */
+const CLAN_SPRITE_MAX_FONT_PX = 256;
+const CLAN_SPRITE_CACHE_MAX = 800;
+/** Nodes smaller than this many device pixels across are drawn as squares. */
+const MIN_ROUND_NODE_DEVICE_PX = 3;
 
 const px = (v: string) => parseFloat(v);
 
@@ -215,7 +230,7 @@ export class CanvasChart {
 
     private frameRequested = false;
     private destroyed = false;
-    private lastStats = { edges: 0, arrows: 0, nodes: 0 };
+    private lastStats = { edges: 0, arrows: 0, nodes: 0, arrowsSkippedForZoom: false };
     private pinPath: Path2D | null = null;
     private arrowPath2D: Path2D | null = null;
     private resizeObserver: ResizeObserver | null = null;
@@ -656,7 +671,11 @@ export class CanvasChart {
             ctx.imageSmoothingEnabled = true;
             ctx.drawImage(this.clanBitmap, r.x, r.y, r.w, r.h);
         }
-        for (const d of this.clanData) this.drawClanLabel(d);
+        for (const d of this.clanData) {
+            const reach = d.labelFontSize * clanLabelText(d.clan).length;
+            if (d.shape.cx + reach < vx0 || d.shape.cx - reach > vx1 || d.shape.cy + reach < vy0 || d.shape.cy - reach > vy1) continue;
+            this.drawClanLabel(d, t.k * dpr);
+        }
 
         // 2. edges, batched by style
         const highlightedLink = (l: ChartLink) => {
@@ -699,22 +718,72 @@ export class CanvasChart {
             ctx.lineWidth = g.width;
             ctx.stroke();
         }
-        ctx.beginPath();
         let arrowCount = 0;
-        for (let i = 0; i < arrows.length; i += 5) {
-            if (this.addArrow(ctx, arrows[i], arrows[i + 1], arrows[i + 2], arrows[i + 3], arrows[i + 4])) arrowCount++;
+        const arrowsSkippedForZoom = 10 * t.k * dpr < MIN_ARROW_DEVICE_PX;
+        if (!arrowsSkippedForZoom) {
+            ctx.fillStyle = relationsColor;
+            ctx.beginPath();
+            for (let i = 0; i < arrows.length; i += 5) {
+                if (!this.addArrow(ctx, arrows[i], arrows[i + 1], arrows[i + 2], arrows[i + 3], arrows[i + 4])) continue;
+                arrowCount++;
+                if (arrowCount % FILL_BATCH === 0) {
+                    ctx.fill();
+                    ctx.beginPath();
+                }
+            }
+            ctx.fill();
         }
-        ctx.fillStyle = relationsColor;
-        ctx.fill();
 
         // 3. node circles
         this.drawnIds.clear();
         const drawLabels = LABEL_FONT_PX * t.k >= MIN_LABEL_SCREEN_PX;
         const pendingPulse = pulse(now, 1200, 0.35);
         const dropPulse = pulse(now, 1800, 0.45);
+        // Plain nodes are filled in per-colour batches; nodes with a special
+        // state (pending, drop/gesture highlight, pin, disallowed) are drawn
+        // one by one on top.
+        const byColor = new Map<string, ChartNode[]>();
+        const special: ChartNode[] = [];
         for (const n of this.nodes) {
             if (n.x == null || n.y == null || !visible(n.x, n.y)) continue;
             this.drawnIds.add(n.id);
+            const plain =
+                !this.dropClasses.has(n.id) &&
+                !this.pendingAdd.has(n.id) &&
+                !this.pendingRemove.has(n.id) &&
+                n.id !== this.gestureSourceId &&
+                n.id !== this.dropTargetId &&
+                !(n.type === "person" && this.pinnedPersonIds.has(denormalizeId(n.id)));
+            if (!plain) {
+                special.push(n);
+                continue;
+            }
+            const fill = this.fillById.get(n.id) ?? shadedNodeColor;
+            let bucket = byColor.get(fill);
+            if (!bucket) byColor.set(fill, (bucket = []));
+            bucket.push(n);
+        }
+        for (const [fill, bucket] of byColor) {
+            ctx.fillStyle = fill;
+            ctx.beginPath();
+            let inPath = 0;
+            for (const n of bucket) {
+                const r = this.nodeRadius(n);
+                if (2 * r * t.k * dpr < MIN_ROUND_NODE_DEVICE_PX) {
+                    ctx.rect(n.x - r, n.y - r, 2 * r, 2 * r);
+                } else {
+                    ctx.moveTo(n.x + r, n.y);
+                    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+                }
+                if (++inPath === FILL_BATCH) {
+                    ctx.fill();
+                    ctx.beginPath();
+                    inPath = 0;
+                }
+            }
+            ctx.fill();
+        }
+        for (const n of special) {
             const disallowed = this.dropClasses.get(n.id) === "drop-disallowed";
             let fill = this.fillById.get(n.id) ?? shadedNodeColor;
             if (disallowed) fill = desaturate(fill, 0.2);
@@ -798,10 +867,17 @@ export class CanvasChart {
         this.drawOverlay();
 
         ctx.globalAlpha = 1;
-        this.lastStats = { edges: edgeCount, arrows: arrowCount, nodes: this.drawnIds.size };
+        this.lastStats = { edges: edgeCount, arrows: arrowCount, nodes: this.drawnIds.size, arrowsSkippedForZoom };
         if (!this.firstDrawAt && this.drawnIds.size > 0) this.firstDrawAt = performance.now();
+        const spent = performance.now() - now;
+        this.renderTiming.frames++;
+        this.renderTiming.totalMs += spent;
+        this.renderTiming.maxMs = Math.max(this.renderTiming.maxMs, spent);
         if (animating) this.requestRender();
     }
+
+    /** CPU time spent in render() (benchmarks). */
+    renderTiming = { frames: 0, totalMs: 0, maxMs: 0 };
 
     private highlightedFamilyEnd(n: ChartNode): boolean {
         return n.type === "family" && this.highlightedIds.has(n.id);
@@ -838,34 +914,68 @@ export class CanvasChart {
         return true;
     }
 
-    private drawClanLabel(d: ClanRenderData) {
+    /**
+     * Clan labels are big rotated text; re-rasterising them every frame was
+     * the main cost of a zoomed-out pan on large stemmas. Each label is drawn
+     * once into a sprite and blitted rotated afterwards. Sprites are keyed by
+     * their on-screen font size in quarter-octave steps (capped), so they are
+     * reused across zoom changes and across the small size changes of a
+     * settling layout.
+     */
+    private clanLabelSprites = new Map<string, { canvas: HTMLCanvasElement; w: number; h: number; fontPx: number }>();
+
+    private clanLabelSprite(text: string, spriteFontPx: number) {
+        const key = `${text}|${spriteFontPx}`;
+        let sprite = this.clanLabelSprites.get(key);
+        if (sprite) return sprite;
+        if (this.clanLabelSprites.size > CLAN_SPRITE_CACHE_MAX) this.clanLabelSprites.clear();
+        const { width, height } = this.measureClanLabel(text, spriteFontPx);
+        const pad = 2;
+        const cw = Math.ceil(width) + 2 * pad;
+        const ch = Math.ceil(height) + 2 * pad;
+        const canvas = document.createElement("canvas");
+        canvas.width = cw;
+        canvas.height = ch;
+        const sctx = canvas.getContext("2d");
+        if (!sctx) return null;
+        sctx.translate(cw / 2, ch / 2);
+        sctx.fillStyle = "#ffffff";
+        sctx.font = `600 ${spriteFontPx}px ${CLAN_LABEL_FONT_FAMILY}`;
+        sctx.textBaseline = "middle";
+        const spacing = CLAN_LABEL_LETTER_SPACING_EM * spriteFontPx;
+        if ("letterSpacing" in (sctx as object)) {
+            (sctx as any).letterSpacing = `${spacing}px`;
+            sctx.textAlign = "center";
+            sctx.fillText(text, 0, 0);
+        } else {
+            const total = sctx.measureText(text).width + spacing * text.length;
+            let x = -total / 2;
+            sctx.textAlign = "left";
+            for (const c of text) {
+                sctx.fillText(c, x, 0);
+                x += sctx.measureText(c).width + spacing;
+            }
+        }
+        sprite = { canvas, w: cw, h: ch, fontPx: spriteFontPx };
+        this.clanLabelSprites.set(key, sprite);
+        return sprite;
+    }
+
+    private drawClanLabel(d: ClanRenderData, deviceScale: number) {
+        const deviceFontPx = d.labelFontSize * deviceScale;
+        if (deviceFontPx < CLAN_LABEL_MIN_DEVICE_PX) return;
+        const spriteFontPx = Math.min(CLAN_SPRITE_MAX_FONT_PX, Math.pow(2, Math.ceil(Math.log2(deviceFontPx) * 4) / 4));
+        const sprite = this.clanLabelSprite(clanLabelText(d.clan), Math.round(spriteFontPx * 100) / 100);
+        if (!sprite) return;
+        // sprite pixels → world units at the label's font size
+        const k = d.labelFontSize / sprite.fontPx;
         const ctx = this.ctx;
-        const text = clanLabelText(d.clan);
-        const fontPx = d.labelFontSize;
         ctx.save();
         ctx.translate(d.shape.cx, d.shape.cy);
         ctx.rotate(d.shape.angle);
         ctx.globalAlpha = CLAN_LABEL_OPACITY;
-        ctx.fillStyle = "#ffffff";
-        ctx.font = `600 ${fontPx}px ${CLAN_LABEL_FONT_FAMILY}`;
-        ctx.textBaseline = "middle";
-        const spacing = CLAN_LABEL_LETTER_SPACING_EM * fontPx;
-        const supportsLetterSpacing = "letterSpacing" in (ctx as object);
-        if (supportsLetterSpacing) {
-            (ctx as any).letterSpacing = `${spacing}px`;
-            ctx.textAlign = "center";
-            ctx.fillText(text, 0, 0);
-            (ctx as any).letterSpacing = "0px";
-        } else {
-            // manual letter spacing
-            const total = ctx.measureText(text).width + spacing * text.length;
-            let x = -total / 2;
-            ctx.textAlign = "left";
-            for (const ch of text) {
-                ctx.fillText(ch, x, 0);
-                x += ctx.measureText(ch).width + spacing;
-            }
-        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(sprite.canvas, (-sprite.w / 2) * k, (-sprite.h / 2) * k, sprite.w * k, sprite.h * k);
         ctx.restore();
     }
 

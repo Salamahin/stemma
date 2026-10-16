@@ -459,6 +459,26 @@
         (window as any).__stemmaChart = {
             snapshot: () => c.snapshot(),
             layout: () => ({ ...layoutStats, firstDrawAt: c.firstDrawAt, engine: engine?.kind ?? null, running: engine?.isRunning() ?? false }),
+            renderTiming: (reset = false) => {
+                const r = { ...c.renderTiming };
+                if (reset) c.renderTiming = { frames: 0, totalMs: 0, maxMs: 0 };
+                return r;
+            },
+            /** Set the pan/zoom directly (benchmarks, debugging). */
+            setTransform: (x: number, y: number, k: number) =>
+                d3.select(canvasEl).call(zoomHandler.transform, d3.zoomIdentity.translate(x, y).scale(k)),
+            /** Zoom so the whole graph fits the canvas; returns the transform. */
+            fit: () => {
+                if (!c.nodes.length) return null;
+                const xs = c.nodes.map((n) => n.x);
+                const ys = c.nodes.map((n) => n.y);
+                const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+                const k = Math.min(c.width / (x1 - x0 + 100), c.height / (y1 - y0 + 100));
+                const tx = c.width / 2 - k * (x0 + x1) / 2;
+                const ty = c.height / 2 - k * (y0 + y1) / 2;
+                d3.select(canvasEl).call(zoomHandler.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
+                return { x: tx, y: ty, k };
+            },
         };
         chart = c;
         onchartReady?.(c);

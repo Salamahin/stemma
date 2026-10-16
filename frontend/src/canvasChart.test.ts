@@ -140,6 +140,62 @@ describe("CanvasChart rendering", () => {
         expect(snap.edges.map((e) => e.arrow).sort()).toEqual(["family", "person"]);
     });
 
+    test("level of detail: arrowheads too small to see are skipped, lines still drawn", () => {
+        const { chart } = makeChart();
+        chart.transform = chart.transform.scale(0.05); // arrow (10 units) ≈ 0.5 px
+        chart.requestRender();
+        flushFrames();
+        const snap = chart.snapshot();
+        expect(snap.stats.edges).toBe(2);
+        expect(snap.stats.arrows).toBe(0);
+        expect(snap.stats.arrowsSkippedForZoom).toBe(true);
+    });
+
+    test("many arrowheads are filled in small batches (huge single paths stall the rasteriser)", () => {
+        const canvas = document.createElement("canvas");
+        const chart = new CanvasChart(canvas);
+        const nodes: ChartNode[] = [];
+        const links: ChartLink[] = [];
+        for (let i = 0; i < 300; i++) {
+            const f: ChartNode = { id: `family_f${i}`, type: "family", x: (i % 20) * 40, y: Math.floor(i / 20) * 40, index: 2 * i };
+            const p: ChartNode = { id: `person_p${i}`, type: "person", name: "P", x: f.x + 20, y: f.y + 20, index: 2 * i + 1 };
+            nodes.push(f, p);
+            links.push({ id: `l${i}`, source: f, target: p, type: "familyToChild" });
+        }
+        chart.setData(nodes, links);
+        fake.calls.fill = 0;
+        flushFrames();
+        expect(chart.snapshot().stats.arrows).toBe(300);
+        // arrows: ≥ 300/64 fills; nodes: batched per colour, not one fill per node
+        expect(fake.calls.fill).toBeGreaterThanOrEqual(Math.ceil(300 / 64));
+        expect(fake.calls.fill).toBeLessThan(100);
+    });
+
+    test("clan labels are rasterised once per zoom level and reused while panning", () => {
+        const canvas = document.createElement("canvas");
+        const chart = new CanvasChart(canvas);
+        const nodes: ChartNode[] = [];
+        const ids: string[] = [];
+        for (let i = 0; i < 6; i++) {
+            nodes.push({ id: `person_c${i}`, type: "person", name: `C${i} Иванов`, x: 100 + (i % 3) * 120, y: 100 + Math.floor(i / 3) * 150, index: i });
+            ids.push(`c${i}`);
+        }
+        chart.setData(nodes, []);
+        chart.setClans([{ surname: "Иванов", color: "hsl(10, 38%, 72%)", personIds: new Set(ids) }]);
+        flushFrames();
+        fake.calls.fillText = 0;
+        fake.calls.drawImage = 0;
+        for (let i = 0; i < 5; i++) {
+            chart.transform = chart.transform.translate(3, 0);
+            chart.requestRender();
+            flushFrames();
+        }
+        // panning: no new text rasterisation for the clan label; the cached sprite is blitted
+        const labelGlyphRuns = fake.calls.fillText ?? 0;
+        expect(labelGlyphRuns).toBe(6 * 5); // only the 6 person names per frame
+        expect(fake.calls.drawImage).toBeGreaterThanOrEqual(5);
+    });
+
     test("snapshot reports drawn nodes and client positions", () => {
         const { chart } = makeChart();
         flushFrames();
