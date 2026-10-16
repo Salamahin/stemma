@@ -1,5 +1,75 @@
 import * as d3 from "d3";
-import { forceCollideSized } from "./graphTools";
+import { forceCollideSized, configureSimulation, updateSimulation, LAYOUT_TICKS, makeNodesAndRelations } from "./graphTools";
+
+function syntheticGraph(target: number) {
+    let s = 7;
+    const rnd = () => (s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+    const people: any[] = [];
+    const families: any[] = [];
+    const queue: string[] = [];
+    const mk = () => {
+        const id = `p${people.length}`;
+        people.push({ id, name: id });
+        return id;
+    };
+    for (let i = 0; i < 3; i++) queue.push(mk());
+    while (people.length < target && queue.length) {
+        const p = queue.shift()!;
+        const spouse = mk();
+        const kids: string[] = [];
+        const n = 1 + Math.floor(rnd() * 3);
+        for (let k = 0; k < n && people.length < target; k++) {
+            const c = mk();
+            kids.push(c);
+            queue.push(c);
+        }
+        families.push({ id: `f${families.length}`, parents: [p, spouse], children: kids });
+    }
+    const [nodes, links] = makeNodesAndRelations(people, families) as [any[], any[]];
+    nodes.forEach((n, i) => {
+        n.x = (i % 30) * 160;
+        n.y = Math.floor(i / 30) * 200;
+    });
+    return { nodes, links };
+}
+
+describe("layout simulation settles", () => {
+    test("a fresh layout ends within the tick budget (no self-sustaining alphaTarget)", () => {
+        const { nodes, links } = syntheticGraph(120);
+        const sim = configureSimulation(nodes, links, 1000, 800);
+        sim.stop();
+        expect(sim.alphaTarget()).toBe(0);
+        let ticks = 0;
+        while (sim.alpha() >= sim.alphaMin() && ticks < 10_000) {
+            sim.tick();
+            ticks++;
+        }
+        expect(ticks).toBeLessThanOrEqual(LAYOUT_TICKS + 5);
+    });
+
+    test("a data update reheats without leaving a permanent alphaTarget", () => {
+        const { nodes, links } = syntheticGraph(60);
+        const sim = configureSimulation(nodes, links, 1000, 800);
+        updateSimulation(sim, nodes, links);
+        sim.stop();
+        expect(sim.alphaTarget()).toBe(0);
+        expect(sim.alpha()).toBeGreaterThan(0);
+    });
+
+    test("burst runs extra ticks inside one timer tick when allowed", () => {
+        const { nodes, links } = syntheticGraph(60);
+        let ticksSeen = 0;
+        const sim = configureSimulation(nodes, links, 1000, 800, () => ticksSeen++, undefined, () => true);
+        sim.stop();
+        const before = sim.alpha();
+        // One timer-driven tick (what d3's timer does each frame).
+        (sim as any).tick();
+        (sim as any).on("tick")();
+        expect(ticksSeen).toBe(1);
+        // the tick listener spent its frame budget on extra iterations
+        expect(sim.alpha()).toBeLessThan(before * Math.pow(1 - sim.alphaDecay(), 2));
+    });
+});
 
 describe("forceCollideSized", () => {
     test("ignores datums without r (no NaN radii, no effect on them)", () => {

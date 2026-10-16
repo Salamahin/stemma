@@ -1,4 +1,4 @@
-// Rendering benchmark for the family graph.
+// Rendering/layout benchmark for the family graph.
 //
 //   cd frontend && E2E_AUTO_LOGIN=1 GOOGLE_CLIENT_ID=bench STEMMA_BACKEND_URL=http://bench.invalid npm run build
 //   npx sirv public --port 4180 --single &          (from frontend/)
@@ -6,10 +6,19 @@
 //
 // The backend is mocked with page.route, so no Docker/DynamoDB is needed.
 // Uses the locally installed Chrome (channel "chrome").
+//
+// Per size, for a cold load (empty layout cache) and a warm reload (cache
+// filled by the cold run):
+//   firstDrawMs   time origin → first frame with nodes on the canvas
+//   settleMs      time origin → layout end (null if it never ended in 30 s)
+//   loadBusyPct   main-thread busy % from navigation until settle (or 30 s)
+//   idle          busy % / fps over 3 s after settle (idle CPU)
+// plus hover cost in view mode.
 import { chromium } from "@playwright/test";
 import { syntheticStemma } from "./syntheticStemma.mjs";
 
 const BASE = process.env.BENCH_URL ?? "http://127.0.0.1:4180/";
+const SETTLE_TIMEOUT_MS = 30_000;
 const sizes = process.argv.slice(2).map(Number).filter(Boolean);
 if (!sizes.length) sizes.push(300, 1000);
 
@@ -32,25 +41,78 @@ async function metrics(cdp) {
   return Object.fromEntries(metrics.map((m) => [m.name, m.value]));
 }
 
+function busy(a, b, sec) {
+  return {
+    busyPct: r1(((b.TaskDuration - a.TaskDuration) / sec) * 100),
+    scriptMsPerSec: r1(((b.ScriptDuration - a.ScriptDuration) * 1000) / sec),
+  };
+}
+
 async function busyWindow(page, cdp, ms) {
   const a = await metrics(cdp);
   const f0 = await page.evaluate(() => window.__frames.length);
   await page.waitForTimeout(ms);
   const b = await metrics(cdp);
-  const frames = await page.evaluate((f0) => {
-    const fs = window.__frames.slice(f0);
-    let maxGap = 0;
-    for (let i = 1; i < fs.length; i++) maxGap = Math.max(maxGap, fs[i] - fs[i - 1]);
-    return { count: fs.length, maxGap };
-  }, f0);
-  const sec = ms / 1000;
+  const frames = await page.evaluate((f0) => window.__frames.length - f0, f0);
+  return { ...busy(a, b, ms / 1000), fps: r1(frames / (ms / 1000)) };
+}
+
+/** Loads (or reloads) the page and measures first draw, settle and load-time CPU. */
+async function load(page, cdp, people, reload) {
+  const m0 = await metrics(cdp);
+  const w0 = Date.now();
+  if (reload) await page.reload();
+  else await page.goto(BASE);
+  await page.waitForFunction(`(${PERSON_COUNT_SRC})() === ${people}`, null, { timeout: 120000 });
+  const deadline = Date.now() + SETTLE_TIMEOUT_MS;
+  let layout = null;
+  while (Date.now() < deadline) {
+    layout = await page.evaluate(() => {
+      const api = window.__stemmaChart;
+      const l = api?.layout?.();
+      return l ? { ...l, now: performance.now() } : null;
+    });
+    if (layout && layout.ends > 0 && layout.lastEndAt >= layout.lastTickAt && layout.now - layout.lastEndAt > 300) break;
+    layout = layout ? { ...layout, unsettled: true } : null;
+    await page.waitForTimeout(100);
+  }
+  const m1 = await metrics(cdp);
+  const settled = layout && !layout.unsettled;
+  const windowSec = (Date.now() - w0) / 1000;
   return {
-    busyPct: r1(((b.TaskDuration - a.TaskDuration) / sec) * 100),
-    scriptMsPerSec: r1(((b.ScriptDuration - a.ScriptDuration) * 1000) / sec),
-    layoutStyleMsPerSec: r1((((b.LayoutDuration - a.LayoutDuration) + (b.RecalcStyleDuration - a.RecalcStyleDuration)) * 1000) / sec),
-    fps: r1(frames.count / sec),
-    maxFrameGapMs: r1(frames.maxGap),
+    firstDrawMs: layout?.firstDrawAt ? Math.round(layout.firstDrawAt) : null,
+    settleMs: settled ? Math.round(layout.lastEndAt) : null,
+    layoutTicks: layout?.ticks ?? null,
+    loadBusyPct: busy(m0, m1, windowSec).busyPct,
   };
+}
+
+async function hover(page) {
+  return await page.evaluate(async () => {
+    const raf2 = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const api = window.__stemmaChart;
+    const canvas = document.querySelector("canvas#chart");
+    const targets = api
+      ? api.snapshot().nodes.filter((n) => n.type === "person" && n.drawn)
+      : [...document.querySelectorAll("#chart g[id^='person_']")];
+    const pick = [];
+    for (let i = 0; i < 15; i++) pick.push(targets[Math.floor((i * targets.length) / 15)]);
+    const sync = [];
+    for (const g of pick) {
+      for (const type of ["mouseenter", "mouseleave"]) {
+        const a = performance.now();
+        if (api) {
+          const at = type === "mouseenter" ? { clientX: g.clientX, clientY: g.clientY } : { clientX: 2, clientY: 2 };
+          canvas.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, ...at }));
+        } else {
+          g.dispatchEvent(new MouseEvent(type, { bubbles: false }));
+        }
+        sync.push(performance.now() - a);
+        await raf2();
+      }
+    }
+    return sync;
+  });
 }
 
 async function runOne(browser, n) {
@@ -88,61 +150,12 @@ async function runOne(browser, n) {
   await cdp.send("Performance.enable");
 
   const out = { people: stemma.people.length, families: stemma.families.length };
-
-  // ---- cold load (empty layout cache) ----
-  const t0 = Date.now();
-  await page.goto(BASE);
-  await page.waitForFunction(`(${PERSON_COUNT_SRC})() === ${stemma.people.length}`, null, { timeout: 120000 });
-  // first painted frame after nodes exist
-  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-  out.coldFirstRenderMs = Date.now() - t0;
-  out.settle0to5s = await busyWindow(page, cdp, 5000);
-  await page.waitForTimeout(5000);
-  out.steady10to15s = await busyWindow(page, cdp, 5000);
-
-  // ---- hover (view mode highlights lineage) ----
-  const hover = await page.evaluate(async () => {
-    const raf2 = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const api = window.__stemmaChart;
-    const canvas = document.querySelector("canvas#chart");
-    // Targets: 15 people spread across the list; hover = enter + leave.
-    const targets = api
-      ? api.snapshot().nodes.filter((n) => n.type === "person" && n.drawn)
-      : [...document.querySelectorAll("#chart g[id^='person_']")];
-    const pick = [];
-    for (let i = 0; i < 15; i++) pick.push(targets[Math.floor((i * targets.length) / 15)]);
-    const sync = [];
-    const frame = [];
-    for (const g of pick) {
-      for (const type of ["mouseenter", "mouseleave"]) {
-        const a = performance.now();
-        if (api) {
-          const at = type === "mouseenter" ? { clientX: g.clientX, clientY: g.clientY } : { clientX: 2, clientY: 2 };
-          canvas.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, ...at }));
-        } else {
-          g.dispatchEvent(new MouseEvent(type, { bubbles: false }));
-        }
-        const b = performance.now();
-        await raf2();
-        const c = performance.now();
-        sync.push(b - a);
-        frame.push(c - a);
-      }
-    }
-    return { sync, frame };
-  });
-  out.hoverSyncMedianMs = r1(median(hover.sync));
-  out.hoverToPaintMedianMs = r1(median(hover.frame));
-  out.afterHover0to3s = await busyWindow(page, cdp, 3000);
-
-  // ---- warm reload (layout cache populated) ----
-  await page.waitForTimeout(1000);
-  const t1 = Date.now();
-  await page.reload();
-  await page.waitForFunction(`(${PERSON_COUNT_SRC})() === ${stemma.people.length}`, null, { timeout: 120000 });
-  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-  out.warmFirstRenderMs = Date.now() - t1;
-  out.warm0to3s = await busyWindow(page, cdp, 3000);
+  out.cold = await load(page, cdp, stemma.people.length, false);
+  out.cold.idle = await busyWindow(page, cdp, 3000);
+  out.hoverSyncMedianMs = r1(median(await hover(page)));
+  await page.waitForTimeout(1500); // let the debounced layout-cache save land
+  out.warm = await load(page, cdp, stemma.people.length, true);
+  out.warm.idle = await busyWindow(page, cdp, 3000);
 
   await context.close();
   return out;
@@ -152,7 +165,7 @@ const browser = await chromium.launch({ channel: "chrome", headless: true, args:
 try {
   for (const n of sizes) {
     const res = await runOne(browser, n);
-    console.log(JSON.stringify(res, null, 2));
+    console.log(JSON.stringify(res));
   }
 } finally {
   await browser.close();

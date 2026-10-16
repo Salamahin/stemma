@@ -83,7 +83,22 @@ export function forceCollideSized(radius) {
 const SETTLE_VELOCITY = 0.02;
 const SETTLE_TICKS = 30;
 
-export function configureSimulation(nodes, relations, width, height, onTick, onEnd) {
+/**
+ * Layout tuning (see e2e/bench/layoutExperiment.mjs). The old setup —
+ * velocityDecay 0.8 plus a permanent alphaTarget 0.1 — crept towards its
+ * equilibrium for minutes and never stopped. Lower friction reaches nearly the
+ * same picture (size, aspect, overlaps) in ~200 ticks and then ends.
+ */
+export const LAYOUT_TICKS = 200;
+export const LAYOUT_VELOCITY_DECAY = 0.3;
+export const LAYOUT_ALPHA_DECAY = 1 - Math.pow(0.001, 1 / LAYOUT_TICKS);
+export const LAYOUT_THETA = 1.2;
+/** Reheat for data changes / leaving edit mode: a gentle refine, not a full relayout. */
+export const LAYOUT_REHEAT_ALPHA = 0.3;
+/** Main-thread time per animation frame the layout may spend on extra ticks. */
+const BURST_BUDGET_MS = 8;
+
+export function configureSimulation(nodes, relations, width, height, onTick, onEnd, canBurst) {
     const sim = d3
         .forceSimulation(nodes)
         .force(
@@ -93,11 +108,19 @@ export function configureSimulation(nodes, relations, width, height, onTick, onE
         .force("x", d3.forceX().x(width * 0.5).strength(0.05))
         .force("y", d3.forceY().y(height * 0.5).strength(0.05))
         .force("collide", forceCollideSized((d) => d.r * 20))
-        .force("repelForce", d3.forceManyBody().strength(-1500).distanceMin(85))
-        .velocityDecay(0.8);
+        .force("repelForce", d3.forceManyBody().strength(-1500).distanceMin(85).theta(LAYOUT_THETA))
+        .velocityDecay(LAYOUT_VELOCITY_DECAY)
+        .alphaDecay(LAYOUT_ALPHA_DECAY);
 
     let calmTicks = 0;
     sim.on("tick", () => {
+        // d3's timer gives one tick per frame. While a layout is settling (no
+        // drag, no ghost burst) spend a small frame budget on extra ticks so
+        // it converges in about a second instead of ~3.5 s of frames.
+        if (canBurst?.() && sim.alphaTarget() === 0) {
+            const start = performance.now();
+            while (sim.alpha() >= sim.alphaMin() && performance.now() - start < BURST_BUDGET_MS) sim.tick();
+        }
         let maxV = 0;
         for (const d of sim.nodes()) {
             if (d.type !== "person" && d.type !== "family") continue;
@@ -129,8 +152,9 @@ export function configureSimulation(nodes, relations, width, height, onTick, onE
 export function updateSimulation(simulation, nodes, relations) {
     simulation.nodes(nodes)
     simulation.force("link").links(relations)
-    simulation.velocityDecay(0.8)
-    simulation.alphaTarget(0.3).restart()
+    simulation.velocityDecay(LAYOUT_VELOCITY_DECAY)
+    simulation.alphaDecay(LAYOUT_ALPHA_DECAY)
+    simulation.alphaTarget(0).alpha(Math.max(simulation.alpha(), LAYOUT_REHEAT_ALPHA)).restart()
 }
 
 export const PERSON_PREFIX = "person_";

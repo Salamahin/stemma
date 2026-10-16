@@ -8,7 +8,7 @@
  * quadtree instead of the DOM.
  */
 import * as d3 from "d3";
-import { layoutGreedy, layoutRemoveOverlaps } from "d3fc-label-layout";
+import { placeLabels } from "./labelLayout";
 import {
     personR,
     familyR,
@@ -222,6 +222,8 @@ export class CanvasChart {
     private dprQuery: MediaQueryList | null = null;
 
     onResize: (() => void) | null = null;
+    /** performance.now() of the first frame that drew any node (benchmarks). */
+    firstDrawAt = 0;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -541,10 +543,9 @@ export class CanvasChart {
         const h = LABEL_FONT_PX * 1.2 + 4;
         const rects = persons.map((p) => {
             const w = (p.name ? this.labelWidth(p.name) : 76) + 4;
-            return { hidden: false, x: p.x - personR, y: p.y + 20, width: w, height: h };
+            return { x: p.x - personR, y: p.y + 20, width: w, height: h };
         });
-        const strategy = layoutRemoveOverlaps(layoutGreedy());
-        const placed = strategy(rects);
+        const placed = placeLabels(rects);
         persons.forEach((p, i) => {
             const slot = placed[i];
             p.labelDx = slot.x - p.x;
@@ -789,6 +790,7 @@ export class CanvasChart {
 
         ctx.globalAlpha = 1;
         this.lastStats = { edges: edgeCount, arrows: arrowCount, nodes: this.drawnIds.size };
+        if (!this.firstDrawAt && this.drawnIds.size > 0) this.firstDrawAt = performance.now();
         if (animating) this.requestRender();
     }
 

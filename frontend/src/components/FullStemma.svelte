@@ -15,6 +15,7 @@
         normalizeId,
         updateSimulation,
         denormalizeId,
+        LAYOUT_REHEAT_ALPHA,
     } from "../graphTools";
     import { computeInitialLayout } from "../initialLayout";
     import { NodeLayoutCache } from "../nodeLayoutCache";
@@ -71,6 +72,9 @@
     let lastPointer: { x: number; y: number } | null = null;
     /** Node whose lineage the hover pushed onto the highlight stack. */
     let hoverPushedId: string | null = null;
+    /** Layout timing, read by the e2e/bench scripts via window.__stemmaChart.layout(). */
+    const layoutStats = { ticks: 0, lastTickAt: 0, lastEndAt: 0, ends: 0 };
+    let lastSimulationActive: boolean | null = null;
 
     const viewSlice = $derived.by(() => {
         if (!stemma) return { people: [], families: [] };
@@ -133,9 +137,8 @@
                 d.fy = null;
             }
         }
-        if (!simulation) return;
-        if (simulationActive) simulation.alphaTarget(0.1).restart();
-        else simulation.alphaTarget(0).stop();
+        // Pinning only freezes nodes where they are; it does not need the
+        // layout to run again (it used to restart a never-ending sim here).
     }
 
     const zoomHandler = d3
@@ -170,7 +173,7 @@
 
     export function setSimulationActive(active: boolean) {
         if (!simulation) return;
-        if (active) simulation.alphaTarget(0.1).restart();
+        if (active) simulation.alphaTarget(0).alpha(Math.max(simulation.alpha(), LAYOUT_REHEAT_ALPHA)).restart();
         else simulation.alphaTarget(0).stop();
     }
 
@@ -186,6 +189,8 @@
 
     $effect(() => {
         if (!simulation || !chart) return;
+        const wasActive = lastSimulationActive;
+        lastSimulationActive = simulationActive;
         if (simulationActive) {
             for (const d of chart.nodes) {
                 if (!d.fixed) {
@@ -193,7 +198,9 @@
                     d.fy = null;
                 }
             }
-            simulation.alphaTarget(0.1).restart();
+            // Leaving edit mode: let the freshly unpinned graph relax a little.
+            // Nothing to do on first mount — the initial layout is already running.
+            if (wasActive === false) simulation.alphaTarget(0).alpha(Math.max(simulation.alpha(), LAYOUT_REHEAT_ALPHA)).restart();
         } else {
             for (const d of chart.nodes) {
                 if (d.x != null && d.y != null) {
@@ -264,6 +271,8 @@
 
     let lastClanUpdate = 0;
     function onSimTick() {
+        layoutStats.ticks++;
+        layoutStats.lastTickAt = performance.now();
         if (!chart) return;
         chart.positionsChanged();
         const now = performance.now();
@@ -274,6 +283,8 @@
     }
 
     function onSimEnd() {
+        layoutStats.ends++;
+        layoutStats.lastEndAt = performance.now();
         if (!chart) return;
         chart.layoutLabels();
         chart.updateClans();
@@ -285,7 +296,7 @@
 
         assignInitialPositions(nodes, window.innerWidth, window.innerHeight, initialPositions, pinnedPeople);
 
-        if (!simulation) simulation = configureSimulation(nodes, relations, window.innerWidth, window.innerHeight, onSimTick, onSimEnd);
+        if (!simulation) simulation = configureSimulation(nodes, relations, window.innerWidth, window.innerHeight, onSimTick, onSimEnd, () => simulationActive && !isDragging);
         else updateSimulation(simulation, nodes, relations);
 
         chart.setData(nodes, relations);
@@ -385,6 +396,7 @@
         setupInteractions(c);
         (window as any).__stemmaChart = {
             snapshot: () => c.snapshot(),
+            layout: () => ({ ...layoutStats, firstDrawAt: c.firstDrawAt }),
         };
         chart = c;
         onchartReady?.(c);
