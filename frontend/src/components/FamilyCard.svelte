@@ -33,7 +33,7 @@
         const parentNames = family.parents
             .map((id) => idx.person(id))
             .filter((p): p is PersonDescription => p != null)
-            .map((p) => personDisplayName(p.name, $t));
+            .map((p) => personDisplayName(p.name));
         if (parentNames.length === 0) return $t("family.compositionTitle");
         return parentNames.join(" & ");
     });
@@ -47,7 +47,7 @@
 
     function personName(id: string): string {
         const p = stemmaIndex?.person(id);
-        return p ? personDisplayName(p.name, $t) : id;
+        return p ? personDisplayName(p.name) : id;
     }
 </script>
 

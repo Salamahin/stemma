@@ -155,7 +155,14 @@ def _string_schema(properties: dict[str, str], required: list[str]) -> dict:
 def _person_write_schema(extra_required: dict[str, dict]) -> dict:
     props = {
         **extra_required,
-        "name": {"type": "string", "description": "Full name of the person"},
+        "name": {
+            "type": "string",
+            "description": (
+                "Full name of the person. Use an empty string for a completely unknown person and "
+                "??? for an unknown part of a name (e.g. \"??? Степанович\"); the app shows unknown "
+                "people as ???, so never write placeholders like Unknown or Неизвестно."
+            ),
+        },
         "birth_date": {"type": "string", "description": "ISO date, e.g. 1901-05-06 (optional)"},
         "death_date": {"type": "string", "description": "ISO date (optional)"},
         "bio": {"type": "string", "description": "Free-text biography (optional)"},
