@@ -1,16 +1,16 @@
 /**
- * Person-label placement: the same algorithm as d3fc-label-layout's
- * `layoutRemoveOverlaps(layoutGreedy())`, but with collision queries served by
- * a uniform grid instead of scanning every label. d3fc is O(n²) per query
- * (~220 ms for 1000 labels, run on every layout end); this is ~linear.
+ * Person-label placement on layout end. Labels are never hidden: a name that
+ * silently disappears is worse than two names touching (#300).
  *
- * Greedy: for each label in order, try 8 placements around its anchor and
- * keep any that strictly lowers its overlap with the current labels.
- * Remove overlaps: repeatedly hide the visible label with the largest total
- * overlap (first one on ties) until no visible labels overlap.
+ * Greedy, in input order: each label tries 8 placements around its anchor at
+ * three distances and keeps the one with the lowest cost — overlap with the
+ * other labels (at their current spots) plus overlap with person circles,
+ * with a small penalty for moving away from the anchor. Collision queries go
+ * through uniform grids, so this stays ~linear (3000 labels in a few ms).
  */
 export type LabelRect = { x: number; y: number; width: number; height: number };
 export type PlacedLabel = { x: number; y: number; hidden: boolean };
+export type Obstacle = { x: number; y: number; r: number };
 
 function intersect(a: LabelRect, b: LabelRect): number {
     if (a.x >= b.x + b.width || a.x + a.width <= b.x || a.y >= b.y + b.height || a.y + a.height <= b.y) return 0;
@@ -21,7 +21,26 @@ function intersect(a: LabelRect, b: LabelRect): number {
     return (right - left) * (bottom - top);
 }
 
+const RINGS = [0, 1, 2];
+// Weight of covering a circle relative to covering another label, and the
+// cost of moving one label-height further from the anchor.
+const OBSTACLE_WEIGHT = 2;
+const DISTANCE_PENALTY = 0.05;
+
 function placements(r: LabelRect): LabelRect[] {
+    const out: LabelRect[] = [];
+    for (const ring of RINGS) {
+        const d = ring * r.height;
+        for (const p of basePlacements(r)) {
+            const dx = Math.sign(p.x - r.x) * d;
+            const dy = Math.sign(p.y - r.y) * d || (p.x === r.x && p.y === r.y ? d : 0);
+            out.push({ ...p, x: p.x + dx, y: p.y + dy });
+        }
+    }
+    return out;
+}
+
+function basePlacements(r: LabelRect): LabelRect[] {
     const { x, y, width: w, height: h } = r;
     return [
         { x, y, width: w, height: h },
@@ -76,7 +95,7 @@ class Grid {
     }
 }
 
-export function placeLabels(input: ReadonlyArray<LabelRect>): PlacedLabel[] {
+export function placeLabels(input: ReadonlyArray<LabelRect>, obstacles: ReadonlyArray<Obstacle> = []): PlacedLabel[] {
     const n = input.length;
     if (n === 0) return [];
     let maxDim = 1;
@@ -85,21 +104,25 @@ export function placeLabels(input: ReadonlyArray<LabelRect>): PlacedLabel[] {
     const rects: LabelRect[] = input.map((r) => ({ x: r.x, y: r.y, width: r.width, height: r.height }));
     rects.forEach((r, i) => grid.insert(i, r));
 
-    const collision = (r: LabelRect, self: number, alive?: Uint8Array) => {
+    const circles: LabelRect[] = obstacles.map((o) => ({ x: o.x - o.r, y: o.y - o.r, width: 2 * o.r, height: 2 * o.r }));
+    const circleGrid = new Grid(maxDim * 2);
+    circles.forEach((c, i) => circleGrid.insert(i, c));
+
+    const cost = (r: LabelRect, self: number) => {
         let sum = 0;
-        for (const j of grid.near(r)) {
-            if (j === self || (alive && !alive[j])) continue;
-            sum += intersect(r, rects[j]);
-        }
+        for (const j of grid.near(r)) if (j !== self) sum += intersect(r, rects[j]);
+        for (const j of circleGrid.near(r)) sum += OBSTACLE_WEIGHT * intersect(r, circles[j]);
         return sum;
     };
 
-    // greedy
     for (let i = 0; i < n; i++) {
+        const anchor = input[i];
         let best = rects[i];
-        let bestScore = collision(best, i);
-        for (const p of placements(input[i])) {
-            const s = collision(p, i);
+        let bestScore = cost(best, i);
+        if (bestScore === 0) continue;
+        for (const p of placements(anchor)) {
+            const moved = Math.hypot(p.x - anchor.x, p.y - anchor.y) / anchor.height;
+            const s = cost(p, i) + DISTANCE_PENALTY * moved * anchor.width * anchor.height;
             if (s < bestScore) {
                 best = p;
                 bestScore = s;
@@ -112,24 +135,5 @@ export function placeLabels(input: ReadonlyArray<LabelRect>): PlacedLabel[] {
         }
     }
 
-    // remove overlaps
-    const alive = new Uint8Array(n).fill(1);
-    const area = rects.map((r, i) => collision(r, i, alive));
-    for (;;) {
-        let worst = -1;
-        let worstArea = 0;
-        for (let i = 0; i < n; i++) {
-            if (alive[i] && area[i] > worstArea) {
-                worst = i;
-                worstArea = area[i];
-            }
-        }
-        if (worst < 0) break;
-        alive[worst] = 0;
-        for (const j of grid.near(rects[worst])) {
-            if (j !== worst && alive[j]) area[j] = collision(rects[j], j, alive);
-        }
-    }
-
-    return rects.map((r, i) => ({ x: r.x, y: r.y, hidden: !alive[i] }));
+    return rects.map((r) => ({ x: r.x, y: r.y, hidden: false }));
 }
