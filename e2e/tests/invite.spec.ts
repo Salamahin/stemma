@@ -1,5 +1,6 @@
 import { expect, test } from "./_fixtures";
 import type { Page } from "@playwright/test";
+import { expectPersonVisible } from "./_chart";
 
 async function createStemma(page: Page, name: string) {
   const stemmaBtn = page.getByTestId("chip-stemma-btn");
@@ -19,12 +20,7 @@ async function addPerson(page: Page, name: string) {
   await page.getByTestId("add-person-fab").click();
   await page.getByTestId("person-name-input").fill(name);
   await page.getByTestId("person-create").click();
-  const node = page
-    .locator("svg#chart g[id^='person_']:not([id*='pending-'])")
-    .filter({ has: page.locator(`text="${name}"`) })
-    .first();
-  await expect(node).toBeVisible({ timeout: 15_000 });
-  return node;
+  return await expectPersonVisible(page, name);
 }
 
 test("invite link grants the invitee access to the stemma", async ({ page, browser }, testInfo) => {
@@ -36,7 +32,7 @@ test("invite link grants the invitee access to the stemma", async ({ page, brows
   await createStemma(page, stemmaName);
   const node = await addPerson(page, personName);
 
-  await node.locator("circle").first().click({ force: true });
+  await page.mouse.click(node.clientX, node.clientY);
   await page.getByTestId("share-access-btn").click();
   const modal = page.getByTestId("share-access-modal");
   await expect(modal).toBeVisible();
@@ -61,9 +57,7 @@ test("invite link grants the invitee access to the stemma", async ({ page, brows
     const chip = inviteePage.getByTestId("chip-stemma-btn");
     await expect(chip).toContainText(stemmaName, { timeout: 30_000 });
     await expect(inviteePage).not.toHaveURL(/inviteToken/);
-    await expect(
-      inviteePage.locator("svg#chart g[id^='person_']").filter({ has: inviteePage.locator(`text="${personName}"`) }),
-    ).toHaveCount(1, { timeout: 15_000 });
+    await expectPersonVisible(inviteePage, personName);
   } finally {
     await invitee.close();
   }
