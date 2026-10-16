@@ -8,9 +8,9 @@
  * writes positions into them as the layout progresses, except for nodes the
  * main thread holds fixed (fx/fy), which stay main-thread authoritative.
  */
-import { anchorWhereMissing, createLayoutSimulation, LayoutLoop, type LayoutNode, type Scheduler } from "./layoutCore";
+import { anchorWhereMissing, giveCollisionRadius, createLayoutSimulation, LayoutLoop, type LayoutNode, type Scheduler } from "./layoutCore";
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from "./layoutProtocol";
-import { applyStructuredSeed, clanRegions } from "./structuredLayout";
+import { applyStructuredSeed, clanRegions, SEED_USES_CLAN_REGIONS } from "./structuredLayout";
 
 export type EngineNode = LayoutNode;
 export type EngineLink = { source: string | EngineNode; target: string | EngineNode };
@@ -62,13 +62,14 @@ export class InlineLayoutEngine implements LayoutEngine {
 
     setGraph(nodes: EngineNode[], links: EngineLink[], alpha: number, start = true, seed = false, groups?: Int32Array) {
         const pairs = linkPairs(nodes, links);
-        const g = groups && groups.length === nodes.length ? groups : undefined;
+        const g = SEED_USES_CLAN_REGIONS && groups && groups.length === nodes.length ? groups : undefined;
         if (seed) applyStructuredSeed(nodes, pairs, this.center, g);
         else if (g) {
             const region = clanRegions(nodes.length, pairs, g);
             nodes.forEach((d, i) => (d.region = region[i]));
         }
         anchorWhereMissing(nodes);
+        giveCollisionRadius(nodes);
         if (!this.sim) {
             this.sim = createLayoutSimulation(nodes, links as any, this.center[0] * 2, this.center[1] * 2);
             this.loop = new LayoutLoop(this.sim, this.scheduler, INLINE_BUDGET_MS, (t) => this.cb.onTick(t), () => this.cb.onEnd());

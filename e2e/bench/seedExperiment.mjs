@@ -86,6 +86,10 @@ function cloudOverlap(nodes) {
   return { clouds: polys.length, overlapShare: Math.round((multi / covered) * 1000) / 1000 };
 }
 
+// clan region of every node, for the crossing breakdown (same for every variant)
+let regionById = new Map();
+// non-tree edges of the last star seed (for the crossing breakdown)
+let nonTree = new Set();
 function quality(nodes, links) {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const people = nodes.filter((n) => n.type === "person");
@@ -96,7 +100,7 @@ function quality(nodes, links) {
     const gx = Math.floor(p.x / cell), gy = Math.floor(p.y / cell);
     for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const q of grid.get(`${gx + dx}:${gy + dy}`) ?? []) if (q.id > p.id && Math.hypot(p.x - q.x, p.y - q.y) < 40) overlaps++;
   }
-  const segs = links.map((l) => { const a = byId.get(typeof l.source === "string" ? l.source : l.source.id), b = byId.get(typeof l.target === "string" ? l.target : l.target.id); return { s: a.id, t: b.id, x1: a.x, y1: a.y, x2: b.x, y2: b.y }; });
+  const segs = links.map((l) => { const a = byId.get(typeof l.source === "string" ? l.source : l.source.id), b = byId.get(typeof l.target === "string" ? l.target : l.target.id); return { s: a.id, t: b.id, x1: a.x, y1: a.y, x2: b.x, y2: b.y, inter: regionById.get(a.id) !== regionById.get(b.id), extra: nonTree.has(`${a.id}|${b.id}`) }; });
   const lens = segs.map((g) => Math.hypot(g.x2 - g.x1, g.y2 - g.y1)).sort((a, b) => a - b);
   const bucket = Math.max(200, lens[Math.floor(lens.length * 0.9)] || 200);
   const sg = new Map();
@@ -104,31 +108,34 @@ function quality(nodes, links) {
   segs.forEach((g, i) => {
     const x0 = Math.floor(Math.min(g.x1, g.x2) / bucket), x1 = Math.floor(Math.max(g.x1, g.x2) / bucket);
     const y0 = Math.floor(Math.min(g.y1, g.y2) / bucket), y1 = Math.floor(Math.max(g.y1, g.y2) / bucket);
+    g.cx0 = x0; g.cy0 = y0;
     if ((x1 - x0 + 1) * (y1 - y0 + 1) > 400) { longSegs.push(i); return; } // long edge: checked against all edges below
-    for (let xx = x0; xx <= x1; xx++) for (let yy = y0; yy <= y1; yy++) { const k = `${xx}:${yy}`; (sg.get(k) ?? sg.set(k, []).get(k)).push(i); }
+    for (let xx = x0; xx <= x1; xx++) for (let yy = y0; yy <= y1; yy++) { const k = `${xx}:${yy}`; (sg.get(k) ?? sg.set(k, Object.assign([], { cx: xx, cy: yy })).get(k)).push(i); }
   });
   const orient = (ax, ay, bx, by, cx, cy) => Math.sign((bx - ax) * (cy - ay) - (by - ay) * (cx - ax));
-  const seen = new Set(); let crossings = 0;
+  let crossings = 0; let interCrossings = 0; let nonTreeCrossings = 0;
   for (const ids of sg.values()) for (let a = 0; a < ids.length; a++) for (let b = a + 1; b < ids.length; b++) {
-    const i = Math.min(ids[a], ids[b]), j = Math.max(ids[a], ids[b]), key = i * 1e6 + j;
-    if (seen.has(key)) continue; seen.add(key);
+    const i = Math.min(ids[a], ids[b]), j = Math.max(ids[a], ids[b]);
     const p = segs[i], q = segs[j];
+    if (Math.max(p.cx0, q.cx0) !== ids.cx || Math.max(p.cy0, q.cy0) !== ids.cy) continue; // count each pair once: in its first shared cell
     if (p.s === q.s || p.s === q.t || p.t === q.s || p.t === q.t) continue;
-    if (orient(p.x1, p.y1, p.x2, p.y2, q.x1, q.y1) * orient(p.x1, p.y1, p.x2, p.y2, q.x2, q.y2) < 0 && orient(q.x1, q.y1, q.x2, q.y2, p.x1, p.y1) * orient(q.x1, q.y1, q.x2, q.y2, p.x2, p.y2) < 0) crossings++;
+    if (orient(p.x1, p.y1, p.x2, p.y2, q.x1, q.y1) * orient(p.x1, p.y1, p.x2, p.y2, q.x2, q.y2) < 0 && orient(q.x1, q.y1, q.x2, q.y2, p.x1, p.y1) * orient(q.x1, q.y1, q.x2, q.y2, p.x2, p.y2) < 0) { crossings++; if (p.inter || q.inter) interCrossings++; if (p.extra || q.extra) nonTreeCrossings++; }
   }
   const longSet = new Set(longSegs);
   for (const i of longSegs) for (let j = 0; j < segs.length; j++) {
     if (j === i || (longSet.has(j) && j < i)) continue;
     const p = segs[i], q = segs[j];
     if (p.s === q.s || p.s === q.t || p.t === q.s || p.t === q.t) continue;
-    if (orient(p.x1, p.y1, p.x2, p.y2, q.x1, q.y1) * orient(p.x1, p.y1, p.x2, p.y2, q.x2, q.y2) < 0 && orient(q.x1, q.y1, q.x2, q.y2, p.x1, p.y1) * orient(q.x1, q.y1, q.x2, q.y2, p.x2, p.y2) < 0) crossings++;
+    if (orient(p.x1, p.y1, p.x2, p.y2, q.x1, q.y1) * orient(p.x1, p.y1, p.x2, p.y2, q.x2, q.y2) < 0 && orient(q.x1, q.y1, q.x2, q.y2, p.x1, p.y1) * orient(q.x1, q.y1, q.x2, q.y2, p.x2, p.y2) < 0) { crossings++; if (p.inter || q.inter) interCrossings++; if (p.extra || q.extra) nonTreeCrossings++; }
   }
   const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
-  return { ...cloudOverlap(nodes), crossings, overlaps, medianLink: Math.round(lens[lens.length >> 1]), p95Link: Math.round(lens[Math.floor(lens.length * 0.95)]), w: Math.round(Math.max(...xs) - Math.min(...xs)), h: Math.round(Math.max(...ys) - Math.min(...ys)) };
+  return { ...cloudOverlap(nodes), crossings, nonTreeEdges: segs.filter((g) => g.extra).length, nonTreeCrossings, interCrossings, interEdges: segs.filter((g) => g.inter).length, overlaps, medianLink: Math.round(lens[lens.length >> 1]), p95Link: Math.round(lens[Math.floor(lens.length * 0.95)]), w: Math.round(Math.max(...xs) - Math.min(...xs)), h: Math.round(Math.max(...ys) - Math.min(...ys)) };
 }
 
 function refine(nodes, links, alpha, anchored) {
   if (anchored) for (const n of nodes) { n.ax = n.x; n.ay = n.y; }
+  // COLLIDE=1: every real node collides (person 20, family 10 units)
+  if (process.env.COLLIDE) for (const n of nodes) n.r = n.type === "person" ? 1 : 0.5;
   const sim = lib.createLayoutSimulation(nodes, links, W, H);
   sim.alpha(alpha);
   const t0 = performance.now();
@@ -152,10 +159,12 @@ function seedStructured(options, withRegions = true) {
       if (groups[i] < 0 || clanSize[ci] > clanSize[groups[i]]) groups[i] = ci;
     }
   });
-  const { x, y, region } = lib.structuredLayout({ ids: g.nodes.map((n) => n.id), links: Int32Array.from(pairs), center: [W / 2, H / 2], groups }, options);
+  const { x, y, region, nonTreeEdges } = lib.structuredLayout({ ids: g.nodes.map((n) => n.id), links: Int32Array.from(pairs), center: [W / 2, H / 2], groups }, options);
   if (withRegions) g.nodes.forEach((n, i) => (n.region = region[i]));
   const ms = Math.round(performance.now() - t0);
   g.nodes.forEach((n, i) => { n.x = x[i]; n.y = y[i]; });
+  nonTree = new Set();
+  for (let i = 0; i < nonTreeEdges.length; i += 2) nonTree.add(`${g.nodes[nonTreeEdges[i]].id}|${g.nodes[nonTreeEdges[i + 1]].id}`).add(`${g.nodes[nonTreeEdges[i + 1]].id}|${g.nodes[nonTreeEdges[i]].id}`);
   return { ...g, seedMs: ms };
 }
 
@@ -200,10 +209,31 @@ const VARIANTS = {
   // clan regions (current default) + anchored refine with weak cross-region links
   clans: () => ({ g: seedStructured({ mode: "clans" }), alpha: 1, anchored: true }),
   clansSeedOnly: () => ({ g: seedStructured({ mode: "clans" }), alpha: 0, anchored: true }),
+  clansRotated: () => ({ g: seedStructured({ mode: "clans", islandRotation: true }), alpha: 1, anchored: true }),
+  clansRotatedGaps: () => ({ g: seedStructured({ mode: "clans", islandRotation: true, regionGapMin: 150 }), alpha: 1, anchored: true }),
+  clansGaps: () => ({ g: seedStructured({ mode: "clans", regionGapMin: 150 }), alpha: 1, anchored: true }),
+  layered: () => ({ g: seedStructured({ mode: "layered" }, false), alpha: 0, anchored: false }),
+  layeredRefined: () => ({ g: seedStructured({ mode: "layered" }, false), alpha: 1, anchored: true }),
+  star: () => ({ g: seedStructured({ mode: "star" }, false), alpha: 0, anchored: true }),
+  starSparseClans: () => ({ g: seedStructured({ mode: "star", starOrderPasses: 6, starSpacing: 80 }), alpha: 1, anchored: true }),
+  starClans: () => ({ g: seedStructured({ mode: "star", starOrderPasses: 6 }), alpha: 1, anchored: true }),
+  starOrderedLight: () => ({ g: seedStructured({ mode: "star", starOrderPasses: 6 }, false), alpha: 0.05, anchored: true }),
+  starSparse: () => ({ g: seedStructured({ mode: "star", starOrderPasses: 6, starSpacing: 80 }, false), alpha: 0, anchored: true }),
+  starSparseLight: () => ({ g: seedStructured({ mode: "star", starOrderPasses: 6, starSpacing: 80 }, false), alpha: 0.05, anchored: true }),
+  starSparseRefined: () => ({ g: seedStructured({ mode: "star", starOrderPasses: 6, starSpacing: 80 }, false), alpha: 1, anchored: true }),
+  starGap300: () => ({ g: seedStructured({ mode: "star", starLevelGap: 300 }, false), alpha: 0, anchored: true }),
+  starGap1000: () => ({ g: seedStructured({ mode: "star", starLevelGap: 1000 }, false), alpha: 0, anchored: true }),
+  starOrdered: () => ({ g: seedStructured({ mode: "star", starOrderPasses: 6 }, false), alpha: 0, anchored: true }),
+  starLight: () => ({ g: seedStructured({ mode: "star" }, false), alpha: 0.05, anchored: true }),
+  starRefined: () => ({ g: seedStructured({ mode: "star" }, false), alpha: 1, anchored: true }),
   clansPacked: () => ({ g: seedStructured({ mode: "clans", regionStart: "pack" }), alpha: 1, anchored: true }),
 };
 
 console.log(`people=${stemma.people.length} families=${stemma.families.length} clans=${clans.length}`);
+{
+  const g = seedStructured({ mode: "clans" });
+  regionById = new Map(g.nodes.map((n) => [n.id, n.region]));
+}
 for (const [name, make] of Object.entries(VARIANTS)) {
   if (only && !only.includes(name)) continue;
   const { g, alpha, anchored } = make();

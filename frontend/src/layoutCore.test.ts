@@ -6,6 +6,7 @@ import {
     LAYOUT_TICKS,
     LAYOUT_REFINE_ALPHA,
     LAYOUT_REHEAT_ALPHA,
+    giveCollisionRadius,
 } from "./layoutCore";
 import { InlineLayoutEngine } from "./layoutEngine";
 import { syntheticGraph, manualScheduler } from "./layoutTestFixtures";
@@ -164,6 +165,23 @@ describe("anchors and clan regions in the layout forces", () => {
         const inside = pair(1, 1);
         const across = pair(1, 2);
         expect(across).toBeLessThan(inside / 20);
+    });
+
+    test("real people collide once the engine gives them a radius (no piles of nodes)", () => {
+        const nodes: any[] = [
+            { id: "person_a", x: 0, y: 0, ax: 0, ay: 0 },
+            { id: "person_b", x: 5, y: 0, ax: 5, ay: 0 },
+            { id: "family_f", x: 0, y: 3, ax: 0, ay: 3 },
+        ];
+        giveCollisionRadius(nodes);
+        expect(nodes.map((n) => n.r)).toEqual([1, 1, 0.5]);
+        const sim = createLayoutSimulation(nodes, [], 0, 0);
+        for (let i = 0; i < 100; i++) sim.tick();
+        expect(Math.hypot(nodes[0].x - nodes[1].x, nodes[0].y - nodes[1].y)).toBeGreaterThan(30);
+        // an explicit radius (ghost-burst neighbours) is kept
+        const ghost: any = { id: "person_g", x: 0, y: 0, r: 1.5 };
+        giveCollisionRadius([ghost]);
+        expect(ghost.r).toBe(1.5);
     });
 
     test("an anchored node is pulled to its anchor, not to the viewport centre", () => {

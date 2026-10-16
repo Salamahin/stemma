@@ -43,7 +43,7 @@ describe("structuredLayout", () => {
         // two parents -> family -> child -> (with spouse) family -> grandchild
         const ids = ["person_a", "person_b", "family_f", "person_c", "person_s", "family_g", "person_d"];
         const links = Int32Array.from([0, 2, 1, 2, 2, 3, 3, 5, 4, 5, 5, 6]);
-        const { x, y } = structuredLayout({ ids, links, center: [0, 0] });
+        const { x, y } = structuredLayout({ ids, links, center: [0, 0] }, { mode: "rings" });
         const cx = x.reduce((s, v) => s + v, 0) / x.length;
         const cy = y.reduce((s, v) => s + v, 0) / y.length;
         const r = (i: number) => Math.hypot(x[i] - cx, y[i] - cy);
@@ -110,6 +110,51 @@ describe("structuredLayout", () => {
     });
 });
 
+describe("star (radial tree) mode", () => {
+    /** A tree plus `extra` cross links between random far-apart people (pedigree collapse). */
+    function withCycles(extra: number) {
+        const { nodes, links } = syntheticGraph(300);
+        const { ids, links: pairs } = indexed(nodes, links);
+        const people = ids.map((id, i) => [id, i] as const).filter(([id]) => id.startsWith("person_")).map(([, i]) => i);
+        const fams = ids.map((id, i) => [id, i] as const).filter(([id]) => id.startsWith("family_")).map(([, i]) => i);
+        const more = Array.from(pairs);
+        for (let k = 0; k < extra; k++) more.push(people[(k * 37) % people.length], fams[(k * 53 + 11) % fams.length]);
+        return { ids, links: Int32Array.from(more) };
+    }
+
+    test("reports exactly the edges left out of the spanning tree", () => {
+        const { ids, links } = withCycles(5);
+        const { nonTreeEdges } = structuredLayout({ ids, links, center: [0, 0] }, { mode: "star" });
+        // a spanning forest keeps N − C edges, so E − N + C are left over
+        const uf = ids.map((_, i) => i);
+        const find = (a: number): number => (uf[a] === a ? a : (uf[a] = find(uf[a])));
+        for (let i = 0; i < links.length; i += 2) uf[find(links[i])] = find(links[i + 1]);
+        const components = new Set(ids.map((_, i) => find(i))).size;
+        expect(nonTreeEdges.length / 2).toBe(links.length / 2 - ids.length + components);
+        expect(nonTreeEdges.length / 2).toBeGreaterThan(0);
+    });
+
+    test("ordering the children shortens the chords of the non-tree edges", () => {
+        const { ids, links } = withCycles(8);
+        const chords = (passes: number) => {
+            const { x, y, nonTreeEdges } = structuredLayout({ ids, links, center: [0, 0] }, { mode: "star", starOrderPasses: passes });
+            let sum = 0;
+            for (let i = 0; i < nonTreeEdges.length; i += 2) sum += Math.hypot(x[nonTreeEdges[i]] - x[nonTreeEdges[i + 1]], y[nonTreeEdges[i]] - y[nonTreeEdges[i + 1]]);
+            return sum;
+        };
+        expect(chords(6)).toBeLessThan(chords(0));
+    });
+
+    test("keeps neighbouring nodes at least about the ring spacing apart", () => {
+        const { nodes, links } = syntheticGraph(200);
+        const { ids, links: pairs } = indexed(nodes, links);
+        const { x, y } = structuredLayout({ ids, links: pairs, center: [0, 0] }, { mode: "star", starSpacing: 80, starLevelGap: 85 });
+        let min = Infinity;
+        for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) min = Math.min(min, Math.hypot(x[i] - x[j], y[i] - y[j]));
+        expect(min).toBeGreaterThan(80 * 0.9);
+    });
+});
+
 describe("clan regions", () => {
     // Two lineages (clans A and B) joined by one marriage: a0 (A) marries b0 (B).
     function twoClans(size: number) {
@@ -160,7 +205,7 @@ describe("clan regions", () => {
 
     test("clans mode keeps each clan in its own region, apart from the other", () => {
         const { ids, links, groups } = twoClans(120);
-        const { x, y, region } = structuredLayout({ ids, links, center: [0, 0], groups });
+        const { x, y, region } = structuredLayout({ ids, links, center: [0, 0], groups }, { mode: "clans" });
         const box = (g: number) => {
             const xs: number[] = [];
             const ys: number[] = [];

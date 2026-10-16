@@ -2,8 +2,8 @@
  * Worker-side message handling, kept separate from the worker entry so it can
  * be unit-tested with a fake `post`/scheduler.
  */
-import { anchorWhereMissing, createLayoutSimulation, LayoutLoop, type LayoutNode, type Scheduler } from "./layoutCore";
-import { applyStructuredSeed, clanRegions } from "./structuredLayout";
+import { anchorWhereMissing, giveCollisionRadius, createLayoutSimulation, LayoutLoop, type LayoutNode, type Scheduler } from "./layoutCore";
+import { applyStructuredSeed, clanRegions, SEED_USES_CLAN_REGIONS } from "./structuredLayout";
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from "./layoutProtocol";
 
 /** Worker time per batch before positions are posted back (≈ one frame). */
@@ -81,13 +81,14 @@ export class LayoutWorkerHost {
             ax: msg.ax && Number.isFinite(msg.ax[i]) ? msg.ax[i] : undefined,
             ay: msg.ay && Number.isFinite(msg.ay[i]) ? msg.ay[i] : undefined,
         }));
-        const groups = msg.groups && msg.groups.length === this.nodes.length ? msg.groups : undefined;
+        const groups = SEED_USES_CLAN_REGIONS && msg.groups && msg.groups.length === this.nodes.length ? msg.groups : undefined;
         if (msg.seed) applyStructuredSeed(this.nodes, msg.links, [msg.width / 2, msg.height / 2], groups);
         else if (groups) {
             const region = clanRegions(this.nodes.length, msg.links, groups);
             this.nodes.forEach((d, i) => (d.region = region[i]));
         }
         anchorWhereMissing(this.nodes);
+        giveCollisionRadius(this.nodes);
         const links = [];
         for (let i = 0; i < msg.links.length; i += 2) {
             links.push({ source: this.nodes[msg.links[i]], target: this.nodes[msg.links[i + 1]] });

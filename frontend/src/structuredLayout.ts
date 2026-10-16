@@ -35,13 +35,23 @@ export type StructuredLayoutOptions = {
      * "clans": every surname clan gets its own region (laid out with rings),
      * regions kept apart; "rings": one set of generation rings per component.
      */
-    mode?: "clans" | "rings";
+    mode?: "star" | "clans" | "rings" | "layered";
+    /** Star: minimum distance between neighbouring nodes on the same ring. */
+    starSpacing?: number;
+    /** Star: minimum distance between consecutive tree depths. */
+    starLevelGap?: number;
+    /** Star: crossing-reduction passes over the children order (0 = off). */
+    starOrderPasses?: number;
     /** Clans: clear space between neighbouring clan regions. */
     regionGap?: number;
     /** Clans: ticks of the small region-graph layout that places the regions. */
     regionTicks?: number;
     /** Clans: start regions packed ("pack") or at their rings-layout centroids ("rings"). */
     regionStart?: "pack" | "rings";
+    /** Clans: smallest gap between regions; strongly connected regions get close to it, unrelated ones keep `regionGap`. */
+    regionGapMin?: number;
+    /** Clans: rotate/mirror every region so its boundary people face the clans they are related to. */
+    islandRotation?: boolean;
     /** Clans: components smaller than this use plain rings. */
     minClanComponent?: number;
 };
@@ -54,12 +64,24 @@ const DEFAULTS: Required<StructuredLayoutOptions> = {
     generationGap: 110,
     sweeps: 4,
     componentGap: 150,
-    mode: "clans",
+    mode: "star",
     regionGap: 500,
     regionTicks: 100,
     regionStart: "rings",
+    starSpacing: 80,
+    starLevelGap: 85,
+    starOrderPasses: 6,
+    regionGapMin: 150,
+    islandRotation: true,
     minClanComponent: 200,
 };
+
+/**
+ * Whether the default seed uses clan regions (and with them weak links
+ * between clans in the force refine). The star layout does not: weakening
+ * cross-clan links there only added crossings.
+ */
+export const SEED_USES_CLAN_REGIONS = DEFAULTS.mode === "clans";
 
 export type StructuredLayoutInput = {
     /** Node ids; families start with "family_", everything else is a person. */
@@ -74,14 +96,16 @@ export type StructuredLayoutInput = {
 export function structuredLayout(
     input: StructuredLayoutInput,
     options: StructuredLayoutOptions = {},
-): { x: Float64Array; y: Float64Array; region: Int32Array } {
+): { x: Float64Array; y: Float64Array; region: Int32Array; nonTreeEdges: number[] } {
     const opt = { ...DEFAULTS, ...options };
     const n = input.ids.length;
     const x = new Float64Array(n);
     const y = new Float64Array(n);
     /** Clan region per node (clans mode), -1 elsewhere. */
     const regionOf = new Int32Array(n).fill(-1);
-    if (n === 0) return { x, y, region: regionOf };
+    /** Star mode: [a, b] index pairs of edges left out of the spanning tree. */
+    const nonTreeEdges: number[] = [];
+    if (n === 0) return { x, y, region: regionOf, nonTreeEdges };
     const isFamily = new Uint8Array(n);
     const inUnit = new Uint8Array(n); // membership of the node set being laid out
     input.ids.forEach((id, i) => (isFamily[i] = id.startsWith("family_") ? 1 : 0));
@@ -173,7 +197,11 @@ export function structuredLayout(
     const circles: Array<{ r: number; x: number; y: number; members: number[] }> = [];
     for (const members of compOf.values()) {
         circles.push(
-            opt.mode === "clans" ? clansComponent(members) : layoutComponent(members),
+            opt.mode === "star"
+                ? starComponent(members)
+                : opt.mode === "clans"
+                  ? clansComponent(members)
+                  : layoutComponent(members), // "rings" and "layered" share ringsOf
         );
     }
 
@@ -278,6 +306,23 @@ export function structuredLayout(
             for (let l = layers.length - 2; l >= 0; l--) reorder(l, 1);
         }
 
+        if (opt.mode === "layered") {
+            // generations as rows (Sugiyama-style reference), same ordering
+            let maxHalf = 0;
+            for (let l = 0; l < layers.length; l++) {
+                const arr = layers[l];
+                const isFamLayer = arr.length > 0 && isFamily[arr[0]] === 1;
+                const spacing = isFamLayer ? opt.familySpacing : opt.personSpacing * 2;
+                const width = arr.length * spacing;
+                maxHalf = Math.max(maxHalf, width / 2);
+                arr.forEach((v) => {
+                    x[v] = pos[v] * width - width / 2;
+                    y[v] = l * (opt.generationGap / 2) - (layers.length * opt.generationGap) / 4;
+                });
+            }
+            return { r: Math.hypot(maxHalf, (layers.length * opt.generationGap) / 4) + opt.componentGap / 2, x: 0, y: 0, members };
+        }
+
         // rings
         let radius = 0;
         let maxR = 0;
@@ -350,7 +395,7 @@ export function structuredLayout(
         const discs = orderRegions.map((r) => {
             const nodes = byRegion.get(r)!;
             const local = layoutComponent(nodes);
-            return { nodes, lx: nodes.map((v) => x[v]), ly: nodes.map((v) => y[v]), r: local.r + opt.regionGap / 2, x: 0, y: 0 };
+            return { nodes, lx: nodes.map((v) => x[v]), ly: nodes.map((v) => y[v]), r: local.r + opt.regionGapMin / 2, x: 0, y: 0 };
         });
         if (opt.regionStart === "rings") {
             // Start every region where the (low-crossing) rings layout of the
@@ -390,7 +435,7 @@ export function structuredLayout(
             .force(
                 "link",
                 forceLink(regionLinks)
-                    .distance((l: any) => discs[l.source.index].r + discs[l.target.index].r)
+                    .distance((l: any) => discs[l.source.index].r + discs[l.target.index].r + (opt.regionGap - opt.regionGapMin) * (1 - l.w / maxW))
                     .strength((l: any) => 0.05 + 0.6 * (l.w / maxW)),
             )
             .force("collide", forceCollide((d: any) => d.r).iterations(3))
@@ -398,6 +443,57 @@ export function structuredLayout(
             .force("y", forceY(0).strength(0.02))
             .stop();
         for (let i = 0; i < opt.regionTicks; i++) regionSim.tick();
+        if (opt.islandRotation) {
+            // Turn (and possibly mirror) every island so that its boundary
+            // people — those with relatives in other clans — face those clans:
+            // minimise Σ |p(u) − centre(other clan)|² over inter-clan edges.
+            const centre = new Map<number, [number, number]>();
+            discs.forEach((d, i) => centre.set(orderRegions[i], [d.x, d.y]));
+            discs.forEach((d) => {
+                const terms: Array<{ j: number; tx: number; ty: number }> = [];
+                d.nodes.forEach((v, j) => {
+                    for (const u of nbrs[v]) {
+                        const b = regionOf[u];
+                        if (b === regionOf[v] || b < 0) continue;
+                        const c = centre.get(b);
+                        if (c) terms.push({ j, tx: c[0] - d.x, ty: c[1] - d.y });
+                    }
+                });
+                if (!terms.length) return;
+                let best = { cost: Infinity, angle: 0, mirror: 1 };
+                for (const mirror of [1, -1]) {
+                    // closed form: maximise Σ (R·m·p)·t  ⇒  angle = atan2(Σ cross, Σ dot)
+                    let dot = 0;
+                    let cross = 0;
+                    for (const t of terms) {
+                        const px = d.lx[t.j];
+                        const py = mirror * d.ly[t.j];
+                        dot += px * t.tx + py * t.ty;
+                        cross += px * t.ty - py * t.tx;
+                    }
+                    const angle = Math.atan2(cross, dot);
+                    const c = Math.cos(angle);
+                    const sn = Math.sin(angle);
+                    let cost = 0;
+                    for (const t of terms) {
+                        const px = d.lx[t.j];
+                        const py = mirror * d.ly[t.j];
+                        const rx = c * px - sn * py;
+                        const ry = sn * px + c * py;
+                        cost += (rx - t.tx) ** 2 + (ry - t.ty) ** 2;
+                    }
+                    if (cost < best.cost) best = { cost, angle, mirror };
+                }
+                const c = Math.cos(best.angle);
+                const sn = Math.sin(best.angle);
+                d.nodes.forEach((_, j) => {
+                    const px = d.lx[j];
+                    const py = best.mirror * d.ly[j];
+                    d.lx[j] = c * px - sn * py;
+                    d.ly[j] = sn * px + c * py;
+                });
+            });
+        }
         let extent = 0;
         for (const d of discs) {
             d.nodes.forEach((v, j) => {
@@ -407,6 +503,208 @@ export function structuredLayout(
             extent = Math.max(extent, Math.hypot(d.x, d.y) + d.r);
         }
         return { r: extent + opt.componentGap / 2, x: 0, y: 0, members };
+    }
+
+    /**
+     * Star: a stemma is almost a tree (pedigree collapse is rare — the real
+     * 11k stemma has 76 independent cycles over 16k nodes), so draw a
+     * spanning tree as a radial tree. Root = the tree's centroid; every
+     * subtree gets an angular wedge proportional to its number of leaves
+     * (wedges never overlap, so tree edges cannot cross); each depth sits on
+     * a ring whose radius grows until neighbouring nodes are `starSpacing`
+     * apart. Only the few non-tree edges can cross anything.
+     */
+    function starComponent(members: number[]) {
+        if (members.length === 1) {
+            x[members[0]] = 0;
+            y[members[0]] = 0;
+            return { r: opt.starSpacing + opt.componentGap / 2, x: 0, y: 0, members };
+        }
+        const memberSet = inUnit;
+        for (const v of members) memberSet[v] = 1;
+        const treeFrom = (root: number) => {
+            const parent = new Int32Array(n).fill(-2);
+            parent[root] = -1;
+            const order = [root];
+            const kids = new Map<number, number[]>();
+            for (let h = 0; h < order.length; h++) {
+                const v = order[h];
+                let next = nbrs[v].filter((u) => memberSet[u] && parent[u] === -2);
+                // a family's spouses first, then its children: couples side by side
+                if (isFamily[v]) next = [...next.filter((u) => parentsOf[v].includes(u)), ...next.filter((u) => !parentsOf[v].includes(u))];
+                const mine: number[] = [];
+                for (const u of next) {
+                    if (parent[u] !== -2) continue;
+                    parent[u] = v;
+                    order.push(u);
+                    mine.push(u);
+                }
+                kids.set(v, mine);
+            }
+            return { order, kids, parent };
+        };
+        const subtree = (order: number[], kids: Map<number, number[]>) => {
+            const size = new Map<number, number>();
+            const leaves = new Map<number, number>();
+            for (let h = order.length - 1; h >= 0; h--) {
+                const v = order[h];
+                const ks = kids.get(v) ?? [];
+                size.set(v, 1 + ks.reduce((sum, k) => sum + size.get(k)!, 0));
+                leaves.set(v, ks.length ? ks.reduce((sum, k) => sum + leaves.get(k)!, 0) : 1);
+            }
+            return { size, leaves };
+        };
+        const first = treeFrom(members[0]);
+        const firstSize = subtree(first.order, first.kids).size;
+        let root = first.order[0];
+        let best = Infinity;
+        for (const v of first.order) {
+            let heaviest = members.length - firstSize.get(v)!;
+            for (const k of first.kids.get(v) ?? []) heaviest = Math.max(heaviest, firstSize.get(k)!);
+            if (heaviest < best) {
+                best = heaviest;
+                root = v;
+            }
+        }
+        const { order, kids, parent } = treeFrom(root);
+        for (const v of members) memberSet[v] = 0;
+        const { leaves } = subtree(order, kids);
+        const firstExtra = nonTreeEdges.length;
+        for (const v of members) for (const u of nbrs[v]) if (u > v && parent[u] !== v && parent[v] !== u) nonTreeEdges.push(v, u);
+        const depth = new Int32Array(n);
+        for (const v of order) depth[v] = parent[v] < 0 ? 0 : depth[parent[v]] + 1;
+
+        const angle = new Float64Array(n);
+        const place = () => {
+            const wedge0 = new Float64Array(n);
+            const wedge1 = new Float64Array(n);
+            wedge0[root] = 0;
+            wedge1[root] = 2 * Math.PI;
+            angle[root] = 0;
+            for (const v of order) {
+                const ks = kids.get(v) ?? [];
+                if (!ks.length) continue;
+                const total = ks.reduce((sum, k) => sum + leaves.get(k)!, 0);
+                let cursor = wedge0[v];
+                const span = wedge1[v] - wedge0[v];
+                for (const k of ks) {
+                    const w = (span * leaves.get(k)!) / total;
+                    wedge0[k] = cursor;
+                    wedge1[k] = cursor + w;
+                    angle[k] = cursor + w / 2;
+                    cursor += w;
+                }
+            }
+        };
+        place();
+
+        // Crossing reduction for the non-tree edges (the few extra marriages /
+        // pedigree collapses): they are drawn as chords across the star, and a
+        // chord crosses every branch between its two ends. Greedy local search
+        // over child orders: for each node on a path from a non-tree edge's
+        // end up to the root, try reversing its children and moving each
+        // involved child to every slot; keep whatever shortens the chords
+        // (sum of angular distances). Each try only re-places that subtree.
+        const extra: Array<[number, number]> = [];
+        // this component's non-tree edges were appended from `firstExtra` on
+        for (let i = firstExtra; i < nonTreeEdges.length; i += 2) extra.push([nonTreeEdges[i], nonTreeEdges[i + 1]]);
+        if (opt.starOrderPasses > 0 && extra.length) {
+            const wedge0 = new Float64Array(n);
+            const wedge1 = new Float64Array(n);
+            // re-place a subtree inside its (fixed) wedge
+            const placeSubtree = (top: number) => {
+                const stack = [top];
+                while (stack.length) {
+                    const v = stack.pop()!;
+                    const ks = kids.get(v) ?? [];
+                    if (!ks.length) continue;
+                    const total = ks.reduce((sum, k) => sum + leaves.get(k)!, 0);
+                    let cursor = wedge0[v];
+                    const span = wedge1[v] - wedge0[v];
+                    for (const k of ks) {
+                        const w = (span * leaves.get(k)!) / total;
+                        wedge0[k] = cursor;
+                        wedge1[k] = cursor + w;
+                        angle[k] = cursor + w / 2;
+                        cursor += w;
+                        stack.push(k);
+                    }
+                }
+            };
+            wedge0[root] = 0;
+            wedge1[root] = 2 * Math.PI;
+            placeSubtree(root);
+            // which non-tree edges touch each subtree, and which nodes are on their paths
+            const touching = new Map<number, number[]>();
+            const onPath = new Set<number>();
+            extra.forEach(([u, v], e) => {
+                for (const end of [u, v]) {
+                    for (let w = end; w >= 0; w = parent[w]) {
+                        onPath.add(w);
+                        const arr = touching.get(w) ?? touching.set(w, []).get(w)!;
+                        if (arr[arr.length - 1] !== e) arr.push(e);
+                    }
+                }
+            });
+            const chord = (e: number) => {
+                const d = Math.abs(angle[extra[e][0]] - angle[extra[e][1]]) % (2 * Math.PI);
+                return Math.min(d, 2 * Math.PI - d);
+            };
+            const costOf = (es: number[]) => es.reduce((sum, e) => sum + chord(e), 0);
+            const candidates = order.filter((v) => onPath.has(v) && (kids.get(v) ?? []).length > 1);
+            for (let pass = 0; pass < opt.starOrderPasses; pass++) {
+                let improved = false;
+                for (const v of candidates) {
+                    const es = touching.get(v) ?? [];
+                    if (!es.length) continue;
+                    const current = kids.get(v)!;
+                    let bestOrder = current;
+                    let bestCost = costOf(es);
+                    const tryOrder = (o: number[]) => {
+                        kids.set(v, o);
+                        placeSubtree(v);
+                        const c = costOf(es);
+                        if (c < bestCost - 1e-9) {
+                            bestCost = c;
+                            bestOrder = o;
+                        }
+                    };
+                    tryOrder([...current].reverse());
+                    for (const k of current) {
+                        if (!onPath.has(k)) continue;
+                        const rest = bestOrder.filter((q) => q !== k);
+                        for (let slot = 0; slot <= rest.length; slot++) tryOrder([...rest.slice(0, slot), k, ...rest.slice(slot)]);
+                    }
+                    kids.set(v, bestOrder);
+                    placeSubtree(v);
+                    if (bestOrder !== current) improved = true;
+                }
+                if (!improved) break;
+            }
+        }
+
+        // ring radii: grow each depth until neighbours are starSpacing apart
+        const byDepth: number[][] = [];
+        for (const v of order) (byDepth[depth[v]] ??= []).push(v);
+        const radius: number[] = [0];
+        for (let d = 1; d < byDepth.length; d++) {
+            const angs = byDepth[d].map((v) => angle[v]).sort((p, q) => p - q);
+            let minGap = 2 * Math.PI;
+            for (let i = 0; i < angs.length; i++) {
+                const next = i + 1 < angs.length ? angs[i + 1] : angs[0] + 2 * Math.PI;
+                if (angs.length > 1) minGap = Math.min(minGap, next - angs[i]);
+            }
+            const need = angs.length > 1 ? opt.starSpacing / Math.max(minGap, 1e-9) : 0;
+            radius[d] = Math.max(radius[d - 1] + opt.starLevelGap, need);
+        }
+        let maxR = 0;
+        for (const v of order) {
+            const r = radius[depth[v]];
+            x[v] = r * Math.cos(angle[v]);
+            y[v] = r * Math.sin(angle[v]);
+            maxR = Math.max(maxR, r);
+        }
+        return { r: maxR + opt.componentGap / 2, x: 0, y: 0, members };
     }
 
     // --- pack components ----------------------------------------------------------
@@ -439,7 +737,7 @@ export function structuredLayout(
         x[i] += dx;
         y[i] += dy;
     }
-    return { x, y, region: regionOf };
+    return { x, y, region: regionOf, nonTreeEdges };
 }
 
 /**

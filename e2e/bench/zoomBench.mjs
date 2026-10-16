@@ -41,10 +41,11 @@ function quality(snap) {
   segs.forEach((g, i) => {
     const x0 = Math.floor(Math.min(g.x1, g.x2) / bucket), x1 = Math.floor(Math.max(g.x1, g.x2) / bucket);
     const y0 = Math.floor(Math.min(g.y1, g.y2) / bucket), y1 = Math.floor(Math.max(g.y1, g.y2) / bucket);
+    g.cx0 = x0; g.cy0 = y0;
     if ((x1 - x0 + 1) * (y1 - y0 + 1) > 400) { longSegs.push(i); return; } // long edge: checked against all edges below // absurdly long edge: skip bucketing cost
     for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
       const k = `${x}:${y}`;
-      (sg.get(k) ?? sg.set(k, []).get(k)).push(i);
+      (sg.get(k) ?? sg.set(k, Object.assign([], { cx: x, cy: y })).get(k)).push(i);
     }
   });
   const orient = (ax, ay, bx, by, cx, cy) => Math.sign((bx - ax) * (cy - ay) - (by - ay) * (cx - ax));
@@ -53,10 +54,8 @@ function quality(snap) {
   for (const ids of sg.values()) {
     for (let a = 0; a < ids.length; a++) for (let b = a + 1; b < ids.length; b++) {
       const i = Math.min(ids[a], ids[b]), j = Math.max(ids[a], ids[b]);
-      const key = i * 1e6 + j;
-      if (seen.has(key)) continue;
-      seen.add(key);
       const p = segs[i], q = segs[j];
+      if (Math.max(p.cx0, q.cx0) !== ids.cx || Math.max(p.cy0, q.cy0) !== ids.cy) continue; // count each pair once: in its first shared cell
       if (p.s === q.s || p.s === q.t || p.t === q.s || p.t === q.t) continue;
       const o1 = orient(p.x1, p.y1, p.x2, p.y2, q.x1, q.y1), o2 = orient(p.x1, p.y1, p.x2, p.y2, q.x2, q.y2);
       const o3 = orient(q.x1, q.y1, q.x2, q.y2, p.x1, p.y1), o4 = orient(q.x1, q.y1, q.x2, q.y2, p.x2, p.y2);

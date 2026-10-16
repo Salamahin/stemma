@@ -69,6 +69,15 @@ export type LayoutNode = {
  * resetting them would drop the spring tension that balances repulsion and
  * the graph would grow a little on every refine.
  */
+/**
+ * Real people and families collide (radius 20 / 10 via `r`), so the refine
+ * cannot pile nodes on top of each other. Nodes that already carry an `r`
+ * (ghost-burst copies) keep theirs.
+ */
+export function giveCollisionRadius(nodes: LayoutNode[]) {
+    for (const d of nodes) if (d.r == null) d.r = d.id.startsWith("family_") ? 0.5 : 1;
+}
+
 export function anchorWhereMissing(nodes: LayoutNode[]) {
     for (const d of nodes) {
         if (d.ax == null || !Number.isFinite(d.ax)) d.ax = d.x;
