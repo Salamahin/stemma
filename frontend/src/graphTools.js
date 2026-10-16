@@ -95,6 +95,8 @@ export const LAYOUT_ALPHA_DECAY = 1 - Math.pow(0.001, 1 / LAYOUT_TICKS);
 export const LAYOUT_THETA = 1.2;
 /** Reheat for data changes / leaving edit mode: a gentle refine, not a full relayout. */
 export const LAYOUT_REHEAT_ALPHA = 0.3;
+/** Start alpha when every node has a remembered position: a short, gentle refine. */
+export const LAYOUT_REFINE_ALPHA = 0.02;
 /** Main-thread time per animation frame the layout may spend on extra ticks. */
 const BURST_BUDGET_MS = 8;
 

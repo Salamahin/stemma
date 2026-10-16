@@ -1,5 +1,5 @@
 import * as d3 from "d3";
-import { forceCollideSized, configureSimulation, updateSimulation, LAYOUT_TICKS, makeNodesAndRelations } from "./graphTools";
+import { forceCollideSized, configureSimulation, updateSimulation, LAYOUT_TICKS, LAYOUT_REFINE_ALPHA, makeNodesAndRelations } from "./graphTools";
 
 function syntheticGraph(target: number) {
     let s = 7;
@@ -54,6 +54,27 @@ describe("layout simulation settles", () => {
         sim.stop();
         expect(sim.alphaTarget()).toBe(0);
         expect(sim.alpha()).toBeGreaterThan(0);
+    });
+
+    test("a refine from a remembered layout is short and barely moves settled nodes", () => {
+        const { nodes, links } = syntheticGraph(120);
+        const sim = configureSimulation(nodes, links, 1000, 800);
+        sim.stop();
+        while (sim.alpha() >= sim.alphaMin()) sim.tick();
+        const before = nodes.map((n: any) => [n.x, n.y]);
+        nodes.forEach((n: any) => {
+            n.vx = 0;
+            n.vy = 0;
+        });
+        sim.alpha(LAYOUT_REFINE_ALPHA);
+        let ticks = 0;
+        while (sim.alpha() >= sim.alphaMin()) {
+            sim.tick();
+            ticks++;
+        }
+        expect(ticks).toBeLessThan(LAYOUT_TICKS * 0.7);
+        const moved = nodes.map((n: any, i: number) => Math.hypot(n.x - before[i][0], n.y - before[i][1])).sort((a: number, b: number) => a - b);
+        expect(moved[Math.floor(moved.length / 2)]).toBeLessThan(20);
     });
 
     test("burst runs extra ticks inside one timer tick when allowed", () => {

@@ -16,8 +16,9 @@
         updateSimulation,
         denormalizeId,
         LAYOUT_REHEAT_ALPHA,
+        LAYOUT_REFINE_ALPHA,
     } from "../graphTools";
-    import { computeInitialLayout } from "../initialLayout";
+    import { computeInitialLayout, seedFromKnown } from "../initialLayout";
     import { NodeLayoutCache } from "../nodeLayoutCache";
     import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
     import { exportChartSvg } from "../svgExport";
@@ -92,7 +93,7 @@
             if (layoutCacheStemmaId !== currentStemmaId) {
                 if (layoutCache) layoutCache.save();
                 layoutCache = new NodeLayoutCache(currentStemmaId);
-                layoutCache.load();
+                layoutCache.load([window.innerWidth / 2, window.innerHeight / 2]);
                 layoutCacheStemmaId = currentStemmaId;
             }
             setActiveLayoutCache(layoutCache);
@@ -290,20 +291,51 @@
         chart.updateClans();
     }
 
-    function reconfigureGraph(chart: CanvasChart, nodes: any[], relations: any[], initialPositions: any, clans: any[]) {
-        const fullyCached =
-            !!layoutCache && nodes.length > 0 && layoutCache.coverage(nodes.map((n) => n.id)) === 1;
+    /**
+     * Below this share of nodes with a remembered position the stored layout
+     * is not worth keeping: lay the stemma out from scratch instead.
+     */
+    const WARM_START_MIN_KNOWN = 0.5;
 
+    function reconfigureGraph(chart: CanvasChart, nodes: any[], relations: any[], initialPositions: any, clans: any[]) {
         assignInitialPositions(nodes, window.innerWidth, window.innerHeight, initialPositions, pinnedPeople);
+
+        // Reopened / edited stemma: nodes with a remembered position (pin,
+        // stored layout, this session) keep it; new ones start next to their
+        // relatives instead of on the generational grid, whose coordinates
+        // have nothing to do with the remembered layout.
+        const known = new Map<string, [number, number]>();
+        for (const n of nodes) if (n.hadKnownPosition) known.set(n.id, [n.x, n.y]);
+        const knownFrac = nodes.length ? known.size / nodes.length : 0;
+        const warm = knownFrac >= WARM_START_MIN_KNOWN;
+        if (warm && known.size < nodes.length) {
+            const seeds = seedFromKnown(nodes, relations, known, initialPositions);
+            for (const n of nodes) {
+                const p = seeds.get(n.id);
+                if (p && !n.hadKnownPosition) [n.x, n.y] = p;
+            }
+        }
+        if (warm) {
+            for (const n of nodes) {
+                n.vx = 0;
+                n.vy = 0;
+            }
+        }
+        layoutCache?.retain(nodes.map((n) => n.id));
 
         if (!simulation) simulation = configureSimulation(nodes, relations, window.innerWidth, window.innerHeight, onSimTick, onSimEnd, () => simulationActive && !isDragging);
         else updateSimulation(simulation, nodes, relations);
+        // Everything remembered: only a gentle refine. Mostly remembered: heat
+        // proportional to the share of newcomers (they are already seeded next
+        // to their relatives), so a few additions do not reshuffle the graph.
+        // Otherwise: a full layout.
+        simulation.alpha(warm ? Math.min(LAYOUT_REHEAT_ALPHA, LAYOUT_REFINE_ALPHA + (1 - knownFrac)) : 1);
 
         chart.setData(nodes, relations);
         chart.setClans(clans);
         applyStyle();
+        if (knownFrac === 1) chart.layoutLabels();
 
-        if (fullyCached) simulation.alphaTarget(0).alpha(0);
         if (!simulationActive) {
             // Sim inactive (edit mode): pin every node that already had a known
             // position so the 80-tick settle only lays out genuinely new nodes,
@@ -318,7 +350,6 @@
             applyManualPositions();
             simulation.alphaTarget(0).stop();
         }
-        if (fullyCached) chart.layoutLabels();
     }
 
     function setupInteractions(c: CanvasChart) {

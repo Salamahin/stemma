@@ -13,6 +13,9 @@
 //   settleMs      time origin → layout end (null if it never ended in 30 s)
 //   loadBusyPct   main-thread busy % from navigation until settle (or 30 s)
 //   idle          busy % / fps over 3 s after settle (idle CPU)
+//   moved         how far nodes travel between first data on screen and settle
+//                 (median / p95 world units; small = the remembered layout held)
+// A third load reopens the stemma with 5% more people ("warmChanged").
 // plus hover cost in view mode.
 import { chromium } from "@playwright/test";
 import { syntheticStemma } from "./syntheticStemma.mjs";
@@ -64,6 +67,11 @@ async function load(page, cdp, people, reload) {
   if (reload) await page.reload();
   else await page.goto(BASE);
   await page.waitForFunction(`(${PERSON_COUNT_SRC})() === ${people}`, null, { timeout: 120000 });
+  const positions = () => page.evaluate(() => {
+    const api = window.__stemmaChart;
+    return api ? Object.fromEntries(api.snapshot().nodes.map((x) => [x.id, [x.x, x.y]])) : {};
+  });
+  const p0 = await positions();
   const deadline = Date.now() + SETTLE_TIMEOUT_MS;
   let layout = null;
   while (Date.now() < deadline) {
@@ -77,6 +85,8 @@ async function load(page, cdp, people, reload) {
     await page.waitForTimeout(100);
   }
   const m1 = await metrics(cdp);
+  const p1 = await positions();
+  const moved = Object.keys(p0).filter((k) => p1[k]).map((k) => Math.hypot(p0[k][0] - p1[k][0], p0[k][1] - p1[k][1])).sort((a, b) => a - b);
   const settled = layout && !layout.unsettled;
   const windowSec = (Date.now() - w0) / 1000;
   return {
@@ -84,6 +94,13 @@ async function load(page, cdp, people, reload) {
     settleMs: settled ? Math.round(layout.lastEndAt) : null,
     layoutTicks: layout?.ticks ?? null,
     loadBusyPct: busy(m0, m1, windowSec).busyPct,
+    moved: moved.length ? { median: Math.round(moved[moved.length >> 1]), p95: Math.round(moved[Math.floor(moved.length * 0.95)]) } : null,
+    personOverlaps: (() => {
+      const ps = Object.entries(p1).filter(([k]) => k.startsWith("person_")).map(([, v]) => v);
+      let c = 0;
+      for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) if (Math.hypot(ps[i][0] - ps[j][0], ps[i][1] - ps[j][1]) < 40) c++;
+      return c;
+    })(),
   };
 }
 
@@ -116,7 +133,7 @@ async function hover(page) {
 }
 
 async function runOne(browser, n) {
-  const stemma = syntheticStemma(n);
+  let stemma = syntheticStemma(n);
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   await context.route("https://accounts.google.com/**", (r) => r.fulfill({ status: 200, body: "", contentType: "text/javascript" }));
   await context.route("http://bench.invalid/**", async (route) => {
@@ -156,6 +173,10 @@ async function runOne(browser, n) {
   await page.waitForTimeout(1500); // let the debounced layout-cache save land
   out.warm = await load(page, cdp, stemma.people.length, true);
   out.warm.idle = await busyWindow(page, cdp, 3000);
+  await page.waitForTimeout(1500);
+  stemma = syntheticStemma(Math.round(n * 1.05));
+  out.warmChanged = await load(page, cdp, stemma.people.length, true);
+  out.warmChanged.idle = await busyWindow(page, cdp, 3000);
 
   await context.close();
   return out;
