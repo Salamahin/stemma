@@ -23,8 +23,8 @@ USER_EMAIL = "alice@example.com"
 
 
 @pytest.fixture
-def client(storage: StorageService, users: UserService, dynamo_table) -> TestClient:
-    handler = RequestHandler(storage, users)
+def client(storage: StorageService, users: UserService, dynamo_table, photo_store) -> TestClient:
+    handler = RequestHandler(storage, users, photo_store=photo_store)
     auth = AuthService(verifier=AllowAnyTokenVerifier(), users=users, sessions=SessionRepo(dynamo_table))
     app = build_mcp_app(
         handler,
@@ -258,3 +258,91 @@ def test_mcp_calls_are_logged_with_user_email_and_tool(
         if r.name == "stemma.usage"
     ]
     assert usage == [("mcp", USER_EMAIL, "tools/list"), ("mcp", USER_EMAIL, "list_stemmas")]
+
+
+def _caller(client: TestClient):
+    import json
+
+    verifier, challenge = _pkce()
+    token = _obtain_token(client, verifier=verifier, challenge=challenge)
+
+    def call(name: str, args: dict) -> dict:
+        reply = _rpc(client, token, "tools/call", {"name": name, "arguments": args})
+        result = reply["result"]
+        assert not result.get("isError"), result["content"][0]["text"]
+        return json.loads(result["content"][0]["text"])
+
+    return call
+
+
+def test_alt_names_and_partial_dates_round_trip_over_mcp(client: TestClient) -> None:
+    call = _caller(client)
+    sid = call("create_stemma", {"name": "Names"})["id"]
+    call(
+        "create_person",
+        {
+            "stemma_id": sid,
+            "name": "Голощапова Василиса Андреевна",
+            "birth_date": "~1891",
+            "alt_names": [{"name": "Рехлова", "kind": "maiden"}],
+        },
+    )
+    [found] = call("search_people", {"stemma_id": sid, "query": "Рехлова"})["people"]
+    assert found["altNames"] == ["Рехлова"]
+    assert found["birthDate"] == "~1891"
+
+    person = call("get_person", {"stemma_id": sid, "person_id": found["id"]})["person"]
+    assert [(a["name"], a["kind"]) for a in person["altNames"]] == [("Рехлова", "maiden")]
+
+    call(
+        "update_person",
+        {
+            "stemma_id": sid,
+            "person_id": found["id"],
+            "name": "Голощапова Василиса Андреевна",
+            "birth_date": "1891",
+            "death_date": "1964",
+            "alt_names": [{"name": "Рехлова", "kind": "maiden"}, {"name": "Голощапова Василиса", "kind": "variant"}],
+        },
+    )
+    person = call("get_person", {"stemma_id": sid, "person_id": found["id"]})["person"]
+    assert [a["name"] for a in person["altNames"]] == ["Рехлова", "Голощапова Василиса"]
+    assert (person["birthDate"], person["deathDate"]) == ("1891", "1964")
+
+
+def test_files_are_uploaded_attached_and_removed_over_mcp(client: TestClient, s3_client) -> None:
+    from tests.conftest import PHOTO_BUCKET
+
+    call = _caller(client)
+    sid = call("create_stemma", {"name": "Files"})["id"]
+    call("create_person", {"stemma_id": sid, "name": "Арсений"})
+    [arseniy] = call("search_people", {"stemma_id": sid, "query": "Арсений"})["people"]
+
+    upload = call(
+        "request_attachment_upload",
+        {"stemma_id": sid, "owner_kind": "person", "owner_id": arseniy["id"], "content_type": "image/jpeg"},
+    )
+    assert upload["type"] == "AttachmentUpload"
+    assert upload["upload_url"].startswith("https://") and upload["upload_fields"]
+    assert "curl" in upload["how_to_upload"]
+    s3_client.put_object(Bucket=PHOTO_BUCKET, Key=upload["file_key"], Body=b"\xff\xd8\xff")
+
+    attached = call(
+        "attach_file",
+        {
+            "stemma_id": sid,
+            "owner_kind": "person",
+            "owner_id": arseniy["id"],
+            "title": "Рождение 1900, ЦГИА СПб ф.19 оп.127 д.1009",
+            "file_key": upload["file_key"],
+            "content_type": "image/jpeg",
+        },
+    )
+    [att] = attached["attachments"]
+    assert att["kind"] == "file" and att["url"].startswith("https://")
+
+    listed = call("get_person", {"stemma_id": sid, "person_id": arseniy["id"]})["attachments"]
+    assert [a["id"] for a in listed] == [att["id"]]
+
+    removed = call("remove_attachment", {"stemma_id": sid, "attachment_id": att["id"]})
+    assert removed["attachments"] == []

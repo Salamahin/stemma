@@ -106,6 +106,37 @@ def _get_person(args: dict, response: dict) -> dict:
     }
 
 
+_OWNER_PROPS: dict = {
+    "stemma_id": {"type": "string", "description": "Id of the stemma"},
+    "owner_kind": {"type": "string", "enum": ["person", "family"]},
+    "owner_id": {"type": "string", "description": "Id of the person or family"},
+}
+
+
+def _upload_instructions(_args: dict, response: dict) -> dict:
+    fields = response.get("uploadFields", {})
+    form = " ".join(f"-F '{k}={v}'" for k, v in fields.items())
+    return {
+        "type": "AttachmentUpload",
+        "upload_url": response.get("uploadUrl"),
+        "upload_fields": fields,
+        "file_key": response.get("fileKey"),
+        "expires_in_seconds": response.get("expiresInSeconds"),
+        "how_to_upload": f"curl -sf {form} -F 'file=@<path to the file>' '{response.get('uploadUrl')}'"
+        " — the file field must come last; then call attach_file with file_key.",
+    }
+
+
+def _remaining_attachments(_args: dict, response: dict) -> dict:
+    return {
+        "type": "Attachments",
+        "attachments": [
+            {k: a.get(k) for k in ("id", "ownerKind", "ownerId", "kind", "title", "url", "note")}
+            for a in response.get("attachments", [])
+        ],
+    }
+
+
 def _attachments_of_owner(args: dict, response: dict) -> dict:
     """Answer an attachment change with the owner's attachments, not the whole stemma."""
     return {
@@ -336,7 +367,8 @@ def tool_specs() -> tuple[ToolSpec, ...]:
         ),
         ToolSpec(
             name="create_person",
-            description="Add a new unattached person to a stemma.",
+            description="Add a new unattached person to a stemma. Dates may be partial (1899, 1899-03, "
+            "~1820); record maiden/married/variant names in alt_names.",
             input_schema=_person_write_schema({"stemma_id": {"type": "string", "description": "Id of the stemma"}}),
             to_payload=lambda args: {
                 "type": "CreateOrphanPersonRequest",
@@ -346,7 +378,9 @@ def tool_specs() -> tuple[ToolSpec, ...]:
         ),
         ToolSpec(
             name="update_person",
-            description="Overwrite a person's name and optional birth/death/bio fields.",
+            description="Overwrite a person's name, dates, bio and alt_names. This replaces the whole "
+            "record: a field you leave out is cleared, so pass the current bio and alt_names (from "
+            "get_person) to keep them. The photo and attachments are not affected.",
             input_schema=_person_write_schema(
                 {
                     "stemma_id": {"type": "string", "description": "Id of the stemma"},
@@ -387,6 +421,75 @@ def tool_specs() -> tuple[ToolSpec, ...]:
                 "note": args.get("note"),
             },
             transform_response=_attachments_of_owner,
+        ),
+        ToolSpec(
+            name="request_attachment_upload",
+            description="Step 1 of attaching a file (scan, photo, PDF) to a person or family: returns a "
+            "presigned S3 POST (upload_url + upload_fields, valid 5 minutes) and a file_key. Upload the "
+            "file there yourself (see how_to_upload), then call attach_file with the file_key. "
+            "Allowed: image/jpeg, image/png, image/webp, image/gif, application/pdf; up to 20 MB.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    **_OWNER_PROPS,
+                    "content_type": {
+                        "type": "string",
+                        "enum": ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"],
+                    },
+                },
+                "required": ["stemma_id", "owner_kind", "owner_id", "content_type"],
+                "additionalProperties": False,
+            },
+            to_payload=lambda args: {
+                "type": "RequestAttachmentUploadUrlRequest",
+                "stemma_id": args["stemma_id"],
+                "owner_kind": args["owner_kind"],
+                "owner_id": args["owner_id"],
+                "content_type": args["content_type"],
+            },
+            transform_response=_upload_instructions,
+        ),
+        ToolSpec(
+            name="attach_file",
+            description="Step 2 of attaching a file: after uploading to the URL from "
+            "request_attachment_upload, attach that file_key to the person or family with a title.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    **_OWNER_PROPS,
+                    "title": {"type": "string", "description": "Short title, e.g. 'Рождение 1900, ЦГИА СПб ф.19 оп.127 д.1009'"},
+                    "file_key": {"type": "string", "description": "file_key from request_attachment_upload"},
+                    "content_type": {"type": "string", "description": "Same content type as requested for the upload"},
+                    "note": {"type": "string", "description": "Optional note"},
+                },
+                "required": ["stemma_id", "owner_kind", "owner_id", "title", "file_key", "content_type"],
+                "additionalProperties": False,
+            },
+            to_payload=lambda args: {
+                "type": "AddFileAttachmentRequest",
+                "stemma_id": args["stemma_id"],
+                "owner_kind": args["owner_kind"],
+                "owner_id": args["owner_id"],
+                "title": args["title"],
+                "file_key": args["file_key"],
+                "content_type": args["content_type"],
+                "note": args.get("note"),
+            },
+            transform_response=_attachments_of_owner,
+        ),
+        ToolSpec(
+            name="remove_attachment",
+            description="Remove a link or file attached to a person or family (the file is deleted).",
+            input_schema=_string_schema(
+                {"stemma_id": "Id of the stemma", "attachment_id": "Id from get_person attachments"},
+                ["stemma_id", "attachment_id"],
+            ),
+            to_payload=lambda args: {
+                "type": "RemoveAttachmentRequest",
+                "stemma_id": args["stemma_id"],
+                "attachment_id": args["attachment_id"],
+            },
+            transform_response=_remaining_attachments,
         ),
         ToolSpec(
             name="delete_person",
