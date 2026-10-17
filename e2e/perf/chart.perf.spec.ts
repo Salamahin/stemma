@@ -7,10 +7,12 @@ import { mockBackend } from "../bench/stemmaSource.mjs";
 // (headless Chrome, software rendering) with headroom; a regression past them
 // fails CI. Draw times come from the renderer's own timing, so they don't
 // depend on how fast the runner happens to paint.
+// First CI run (ubuntu-24.04): avg draw 0.27 / 0.35 / 0.82 ms, slowest 0.7 / 1 / 2.4 ms,
+// hover 0.6 / 0.4 / 1.1 ms for 200 / 750 / 3000 people — budgets are ~5x that.
 const BUDGETS: Record<number, { panDrawAvgMs: number; panDrawMaxMs: number; hoverMedianMs: number }> = {
-  200: { panDrawAvgMs: 4, panDrawMaxMs: 25, hoverMedianMs: 4 },
-  750: { panDrawAvgMs: 8, panDrawMaxMs: 40, hoverMedianMs: 6 },
-  3000: { panDrawAvgMs: 16, panDrawMaxMs: 80, hoverMedianMs: 12 },
+  200: { panDrawAvgMs: 1.5, panDrawMaxMs: 8, hoverMedianMs: 3 },
+  750: { panDrawAvgMs: 2, panDrawMaxMs: 10, hoverMedianMs: 3 },
+  3000: { panDrawAvgMs: 4, panDrawMaxMs: 15, hoverMedianMs: 6 },
 };
 const IDLE_MAX_FRAMES = 1; // a settled chart draws nothing
 const IDLE_MAX_BUSY_PCT = 5;
