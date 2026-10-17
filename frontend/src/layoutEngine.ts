@@ -8,7 +8,7 @@
  * writes positions into them as the layout progresses, except for nodes the
  * main thread holds fixed (fx/fy), which stay main-thread authoritative.
  */
-import { anchorWhereMissing, giveCollisionRadius, createLayoutSimulation, LayoutLoop, type LayoutNode, type Scheduler } from "./layoutCore";
+import { anchorWhereMissing, giveCollisionRadius, createLayoutSimulation, LayoutLoop, LAYOUT_SETTLE_MS, type LayoutNode, type Scheduler } from "./layoutCore";
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from "./layoutProtocol";
 import { applyStructuredSeed, clanRegions, SEED_USES_CLAN_REGIONS } from "./structuredLayout";
 
@@ -72,7 +72,7 @@ export class InlineLayoutEngine implements LayoutEngine {
         giveCollisionRadius(nodes);
         if (!this.sim) {
             this.sim = createLayoutSimulation(nodes, links as any, this.center[0] * 2, this.center[1] * 2);
-            this.loop = new LayoutLoop(this.sim, this.scheduler, INLINE_BUDGET_MS, (t) => this.cb.onTick(t), () => this.cb.onEnd());
+            this.loop = new LayoutLoop(this.sim, this.scheduler, INLINE_BUDGET_MS, (t) => this.cb.onTick(t), () => this.cb.onEnd(), LAYOUT_SETTLE_MS);
         } else {
             this.sim.nodes(nodes as any);
             (this.sim.force("link") as any).links(links);
