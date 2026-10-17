@@ -1,10 +1,19 @@
 import logging
+import uuid
 from collections.abc import Iterable
+from urllib.parse import urlparse
 
 from botocore.exceptions import ClientError
 
-from stemma.domain.errors import AccessToPersonDenied, AccessToStemmaDenied, ForeignInviteToken
+from stemma.domain.errors import (
+    AccessToPersonDenied,
+    AccessToStemmaDenied,
+    ForeignInviteToken,
+    InvalidAttachment,
+)
 from stemma.domain.requests import (
+    AddFileAttachmentRequest,
+    AddLinkAttachmentRequest,
     AuthLoginRequest,
     AuthLogoutRequest,
     BearInvitationRequest,
@@ -20,7 +29,9 @@ from stemma.domain.requests import (
     LinkPersonsRequest,
     ListDescribeStemmasRequest,
     RenameStemmaRequest,
+    RemoveAttachmentRequest,
     Request,
+    RequestAttachmentUploadUrlRequest,
     RequestPhotoUploadUrlRequest,
     SetFavouriteStemmaRequest,
     SetPersonPhotoRequest,
@@ -28,6 +39,7 @@ from stemma.domain.requests import (
     UpdatePersonRequest,
 )
 from stemma.domain.responses import (
+    AttachmentUploadUrl,
     CloneResult,
     FavouriteStemma,
     InviteToken,
@@ -41,9 +53,11 @@ from stemma.domain.responses import (
 from stemma.domain.user import User
 from stemma.seed.kings_of_europe import load_kings_of_europe
 from stemma.services.photo_service import (
+    ALLOWED_ATTACHMENT_CONTENT_TYPES,
     PUT_URL_EXPIRES_SECONDS,
     PhotoStore,
     belongs_to_stemma,
+    is_attachment_key_of,
 )
 from stemma.services.user_service import UserService
 from stemma.storage.storage_service import StorageService
@@ -100,6 +114,14 @@ class RequestHandler:
                 return self._request_photo_upload_url(user, request)
             case SetPersonPhotoRequest():
                 return self._set_person_photo(user, request)
+            case AddLinkAttachmentRequest():
+                return self._add_link_attachment(user, request)
+            case RequestAttachmentUploadUrlRequest():
+                return self._request_attachment_upload_url(user, request)
+            case AddFileAttachmentRequest():
+                return self._add_file_attachment(user, request)
+            case RemoveAttachmentRequest():
+                return self._remove_attachment(user, request)
             case AuthLoginRequest() | AuthLogoutRequest():
                 raise RuntimeError("auth requests must be handled at the transport layer")
 
@@ -202,7 +224,8 @@ class RequestHandler:
         return stemma
 
     def _delete_family(self, user: User, request: DeleteFamilyRequest) -> Stemma:
-        self._storage.remove_family(user.user_id, request.stemma_id, request.family_id)
+        removed_files = self._storage.remove_family(user.user_id, request.stemma_id, request.family_id)
+        self._forget_photos(request.stemma_id, removed_files)
         return self._storage.stemma(user.user_id, request.stemma_id)
 
     def _update_family(self, user: User, request: UpdateFamilyRequest) -> Stemma:
@@ -254,6 +277,59 @@ class RequestHandler:
             self._forget_photos(request.stemma_id, [previous_key])
         return self._storage.stemma(user.user_id, request.stemma_id)
 
+    def _add_link_attachment(self, user: User, request: AddLinkAttachmentRequest) -> Stemma:
+        url = request.url.strip()
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise InvalidAttachment(reason="only http(s) links can be attached")
+        return self._storage.add_attachment(
+            user.user_id,
+            request.stemma_id,
+            request.owner_kind,
+            request.owner_id,
+            title=_attachment_title(request.title, url),
+            url=url,
+            note=_blank_to_none(request.note),
+        )
+
+    def _request_attachment_upload_url(
+        self, user: User, request: RequestAttachmentUploadUrlRequest
+    ) -> AttachmentUploadUrl:
+        if self._photo_store is None:
+            raise RuntimeError("photo_store not configured")
+        self._storage.require_attachment_owner_access(
+            user.user_id, request.stemma_id, request.owner_kind, request.owner_id
+        )
+        url, fields, key = self._photo_store.issue_attachment_upload_url(
+            request.stemma_id, uuid.uuid4().hex, request.content_type
+        )
+        return AttachmentUploadUrl(
+            upload_url=url, upload_fields=fields, file_key=key, expires_in_seconds=PUT_URL_EXPIRES_SECONDS
+        )
+
+    def _add_file_attachment(self, user: User, request: AddFileAttachmentRequest) -> Stemma:
+        # Only keys this stemma issued: anything else could point at another stemma's files.
+        if not is_attachment_key_of(request.stemma_id, request.file_key):
+            raise InvalidAttachment(reason="the file does not belong to this stemma")
+        if request.content_type not in ALLOWED_ATTACHMENT_CONTENT_TYPES:
+            raise InvalidAttachment(reason=f"unsupported file type {request.content_type}")
+        return self._storage.add_attachment(
+            user.user_id,
+            request.stemma_id,
+            request.owner_kind,
+            request.owner_id,
+            title=_attachment_title(request.title, request.file_key.rsplit("/", 1)[-1]),
+            file_key=request.file_key,
+            content_type=request.content_type,
+            note=_blank_to_none(request.note),
+        )
+
+    def _remove_attachment(self, user: User, request: RemoveAttachmentRequest) -> Stemma:
+        stemma, file_key = self._storage.remove_attachment(user.user_id, request.stemma_id, request.attachment_id)
+        if file_key is not None:
+            self._forget_photos(request.stemma_id, [file_key])
+        return stemma
+
     def _forget_photos(self, stemma_id: str, keys: Iterable[str]) -> None:
         """Drop the S3 objects behind photos this stemma no longer references.
         Keys under another stemma's prefix belong to a clone made before photos
@@ -267,6 +343,14 @@ class RequestHandler:
             self._photo_store.delete(owned)
         except ClientError:
             logger.warning("could not delete photos %s of stemma %s", owned, stemma_id)
+
+
+def _blank_to_none(value: str | None) -> str | None:
+    return value.strip() or None if value is not None else None
+
+
+def _attachment_title(title: str, fallback: str) -> str:
+    return title.strip() or fallback
 
 
 def _order_with_preferred_first(

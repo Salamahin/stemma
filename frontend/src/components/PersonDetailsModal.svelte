@@ -47,6 +47,8 @@
     import { isUnknownPerson, personDisplayName } from "../personDisplayName";
     import type { AltName, AltNameKind, CreateNewPerson } from "../model";
     import Modal from "./Modal.svelte";
+    import Attachments from "./Attachments.svelte";
+    import type { Attachment } from "../model";
 
     export type CreatePersonPayload = {
         description: CreateNewPerson;
@@ -59,6 +61,10 @@
         onpersonUpdated?: (payload: UpdatePerson) => void;
         onpersonRemoveRequested?: (payload: { id: string; name: string }) => void;
         onshareAccessRequested?: (payload: { personId: string; name: string }) => void;
+        attachmentsOf?: (personId: string) => Attachment[];
+        onattachLink?: (payload: { personId: string; title: string; url: string; note: string }) => Promise<unknown> | void;
+        onattachFile?: (payload: { personId: string; file: File; title: string }) => Promise<unknown> | void;
+        onremoveAttachment?: (id: string) => void;
     };
 
     let {
@@ -66,6 +72,10 @@
         onpersonUpdated,
         onpersonRemoveRequested,
         onshareAccessRequested,
+        attachmentsOf,
+        onattachLink,
+        onattachFile,
+        onremoveAttachment,
     }: Props = $props();
 
     let open = $state(false);
@@ -659,6 +669,15 @@
                         <div class="bio-preview">{@html bioHtml}</div>
                     {:else}
                         <div class="bio-preview text-muted fst-italic">{$t("person.bioEmpty")}</div>
+                    {/if}
+                    {#if !isCreate && id}
+                        <Attachments
+                            attachments={attachmentsOf?.(id) ?? []}
+                            editable={editingAllowed}
+                            onaddLink={(p) => onattachLink?.({ personId: id, ...p })}
+                            onaddFile={(p) => onattachFile?.({ personId: id, ...p })}
+                            onremove={(aid) => onremoveAttachment?.(aid)}
+                        />
                     {/if}
                 </div>
 

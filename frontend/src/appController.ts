@@ -1,6 +1,6 @@
 import { HighlightLineages } from './highlight';
 import { Model } from './model';
-import type { AltName, CreateNewPerson, LinkRole, PersonDefinition, Stemma, StemmaDescription } from './model';
+import type { AltName, AttachmentOwnerKind, CreateNewPerson, LinkRole, PersonDefinition, Stemma, StemmaDescription } from './model';
 import { PinnedPeopleStorage } from './pinnedPeopleStorage';
 import { StemmaIndex } from './stemmaIndex';
 import { writable, get } from 'svelte/store';
@@ -229,6 +229,26 @@ export class AppController {
 
     removeFamily(familyId: string, options?: MutationOptions) {
         return this.manipulateStemma((model, stemmaId) => model.removeFamily(stemmaId, familyId), options)
+    }
+
+    attachLink(ownerKind: AttachmentOwnerKind, ownerId: string, title: string, url: string, note: string) {
+        return this.manipulateStemma(
+            (model, stemmaId) => model.addLinkAttachment(stemmaId, ownerKind, ownerId, title.trim(), url.trim(), note.trim() || null),
+            { silent: true },
+        )
+    }
+
+    /** Uploads the file straight to S3 with a presigned POST, then attaches it. */
+    attachFile(ownerKind: AttachmentOwnerKind, ownerId: string, file: File, title: string) {
+        return this.manipulateStemma(async (model, stemmaId) => {
+            const upload = await model.requestAttachmentUploadUrl(stemmaId, ownerKind, ownerId, file.type)
+            await model.uploadPhotoToPresignedUrl(upload.uploadUrl, upload.uploadFields, file)
+            return model.addFileAttachment(stemmaId, ownerKind, ownerId, title.trim() || file.name, upload.fileKey, file.type)
+        }, { silent: true })
+    }
+
+    removeAttachment(attachmentId: string) {
+        return this.manipulateStemma((model, stemmaId) => model.removeAttachment(stemmaId, attachmentId), { silent: true })
     }
 
     savePerson(personId: string, descr: CreateNewPerson, pin: boolean, photoUpload: Blob | null, photoRemove: boolean) {

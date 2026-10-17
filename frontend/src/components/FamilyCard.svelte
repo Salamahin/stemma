@@ -3,6 +3,8 @@
     import type { StemmaIndex } from "../stemmaIndex";
     import { t } from "../i18n";
     import { personDisplayName } from "../personDisplayName";
+    import Attachments from "./Attachments.svelte";
+    import type { Attachment } from "../model";
 
     type Props = {
         stemmaIndex: StemmaIndex | null;
@@ -10,6 +12,10 @@
         familyId: string | null;
         onfamilyRemoveRequested?: (familyId: string) => void;
         onclose?: () => void;
+        attachments?: Attachment[];
+        onattachLink?: (payload: { familyId: string; title: string; url: string; note: string }) => Promise<unknown> | void;
+        onattachFile?: (payload: { familyId: string; file: File; title: string }) => Promise<unknown> | void;
+        onremoveAttachment?: (id: string) => void;
     };
 
     let {
@@ -18,6 +24,10 @@
         familyId,
         onfamilyRemoveRequested,
         onclose,
+        attachments = [],
+        onattachLink,
+        onattachFile,
+        onremoveAttachment,
     }: Props = $props();
 
     const family = $derived.by<FamilyDescription | null>(() => {
@@ -82,6 +92,16 @@
     {/if}
     {#if !family || (family.parents.length === 0 && family.children.length === 0)}
         <p class="no-info">{$t("family.noInfo")}</p>
+    {/if}
+
+    {#if family && (attachments.length > 0 || (editMode && canRemoveFamily))}
+        <Attachments
+            {attachments}
+            editable={editMode && canRemoveFamily}
+            onaddLink={(p) => familyId && onattachLink?.({ familyId, ...p })}
+            onaddFile={(p) => familyId && onattachFile?.({ familyId, ...p })}
+            onremove={(id) => onremoveAttachment?.(id)}
+        />
     {/if}
 
     {#if editMode && canRemoveFamily}

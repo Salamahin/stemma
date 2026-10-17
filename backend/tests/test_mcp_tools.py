@@ -22,6 +22,22 @@ def test_search_clamps_a_nonsense_limit() -> None:
     assert len(_search_people({"query": "Иван", "limit": 999}, _response(5))["people"]) == 5
 
 
+def test_add_link_tool_builds_the_request_and_returns_only_the_owner_attachments() -> None:
+    from stemma.services.mcp_tools import tools_by_name
+
+    tool = tools_by_name()["add_link"]
+    args = {"stemma_id": "s", "owner_kind": "person", "owner_id": "p", "title": "ОБД", "url": "https://x"}
+    assert tool.to_payload(args)["type"] == "AddLinkAttachmentRequest"
+    response = {
+        "attachments": [
+            {"id": "1", "ownerKind": "person", "ownerId": "p", "kind": "link", "title": "ОБД", "url": "https://x"},
+            {"id": "2", "ownerKind": "person", "ownerId": "q", "kind": "link", "title": "other", "url": "https://y"},
+        ]
+    }
+    assert tool.transform_response is not None
+    assert [a["id"] for a in tool.transform_response(args, response)["attachments"]] == ["1"]
+
+
 def test_person_name_schema_tells_the_assistant_how_to_write_unknown_people() -> None:
     from stemma.services.mcp_tools import _person_write_schema
 

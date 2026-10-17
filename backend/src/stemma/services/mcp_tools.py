@@ -85,13 +85,38 @@ def _get_person(args: dict, response: dict) -> dict:
     def briefs(ids: list[str]) -> list[dict]:
         return [_brief(by_id[i]) for i in _dedup(ids) if i in by_id]
 
+    own_families = {
+        f["id"] for f in response.get("families", []) if person_id in f.get("parents", [])
+    }
+    attachments = [
+        {k: a.get(k) for k in ("id", "ownerKind", "ownerId", "kind", "title", "url", "note")}
+        for a in response.get("attachments", [])
+        if (a.get("ownerKind") == "person" and a.get("ownerId") == person_id)
+        or (a.get("ownerKind") == "family" and a.get("ownerId") in own_families)
+    ]
+
     return {
         "type": "Person",
         "person": person,
+        "attachments": attachments,
         "parents": briefs(parents),
         "spouses": briefs(spouses),
         "children": briefs(children),
         "siblings": briefs(siblings),
+    }
+
+
+def _attachments_of_owner(args: dict, response: dict) -> dict:
+    """Answer an attachment change with the owner's attachments, not the whole stemma."""
+    return {
+        "type": "Attachments",
+        "owner_kind": args["owner_kind"],
+        "owner_id": args["owner_id"],
+        "attachments": [
+            {k: a.get(k) for k in ("id", "kind", "title", "url", "note")}
+            for a in response.get("attachments", [])
+            if a.get("ownerKind") == args["owner_kind"] and a.get("ownerId") == args["owner_id"]
+        ],
     }
 
 
@@ -334,6 +359,34 @@ def tool_specs() -> tuple[ToolSpec, ...]:
                 "person_id": args["person_id"],
                 "person_descr": _person_descr(args),
             },
+        ),
+        ToolSpec(
+            name="add_link",
+            description="Attach a link (archive record, memorial page, scan on a website) to a person "
+            "or to a family (e.g. a marriage record). get_person lists a person's attachments.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "stemma_id": {"type": "string", "description": "Id of the stemma"},
+                    "owner_kind": {"type": "string", "enum": ["person", "family"]},
+                    "owner_id": {"type": "string", "description": "Id of the person or family"},
+                    "title": {"type": "string", "description": "Short title, e.g. 'ЦГИА СПб ф.19 оп.127 д.1009'"},
+                    "url": {"type": "string", "description": "http(s) URL"},
+                    "note": {"type": "string", "description": "Optional note"},
+                },
+                "required": ["stemma_id", "owner_kind", "owner_id", "title", "url"],
+                "additionalProperties": False,
+            },
+            to_payload=lambda args: {
+                "type": "AddLinkAttachmentRequest",
+                "stemma_id": args["stemma_id"],
+                "owner_kind": args["owner_kind"],
+                "owner_id": args["owner_id"],
+                "title": args["title"],
+                "url": args["url"],
+                "note": args.get("note"),
+            },
+            transform_response=_attachments_of_owner,
         ),
         ToolSpec(
             name="delete_person",

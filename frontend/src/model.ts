@@ -69,6 +69,10 @@ type Request =
     | SetPersonPhotoRequest
     | CreateOrphanPersonRequest
     | LinkPersonsRequest
+    | { type: "AddLinkAttachmentRequest", stemmaId: string, ownerKind: AttachmentOwnerKind, ownerId: string, title: string, url: string, note: string | null }
+    | { type: "RequestAttachmentUploadUrlRequest", stemmaId: string, ownerKind: AttachmentOwnerKind, ownerId: string, contentType: string }
+    | { type: "AddFileAttachmentRequest", stemmaId: string, ownerKind: AttachmentOwnerKind, ownerId: string, title: string, fileKey: string, contentType: string }
+    | { type: "RemoveAttachmentRequest", stemmaId: string, attachmentId: string }
     | AuthLoginRequest
     | AuthLogoutRequest
 
@@ -78,7 +82,10 @@ export type FamilyDescription = { type: "FamilyDescription", id: string, parents
 export type InviteToken = { type: "InviteToken", token: string }
 export type OwnedStemmas = { type: "OwnedStemmas", stemmas: Array<StemmaDescription>, firstStemma: Stemma, defaultStemmaId?: string | null, favouriteStemmaId?: string | null }
 export type FavouriteStemma = { type: "FavouriteStemma", stemmaId: string | null }
-export type Stemma = { type: "Stemma", people: Array<PersonDescription>, families: Array<FamilyDescription> }
+export type AttachmentOwnerKind = "person" | "family"
+export type Attachment = { type: "AttachmentDescription", id: string, ownerKind: AttachmentOwnerKind, ownerId: string, kind: "link" | "file", title: string, url: string | null, contentType?: string | null, note?: string | null }
+export type Stemma = { type: "Stemma", people: Array<PersonDescription>, families: Array<FamilyDescription>, attachments?: Array<Attachment> }
+export type AttachmentUploadUrl = { type: "AttachmentUploadUrl", uploadUrl: string, uploadFields: Record<string, string>, fileKey: string, expiresInSeconds: number }
 export type StemmaDescription = { type: "StemmaDescription", id: string, name: string, removable: Boolean }
 export type PersonDescription = { type: "PersonDescription", id: string, name: string, birthDate?: string, deathDate?: string, bio?: string, altNames?: AltName[], readOnly: boolean, photoUrl?: string | null }
 export type TokenAccepted = { type: "TokenAccepted", stemmas: Array<StemmaDescription>, stemmaId: string, lastStemma: Stemma }
@@ -105,6 +112,8 @@ export type StemmaHasCycles = { type: "StemmaHasCycles" }
 export type AmbiguousLinkTarget = { type: "AmbiguousLinkTarget", personId: string }
 export type SpouseLinkAlreadyExists = { type: "SpouseLinkAlreadyExists", familyId: string }
 export type TooManyParents = { type: "TooManyParents", familyId: string }
+export type InvalidAttachment = { type: "InvalidAttachment", reason: string }
+export type NoSuchAttachment = { type: "NoSuchAttachment", id: string }
 
 export type StemmaResponse =
     | FamilyDescription
@@ -117,6 +126,7 @@ export type StemmaResponse =
     | TokenAccepted
     | CloneResult
     | PhotoUploadUrl
+    | AttachmentUploadUrl
     | AuthLoginResponse
     | AuthLogoutResponse
     | UnknownError
@@ -133,6 +143,8 @@ export type StemmaResponse =
     | ForeignInviteToken
     | StemmaHasCycles
     | UnsupportedPhotoType
+    | InvalidAttachment
+    | NoSuchAttachment
     | AmbiguousLinkTarget
     | SpouseLinkAlreadyExists
     | TooManyParents
@@ -268,6 +280,22 @@ export class Model {
             { type: "SetPersonPhotoRequest", stemmaId, personId, photoKey },
             stemmaIndex,
         )
+    }
+
+    async addLinkAttachment(stemmaId: string, ownerKind: AttachmentOwnerKind, ownerId: string, title: string, url: string, note: string | null): Promise<Stemma> {
+        return this.send<Stemma>({ type: "AddLinkAttachmentRequest", stemmaId, ownerKind, ownerId, title, url, note }, null)
+    }
+
+    async requestAttachmentUploadUrl(stemmaId: string, ownerKind: AttachmentOwnerKind, ownerId: string, contentType: string): Promise<AttachmentUploadUrl> {
+        return this.send<AttachmentUploadUrl>({ type: "RequestAttachmentUploadUrlRequest", stemmaId, ownerKind, ownerId, contentType }, null)
+    }
+
+    async addFileAttachment(stemmaId: string, ownerKind: AttachmentOwnerKind, ownerId: string, title: string, fileKey: string, contentType: string): Promise<Stemma> {
+        return this.send<Stemma>({ type: "AddFileAttachmentRequest", stemmaId, ownerKind, ownerId, title, fileKey, contentType }, null)
+    }
+
+    async removeAttachment(stemmaId: string, attachmentId: string): Promise<Stemma> {
+        return this.send<Stemma>({ type: "RemoveAttachmentRequest", stemmaId, attachmentId }, null)
     }
 
     async uploadPhotoToPresignedUrl(uploadUrl: string, uploadFields: Record<string, string>, file: Blob): Promise<void> {
