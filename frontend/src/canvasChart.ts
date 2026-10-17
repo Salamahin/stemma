@@ -560,7 +560,9 @@ export class CanvasChart {
 
     // ------------------------------------------------------- label layout
 
-    /** Greedy non-overlapping placement of person labels (runs when the sim settles). */
+    private labelLayouts = 0;
+
+    /** Places person labels clear of other labels and circles when the sim settles; never hides one. */
     layoutLabels() {
         const persons = this.nodes.filter((n) => n.type === "person");
         if (persons.length === 0) return;
@@ -569,13 +571,15 @@ export class CanvasChart {
             const w = (p.name ? this.labelWidth(p.name) : 76) + 4;
             return { x: p.x - personR, y: p.y + 20, width: w, height: h };
         });
-        const placed = placeLabels(rects);
+        const circles = persons.map((p) => ({ x: p.x, y: p.y, r: personR }));
+        const placed = placeLabels(rects, circles);
         persons.forEach((p, i) => {
             const slot = placed[i];
             p.labelDx = slot.x - p.x;
             p.labelDy = slot.y - p.y + h * 0.7;
             p.labelHidden = !!slot.hidden;
         });
+        this.labelLayouts++;
         this.requestRender();
     }
 
@@ -1168,6 +1172,7 @@ export class CanvasChart {
                 r: this.nodeRadius(n),
                 drawn: this.drawnIds.has(n.id),
                 pending: pendingId(n.id),
+                labelHidden: !!n.labelHidden,
                 clientX: c.x,
                 clientY: c.y,
             };
@@ -1192,6 +1197,7 @@ export class CanvasChart {
             ghosts,
             edges,
             stats: { ...this.lastStats },
+            labelLayouts: this.labelLayouts,
             transform: { x: this.transform.x, y: this.transform.y, k: this.transform.k },
         };
     }
