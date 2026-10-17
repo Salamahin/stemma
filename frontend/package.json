@@ -44,7 +44,6 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@imask/svelte": "^6.6.3",
     "dompurify": "^3.4.16",
     "fuse.js": "^7.4.1",
     "lodash.clone": "^4.5.0",

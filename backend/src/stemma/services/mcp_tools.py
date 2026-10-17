@@ -13,7 +13,7 @@ from stemma.services.person_search import DEFAULT_LIMIT, search_people
 _SEED_DEFAULT_STEMMA_NAME = "My Stemma"
 _SEED_KINGS_STEMMA_NAME = "European Kings"
 
-_OPTIONAL_PERSON_FIELDS = ("birth_date", "death_date", "bio")
+_OPTIONAL_PERSON_FIELDS = ("birth_date", "death_date", "bio", "alt_names")
 
 
 @dataclass(frozen=True)
@@ -34,7 +34,10 @@ def _stemma_list_only(_args: dict, response: dict) -> dict:
 
 
 def _brief(person: dict) -> dict:
-    return {k: person.get(k) for k in ("id", "name", "birthDate", "deathDate")}
+    brief = {k: person.get(k) for k in ("id", "name", "birthDate", "deathDate")}
+    if person.get("altNames"):
+        brief["altNames"] = [a.get("name") for a in person["altNames"]]
+    return brief
 
 
 def _dedup(ids: list[str]) -> list[str]:
@@ -42,6 +45,10 @@ def _dedup(ids: list[str]) -> list[str]:
 
 
 _MAX_SEARCH_LIMIT = 100
+_DATE_HELP = (
+    "{what} date with the precision you actually know: YYYY, YYYY-MM or YYYY-MM-DD, "
+    "prefixed with ~ for approximately (e.g. 1899, 1899-03, 1899-03-16, ~1820). Optional."
+)
 
 
 def _search_people(args: dict, response: dict) -> dict:
@@ -163,9 +170,27 @@ def _person_write_schema(extra_required: dict[str, dict]) -> dict:
                 "people as ???, so never write placeholders like Unknown or Неизвестно."
             ),
         },
-        "birth_date": {"type": "string", "description": "ISO date, e.g. 1901-05-06 (optional)"},
-        "death_date": {"type": "string", "description": "ISO date (optional)"},
+        "birth_date": {"type": "string", "description": _DATE_HELP.format(what="Birth")},
+        "death_date": {"type": "string", "description": _DATE_HELP.format(what="Death")},
         "bio": {"type": "string", "description": "Free-text biography (optional)"},
+        "alt_names": {
+            "type": "array",
+            "description": (
+                "Other names the person is known under (optional; replaces the whole list on update): "
+                "maiden or married surnames, spelling variants from old records, nicknames. "
+                "search_people matches these too. Keep the primary name in `name`; don't add "
+                "(урожд. X) to it — record X here with kind maiden."
+            ),
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "kind": {"type": "string", "enum": ["maiden", "married", "variant", "other"]},
+                },
+                "required": ["name"],
+                "additionalProperties": False,
+            },
+        },
     }
     return {
         "type": "object",

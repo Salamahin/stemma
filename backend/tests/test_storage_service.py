@@ -1,4 +1,3 @@
-from datetime import date
 
 import pytest
 
@@ -459,5 +458,10 @@ def test_parse_date_returns_none_for_falsy(value: str | None) -> None:
     assert _parse_date(value) is None
 
 
-def test_parse_date_parses_iso_string() -> None:
-    assert _parse_date("1900-01-15") == date(1900, 1, 15)
+def test_parse_date_keeps_the_stored_partial_date() -> None:
+    assert _parse_date("1900-01-15") == "1900-01-15"
+    assert _parse_date("~1900") == "~1900"
+
+
+def test_parse_date_drops_a_corrupt_value() -> None:
+    assert _parse_date("not a date") is None

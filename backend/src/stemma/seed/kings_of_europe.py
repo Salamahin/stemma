@@ -1,16 +1,16 @@
 import json
 from dataclasses import dataclass
-from datetime import date
 from functools import cache
 from pathlib import Path
+from stemma.domain.dates import parse_partial_date
 
 
 @dataclass(frozen=True)
 class SeedPerson:
     id: str
     name: str
-    birth_date: date | None
-    death_date: date | None
+    birth_date: str | None
+    death_date: str | None
     bio: str | None
 
 
@@ -27,10 +27,11 @@ class SeedStemma:
     families: tuple[SeedFamily, ...]
 
 
-def _parse_date(value: str | None) -> date | None:
+def _parse_date(value: str | None) -> str | None:
     if not value:
         return None
-    return date.fromisoformat(value)
+    parse_partial_date(value)
+    return value
 
 
 @cache

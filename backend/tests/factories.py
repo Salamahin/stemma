@@ -1,14 +1,13 @@
 from collections.abc import Callable
-from datetime import date
 
 from stemma.domain.requests import CreateFamily, CreateNewPerson, ExistingPerson, PersonDefinition
 from stemma.domain.responses import Stemma
 
-JOHNS_BIRTHDAY = date(1900, 1, 1)
-JOHNS_DEATHDAY = date(2000, 1, 1)
+JOHNS_BIRTHDAY = "1900-01-01"
+JOHNS_DEATHDAY = "2000-01-01"
 
 create_john = CreateNewPerson(name="John", birth_date=JOHNS_BIRTHDAY, death_date=JOHNS_DEATHDAY)
-create_jane = CreateNewPerson(name="Jane", birth_date=date(1850, 1, 1), death_date=date(1950, 1, 1))
+create_jane = CreateNewPerson(name="Jane", birth_date="1850-01-01", death_date="1950-01-01")
 create_james = CreateNewPerson(name="James")
 create_jake = CreateNewPerson(name="Jake")
 create_july = CreateNewPerson(name="July")

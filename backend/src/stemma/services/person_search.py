@@ -91,7 +91,7 @@ def _score(query_tokens: list[set[str]], name_tokens: list[set[str]]) -> float:
 
 
 def search_people(query: str, people: list[dict], limit: int | None = DEFAULT_LIMIT) -> list[dict]:
-    """Return the people whose name fuzzily matches `query`, best first. Blank-named
+    """Return the people whose name (or any alternative name) fuzzily matches `query`, best first. Blank-named
     (unknown) people are skipped, matching the frontend. `limit=None` returns every match."""
     if len(query.strip()) < MIN_QUERY_LENGTH:
         return []
@@ -101,7 +101,10 @@ def search_people(query: str, people: list[dict], limit: int | None = DEFAULT_LI
         name = person.get("name") or ""
         if not name.strip():
             continue
-        score = _score(query_tokens, token_variants(name))
+        # Maiden, married and variant names count as much as the primary one: their
+        # tokens are pooled, so "Мария Петрова" finds Иванова Мария née Петрова.
+        names = [name, *(a.get("name") or "" for a in person.get("altNames") or [])]
+        score = _score(query_tokens, [t for n in names for t in token_variants(n)])
         if score >= FUZZY_THRESHOLD:
             scored.append((score, person))
     scored.sort(key=lambda pair: pair[0], reverse=True)
