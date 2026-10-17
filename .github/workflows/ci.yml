@@ -132,9 +132,58 @@ jobs:
           e2e/test-results
         if-no-files-found: ignore
         retention-days: 14
+  perf:
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.e2e == 'true' || needs.changes.outputs.workflow == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v6
+    - name: Set up Node
+      uses: actions/setup-node@v7
+      with:
+        node-version: '22'
+        cache: 'npm'
+        cache-dependency-path: |
+          frontend/package-lock.json
+          e2e/package-lock.json
+    - name: Install frontend deps
+      run: npm ci
+      working-directory: frontend
+    - name: Install e2e deps
+      run: npm ci
+      working-directory: e2e
+    - name: Resolve Playwright version
+      id: pw
+      run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      working-directory: e2e
+    - name: Cache Playwright browsers
+      id: playwright-cache
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+    - name: Install Playwright browser
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      run: npx playwright install --with-deps chromium
+      working-directory: e2e
+    - name: Install Playwright system deps (cache hit)
+      if: steps.playwright-cache.outputs.cache-hit == 'true'
+      run: npx playwright install-deps chromium
+      working-directory: e2e
+    - name: Run rendering performance budgets
+      run: npx playwright test -c perf.config.ts
+      working-directory: e2e
+    - name: Upload performance results
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: perf-results
+        path: e2e/perf-results
+        if-no-files-found: ignore
+        retention-days: 30
   ci:
     if: always()
-    needs: [changes, backend, frontend, e2e]
+    needs: [changes, backend, frontend, e2e, perf]
     runs-on: ubuntu-24.04
     steps:
     - name: Verify upstream jobs

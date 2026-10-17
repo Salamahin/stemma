@@ -390,6 +390,7 @@
             onabout={() => aboutModal?.show()}
             onsettings={() => settingsModal?.show()}
             onexport={() => stemmaChart?.exportSvg($t("nav.exportDefaultName"))}
+            onexportPng={() => stemmaChart?.exportPng($t("nav.exportDefaultName")).catch((e) => console.error("PNG export failed", e))}
             onsignOut={() => session.signOut()}
             oneditToggle={() => { editMode = !editMode; }}
             onpanToggle={() => { panMode = !panMode; }}

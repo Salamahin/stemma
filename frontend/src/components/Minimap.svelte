@@ -7,7 +7,7 @@
         computeLayout,
         projectViewport,
         minimapClickToTranslate,
-        projectAndBuildPaths,
+        drawMinimap,
         type NodeDot,
         type MinimapLayout,
     } from "../minimapProjection";
@@ -28,11 +28,16 @@
 
     const CANVAS_W = 160;
     const CANVAS_H = 120;
-    const PERSON_R = 2.5;
-    const FAMILY_R = 1.5;
+    const STYLE = {
+        person: "#5a7fa0",
+        family: "#326f93",
+        viewportFill: "rgba(100, 149, 237, 0.12)",
+        viewportStroke: "#4a80c4",
+    };
 
-    let personsPath = $state("");
-    let familiesPath = $state("");
+    let canvasEl = $state<HTMLCanvasElement | null>(null);
+    let nodes: NodeDot[] = [];
+    let nodesVersion = $state(0);
     let currentTransform = $state<d3.ZoomTransform>(d3.zoomIdentity);
     let isDragging = $state(false);
     let viewWidth = $state(typeof window !== "undefined" ? window.innerWidth : 0);
@@ -56,12 +61,9 @@
     }
 
     export function refresh() {
-        const raw = chart ? readChartNodes(chart) : [];
-        const bounds = computeBounds(raw);
-        layout = computeLayout(bounds, CANVAS_W, CANVAS_H);
-        const paths = projectAndBuildPaths(raw, layout, PERSON_R, FAMILY_R);
-        personsPath = paths.persons;
-        familiesPath = paths.families;
+        nodes = chart ? readChartNodes(chart) : [];
+        layout = computeLayout(computeBounds(nodes), CANVAS_W, CANVAS_H);
+        nodesVersion++;
         currentTransform = getZoomTransform() ?? d3.zoomIdentity;
     }
 
@@ -98,6 +100,22 @@
         projectViewport(currentTransform, viewWidth, viewHeight, layout),
     );
 
+    // Redraw whenever the nodes or the viewport frame change.
+    $effect(() => {
+        nodesVersion;
+        const viewport = projectedViewport;
+        const canvas = canvasEl;
+        if (!canvas) return;
+        const dpr = window.devicePixelRatio || 1;
+        if (canvas.width !== CANVAS_W * dpr || canvas.height !== CANVAS_H * dpr) {
+            canvas.width = CANVAS_W * dpr;
+            canvas.height = CANVAS_H * dpr;
+        }
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        drawMinimap(ctx, nodes, layout, viewport, { width: CANVAS_W, height: CANVAS_H, dpr }, STYLE);
+    });
+
     function onMinimapPointerDown(event: PointerEvent) {
         event.preventDefault();
         (event.currentTarget as Element).setPointerCapture(event.pointerId);
@@ -131,28 +149,16 @@
 
 {#if editMode}
     <div class="minimap-container">
-        <svg
+        <canvas
+            bind:this={canvasEl}
             class="minimap-canvas"
-            width={CANVAS_W}
-            height={CANVAS_H}
-            role="img"
+            style="width: {CANVAS_W}px; height: {CANVAS_H}px; cursor: {isDragging ? 'grabbing' : 'crosshair'}"
             aria-label={$t("minimap.show")}
-            style="cursor: {isDragging ? 'grabbing' : 'crosshair'}"
+            data-testid="minimap"
             onpointerdown={onMinimapPointerDown}
             onpointermove={onMinimapPointerMove}
             onpointerup={onMinimapPointerUp}
-        >
-            <path d={personsPath} class="minimap-person" />
-            <path d={familiesPath} class="minimap-family" />
-
-            <rect
-                x={projectedViewport.x}
-                y={projectedViewport.y}
-                width={projectedViewport.width}
-                height={projectedViewport.height}
-                class="minimap-viewport"
-            />
-        </svg>
+        ></canvas>
     </div>
 {/if}
 
@@ -183,20 +189,4 @@
         touch-action: none;
     }
 
-    :global(.minimap-person) {
-        fill: #5a7fa0;
-        opacity: 0.7;
-    }
-
-    :global(.minimap-family) {
-        fill: #326f93;
-        opacity: 0.7;
-    }
-
-    :global(.minimap-viewport) {
-        fill: rgba(100, 149, 237, 0.12);
-        stroke: #4a80c4;
-        stroke-width: 1.5px;
-        pointer-events: none;
-    }
 </style>

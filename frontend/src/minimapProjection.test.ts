@@ -4,7 +4,7 @@ import {
     projectNodes,
     projectViewport,
     minimapClickToTranslate,
-    projectAndBuildPaths,
+    drawMinimap,
     type NodeDot,
 } from "./minimapProjection";
 import { zoomIdentity } from "d3";
@@ -108,33 +108,43 @@ describe("projectViewport", () => {
     });
 });
 
-describe("projectAndBuildPaths", () => {
-    const layout = { scale: 2, offsetX: 5, offsetY: 3, contentWidth: 100, contentHeight: 100 };
+function recordingContext() {
+    const calls: Array<[string, ...unknown[]]> = [];
+    const ctx: any = {
+        fillStyle: "", strokeStyle: "", lineWidth: 0, globalAlpha: 1,
+    };
+    for (const m of ["setTransform", "clearRect", "beginPath", "moveTo", "arc", "fill", "fillRect", "strokeRect"]) {
+        ctx[m] = (...args: unknown[]) => calls.push([m, ...args]);
+    }
+    return { ctx, calls };
+}
 
-    it("returns empty strings for empty input", () => {
-        expect(projectAndBuildPaths([], layout, 2, 1)).toEqual({ persons: "", families: "" });
+describe("drawMinimap", () => {
+    const layout = { scale: 2, offsetX: 5, offsetY: 3, contentWidth: 100, contentHeight: 100 };
+    const viewport = { x: 10, y: 20, width: 30, height: 40 };
+    const style = { person: "#111", family: "#222", viewportFill: "#333", viewportStroke: "#444" };
+
+    it("clears a high-DPI canvas and draws only the viewport for an empty chart", () => {
+        const { ctx, calls } = recordingContext();
+        drawMinimap(ctx, [], layout, viewport, { width: 160, height: 120, dpr: 2 }, style);
+        expect(calls[0]).toEqual(["setTransform", 2, 0, 0, 2, 0, 0]);
+        expect(calls).toContainEqual(["clearRect", 0, 0, 160, 120]);
+        expect(calls.filter((c) => c[0] === "arc")).toEqual([]);
+        expect(calls).toContainEqual(["strokeRect", 10, 20, 30, 40]);
     });
 
-    it("splits nodes by type into separate path strings", () => {
+    it("projects people and families into one batched path per type", () => {
         const nodes: NodeDot[] = [
             { x: 10, y: 10, type: "person" },
             { x: 20, y: 20, type: "family" },
-        ];
-        const { persons, families } = projectAndBuildPaths(nodes, layout, 2, 1);
-        // person projected: x = 10*2+5 = 25, y = 10*2+3 = 23 → "M23,23..."
-        expect(persons).toContain("M23,23");
-        expect(families).toContain("M44,43");
-        expect(persons).not.toContain("M44");
-        expect(families).not.toContain("M23,23");
-    });
-
-    it("concatenates one subpath per node", () => {
-        const nodes: NodeDot[] = [
-            { x: 10, y: 10, type: "person" },
             { x: 30, y: 30, type: "person" },
         ];
-        const { persons } = projectAndBuildPaths(nodes, layout, 1, 1);
-        expect(persons.match(/M/g)?.length).toBe(2);
+        const { ctx, calls } = recordingContext();
+        drawMinimap(ctx, nodes, layout, viewport, { width: 160, height: 120, dpr: 1 }, style);
+        const arcs = calls.filter((c) => c[0] === "arc");
+        // person projected: x = 10*2+5 = 25, y = 10*2+3 = 23; family: 45, 43
+        expect(arcs.map((c) => [c[1], c[2]])).toEqual([[25, 23], [65, 63], [45, 43]]);
+        expect(calls.filter((c) => c[0] === "fill")).toHaveLength(2);
     });
 });
 

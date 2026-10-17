@@ -6,10 +6,11 @@
         onabout?: () => void;
         onsettings?: () => void;
         onexport?: () => void;
+        onexportPng?: () => void;
         onsignOut?: () => void;
     };
 
-    let { showSignOut, onabout, onsettings, onexport, onsignOut }: Props = $props();
+    let { showSignOut, onabout, onsettings, onexport, onexportPng, onsignOut }: Props = $props();
 
     let open = $state(false);
 
@@ -30,6 +31,7 @@
         onclick={toggle}
         aria-label="Menu"
         aria-expanded={open}
+        data-testid="menu-btn"
     >
         <img src="/assets/logo_color.webp" alt="Stemma" width="32" height="32" />
     </button>
@@ -44,6 +46,9 @@
             </button>
             <button type="button" class="menu-item" onclick={() => closeAndCall(onexport)} data-testid="menu-export">
                 <i class="bi bi-download me-2"></i>{$t("exportSvg")}
+            </button>
+            <button type="button" class="menu-item" onclick={() => closeAndCall(onexportPng)} data-testid="menu-export-png">
+                <i class="bi bi-image me-2"></i>{$t("exportPng")}
             </button>
             {#if showSignOut}
                 <div class="menu-divider"></div>

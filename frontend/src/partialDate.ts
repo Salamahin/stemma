@@ -82,6 +82,15 @@ export function toDateInput(value: string | null | undefined): string {
 
 const APPROX_LABEL: Record<string, string> = { en: "c.", ru: "ок." };
 
+// Creating an Intl.DateTimeFormat is slow; the chart formats thousands of dates at once.
+const formatters = new Map<string, Intl.DateTimeFormat>();
+function formatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+    const key = locale + JSON.stringify(options);
+    let f = formatters.get(key);
+    if (!f) formatters.set(key, (f = new Intl.DateTimeFormat(locale, options)));
+    return f;
+}
+
 /** Human-readable date showing only the known precision ("Mar 1899", "ок. 1820"). */
 export function formatPartialDate(value: string | null | undefined, locale: string): string {
     if (!value) return "";
@@ -91,10 +100,10 @@ export function formatPartialDate(value: string | null | undefined, locale: stri
     let text: string;
     if (p.month == null) text = String(p.year);
     else if (p.day == null) {
-        const month = new Intl.DateTimeFormat(locale, { month: locale === "ru" ? "long" : "short", timeZone: "UTC" }).format(date);
+        const month = formatter(locale, { month: locale === "ru" ? "long" : "short", timeZone: "UTC" }).format(date);
         text = `${month} ${p.year}`;
     } else {
-        const dayMonth = new Intl.DateTimeFormat(locale === "en" ? "en-GB" : locale, { day: "numeric", month: "short", timeZone: "UTC" }).format(date);
+        const dayMonth = formatter(locale === "en" ? "en-GB" : locale, { day: "numeric", month: "short", timeZone: "UTC" }).format(date);
         text = `${dayMonth} ${p.year}`;
     }
     return p.approx ? `${APPROX_LABEL[locale] ?? "~"} ${text}` : text;
