@@ -44,6 +44,10 @@ class PhotoStore(Protocol):
         self, stemma_id: str, attachment_id: str, content_type: str
     ) -> tuple[str, dict[str, str], str]: ...
 
+    def issue_attachment_put_url(self, stemma_id: str, attachment_id: str, content_type: str) -> tuple[str, str]: ...
+
+    def object_info(self, key: str) -> tuple[int, str] | None: ...
+
     def issue_get_url(self, key: str) -> str: ...
 
     def copy(self, source_key: str, destination_key: str) -> None: ...
@@ -91,6 +95,29 @@ class S3PhotoService:
             ExpiresIn=PUT_URL_EXPIRES_SECONDS,
         )
         return response["url"], response["fields"], key
+
+    def issue_attachment_put_url(self, stemma_id: str, attachment_id: str, content_type: str) -> tuple[str, str]:
+        """A single presigned PUT URL. S3 can't enforce a size range on a PUT, so the
+        caller must check object_info() before trusting the upload."""
+        if content_type not in ALLOWED_ATTACHMENT_CONTENT_TYPES:
+            raise InvalidAttachment(reason=f"unsupported file type {content_type}")
+        key = attachment_key(stemma_id, attachment_id)
+        url = self.s3_client.generate_presigned_url(
+            "put_object",
+            Params={"Bucket": self.bucket, "Key": key, "ContentType": content_type},
+            ExpiresIn=PUT_URL_EXPIRES_SECONDS,
+        )
+        return url, key
+
+    def object_info(self, key: str) -> tuple[int, str] | None:
+        """(size in bytes, content type) of an uploaded object, or None if it doesn't exist."""
+        try:
+            head = self.s3_client.head_object(Bucket=self.bucket, Key=key)
+        except self.s3_client.exceptions.ClientError as e:
+            if e.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+                return None
+            raise
+        return int(head["ContentLength"]), head.get("ContentType", "")
 
     def issue_get_url(self, key: str) -> str:
         return self.s3_client.generate_presigned_url(

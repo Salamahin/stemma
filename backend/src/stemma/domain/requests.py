@@ -188,6 +188,9 @@ class RequestAttachmentUploadUrlRequest:
     owner_kind: AttachmentOwnerKind
     owner_id: str
     content_type: str
+    # POST (browser form upload, size limit enforced by S3) or PUT (a single URL for
+    # scripted clients such as MCP; size and type are checked when the file is attached).
+    method: Literal["POST", "PUT"] = "POST"
     type: Literal["RequestAttachmentUploadUrlRequest"] = "RequestAttachmentUploadUrlRequest"
 
 

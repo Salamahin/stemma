@@ -113,17 +113,17 @@ _OWNER_PROPS: dict = {
 }
 
 
-def _upload_instructions(_args: dict, response: dict) -> dict:
-    fields = response.get("uploadFields", {})
-    form = " ".join(f"-F '{k}={v}'" for k, v in fields.items())
+def _upload_instructions(args: dict, response: dict) -> dict:
+    content_type = args["content_type"]
     return {
         "type": "AttachmentUpload",
-        "upload_url": response.get("uploadUrl"),
-        "upload_fields": fields,
         "file_key": response.get("fileKey"),
+        "method": "PUT",
+        "upload_url": response.get("uploadUrl"),
+        "headers": {"Content-Type": content_type},
         "expires_in_seconds": response.get("expiresInSeconds"),
-        "how_to_upload": f"curl -sf {form} -F 'file=@<path to the file>' '{response.get('uploadUrl')}'"
-        " — the file field must come last; then call attach_file with file_key.",
+        "how_to_upload": f"curl -T <file> -f -H 'Content-Type: {content_type}' '<upload_url>', "
+        "then attach_file with file_key",
     }
 
 
@@ -425,9 +425,10 @@ def tool_specs() -> tuple[ToolSpec, ...]:
         ToolSpec(
             name="request_attachment_upload",
             description="Step 1 of attaching a file (scan, photo, PDF) to a person or family: returns a "
-            "presigned S3 POST (upload_url + upload_fields, valid 5 minutes) and a file_key. Upload the "
-            "file there yourself (see how_to_upload), then call attach_file with the file_key. "
-            "Allowed: image/jpeg, image/png, image/webp, image/gif, application/pdf; up to 20 MB.",
+            "presigned upload_url (valid 5 minutes) and a file_key. PUT the file there yourself with the "
+            "given Content-Type header (see how_to_upload), then call attach_file with the file_key. "
+            "Allowed: image/jpeg, image/png, image/webp, image/gif, application/pdf; up to 20 MB "
+            "(checked by attach_file, which rejects and deletes anything else).",
             input_schema={
                 "type": "object",
                 "properties": {
@@ -446,6 +447,7 @@ def tool_specs() -> tuple[ToolSpec, ...]:
                 "owner_kind": args["owner_kind"],
                 "owner_id": args["owner_id"],
                 "content_type": args["content_type"],
+                "method": "PUT",
             },
             transform_response=_upload_instructions,
         ),
