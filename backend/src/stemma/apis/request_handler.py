@@ -52,6 +52,7 @@ from stemma.domain.responses import (
 )
 from stemma.domain.user import User
 from stemma.seed.kings_of_europe import load_kings_of_europe
+from stemma.services import photo_service
 from stemma.services.photo_service import (
     ALLOWED_ATTACHMENT_CONTENT_TYPES,
     PUT_URL_EXPIRES_SECONDS,
@@ -300,6 +301,14 @@ class RequestHandler:
         self._storage.require_attachment_owner_access(
             user.user_id, request.stemma_id, request.owner_kind, request.owner_id
         )
+        if request.method == "PUT":
+            url, key = self._photo_store.issue_attachment_put_url(
+                request.stemma_id, uuid.uuid4().hex, request.content_type
+            )
+            return AttachmentUploadUrl(
+                upload_url=url, upload_fields={}, file_key=key,
+                expires_in_seconds=PUT_URL_EXPIRES_SECONDS, method="PUT",
+            )
         url, fields, key = self._photo_store.issue_attachment_upload_url(
             request.stemma_id, uuid.uuid4().hex, request.content_type
         )
@@ -313,6 +322,7 @@ class RequestHandler:
             raise InvalidAttachment(reason="the file does not belong to this stemma")
         if request.content_type not in ALLOWED_ATTACHMENT_CONTENT_TYPES:
             raise InvalidAttachment(reason=f"unsupported file type {request.content_type}")
+        self._verify_uploaded_file(request.stemma_id, request.file_key, request.content_type)
         return self._storage.add_attachment(
             user.user_id,
             request.stemma_id,
@@ -323,6 +333,24 @@ class RequestHandler:
             content_type=request.content_type,
             note=_blank_to_none(request.note),
         )
+
+    def _verify_uploaded_file(self, stemma_id: str, file_key: str, content_type: str) -> None:
+        """A presigned PUT carries no size limit, so check what actually landed in S3
+        (and drop it if it is not acceptable) before it becomes an attachment."""
+        if self._photo_store is None:
+            return
+        info = self._photo_store.object_info(file_key)
+        if info is None:
+            raise InvalidAttachment(reason="the file has not been uploaded")
+        size, stored_type = info
+        problem = None
+        if size > photo_service.MAX_ATTACHMENT_BYTES:
+            problem = f"the file is larger than {photo_service.MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB"
+        elif stored_type != content_type:
+            problem = f"the file was uploaded as {stored_type or 'unknown type'}, not {content_type}"
+        if problem:
+            self._forget_photos(stemma_id, [file_key])
+            raise InvalidAttachment(reason=problem)
 
     def _remove_attachment(self, user: User, request: RemoveAttachmentRequest) -> Stemma:
         stemma, file_key = self._storage.remove_attachment(user.user_id, request.stemma_id, request.attachment_id)

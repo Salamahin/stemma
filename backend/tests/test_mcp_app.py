@@ -1,4 +1,5 @@
 import base64
+import json
 import hashlib
 import logging
 import secrets
@@ -323,9 +324,11 @@ def test_files_are_uploaded_attached_and_removed_over_mcp(client: TestClient, s3
         {"stemma_id": sid, "owner_kind": "person", "owner_id": arseniy["id"], "content_type": "image/jpeg"},
     )
     assert upload["type"] == "AttachmentUpload"
-    assert upload["upload_url"].startswith("https://") and upload["upload_fields"]
-    assert "curl" in upload["how_to_upload"]
-    s3_client.put_object(Bucket=PHOTO_BUCKET, Key=upload["file_key"], Body=b"\xff\xd8\xff")
+    assert upload["method"] == "PUT" and upload["upload_url"].startswith("https://")
+    assert upload["headers"] == {"Content-Type": "image/jpeg"}
+    assert "curl -T" in upload["how_to_upload"]
+    assert len(json.dumps(upload, ensure_ascii=False)) < 2000  # one URL, no repeated policy/token
+    s3_client.put_object(Bucket=PHOTO_BUCKET, Key=upload["file_key"], Body=b"\xff\xd8\xff", ContentType="image/jpeg")
 
     attached = call(
         "attach_file",

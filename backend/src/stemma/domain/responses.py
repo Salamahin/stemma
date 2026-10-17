@@ -78,6 +78,7 @@ class AttachmentUploadUrl:
     upload_fields: dict[str, str]
     file_key: str
     expires_in_seconds: int
+    method: Literal["POST", "PUT"] = "POST"
     type: Literal["AttachmentUploadUrl"] = "AttachmentUploadUrl"
 
 
