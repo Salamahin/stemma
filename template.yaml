@@ -427,6 +427,16 @@ Resources:
             SecretArn: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/invite-*"
         - DynamoDBCrudPolicy:
             TableName: !Ref StemmaTable
+        # Same photo/attachment access as StemmaFunction: presigned uploads and download
+        # links are signed with this role, and deleting/cloning a stemma over MCP drops or
+        # copies its files.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+                - s3:DeleteObject
+              Resource: !Sub "${PersonPhotoBucket.Arn}/*"
   TableMetricsFunction:
     # DynamoDB publishes no table-size metric to CloudWatch; DescribeTable carries size and
     # item count, so this re-publishes them as two custom metrics for the analytics dashboard.
