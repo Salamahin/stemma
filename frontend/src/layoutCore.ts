@@ -39,6 +39,13 @@ export const LAYOUT_TICKS = 200;
 export const LAYOUT_VELOCITY_DECAY = 0.3;
 export const LAYOUT_ALPHA_DECAY = 1 - Math.pow(0.001, 1 / LAYOUT_TICKS);
 export const LAYOUT_THETA = 1.2;
+/**
+ * How long a full settle should take on screen. The ~200 ticks used to run as
+ * fast as the CPU allowed (well under a second), so the picture snapped into
+ * place; pacing spreads the same ticks over a few seconds so the movement is
+ * visible (#307). Slower machines and big stemmas are never slowed further.
+ */
+export const LAYOUT_SETTLE_MS = 4000;
 /** Reheat for data changes / leaving edit mode: a gentle refine, not a full relayout. */
 export const LAYOUT_REHEAT_ALPHA = 0.3;
 /** Start alpha when every node has a remembered position: a short, gentle refine. */
@@ -165,7 +172,18 @@ export class LayoutLoop {
         private budgetMs: number,
         private onTick: (ticks: number) => void,
         private onEnd: () => void,
+        /** Spread a full settle (LAYOUT_TICKS) over about this long; 0 = as fast as possible. */
+        private settleMs = 0,
     ) {}
+
+    private pacedFrom = 0;
+    private pacedTicks = 0;
+
+    /** True when fewer ticks ran than the pace allows by now: run the next batch without waiting a frame. */
+    private behindPace() {
+        const elapsed = this.scheduler.now() - this.pacedFrom;
+        return this.pacedTicks < Math.floor((elapsed * LAYOUT_TICKS) / this.settleMs);
+    }
 
     get isRunning() {
         return this.running;
@@ -173,6 +191,8 @@ export class LayoutLoop {
 
     start() {
         this.running = true;
+        this.pacedFrom = this.scheduler.now();
+        this.pacedTicks = 0;
         this.schedule(true);
     }
 
@@ -198,7 +218,8 @@ export class LayoutLoop {
             this.pending = false;
             this.step();
         };
-        if (immediate || this.sim.alphaTarget() === 0) this.scheduler.soon(run);
+        const paced = this.settleMs > 0 && !immediate && !this.behindPace();
+        if (!paced && (immediate || this.sim.alphaTarget() === 0)) this.scheduler.soon(run);
         else this.scheduler.frame(run);
     }
 
@@ -211,10 +232,16 @@ export class LayoutLoop {
             ticks = 1;
         } else {
             const start = this.scheduler.now();
+            // Paced: only the ticks that are due by now (at least one per frame);
+            // a machine that falls behind catches up within the frame budget.
+            const due = this.settleMs > 0
+                ? Math.max(1, Math.floor(((start - this.pacedFrom) * LAYOUT_TICKS) / this.settleMs) - this.pacedTicks)
+                : Infinity;
             do {
                 sim.tick();
                 ticks++;
-            } while (sim.alpha() >= sim.alphaMin() && this.scheduler.now() - start < this.budgetMs);
+            } while (ticks < due && sim.alpha() >= sim.alphaMin() && this.scheduler.now() - start < this.budgetMs);
+            this.pacedTicks += ticks;
         }
         this.onTick(ticks);
         if (sim.alpha() < sim.alphaMin() && sim.alphaTarget() === 0) {

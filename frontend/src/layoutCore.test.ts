@@ -6,6 +6,7 @@ import {
     LAYOUT_TICKS,
     LAYOUT_REFINE_ALPHA,
     LAYOUT_REHEAT_ALPHA,
+    LAYOUT_SETTLE_MS,
     giveCollisionRadius,
 } from "./layoutCore";
 import { InlineLayoutEngine } from "./layoutEngine";
@@ -96,7 +97,63 @@ describe("layout simulation settles", () => {
     });
 });
 
+/** A scheduler on a simulated clock: waiting for a frame costs 1000/60 ms, `spend` advances it by hand. */
+function frameClock() {
+    const queue: Array<() => void> = [];
+    let t = 0;
+    const scheduler = {
+        soon: (fn: () => void) => queue.push(fn),
+        frame: (fn: () => void) => queue.push(() => {
+            t += 1000 / 60;
+            fn();
+        }),
+        now: () => t,
+    };
+    return {
+        scheduler,
+        time: () => t,
+        spend: (ms: number) => (t += ms),
+        runAll: (max = 100_000) => {
+            let i = 0;
+            while (queue.length && i++ < max) queue.shift()!();
+        },
+    };
+}
+
 describe("LayoutLoop", () => {
+    test("a paced settle spreads the same ticks over about LAYOUT_SETTLE_MS instead of finishing at once (#307)", () => {
+        const { nodes, links } = syntheticGraph(60);
+        const sim = createLayoutSimulation(nodes, links, 1000, 800);
+        const clock = frameClock();
+        let ticks = 0;
+        let endedAt = -1;
+        const loop = new LayoutLoop(sim, clock.scheduler, 8, (t) => (ticks += t), () => (endedAt = clock.time()), LAYOUT_SETTLE_MS);
+        loop.start();
+        clock.runAll();
+        expect(endedAt).toBeGreaterThan(LAYOUT_SETTLE_MS * 0.8);
+        expect(endedAt).toBeLessThan(LAYOUT_SETTLE_MS * 1.3);
+        expect(ticks).toBeLessThanOrEqual(LAYOUT_TICKS + 5);
+    });
+
+    test("a slow machine is not slowed down further by pacing", () => {
+        const run = (settleMs: number) => {
+            const { nodes, links } = syntheticGraph(60);
+            const s = createLayoutSimulation(nodes, links, 1000, 800);
+            const clock = frameClock();
+            const tick = s.tick.bind(s);
+            s.tick = ((n?: number) => {
+                clock.spend(40 * (n ?? 1)); // every tick costs 40 ms: slower than the pace
+                return tick(n);
+            }) as typeof s.tick;
+            let endedAt = -1;
+            new LayoutLoop(s, clock.scheduler, 8, () => {}, () => (endedAt = clock.time()), settleMs).start();
+            clock.runAll();
+            return endedAt;
+        };
+        expect(run(LAYOUT_SETTLE_MS)).toBeLessThanOrEqual(run(0) * 1.05);
+    });
+
+
     test("settling runs extra ticks inside one batch, within the time budget", () => {
         const { nodes, links } = syntheticGraph(60);
         const sim = createLayoutSimulation(nodes, links, 1000, 800);

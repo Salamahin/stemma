@@ -2,7 +2,7 @@
  * Worker-side message handling, kept separate from the worker entry so it can
  * be unit-tested with a fake `post`/scheduler.
  */
-import { anchorWhereMissing, giveCollisionRadius, createLayoutSimulation, LayoutLoop, type LayoutNode, type Scheduler } from "./layoutCore";
+import { anchorWhereMissing, giveCollisionRadius, createLayoutSimulation, LayoutLoop, LAYOUT_SETTLE_MS, type LayoutNode, type Scheduler } from "./layoutCore";
 import { applyStructuredSeed, clanRegions, SEED_USES_CLAN_REGIONS } from "./structuredLayout";
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from "./layoutProtocol";
 
@@ -102,6 +102,7 @@ export class LayoutWorkerHost {
             WORKER_BUDGET_MS,
             (ticks) => this.postPositions(gen, ticks),
             () => this.post({ type: "end", gen }, []),
+            LAYOUT_SETTLE_MS,
         );
         // show the seed straight away, before the first refine batch
         if (msg.seed) this.postPositions(gen, 0, true);
