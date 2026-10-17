@@ -26,7 +26,7 @@
     import PersonDetailsModal from "./components/PersonDetailsModal.svelte";
     import FocusController from "./components/FocusController.svelte";
     import GhostLayer from "./components/GhostLayer.svelte";
-    import DragGestures from "./components/DragGestures.svelte";
+    import EditGestures from "./components/EditGestures.svelte";
     import EditModeOverlay from "./components/EditModeOverlay.svelte";
     import Chrome from "./components/Chrome.svelte";
     import PendingVisuals from "./components/PendingVisuals.svelte";
@@ -334,21 +334,17 @@
             onghostClick={(kind, focused, pins, existingFamilyId) => actions.onGhostClick(kind, focused, pins, existingFamilyId)}
             onpositionsChange={(p) => (ghostSimPositions = p)}
         />
-        <DragGestures
+        <EditGestures
             {editMode}
             {panActive}
             {panMode}
             {chart}
-            {displayedStemmaIndex}
-            findPendingFamily={(id) => actions.findFamily(id)}
             popHover={() => stemmaChart?.popHover()}
-            onattachPersonToFamily={(personId, familyId, role, pinAt) => actions.attachPersonToFamily(personId, familyId, role, pinAt)}
-            oncreatePersonInFamily={(familyId, role, title, pinAt) => actions.createPersonInFamily(familyId, role, title, pinAt)}
-            oncreatePendingFamily={(personId, role, familyAt) => { actions.createPendingFamilyForPerson(personId, role, familyAt); }}
             onshortTapFocus={(f) => (focusedId = f)}
             onlongPress={handleNodeActivation}
             ondesktopNodeClick={handleNodeActivation}
             onclearFocus={() => (focusedId = null)}
+            onnodeMoved={(nodeId, x, y) => stemmaChart?.placeNode(nodeId, x, y)}
             onclosePanMode={() => (panMode = false)}
             onspacePanChange={(v) => (spacePan = v)}
         />

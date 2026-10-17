@@ -48,6 +48,7 @@
     import type { AltName, AltNameKind, CreateNewPerson } from "../model";
     import Modal from "./Modal.svelte";
     import Attachments from "./Attachments.svelte";
+    import ExistingPersonPicker from "./ExistingPersonPicker.svelte";
     import type { Attachment } from "../model";
 
     export type CreatePersonPayload = {
@@ -82,7 +83,11 @@
     let mode = $state<"view" | "create">("view");
     let createTitle = $state<string | null>(null);
     let activeCreateCallback: ((payload: CreatePersonPayload) => void) | null = null;
+    /** Create mode from a ghost: someone already in the tree can be picked instead. */
+    let existingPick = $state<{ candidates: PersonDescription[]; onpick: (personId: string) => void } | null>(null);
+    let createTab = $state<"new" | "existing">("new");
     const isCreate = $derived(mode === "create");
+    const pickingExisting = $derived(isCreate && existingPick != null && createTab === "existing");
     let birthInputEl = $state<HTMLInputElement | null>(null);
     let deathInputEl = $state<HTMLInputElement | null>(null);
     let photoFileInputEl = $state<HTMLInputElement | null>(null);
@@ -197,17 +202,33 @@
         open = true;
     }
 
-    export function showCreatePerson(opts: { title?: string; oncreate: (payload: CreatePersonPayload) => void }) {
+    export function showCreatePerson(opts: {
+        title?: string;
+        oncreate: (payload: CreatePersonPayload) => void;
+        existing?: { candidates: PersonDescription[]; onpick: (personId: string) => void };
+    }) {
         mode = "create";
         createTitle = opts.title ?? null;
         activeCreateCallback = opts.oncreate;
+        existingPick = opts.existing && opts.existing.candidates.length > 0 ? opts.existing : null;
+        createTab = "new";
         resetFormState(null);
         open = true;
+    }
+
+    function pickExisting(personId: string) {
+        const pick = existingPick;
+        activeCreateCallback = null;
+        existingPick = null;
+        open = false;
+        resetPendingPhoto();
+        pick?.onpick(personId);
     }
 
     function close() {
         open = false;
         activeCreateCallback = null;
+        existingPick = null;
         resetPendingPhoto();
     }
 
@@ -496,6 +517,25 @@
                 <p class="hint">{$t("person.photoAdjustHint")}</p>
             </div>
         {:else}
+            {#if isCreate && existingPick}
+                <div class="btn-group create-tabs" role="group">
+                    <button
+                        type="button"
+                        class="btn btn-sm {createTab === 'new' ? 'btn-primary' : 'btn-outline-primary'}"
+                        onclick={() => (createTab = "new")}
+                        data-testid="create-tab-new"
+                    >{$t("createTabNew")}</button>
+                    <button
+                        type="button"
+                        class="btn btn-sm {createTab === 'existing' ? 'btn-primary' : 'btn-outline-primary'}"
+                        onclick={() => (createTab = "existing")}
+                        data-testid="create-tab-existing"
+                    >{$t("createTabExisting")}</button>
+                </div>
+            {/if}
+            {#if pickingExisting && existingPick}
+                <ExistingPersonPicker candidates={existingPick.candidates} onpick={pickExisting} />
+            {:else}
             <div class="grid">
                 <div class="col-photo">
                     <div class="photo-frame">
@@ -696,6 +736,7 @@
                     </div>
                 {/if}
             </div>
+            {/if}
         {/if}
     {/snippet}
 
@@ -709,6 +750,8 @@
                 onclick={confirmCrop}
                 data-testid="person-crop-save"
             >{$t("common.save")}</button>
+        {:else if pickingExisting}
+            <button type="button" class="btn btn-secondary" onclick={close}>{$t("common.cancel")}</button>
         {:else if isCreate}
             <button type="button" class="btn btn-secondary" onclick={close}>{$t("common.cancel")}</button>
             <button
@@ -756,6 +799,10 @@
 </Modal>
 
 <style>
+    .create-tabs {
+        margin-bottom: 12px;
+    }
+
     .grid {
         display: grid;
         grid-template-columns: 200px 1fr;

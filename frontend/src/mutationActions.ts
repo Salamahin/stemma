@@ -1,6 +1,6 @@
 import { get } from "svelte/store";
 import { AppController, type MutationResult } from "./appController";
-import type { CreateNewPerson, PersonDefinition } from "./model";
+import type { CreateNewPerson, PersonDefinition, PersonDescription } from "./model";
 import { normalizeId } from "./graphTools";
 import type { StemmaIndex } from "./stemmaIndex";
 import { t as tStore } from "./i18n";
@@ -16,6 +16,7 @@ import {
 } from "./pendingState";
 import type { FocusedId } from "./focusGesture";
 import type { GhostKind } from "./ghostHelpers";
+import { linkCandidates, type LinkTarget } from "./ghostLink";
 
 type CreatePersonArgs = {
     description: CreateNewPerson;
@@ -31,6 +32,7 @@ type PersonModalRef = {
     showCreatePerson: (cfg: {
         title: string;
         oncreate: (args: CreatePersonArgs) => void;
+        existing?: { candidates: PersonDescription[]; onpick: (personId: string) => void };
     }) => void;
 } | null;
 
@@ -173,6 +175,7 @@ export class MutationActions {
         if (!pending && !stemmaIndex?.family(familyId)) return;
         this.deps.getPersonEditModal()?.showCreatePerson({
             title,
+            existing: pending ? undefined : this.existingFor({ kind: role, familyId }, (personId) => this.attachPersonToFamily(personId, familyId, role)),
             oncreate: ({ description, pin, photoUpload }) => {
                 if (pending) {
                     void this.withPendingAdd(
@@ -228,14 +231,22 @@ export class MutationActions {
 
         if (focused.kind !== "person") return;
         const spec = BRANCH_FROM_PERSON[kind];
-        this.startBranchFromPerson(focused.id, spec.titleKey, spec.pending, spec.promote, {
+        this.startBranchFromPerson(focused.id, kind, spec.titleKey, spec.pending, spec.promote, {
             person: pins.person,
             family: pins.family ?? pins.person,
         });
     }
 
+    /** The "already in the tree" choice of a ghost's create dialog (none when nobody fits). */
+    private existingFor(target: LinkTarget, onpick: (personId: string) => void) {
+        const index = this.deps.getStemmaIndex();
+        if (!index) return undefined;
+        return { candidates: linkCandidates(index, index.people(), target), onpick };
+    }
+
     private startBranchFromPerson(
         personId: string,
+        kind: GhostKind,
         titleKey: string,
         pendingRole: FamilyRole,
         promoteRole: FamilyRole,
@@ -243,6 +254,15 @@ export class MutationActions {
     ): void {
         this.deps.getPersonEditModal()?.showCreatePerson({
             title: this.t(titleKey),
+            // an existing person keeps their place; the new family goes where the ghost family was
+            existing: this.existingFor({ kind, personId }, (existingId) => {
+                const pending = this.createPendingFamilyForPerson(personId, pendingRole, pins.family);
+                const incoming: PersonDefinition = { type: "ExistingPerson", id: existingId };
+                this.promotePendingFamily(pending, incoming, promoteRole)
+                    .then((result) => this.pinPromotedFamily(pending, result.newFamilyIds[0]))
+                    .catch(() => {})
+                    .finally(() => this.clearPendingFamily(pending.tempId));
+            }),
             oncreate: ({ description, pin, photoUpload }) => {
                 const pending = this.createPendingFamilyForPerson(personId, pendingRole, pins.family);
                 void this.withPendingAdd(

@@ -2,7 +2,7 @@
  * Worker-side message handling, kept separate from the worker entry so it can
  * be unit-tested with a fake `post`/scheduler.
  */
-import { anchorAtRest, anchorWhereMissing, giveCollisionRadius, createLayoutSimulation, LayoutLoop, LAYOUT_SETTLE_MS, type LayoutNode, type Scheduler } from "./layoutCore";
+import { anchorAtRest, anchorWhereMissing, moveNodeTo, refreshAnchors, giveCollisionRadius, createLayoutSimulation, LayoutLoop, LAYOUT_SETTLE_MS, type LayoutNode, type Scheduler } from "./layoutCore";
 import { applyStructuredSeed, clanRegions, SEED_USES_CLAN_REGIONS } from "./structuredLayout";
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from "./layoutProtocol";
 
@@ -47,7 +47,16 @@ export class LayoutWorkerHost {
                     if (msg.fx == null) {
                         d.ax = d.x;
                         d.ay = d.y;
+                        if (this.sim) refreshAnchors(this.sim);
                     }
+                }
+                break;
+            }
+            case "move": {
+                const d = this.nodes[msg.index];
+                if (d) {
+                    moveNodeTo(d, msg.x, msg.y);
+                    if (this.sim) refreshAnchors(this.sim);
                 }
                 break;
             }
@@ -110,6 +119,7 @@ export class LayoutWorkerHost {
                 if (this.anchorAtEnd) {
                     this.anchorAtEnd = false;
                     anchorAtRest(this.nodes, msg.width, msg.height);
+                    if (this.sim) refreshAnchors(this.sim);
                     this.postPositions(gen, 0, true);
                 }
                 this.post({ type: "end", gen }, []);

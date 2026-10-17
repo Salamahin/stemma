@@ -108,6 +108,34 @@ export function anchorAtRest(nodes: LayoutNode[], width: number, height: number)
     }
 }
 
+/**
+ * The user put a node here (edit-mode drag): it is drawn there, stays pinned
+ * there while pinned, and once released the layout keeps it there (anchor).
+ */
+export function moveNodeTo(d: LayoutNode, x: number, y: number) {
+    d.x = x;
+    d.y = y;
+    d.vx = 0;
+    d.vy = 0;
+    if (d.fx != null) d.fx = x;
+    if (d.fy != null) d.fy = y;
+    d.ax = x;
+    d.ay = y;
+}
+
+/**
+ * d3's forceX/forceY read their targets (and strengths) only when they are
+ * initialised, so anchors changed on a running simulation (drop after a drag,
+ * an edit-mode move, anchoring at rest) are ignored until the forces are
+ * re-initialised — which re-setting their accessors does.
+ */
+export function refreshAnchors(sim: d3.Simulation<any, any>) {
+    const fx = sim.force("x") as d3.ForceX<any> | undefined;
+    const fy = sim.force("y") as d3.ForceY<any> | undefined;
+    fx?.x(fx.x());
+    fy?.y(fy.y());
+}
+
 export type LayoutLink = { source: string | LayoutNode; target: string | LayoutNode };
 
 /**

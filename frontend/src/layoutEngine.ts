@@ -8,7 +8,7 @@
  * writes positions into them as the layout progresses, except for nodes the
  * main thread holds fixed (fx/fy), which stay main-thread authoritative.
  */
-import { anchorAtRest, anchorWhereMissing, giveCollisionRadius, createLayoutSimulation, LayoutLoop, LAYOUT_SETTLE_MS, type LayoutNode, type Scheduler } from "./layoutCore";
+import { anchorAtRest, anchorWhereMissing, moveNodeTo, refreshAnchors, giveCollisionRadius, createLayoutSimulation, LayoutLoop, LAYOUT_SETTLE_MS, type LayoutNode, type Scheduler } from "./layoutCore";
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from "./layoutProtocol";
 import { applyStructuredSeed, clanRegions, SEED_USES_CLAN_REGIONS } from "./structuredLayout";
 
@@ -35,6 +35,8 @@ export interface LayoutEngine {
     syncFixed(): void;
     /** Re-send one node's fx/fy (drag). */
     pin(node: EngineNode): void;
+    /** The user put the node here (edit-mode drag); it belongs there from now on. */
+    moveTo(node: EngineNode, x: number, y: number): void;
     /** Restart with the given alpha and/or alphaTarget. */
     run(opts: { alpha?: number; alphaTarget?: number }): void;
     stop(): void;
@@ -81,6 +83,7 @@ export class InlineLayoutEngine implements LayoutEngine {
                 if (this.anchorAtEnd) {
                     this.anchorAtEnd = false;
                     anchorAtRest(this.sim!.nodes() as LayoutNode[], this.center[0] * 2, this.center[1] * 2);
+                    refreshAnchors(this.sim!);
                 }
                 this.cb.onEnd();
             }, LAYOUT_SETTLE_MS);
@@ -103,7 +106,14 @@ export class InlineLayoutEngine implements LayoutEngine {
         if (node.fx == null) {
             node.ax = node.x;
             node.ay = node.y;
+            if (this.sim) refreshAnchors(this.sim);
         }
+    }
+
+    moveTo(node: EngineNode, x: number, y: number) {
+        // nodes are shared with the caller
+        moveNodeTo(node, x, y);
+        if (this.sim) refreshAnchors(this.sim);
     }
 
     run(opts: { alpha?: number; alphaTarget?: number }) {
@@ -263,6 +273,14 @@ export class WorkerLayoutEngine implements LayoutEngine {
         const i = this.nodes.indexOf(node);
         if (i < 0) return;
         this.post({ type: "pin", gen: this.gen, index: i, fx: node.fx ?? null, fy: node.fy ?? null });
+    }
+
+    moveTo(node: EngineNode, x: number, y: number) {
+        moveNodeTo(node, x, y);
+        if (this.fallback) return this.fallback.moveTo(node, x, y);
+        const i = this.nodes.indexOf(node);
+        if (i < 0) return;
+        this.post({ type: "move", gen: this.gen, index: i, x, y });
     }
 
     run(opts: { alpha?: number; alphaTarget?: number }) {

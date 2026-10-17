@@ -10,39 +10,7 @@ import {
   nodeById,
 } from "./_chart";
 import { waitForFirstLoginSeeded } from "./_seeded";
-
-async function createFreshStemma(page: Page) {
-  const stemmaBtn = page.getByTestId("chip-stemma-btn");
-  await expect(stemmaBtn).toBeVisible({ timeout: 10_000 });
-  await stemmaBtn.click();
-  const addBtn = page.getByTestId("chip-add-stemma");
-  await expect(addBtn).toBeVisible({ timeout: 5_000 });
-  await addBtn.click();
-  const modal = page.getByTestId("add-stemma-modal");
-  await expect(modal).toBeVisible({ timeout: 5_000 });
-  await modal.locator("input").fill(`smoke-${Date.now()}`);
-  await modal.locator("button.btn-primary").click();
-  await page.waitForTimeout(2_500);
-}
-
-async function enterEditMode(page: Page) {
-  await page.getByTestId("edit-fab").click();
-  await expect(page.locator(".edit-mode")).toHaveCount(1);
-}
-
-async function leaveEditMode(page: Page) {
-  await page.getByTestId("edit-fab").click();
-  await expect(page.locator(".edit-mode")).toHaveCount(0);
-}
-
-async function addOrphan(page: Page, name: string) {
-  await page.getByTestId("add-person-fab").click();
-  const nameInput = page.getByTestId("person-name-input");
-  await expect(nameInput).toBeVisible();
-  await nameInput.fill(name);
-  await page.getByTestId("person-create").click();
-  await expectPersonVisible(page, name, 15_000);
-}
+import { addOrphan, clickGhost, createFreshStemma, enterEditMode, leaveEditMode } from "./_edit";
 
 const ghostPersonCount = async (page: Page) => (await ghostPersons(page)).length;
 
@@ -141,27 +109,10 @@ test("ghost-child stays separated from an existing real child", async ({ page })
 
   const parentGroup = await expectPersonVisible(page, parentName);
   expect(parentGroup.r).toBeGreaterThan(0);
-  const parentCx = parentGroup.clientX;
-  const parentCy = parentGroup.clientY;
 
-  const pressAndDrag = async (fromX: number, fromY: number, toX: number, toY: number) => {
-    await page.mouse.move(fromX, fromY);
-    await page.mouse.down();
-    await page.mouse.move(fromX + 30, fromY + 30, { steps: 4 });
-    await page.mouse.move(toX, toY, { steps: 12 });
-    await page.waitForTimeout(100);
-  };
-
-  await pressAndDrag(parentCx, parentCy, parentCx + 280, parentCy + 120);
-  await page.mouse.up();
-  const pendingFamily = async () =>
-    (await chartSnapshot(page)).nodes.find((n) => n.id.startsWith("family_pending-family-")) ?? null;
-  await expect.poll(async () => ((await pendingFamily())?.r ?? 0) > 0 && (await pendingFamily())!.drawn, { timeout: 5_000 }).toBe(true);
-  const pendingNode = (await pendingFamily())!;
-  const pendingCenter = { x: pendingNode.clientX, y: pendingNode.clientY };
-
-  await pressAndDrag(pendingCenter.x, pendingCenter.y, pendingCenter.x + 240, pendingCenter.y + 120);
-  await page.mouse.up();
+  // add a real child through the child ghost
+  await hoverNode(page, parentGroup.id);
+  await clickGhost(page, "ghost-person-child");
   const nameInput = page.getByTestId("person-name-input");
   await expect(nameInput).toBeVisible({ timeout: 5_000 });
   const childName = `Child${Date.now()}`;
