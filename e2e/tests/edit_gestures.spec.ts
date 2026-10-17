@@ -98,14 +98,14 @@ test("a ghost links someone already in the tree instead of creating a namesake",
   // the parent ghost sits above: the way there crosses nobody else
   await clickGhost(page, "ghost-person-parent");
 
-  await page.getByTestId("create-tab-existing").click();
-  await page.getByTestId("existing-person-query").fill(mother.slice(0, 8));
+  // typing the name offers the people already in the tree that fit
+  await page.getByTestId("person-name-input").fill(mother.slice(0, 8));
   const option = page.getByTestId("existing-person-option").filter({ hasText: mother });
   await expect(option).toHaveCount(1);
   // the person themself is never offered
   await expect(page.getByTestId("existing-person-option").filter({ hasText: child })).toHaveCount(0);
   await option.click();
-  await expect(page.getByTestId("person-name-input")).toBeHidden();
+  await expect(page.getByTestId("person-details-modal")).toBeHidden();
 
   // one family: the existing mother as parent, the kid as child; nobody new
   const motherId = (await nodeByName(page, mother))!.id;

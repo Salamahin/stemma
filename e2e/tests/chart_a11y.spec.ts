@@ -28,7 +28,9 @@ test("the chart can be explored with the keyboard and a screen reader", async ({
   // Enter opens the focused person's card.
   const announced = (await announcer.textContent())!.split(",")[0];
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("person-name-input")).toBeVisible();
-  const shownName = await page.getByTestId("person-name-input").inputValue();
+  // view mode: the card shows the name as text
+  const shown = page.getByTestId("person-view-name");
+  await expect(shown).toBeVisible();
+  const shownName = (await shown.textContent())!.trim();
   expect(announced).toContain(shownName.split(" ")[0]);
 });

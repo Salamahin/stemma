@@ -23,6 +23,8 @@ test("a person is found by a maiden name", async ({ page }) => {
   const stamp = Date.now();
   const name = `Ivanova Maria ${stamp}`;
   await page.getByTestId("person-name-input").fill(name);
+  // other names are folded under "more" in the add dialog
+  await page.getByTestId("person-more").click();
   await page.getByTestId("person-add-alt-name").click();
   await page.getByTestId("person-alt-name-input").fill(`Petrova${stamp}`);
   await page.getByTestId("person-create").click();

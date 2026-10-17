@@ -33,7 +33,7 @@ Edit-mode pointer handling on the chart canvas is `components/EditGestures.svelt
 | drag on empty canvas | pans (d3.zoom), as in view mode |
 | Escape | cancels a move (node goes back) and blurs |
 
-There are no linking drag gestures any more: relatives are added **and linked** through the ghosts. A ghost's create dialog has an "Already in the tree" tab (`ExistingPersonPicker.svelte`) offering only people the link is valid for (`ghostLink.ts` `linkCandidates`: editable, not pending, no second pair of parents, no cycle, not already the person's spouse); picking one attaches them (`attachPersonToFamily`) or creates the new family with them (`startBranchFromPerson`, through a transient pending family).
+There are no linking drag gestures any more: relatives are added **and linked** through the ghosts. Creating from a ghost, the card's name field also lists matching people already in the tree (`existingMatches`, quick-search matcher) — only people the link is valid for (`ghostLink.ts` `linkCandidates`: editable, not pending, no second pair of parents, no cycle, not already the person's spouse); picking one attaches them (`attachPersonToFamily`) or creates the new family with them (`startBranchFromPerson`, through a transient pending family).
 
 ### Pending families
 
@@ -66,7 +66,7 @@ Clicking a ghost opens the create-person modal. On confirm, ghost materializes i
 
 - All non-focused real nodes frozen via `fx, fy = current`.
 - Focused real node also frozen (anchored at tap position — no jump).
-- Ghosts: unfrozen. Initial seed: spouse to right of person, parent above, child below family. d3 collision force pushes ghosts into empty space against frozen neighbors. Sim stops on blur, ghosts despawn.
+- Ghosts: pinned at their seeds close to the focus (`GHOST_FAMILY_GAP` / `GHOST_PERSON_GAP` / `GHOST_CHILD_DROP` in `ghostHelpers.ts`): spouse to the right, parent above, child below the family. The real nodes around make room for them instead (below); the burst simulation only drives that push. Sim stops on blur, ghosts despawn.
 - Real nodes near the ghosts make room (`ghostPush.ts`): while the burst runs, nodes within `GHOST_PUSH_REACH` of a ghost (except the focused node and viewer-pinned people) are pushed off the ghost circles and their labels (`GHOST_PUSH_CLEARANCE`), off the dashed ghost edges, and real edges running through a ghost are shifted aside with their ends — with a spring back home, never closer to anyone than they were (up to `NODE_SEPARATION`). They move on the chart itself (their frozen burst copies follow, so ghosts collide with them where they are) and glide home on blur; a focus that starts mid-glide pushes from home (`PushRegistry`, one per chart via `pushRegistryFor`), and leaving edit mode settles everyone home before the layout runs. A node something else moved meanwhile (drag, layout) stays put. Not unfrozen in the burst sim: edit mode leaves the graph pinned out of equilibrium, so the full forces would make them drift with no ghost near.
 
 ### Visual
@@ -75,6 +75,10 @@ Clicking a ghost opens the create-person modal. On confirm, ghost materializes i
 - Dashed edge from focused node to ghost.
 - Centered "+" icon + i18n label.
 - Fade-in/out 200 ms on focus change.
+
+## Person card
+
+`PersonDetailsModal.svelte` is the one card for viewing, editing and creating a person. It leads with photo, name and life years; other names, bio and attachments are folded under "More" (with a summary of what is there) when editing or creating. Viewing shows only what is filled in — no empty bio or attachment blocks. Dates are typed as a year, mm.yyyy or dd.mm.yyyy (`parseDateInput` still accepts the "c."/"~" approximate prefixes, but the UI does not ask for them).
 
 ## Known constraints
 
