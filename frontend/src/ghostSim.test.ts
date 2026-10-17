@@ -1,5 +1,8 @@
 import {
     GHOST_NODE_COLLIDE_R,
+    GHOST_PUSH_CLEARANCE,
+    GHOST_PUSH_REACH,
+    NeighbourPush,
     buildGhostInjection,
     ghostSimNeighborDomIds,
     type GhostAnchors,
@@ -138,5 +141,68 @@ describe("ghostSimNeighborDomIds", () => {
         expect(ids.has(normalizeId("family", "pending-family-xyz"))).toBe(false);
         expect(ids.has(normalizeId("family", "fReal"))).toBe(true);
         expect(ids.has(normalizeId("person", "p2"))).toBe(true);
+    });
+});
+
+describe("NeighbourPush", () => {
+    const GHOSTS = [{ x: 110, y: 10 }, { x: 0, y: 110 }];
+    type N = { id: string; x: number; y: number };
+    const setup = () => {
+        const focus: N = { id: "person_f", x: 0, y: 0 };
+        const near: N = { id: "person_near", x: 100, y: 0 };
+        const far: N = { id: "person_far", x: 110 + GHOST_PUSH_REACH + 50, y: 0 };
+        const pinned: N = { id: "person_pinned", x: 0, y: 100 };
+        const nodes = [focus, near, far, pinned];
+        const copies = new Map(nodes.map((n) => [n.id, { x: n.x, y: n.y, fx: n.x, fy: n.y } as any]));
+        const push = new NeighbourPush(nodes, copies, focus.id, GHOSTS, (n) => n.id === "person_pinned");
+        return { focus, near, far, pinned, copies, push };
+    };
+    const settle = (push: NeighbourPush<{ id: string; x: number; y: number }>, ghosts: Array<{ x: number; y: number }>) => {
+        for (let i = 0; i < 60; i++) push.step(ghosts);
+    };
+
+    test("ghosts push nearby real nodes out of the way; the focused, far and pinned nodes stay", () => {
+        const { focus, near, far, pinned, copies, push } = setup();
+        const ghosts = GHOSTS;
+        settle(push, ghosts);
+        const gap = Math.hypot(near.x - ghosts[0].x, near.y - ghosts[0].y);
+        expect(gap).toBeGreaterThan(GHOST_PUSH_CLEARANCE * 0.8);
+        // the burst sim sees the moved node (frozen copy follows it)
+        expect(copies.get("person_near").fx).toBe(near.x);
+        expect([focus.x, focus.y, far.x, far.y, pinned.x, pinned.y]).toEqual([0, 0, 110 + GHOST_PUSH_REACH + 50, 0, 0, 100]);
+    });
+
+    test("pushed people never pile onto each other or onto nodes that stay", () => {
+        const focus = { id: "person_f", x: 0, y: 0 };
+        const a = { id: "person_a", x: 130, y: 0 };
+        const b = { id: "person_b", x: 180, y: 0 };
+        const c = { id: "person_c", x: 135, y: 20 }; // already closer than the separation to a
+        const nodes = [focus, a, b, c];
+        const push = new NeighbourPush(nodes, new Map(), focus.id, [{ x: 95, y: 0 }]);
+        // a ghost pushing a straight into b, and towards the focus side
+        for (let i = 0; i < 60; i++) push.step([{ x: 95, y: 0 }]);
+        expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(44.9);
+        expect(Math.hypot(a.x - c.x, a.y - c.y)).toBeGreaterThanOrEqual(Math.hypot(5, 20) - 0.1);
+        for (const n of [a, b, c]) expect(Math.hypot(n.x - focus.x, n.y - focus.y)).toBeGreaterThanOrEqual(44.9);
+    });
+
+    test("without ghosts nearby nothing moves", () => {
+        const { near, push } = setup();
+        settle(push, [{ x: -200, y: -200 }]);
+        expect([near.x, near.y]).toEqual([100, 0]);
+    });
+
+    test("restore puts pushed nodes back unless something else moved them since", () => {
+        const { near, pinned, push } = setup();
+        settle(push, [{ x: 110, y: 10 }]);
+        expect(push.restore()).toBe(true);
+        expect([near.x, near.y]).toEqual([100, 0]);
+
+        const again = setup();
+        settle(again.push, [{ x: 110, y: 10 }]);
+        again.near.x = 999; // dragged meanwhile
+        again.push.restore();
+        expect(again.near.x).toBe(999);
+        expect(pinned.y).toBe(100);
     });
 });

@@ -17,6 +17,7 @@
         ghostSimNeighborDomIds,
         resolveAnchorSimId,
         GHOST_NEIGHBOUR_COLLIDE_R,
+        NeighbourPush,
         type GhostExtraNode,
     } from "../ghostSim";
     import type { CanvasChart, GhostEdgeView, GhostNodeView } from "../canvasChart";
@@ -148,6 +149,15 @@
         const focusedDatum = datumById.get(focusDomId);
         if (focusedDatum) focusedDatum.r = GHOST_NEIGHBOUR_COLLIDE_R;
 
+        // Real nodes around the focus make room for the ghosts while they are
+        // shown (moved on the chart itself, put back on blur; see NeighbourPush),
+        // and the ghosts keep off them in turn, so both give way.
+        const push = new NeighbourPush(c.nodes, datumById, focusDomId, injection.extraNodes, (n) => c.isPinned(n));
+        for (const id of push.pushedIds) {
+            const d = datumById.get(id);
+            if (d && d.r == null) d.r = GHOST_NEIGHBOUR_COLLIDE_R;
+        }
+
         // Pin ghost y to the seed value: the schema (spouse east of focus at
         // same y, child below east family, parent above) is the affordance
         // semantic and must not drift under the sim's forceY/link pull. Ghosts
@@ -233,7 +243,10 @@
         };
         emitPositions();
 
-        sim.on("tick.ghost", () => c.requestRender());
+        sim.on("tick.ghost", () => {
+            if (push.step(injection.extraNodes)) c.positionsChanged();
+            else c.requestRender();
+        });
         sim.on("end.ghost", emitPositions);
 
         return () => {
@@ -241,6 +254,7 @@
             sim.on("tick.ghost", null);
             sim.on("end.ghost", null);
             sim.stop();
+            if (push.restore()) c.positionsChanged();
             onpositionsChange([]);
             hideGhosts();
         };

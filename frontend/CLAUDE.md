@@ -107,6 +107,7 @@ Clicking a ghost opens the create-person modal. On confirm, ghost materializes i
 - All non-focused real nodes frozen via `fx, fy = current`.
 - Focused real node also frozen (anchored at tap position — no jump).
 - Ghosts: unfrozen. Initial seed: spouse to right of person, parent above, child below family. d3 collision force pushes ghosts into empty space against frozen neighbors. Sim stops on blur, ghosts despawn.
+- Real nodes near the ghosts make room (`NeighbourPush` in `ghostSim.ts`): while the burst runs, nodes within `GHOST_PUSH_REACH` of a ghost (except the focused node and viewer-pinned people) are nudged out to `GHOST_PUSH_CLEARANCE` with a spring back to their spot, never closer to anyone than they were (up to 45 units). They move on the chart itself (their frozen burst copies follow, so ghosts collide with them where they are) and are put back on blur unless something else moved them meanwhile. Not unfrozen in the burst sim: edit mode leaves the graph pinned out of equilibrium, so the full forces would make them drift with no ghost near.
 
 ### Visual
 
