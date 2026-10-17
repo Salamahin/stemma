@@ -25,7 +25,9 @@
     import { exportChartSvg } from "../svgExport";
     import { exportChartPng } from "../pngExport";
     import { personDisplayName } from "../personDisplayName";
-    import { t } from "../i18n";
+    import { locale, t } from "../i18n";
+    import { formatPartialDate } from "../partialDate";
+    import { nearestTo, nextInDirection, type Direction, type Point } from "../chartKeyboard";
     import { computeClans, type Clan } from "../clans";
     import { CanvasChart, type ChartNode, type ChartLink } from "../canvasChart";
 
@@ -271,6 +273,90 @@
         applyStyle();
         onhighlightChanged?.();
     }
+
+    // ---- keyboard navigation and screen-reader support ----
+
+    let keyboardId = $state<string | null>(null);
+    let announcement = $state("");
+
+    const KEY_DIRECTIONS: Record<string, Direction> = {
+        ArrowLeft: "left",
+        ArrowRight: "right",
+        ArrowUp: "up",
+        ArrowDown: "down",
+    };
+
+    function personPoints(): Point[] {
+        if (!chart) return [];
+        return chart.nodes
+            .filter((n) => n.type === "person" && n.x != null && n.y != null)
+            .map((n) => ({ id: n.id, x: n.x!, y: n.y! }));
+    }
+
+    function describePerson(personId: string): string {
+        const p = stemmaIndex.person(personId);
+        if (!p) return "";
+        const birth = formatPartialDate(p.birthDate, $locale);
+        const death = formatPartialDate(p.deathDate, $locale);
+        const span = birth || death ? `${birth || "?"} – ${death}`.trim().replace(/ –$/, "") : "";
+        return span ? `${personDisplayName(p.name)}, ${span}` : personDisplayName(p.name);
+    }
+
+    function revealNode(node: ChartNode) {
+        if (!canvasEl || node.x == null || node.y == null) return;
+        const tr = d3.zoomTransform(canvasEl);
+        const [sx, sy] = tr.apply([node.x, node.y]);
+        const rect = canvasEl.getBoundingClientRect();
+        const margin = 80;
+        if (sx >= margin && sx <= rect.width - margin && sy >= margin && sy <= rect.height - margin) return;
+        d3.select(canvasEl)
+            .transition()
+            .duration(300)
+            .call(zoomHandler.transform, d3.zoomIdentity.translate(rect.width / 2 - tr.k * node.x, rect.height / 2 - tr.k * node.y).scale(tr.k));
+    }
+
+    function focusNodeById(nodeId: string) {
+        const node = chart?.node(nodeId);
+        if (!node) return;
+        clearHover();
+        hoverEnter(node);
+        keyboardId = nodeId;
+        announcement = describePerson(denormalizeId(nodeId));
+        revealNode(node);
+    }
+
+    function onChartKeydown(e: KeyboardEvent) {
+        if (!chart || !canvasEl) return;
+        const dir = KEY_DIRECTIONS[e.key];
+        if (dir) {
+            e.preventDefault();
+            const points = personPoints();
+            let next: Point | null = null;
+            if (keyboardId) next = nextInDirection(points, keyboardId, dir);
+            if (!keyboardId || !chart.node(keyboardId)) {
+                const rect = canvasEl.getBoundingClientRect();
+                const [cx, cy] = d3.zoomTransform(canvasEl).invert([rect.width / 2, rect.height / 2]);
+                next = nearestTo(points, cx, cy);
+            }
+            if (next) focusNodeById(next.id);
+        } else if ((e.key === "Enter" || e.key === " ") && keyboardId) {
+            e.preventDefault();
+            onpersonSelected?.(stemmaIndex.person(denormalizeId(keyboardId)));
+        } else if (e.key === "Escape" && keyboardId) {
+            keyboardId = null;
+            announcement = "";
+            clearHover();
+        }
+    }
+
+    function openFromList(personId: string) {
+        focusNodeById(normalizeId("person", personId));
+        onpersonSelected?.(stemmaIndex.person(personId));
+    }
+
+    const peopleForList = $derived(
+        [...stemma.people].sort((a, b) => personDisplayName(a.name).localeCompare(personDisplayName(b.name))),
+    );
 
     function updateHover(clientX: number, clientY: number) {
         if (!chart || isDragging) return;
@@ -559,7 +645,23 @@
 </script>
 
 <div {hidden}>
-    <canvas id="chart" class="chart-canvas" bind:this={canvasEl}></canvas>
+    <canvas
+        id="chart"
+        class="chart-canvas"
+        bind:this={canvasEl}
+        tabindex="0"
+        aria-label={$t("chart.a11yLabel")}
+        aria-describedby="chart-people"
+        onkeydown={onChartKeydown}
+    ></canvas>
+    <div class="visually-hidden" aria-live="polite" data-testid="chart-announcer">{announcement}</div>
+    <!-- The chart is a canvas: this list gives screen readers the people in it. Items are
+         reachable in browse mode but kept out of the Tab order (arrows move on the chart). -->
+    <ul id="chart-people" class="visually-hidden" aria-label={$t("chart.peopleList")} data-testid="chart-people">
+        {#each peopleForList as p (p.id)}
+            <li><button type="button" tabindex="-1" onclick={() => openFromList(p.id)}>{describePerson(p.id)}</button></li>
+        {/each}
+    </ul>
 </div>
 
 <style lang="less">
@@ -567,5 +669,14 @@
         display: block;
         width: 100%;
         height: calc(~"100vh - 56px");
+    }
+
+    .chart-canvas:focus {
+        outline: none;
+    }
+
+    .chart-canvas:focus-visible {
+        outline: 2px solid #4a80c4;
+        outline-offset: -2px;
     }
 </style>
