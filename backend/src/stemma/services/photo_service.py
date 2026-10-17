@@ -2,11 +2,15 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from stemma.domain.errors import UnsupportedPhotoType
+from stemma.domain.errors import InvalidAttachment, UnsupportedPhotoType
 
 MAX_PHOTO_BYTES = 5 * 1024 * 1024
 ALLOWED_PHOTO_CONTENT_TYPES: frozenset[str] = frozenset(
     {"image/jpeg", "image/png", "image/webp"}
+)
+MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
+ALLOWED_ATTACHMENT_CONTENT_TYPES: frozenset[str] = frozenset(
+    {"image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"}
 )
 PUT_URL_EXPIRES_SECONDS = 300
 GET_URL_EXPIRES_SECONDS = 3600
@@ -14,6 +18,14 @@ GET_URL_EXPIRES_SECONDS = 3600
 
 def photo_key(stemma_id: str, person_id: str) -> str:
     return f"stemmas/{stemma_id}/persons/{person_id}/photo"
+
+
+def attachment_key(stemma_id: str, attachment_id: str) -> str:
+    return f"stemmas/{stemma_id}/attachments/{attachment_id}"
+
+
+def is_attachment_key_of(stemma_id: str, key: str) -> bool:
+    return key.startswith(f"stemmas/{stemma_id}/attachments/")
 
 
 def belongs_to_stemma(stemma_id: str, key: str) -> bool:
@@ -26,6 +38,10 @@ def belongs_to_stemma(stemma_id: str, key: str) -> bool:
 class PhotoStore(Protocol):
     def issue_upload_url(
         self, stemma_id: str, person_id: str, content_type: str
+    ) -> tuple[str, dict[str, str], str]: ...
+
+    def issue_attachment_upload_url(
+        self, stemma_id: str, attachment_id: str, content_type: str
     ) -> tuple[str, dict[str, str], str]: ...
 
     def issue_get_url(self, key: str) -> str: ...
@@ -52,6 +68,24 @@ class S3PhotoService:
             Fields={"Content-Type": content_type},
             Conditions=[
                 ["content-length-range", 0, MAX_PHOTO_BYTES],
+                ["eq", "$Content-Type", content_type],
+            ],
+            ExpiresIn=PUT_URL_EXPIRES_SECONDS,
+        )
+        return response["url"], response["fields"], key
+
+    def issue_attachment_upload_url(
+        self, stemma_id: str, attachment_id: str, content_type: str
+    ) -> tuple[str, dict[str, str], str]:
+        if content_type not in ALLOWED_ATTACHMENT_CONTENT_TYPES:
+            raise InvalidAttachment(reason=f"unsupported file type {content_type}")
+        key = attachment_key(stemma_id, attachment_id)
+        response = self.s3_client.generate_presigned_post(
+            self.bucket,
+            key,
+            Fields={"Content-Type": content_type},
+            Conditions=[
+                ["content-length-range", 0, MAX_ATTACHMENT_BYTES],
                 ["eq", "$Content-Type", content_type],
             ],
             ExpiresIn=PUT_URL_EXPIRES_SECONDS,

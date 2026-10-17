@@ -49,10 +49,36 @@ class StemmaDescription:
 
 
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
+class AttachmentDescription:
+    """A link or an uploaded file (scan, PDF, photo) attached to a person or a family.
+    For files `url` is a short-lived download link."""
+
+    id: str
+    owner_kind: Literal["person", "family"]
+    owner_id: str
+    kind: Literal["link", "file"]
+    title: str
+    url: str | None
+    content_type: str | None = None
+    note: str | None = None
+    type: Literal["AttachmentDescription"] = "AttachmentDescription"
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class Stemma:
     people: list[PersonDescription] = field(default_factory=list)
     families: list[FamilyDescription] = field(default_factory=list)
+    attachments: list[AttachmentDescription] = field(default_factory=list)
     type: Literal["Stemma"] = "Stemma"
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
+class AttachmentUploadUrl:
+    upload_url: str
+    upload_fields: dict[str, str]
+    file_key: str
+    expires_in_seconds: int
+    type: Literal["AttachmentUploadUrl"] = "AttachmentUploadUrl"
 
 
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
@@ -114,6 +140,7 @@ Response = Annotated[
     | CloneResult
     | TokenAccepted
     | PhotoUploadUrl
+    | AttachmentUploadUrl
     | AuthLoginResponse
     | AuthLogoutResponse,
     Discriminator("type"),

@@ -32,6 +32,7 @@
     import PendingVisuals from "./components/PendingVisuals.svelte";
     import Minimap from "./components/Minimap.svelte";
     import { capturePendingInvite, takePendingInvite } from "./inviteLinkBuilder";
+    import { attachmentsOf } from "./attachments";
     import { Circle2 } from "svelte-loading-spinners";
     import { normalizeId } from "./graphTools";
     import type { FocusedId } from "./focusGesture";
@@ -427,6 +428,10 @@
                 familyId={selectedFamilyId}
                 onfamilyRemoveRequested={(id) => modals.confirmRemoveFamily(id)}
                 onclose={closeFamilySheet}
+                attachments={selectedFamilyId ? attachmentsOf(stemma, "family", selectedFamilyId) : []}
+                onattachLink={(p) => controller.attachLink("family", p.familyId, p.title, p.url, p.note)}
+                onattachFile={(p) => controller.attachFile("family", p.familyId, p.file, p.title)}
+                onremoveAttachment={(id) => controller.removeAttachment(id)}
             />
         {/snippet}
     </Sheet>
@@ -437,6 +442,10 @@
         onpersonUpdated={(p) => controller.savePerson(p.id, p.description, p.pin, p.photoUpload, p.photoRemove)}
         onpersonRemoveRequested={(p) => modals.confirmRemovePerson(p)}
         onshareAccessRequested={(p) => shareAccessModal?.show(p)}
+        attachmentsOf={(personId) => attachmentsOf(stemma, "person", personId)}
+        onattachLink={(p) => controller.attachLink("person", p.personId, p.title, p.url, p.note)}
+        onattachFile={(p) => controller.attachFile("person", p.personId, p.file, p.title)}
+        onremoveAttachment={(id) => controller.removeAttachment(id)}
     />
 
     <AboutModal bind:this={aboutModal} />
