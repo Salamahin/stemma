@@ -12,6 +12,7 @@ stemma (or session) a user owns by querying gsi1pk = USER#<user_id>.
     STEMMA#<sid>            | OWNER#STEMMA#<uid>                | stemma ownership (also on GSI1)
     STEMMA#<sid>            | OWNER#PERSON#<pid>#<uid>          | person ownership
     STEMMA#<sid>            | OWNER#FAMILY#<fid>#<uid>          | family ownership
+    STEMMA#<sid>            | ATTACH#<aid>                      | link/file attached to a person or family
     SESSION#<sid>           | META                              | session (TTL attr drives DynamoDB expiry)
     OAUTHCLIENT#<cid>       | META                              | dynamically registered MCP OAuth client
     OAUTHFLOW#<flow_id>     | META                              | pending authorize→IdP round-trip (TTL)
@@ -36,6 +37,7 @@ FAMILY_PREFIX = "FAMILY#"
 STEMMA_OWNER_PREFIX = "OWNER#STEMMA#"
 PERSON_OWNER_PREFIX = "OWNER#PERSON#"
 FAMILY_OWNER_PREFIX = "OWNER#FAMILY#"
+ATTACHMENT_PREFIX = "ATTACH#"
 
 GSI1_INDEX_NAME = "UserStemmasIndex"
 
@@ -79,6 +81,10 @@ def person_sk(person_id: str) -> str:
 
 def family_sk(family_id: str) -> str:
     return f"{FAMILY_PREFIX}{family_id}"
+
+
+def attachment_sk(attachment_id: str) -> str:
+    return f"{ATTACHMENT_PREFIX}{attachment_id}"
 
 
 def stemma_owner_sk(user_id: str) -> str:

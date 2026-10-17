@@ -1,7 +1,7 @@
 import logging
 import uuid
 from collections import defaultdict
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from boto3.dynamodb.conditions import Key
@@ -18,6 +18,7 @@ from stemma.domain.errors import (
     DuplicatedIds,
     IncompleteFamily,
     IsNotTheOnlyStemmaOwner,
+    NoSuchAttachment,
     NoSuchPersonId,
     SpouseLinkAlreadyExists,
     StemmaHasCycles,
@@ -30,13 +31,20 @@ from stemma.domain.requests import (
     LinkRole,
     PersonDefinition,
 )
-from stemma.domain.responses import FamilyDescription, PersonDescription, Stemma, StemmaDescription
+from stemma.domain.responses import (
+    AttachmentDescription,
+    FamilyDescription,
+    PersonDescription,
+    Stemma,
+    StemmaDescription,
+)
 from stemma.domain.user import User
 from stemma.seed.kings_of_europe import SeedStemma
 from stemma.services.kinship import FamilyLink, kinsmen_families, members_of
-from stemma.services.photo_service import PhotoStore, photo_key
+from stemma.services.photo_service import PhotoStore, attachment_key, photo_key
 from stemma.services.stemma_dfs import has_cycles
 from stemma.storage.schema import (
+    ATTACHMENT_PREFIX,
     ATTR_DEFAULT_STEMMA_ID,
     ATTR_DISPLAY_NAME,
     ATTR_FAVOURITE_STEMMA_ID,
@@ -49,6 +57,7 @@ from stemma.storage.schema import (
     SK_PROFILE,
     STEMMA_OWNER_PREFIX,
     STEMMA_PK_PREFIX,
+    attachment_sk,
     family_owner_sk,
     family_sk,
     parse_id_after_prefix,
@@ -84,6 +93,18 @@ class _FamilyRow:
 
 
 @dataclass(frozen=True)
+class _AttachmentRow:
+    id: str
+    owner_kind: str
+    owner_id: str
+    title: str
+    url: str | None = None
+    file_key: str | None = None
+    content_type: str | None = None
+    note: str | None = None
+
+
+@dataclass(frozen=True)
 class _StemmaSnapshot:
     stemma_id: str
     people: dict[str, _PersonRow]
@@ -91,6 +112,7 @@ class _StemmaSnapshot:
     stemma_owners: set[str]
     person_owners: set[tuple[str, str]]
     family_owners: set[tuple[str, str]]
+    attachments: dict[str, _AttachmentRow] = field(default_factory=dict)
 
 
 class StorageService:
@@ -278,8 +300,9 @@ class StorageService:
         if len(snapshot.stemma_owners) != 1:
             raise IsNotTheOnlyStemmaOwner(stemma_id=stemma_id)
         photo_keys = [p.photo_key for p in snapshot.people.values() if p.photo_key is not None]
+        file_keys = [a.file_key for a in snapshot.attachments.values() if a.file_key is not None]
         self._delete_entire_stemma(stemma_id)
-        return photo_keys
+        return photo_keys + file_keys
 
     def stemma(self, user_id: str, stemma_id: str) -> Stemma:
         snapshot = self._load_snapshot(stemma_id)
@@ -314,7 +337,44 @@ class StorageService:
         _, stemma = self._write_owned_stemma(
             user_id, new_stemma_name, persons, families, stemma_id=new_stemma_id
         )
-        return stemma
+        attachments = self._clone_attachments(source, new_stemma_id, person_id_map, family_id_map)
+        if not attachments:
+            return stemma
+        copied = _StemmaSnapshot(
+            stemma_id=new_stemma_id,
+            people={p.id: p for p in persons},
+            families={f.id: f for f in families},
+            stemma_owners={user_id},
+            person_owners={(p.id, user_id) for p in persons},
+            family_owners={(f.id, user_id) for f in families},
+            attachments={a.id: a for a in attachments},
+        )
+        return _describe_stemma(copied, user_id, self._photo_store)
+
+    def _clone_attachments(
+        self,
+        source: _StemmaSnapshot,
+        new_stemma_id: str,
+        person_id_map: dict[str, str],
+        family_id_map: dict[str, str],
+    ) -> list[_AttachmentRow]:
+        """Copies attachments (and their files, so either stemma can be deleted on its own)."""
+        rows: list[_AttachmentRow] = []
+        for a in source.attachments.values():
+            id_map = person_id_map if a.owner_kind == "person" else family_id_map
+            if a.owner_id not in id_map:
+                continue
+            new_id = uuid.uuid4().hex
+            file_key = None
+            if a.file_key is not None:
+                file_key = self._copy_attachment_file(a.file_key, new_stemma_id, new_id)
+                if file_key is None:
+                    continue
+            rows.append(replace(a, id=new_id, owner_id=id_map[a.owner_id], file_key=file_key))
+        with self._table.batch_writer() as batch:
+            for row in rows:
+                batch.put_item(Item=_attachment_item(new_stemma_id, row))
+        return rows
 
     def _copy_photo(
         self, source_key: str | None, new_stemma_id: str, new_person_id: str
@@ -351,10 +411,12 @@ class StorageService:
         self._require_family_access(snapshot, user_id, family_id)
         return self._apply_family_change(snapshot, user_id, target_family_id=family_id, family=family)
 
-    def remove_family(self, user_id: str, stemma_id: str, family_id: str) -> None:
+    def remove_family(self, user_id: str, stemma_id: str, family_id: str) -> list[str]:
+        """Deletes the family and its attachments; returns the attachment files to drop."""
         snapshot = self._load_snapshot(stemma_id)
         self._require_family_access(snapshot, user_id, family_id)
         self._delete_family(stemma_id, family_id, snapshot.family_owners)
+        return self._delete_attachments_of(snapshot, {("family", family_id)})
 
     def link_persons(
         self, user_id: str, stemma_id: str, from_person_id: str, to_person_id: str, role: LinkRole
@@ -430,7 +492,10 @@ class StorageService:
                 else:
                     batch.put_item(Item=_family_item(stemma_id, fam))
 
-        return removed_photos
+        owners = {("person", person_id)} | {
+            ("family", fam.id) for fam in affected_families if len(fam.parents) + len(fam.children) < 2
+        }
+        return removed_photos + self._delete_attachments_of(snapshot, owners)
 
     def create_orphan_person(
         self, user_id: str, stemma_id: str, description: CreateNewPerson
@@ -545,6 +610,82 @@ class StorageService:
         ).get("Item")
         return item is not None
 
+    # ---------- attachments ----------
+
+    def add_attachment(
+        self,
+        user_id: str,
+        stemma_id: str,
+        owner_kind: str,
+        owner_id: str,
+        *,
+        title: str,
+        url: str | None = None,
+        file_key: str | None = None,
+        content_type: str | None = None,
+        note: str | None = None,
+        attachment_id: str | None = None,
+    ) -> Stemma:
+        snapshot = self._load_snapshot(stemma_id)
+        self._require_owner_access(snapshot, user_id, owner_kind, owner_id)
+        row = _AttachmentRow(
+            id=attachment_id or uuid.uuid4().hex,
+            owner_kind=owner_kind,
+            owner_id=owner_id,
+            title=title,
+            url=url,
+            file_key=file_key,
+            content_type=content_type,
+            note=note,
+        )
+        self._table.put_item(Item=_attachment_item(stemma_id, row))
+        planned = replace(snapshot, attachments={**snapshot.attachments, row.id: row})
+        return _describe_stemma(planned, user_id, self._photo_store)
+
+    def require_attachment_owner_access(self, user_id: str, stemma_id: str, owner_kind: str, owner_id: str) -> None:
+        self._require_owner_access(self._load_snapshot(stemma_id), user_id, owner_kind, owner_id)
+
+    def remove_attachment(self, user_id: str, stemma_id: str, attachment_id: str) -> tuple[Stemma, str | None]:
+        """Deletes one attachment; returns the stemma and the file to drop, if any."""
+        snapshot = self._load_snapshot(stemma_id)
+        row = snapshot.attachments.get(attachment_id)
+        if row is None:
+            raise NoSuchAttachment(id=attachment_id)
+        self._require_owner_access(snapshot, user_id, row.owner_kind, row.owner_id)
+        self._table.delete_item(Key={"pk": stemma_pk(stemma_id), "sk": attachment_sk(attachment_id)})
+        remaining = {k: v for k, v in snapshot.attachments.items() if k != attachment_id}
+        return _describe_stemma(replace(snapshot, attachments=remaining), user_id, self._photo_store), row.file_key
+
+    def _require_owner_access(self, snapshot: _StemmaSnapshot, user_id: str, owner_kind: str, owner_id: str) -> None:
+        if owner_kind == "person":
+            if owner_id not in snapshot.people:
+                raise NoSuchPersonId(id=owner_id)
+            self._require_person_access(snapshot, user_id, owner_id)
+        else:
+            if owner_id not in snapshot.families:
+                raise AccessToFamilyDenied(family_id=owner_id)
+            self._require_family_access(snapshot, user_id, owner_id)
+
+    def _delete_attachments_of(self, snapshot: _StemmaSnapshot, owners: set[tuple[str, str]]) -> list[str]:
+        doomed = [a for a in snapshot.attachments.values() if (a.owner_kind, a.owner_id) in owners]
+        if not doomed:
+            return []
+        with self._table.batch_writer() as batch:
+            for a in doomed:
+                batch.delete_item(Key={"pk": stemma_pk(snapshot.stemma_id), "sk": attachment_sk(a.id)})
+        return [a.file_key for a in doomed if a.file_key is not None]
+
+    def _copy_attachment_file(self, source_key: str, new_stemma_id: str, new_attachment_id: str) -> str | None:
+        if self._photo_store is None:
+            return None
+        destination = attachment_key(new_stemma_id, new_attachment_id)
+        try:
+            self._photo_store.copy(source_key, destination)
+        except ClientError:
+            logger.warning("could not copy attachment %s while cloning into %s", source_key, new_stemma_id)
+            return None
+        return destination
+
     # ---------- internals ----------
 
     def _load_snapshot(self, stemma_id: str) -> _StemmaSnapshot:
@@ -555,6 +696,7 @@ class StorageService:
         stemma_owners: set[str] = set()
         person_owners: set[tuple[str, str]] = set()
         family_owners: set[tuple[str, str]] = set()
+        attachments: dict[str, _AttachmentRow] = {}
 
         for item in items:
             sk = item["sk"]
@@ -578,6 +720,9 @@ class StorageService:
                     parents=list(item.get("parents", [])),
                     children=list(item.get("children", [])),
                 )
+            elif sk.startswith(ATTACHMENT_PREFIX):
+                aid = parse_id_after_prefix(sk, ATTACHMENT_PREFIX)
+                attachments[aid] = _attachment_row(aid, item)
             elif sk.startswith(STEMMA_OWNER_PREFIX):
                 stemma_owners.add(parse_id_after_prefix(sk, STEMMA_OWNER_PREFIX))
             elif sk.startswith(PERSON_OWNER_PREFIX):
@@ -592,6 +737,7 @@ class StorageService:
             stemma_owners=stemma_owners,
             person_owners=person_owners,
             family_owners=family_owners,
+            attachments=attachments,
         )
 
     def _query_all(self, **kwargs) -> list[dict]:
@@ -917,6 +1063,34 @@ def _person_item(stemma_id: str, person: _PersonRow) -> dict:
     return item
 
 
+def _attachment_row(aid: str, item: dict) -> _AttachmentRow:
+    return _AttachmentRow(
+        id=aid,
+        owner_kind=item.get("owner_kind", "person"),
+        owner_id=item.get("owner_id", ""),
+        title=item.get("title", ""),
+        url=item.get("url"),
+        file_key=item.get("file_key"),
+        content_type=item.get("content_type"),
+        note=item.get("note"),
+    )
+
+
+def _attachment_item(stemma_id: str, row: _AttachmentRow) -> dict:
+    item: dict = {
+        "pk": stemma_pk(stemma_id),
+        "sk": attachment_sk(row.id),
+        "owner_kind": row.owner_kind,
+        "owner_id": row.owner_id,
+        "title": row.title,
+    }
+    for attr in ("url", "file_key", "content_type", "note"):
+        value = getattr(row, attr)
+        if value is not None:
+            item[attr] = value
+    return item
+
+
 def _parse_alt_names(value: object) -> tuple[AltName, ...]:
     # Best effort: a malformed entry is skipped rather than breaking the stemma.
     if not isinstance(value, list):
@@ -983,5 +1157,20 @@ def _describe_stemma(
                 read_only=(f.id, user_id) not in snapshot.family_owners,
             )
             for f in snapshot.families.values()
+        ],
+        attachments=[
+            AttachmentDescription(
+                id=a.id,
+                owner_kind="family" if a.owner_kind == "family" else "person",
+                owner_id=a.owner_id,
+                kind="file" if a.file_key else "link",
+                title=a.title,
+                url=_photo_url(a.file_key) if a.file_key else a.url,
+                content_type=a.content_type,
+                note=a.note,
+            )
+            for a in snapshot.attachments.values()
+            # An attachment of a family that was dissolved elsewhere is not shown.
+            if (a.owner_id in snapshot.people if a.owner_kind == "person" else a.owner_id in snapshot.families)
         ],
     )

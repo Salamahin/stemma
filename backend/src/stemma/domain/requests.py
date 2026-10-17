@@ -168,6 +168,48 @@ class SetPersonPhotoRequest:
     type: Literal["SetPersonPhotoRequest"] = "SetPersonPhotoRequest"
 
 
+AttachmentOwnerKind = Literal["person", "family"]
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
+class AddLinkAttachmentRequest:
+    stemma_id: str
+    owner_kind: AttachmentOwnerKind
+    owner_id: str
+    title: str
+    url: str
+    note: str | None = None
+    type: Literal["AddLinkAttachmentRequest"] = "AddLinkAttachmentRequest"
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
+class RequestAttachmentUploadUrlRequest:
+    stemma_id: str
+    owner_kind: AttachmentOwnerKind
+    owner_id: str
+    content_type: str
+    type: Literal["RequestAttachmentUploadUrlRequest"] = "RequestAttachmentUploadUrlRequest"
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
+class AddFileAttachmentRequest:
+    stemma_id: str
+    owner_kind: AttachmentOwnerKind
+    owner_id: str
+    title: str
+    file_key: str
+    content_type: str
+    note: str | None = None
+    type: Literal["AddFileAttachmentRequest"] = "AddFileAttachmentRequest"
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
+class RemoveAttachmentRequest:
+    stemma_id: str
+    attachment_id: str
+    type: Literal["RemoveAttachmentRequest"] = "RemoveAttachmentRequest"
+
+
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
 class AuthLoginRequest:
     id_token: str
@@ -198,6 +240,10 @@ Request = Annotated[
     | LinkPersonsRequest
     | RequestPhotoUploadUrlRequest
     | SetPersonPhotoRequest
+    | AddLinkAttachmentRequest
+    | RequestAttachmentUploadUrlRequest
+    | AddFileAttachmentRequest
+    | RemoveAttachmentRequest
     | AuthLoginRequest
     | AuthLogoutRequest,
     Discriminator("type"),

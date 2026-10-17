@@ -35,6 +35,10 @@ export function mapStemmaError<T extends StemmaResponse>(response: T, describePe
             throw new LocalizedError("error.spouseLinkAlreadyExists")
         case "TooManyParents":
             throw new LocalizedError("error.tooManyParents")
+        case "InvalidAttachment":
+            throw new LocalizedError("error.invalidAttachment", { reason: response.reason })
+        case "NoSuchAttachment":
+            throw new LocalizedError("error.noSuchAttachment")
         default:
             return response
     }

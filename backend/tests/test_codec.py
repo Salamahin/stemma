@@ -103,6 +103,7 @@ def test_encode_owned_stemmas_response_tags_with_type_field() -> None:
             "families": [
                 {"type": "FamilyDescription", "id": "1", "parents": ["9"], "children": [], "readOnly": False}
             ],
+            "attachments": [],
         },
     }
 

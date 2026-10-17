@@ -109,6 +109,18 @@ class TooManyParents(StemmaError):
     type: Literal["TooManyParents"] = "TooManyParents"
 
 
+@dataclass(config=DOMAIN_CONFIG)
+class InvalidAttachment(StemmaError):
+    reason: str
+    type: Literal["InvalidAttachment"] = "InvalidAttachment"
+
+
+@dataclass(config=DOMAIN_CONFIG)
+class NoSuchAttachment(StemmaError):
+    id: str
+    type: Literal["NoSuchAttachment"] = "NoSuchAttachment"
+
+
 StemmaErrorUnion = Annotated[
     UnknownError
     | RequestDeserializationProblem
@@ -126,6 +138,8 @@ StemmaErrorUnion = Annotated[
     | UnsupportedPhotoType
     | AmbiguousLinkTarget
     | SpouseLinkAlreadyExists
-    | TooManyParents,
+    | TooManyParents
+    | InvalidAttachment
+    | NoSuchAttachment,
     Discriminator("type"),
 ]
