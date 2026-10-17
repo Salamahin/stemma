@@ -76,28 +76,51 @@ export function projectNodes(nodes: NodeDot[], layout: MinimapLayout): NodeDot[]
     }));
 }
 
-export type ProjectedPaths = { persons: string; families: string };
+export type MinimapStyle = { person: string; family: string; viewportFill: string; viewportStroke: string };
 
-export function projectAndBuildPaths(
+export type MinimapSurface = { width: number; height: number; dpr: number };
+
+type MinimapContext = Pick<
+    CanvasRenderingContext2D,
+    "setTransform" | "clearRect" | "beginPath" | "moveTo" | "arc" | "fill" | "fillRect" | "strokeRect"
+> & { fillStyle: unknown; strokeStyle: unknown; lineWidth: number; globalAlpha: number };
+
+const MINIMAP_PERSON_R = 2.5;
+const MINIMAP_FAMILY_R = 1.5;
+
+/** Draws the overview on a canvas: one batched path per node type, then the viewport frame. */
+export function drawMinimap(
+    ctx: MinimapContext,
     rawNodes: NodeDot[],
     layout: MinimapLayout,
-    personRadius: number,
-    familyRadius: number,
-): ProjectedPaths {
-    const persons: string[] = [];
-    const families: string[] = [];
-    const pd2 = personRadius * 2;
-    const fd2 = familyRadius * 2;
-    for (const n of rawNodes) {
-        const x = n.x * layout.scale + layout.offsetX;
-        const y = n.y * layout.scale + layout.offsetY;
-        if (n.type === "person") {
-            persons.push(`M${x - personRadius},${y}a${personRadius},${personRadius} 0 1,0 ${pd2},0a${personRadius},${personRadius} 0 1,0 ${-pd2},0`);
-        } else {
-            families.push(`M${x - familyRadius},${y}a${familyRadius},${familyRadius} 0 1,0 ${fd2},0a${familyRadius},${familyRadius} 0 1,0 ${-fd2},0`);
+    viewport: ViewportRect,
+    surface: MinimapSurface,
+    style: MinimapStyle,
+): void {
+    ctx.setTransform(surface.dpr, 0, 0, surface.dpr, 0, 0);
+    ctx.clearRect(0, 0, surface.width, surface.height);
+    ctx.globalAlpha = 0.7;
+    for (const [type, radius, color] of [
+        ["person", MINIMAP_PERSON_R, style.person],
+        ["family", MINIMAP_FAMILY_R, style.family],
+    ] as const) {
+        ctx.beginPath();
+        for (const n of rawNodes) {
+            if (n.type !== type) continue;
+            const x = n.x * layout.scale + layout.offsetX;
+            const y = n.y * layout.scale + layout.offsetY;
+            ctx.moveTo(x + radius, y);
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
         }
+        ctx.fillStyle = color;
+        ctx.fill();
     }
-    return { persons: persons.join(""), families: families.join("") };
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = style.viewportFill;
+    ctx.fillRect(viewport.x, viewport.y, viewport.width, viewport.height);
+    ctx.strokeStyle = style.viewportStroke;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(viewport.x, viewport.y, viewport.width, viewport.height);
 }
 
 export function projectViewport(
