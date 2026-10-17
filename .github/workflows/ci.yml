@@ -41,7 +41,7 @@ jobs:
       with:
         python-version: '3.14'
     - name: Set up uv
-      uses: astral-sh/setup-uv@v10
+      uses: astral-sh/setup-uv@v10.3.0
       with:
         enable-cache: true
         cache-dependency-glob: backend/uv.lock
@@ -80,7 +80,7 @@ jobs:
       with:
         python-version: '3.14'
     - name: Set up uv
-      uses: astral-sh/setup-uv@v10
+      uses: astral-sh/setup-uv@v10.3.0
       with:
         enable-cache: true
         cache-dependency-glob: backend/uv.lock
