@@ -2,12 +2,13 @@ import logging
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, replace
-from datetime import date
 from typing import Any
 
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
+from stemma.domain.dates import parse_partial_date
+from stemma.domain.names import AltName
 from stemma.domain.errors import (
     AccessToFamilyDenied,
     AccessToPersonDenied,
@@ -68,10 +69,11 @@ logger = logging.getLogger(__name__)
 class _PersonRow:
     id: str
     name: str
-    birth_date: date | None
-    death_date: date | None
+    birth_date: str | None
+    death_date: str | None
     bio: str | None
     photo_key: str | None = None
+    alt_names: tuple[AltName, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -567,6 +569,7 @@ class StorageService:
                     death_date=_parse_date(item.get("death_date")),
                     bio=item.get("bio"),
                     photo_key=item.get("photo_key"),
+                    alt_names=_parse_alt_names(item.get("alt_names")),
                 )
             elif sk.startswith(FAMILY_PREFIX) and not sk.startswith(FAMILY_OWNER_PREFIX):
                 fid = parse_id_after_prefix(sk, FAMILY_PREFIX)
@@ -891,6 +894,7 @@ def _make_person_row(pid: str, definition: CreateNewPerson) -> _PersonRow:
         birth_date=definition.birth_date,
         death_date=definition.death_date,
         bio=definition.bio,
+        alt_names=tuple(a for a in definition.alt_names if a.name.strip()),
     )
 
 
@@ -901,14 +905,29 @@ def _person_item(stemma_id: str, person: _PersonRow) -> dict:
         "name": person.name,
     }
     if person.birth_date is not None:
-        item["birth_date"] = person.birth_date.isoformat()
+        item["birth_date"] = person.birth_date
     if person.death_date is not None:
-        item["death_date"] = person.death_date.isoformat()
+        item["death_date"] = person.death_date
     if person.bio is not None:
         item["bio"] = person.bio
     if person.photo_key is not None:
         item["photo_key"] = person.photo_key
+    if person.alt_names:
+        item["alt_names"] = [{"name": a.name, "kind": a.kind} for a in person.alt_names]
     return item
+
+
+def _parse_alt_names(value: object) -> tuple[AltName, ...]:
+    # Best effort: a malformed entry is skipped rather than breaking the stemma.
+    if not isinstance(value, list):
+        return ()
+    names: list[AltName] = []
+    for entry in value:
+        try:
+            names.append(AltName(name=entry["name"], kind=entry.get("kind", "variant")))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return tuple(names)
 
 
 def _family_item(stemma_id: str, family: _FamilyRow) -> dict:
@@ -920,10 +939,16 @@ def _family_item(stemma_id: str, family: _FamilyRow) -> dict:
     }
 
 
-def _parse_date(value: str | None) -> date | None:
+def _parse_date(value: str | None) -> str | None:
+    # Stored values were written through PartialDate; anything else is
+    # dropped rather than breaking the whole stemma.
     if not value:
         return None
-    return date.fromisoformat(value)
+    try:
+        parse_partial_date(value)
+    except ValueError:
+        return None
+    return value
 
 
 def _describe_stemma(
@@ -946,6 +971,7 @@ def _describe_stemma(
                 bio=p.bio,
                 read_only=(p.id, user_id) not in snapshot.person_owners,
                 photo_url=_photo_url(p.photo_key),
+                alt_names=list(p.alt_names),
             )
             for p in snapshot.people.values()
         ],

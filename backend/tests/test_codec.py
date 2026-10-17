@@ -1,5 +1,3 @@
-from datetime import date
-
 from stemma.domain.codec import decode_request, encode_error, encode_response
 from stemma.domain.errors import AccessToFamilyDenied, IncompleteFamily, InvalidInviteToken
 from stemma.domain.requests import (
@@ -36,7 +34,7 @@ def test_decode_create_family_request_with_mixed_person_definitions() -> None:
     assert isinstance(request, CreateFamilyRequest)
     assert request.stemma_id == "7"
     assert request.family_descr.parent1 == ExistingPerson(id="1")
-    assert request.family_descr.parent2 == CreateNewPerson(name="Jane", birth_date=date(1900, 1, 1))
+    assert request.family_descr.parent2 == CreateNewPerson(name="Jane", birth_date="1900-01-01")
     assert request.family_descr.children == [CreateNewPerson(name="Josh")]
 
 
@@ -49,7 +47,7 @@ def test_decode_create_orphan_person_request() -> None:
     request = decode_request(payload)
     assert isinstance(request, CreateOrphanPersonRequest)
     assert request.stemma_id == "s1"
-    assert request.person_descr == CreateNewPerson(name="Solo", birth_date=date(1980, 5, 1))
+    assert request.person_descr == CreateNewPerson(name="Solo", birth_date="1980-05-01")
 
 
 def test_decode_update_person_request_omits_missing_optional_fields() -> None:
@@ -72,7 +70,7 @@ def test_encode_owned_stemmas_response_tags_with_type_field() -> None:
                 PersonDescription(
                     id="9",
                     name="John",
-                    birth_date=date(1900, 1, 1),
+                    birth_date="1900-01-01",
                     death_date=None,
                     bio=None,
                     read_only=False,
@@ -99,6 +97,7 @@ def test_encode_owned_stemmas_response_tags_with_type_field() -> None:
                     "bio": None,
                     "readOnly": False,
                     "photoUrl": None,
+                    "altNames": [],
                 }
             ],
             "families": [

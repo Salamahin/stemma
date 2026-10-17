@@ -21,7 +21,9 @@ export const DEFAULT_SETTINGS: Settings = {
 
 //requests
 export type ExistingPerson = { type: "ExistingPerson", id: string }
-export type CreateNewPerson = { type: "CreateNewPerson", name: string, birthDate?: string, deathDate?: string, bio?: string }
+export type AltNameKind = "maiden" | "married" | "variant" | "other"
+export type AltName = { name: string, kind: AltNameKind }
+export type CreateNewPerson = { type: "CreateNewPerson", name: string, birthDate?: string, deathDate?: string, bio?: string, altNames?: AltName[] }
 export type PersonDefinition = ExistingPerson | CreateNewPerson
 
 export type CreateFamily = { parent1?: PersonDefinition, parent2?: PersonDefinition, children: Array<PersonDefinition> }
@@ -78,7 +80,7 @@ export type OwnedStemmas = { type: "OwnedStemmas", stemmas: Array<StemmaDescript
 export type FavouriteStemma = { type: "FavouriteStemma", stemmaId: string | null }
 export type Stemma = { type: "Stemma", people: Array<PersonDescription>, families: Array<FamilyDescription> }
 export type StemmaDescription = { type: "StemmaDescription", id: string, name: string, removable: Boolean }
-export type PersonDescription = { type: "PersonDescription", id: string, name: string, birthDate?: string, deathDate?: string, bio?: string, readOnly: boolean, photoUrl?: string | null }
+export type PersonDescription = { type: "PersonDescription", id: string, name: string, birthDate?: string, deathDate?: string, bio?: string, altNames?: AltName[], readOnly: boolean, photoUrl?: string | null }
 export type TokenAccepted = { type: "TokenAccepted", stemmas: Array<StemmaDescription>, stemmaId: string, lastStemma: Stemma }
 export type CloneResult = { type: "CloneResult", createdStemma: Stemma, stemmas: Array<StemmaDescription> }
 export type PhotoUploadUrl = { type: "PhotoUploadUrl", uploadUrl: string, uploadFields: Record<string, string>, photoKey: string, expiresInSeconds: number }

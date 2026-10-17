@@ -392,6 +392,27 @@ describe("AppController", () => {
             expect(model.requestPhotoUploadUrl).not.toHaveBeenCalled();
         });
 
+        test("changing only the alternative names saves the person", async () => {
+            const model = {
+                requestPhotoUploadUrl: jest.fn(),
+                uploadPhotoToPresignedUrl: jest.fn(),
+                setPersonPhoto: jest.fn(),
+                updatePerson: jest.fn().mockResolvedValue(updatedStemma),
+            };
+            const c = makeController(model);
+            c.savePerson(personId, { ...sameDescr, altNames: [{ name: "Robert", kind: "variant" }] }, false, null, false);
+            await drainAll();
+            expect(model.updatePerson).toHaveBeenCalledTimes(1);
+        });
+
+        test("no alternative names on either side is not a change", async () => {
+            const model = { updatePerson: jest.fn() };
+            const c = makeController(model);
+            c.savePerson(personId, { ...sameDescr, altNames: [] }, false, null, false);
+            await drainAll();
+            expect(model.updatePerson).not.toHaveBeenCalled();
+        });
+
         test("only photo upload (no field change): upload chain, no updatePerson", async () => {
             const model = {
                 requestPhotoUploadUrl: jest.fn().mockResolvedValue({ uploadUrl: "u", uploadFields: {}, photoKey: "k" }),

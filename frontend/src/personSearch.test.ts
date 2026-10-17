@@ -152,6 +152,27 @@ describe("searchPeople", () => {
     });
 });
 
+describe("searchPeople with alternative names", () => {
+    const maria: PersonDescription = {
+        ...person("1", "Иванова Мария"),
+        altNames: [{ name: "Петрова", kind: "maiden" }],
+    };
+    const ivan = person("2", "Петров Иван");
+
+    it("finds a person by a maiden name combined with the given name", () => {
+        expect(searchPeople("Мария Петрова", [maria, ivan]).map((r) => r.item.id)).toEqual(["1"]);
+    });
+
+    it("matches alternative names like the primary one", () => {
+        expect(searchPeople("Петров", [maria, ivan]).map((r) => r.item.id).sort()).toEqual(["1", "2"]);
+    });
+
+    it("finds an old spelling variant", () => {
+        const irina = { ...person("3", "Саломахина Ирина"), altNames: [{ name: "Соломахина", kind: "variant" as const }] };
+        expect(searchPeople("Соломахина", [irina]).map((r) => r.item.id)).toEqual(["3"]);
+    });
+});
+
 describe("highlightMatches", () => {
     it("wraps matched ranges in <b>", () => {
         expect(highlightMatches("Федор", [[0, 4]])).toBe("<b>Федор</b>");
