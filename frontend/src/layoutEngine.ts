@@ -8,7 +8,7 @@
  * writes positions into them as the layout progresses, except for nodes the
  * main thread holds fixed (fx/fy), which stay main-thread authoritative.
  */
-import { anchorWhereMissing, giveCollisionRadius, createLayoutSimulation, LayoutLoop, LAYOUT_SETTLE_MS, type LayoutNode, type Scheduler } from "./layoutCore";
+import { anchorAtRest, anchorWhereMissing, giveCollisionRadius, createLayoutSimulation, LayoutLoop, LAYOUT_SETTLE_MS, type LayoutNode, type Scheduler } from "./layoutCore";
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from "./layoutProtocol";
 import { applyStructuredSeed, clanRegions, SEED_USES_CLAN_REGIONS } from "./structuredLayout";
 
@@ -60,6 +60,8 @@ export class InlineLayoutEngine implements LayoutEngine {
 
     constructor(readonly center: [number, number], private cb: LayoutCallbacks, private scheduler: Scheduler = mainThreadScheduler) {}
 
+    private anchorAtEnd = false;
+
     setGraph(nodes: EngineNode[], links: EngineLink[], alpha: number, start = true, seed = false, groups?: Int32Array) {
         const pairs = linkPairs(nodes, links);
         const g = SEED_USES_CLAN_REGIONS && groups && groups.length === nodes.length ? groups : undefined;
@@ -68,11 +70,20 @@ export class InlineLayoutEngine implements LayoutEngine {
             const region = clanRegions(nodes.length, pairs, g);
             nodes.forEach((d, i) => (d.region = region[i]));
         }
-        anchorWhereMissing(nodes);
+        // A fresh star seed refines without anchors so long seed edges can shorten;
+        // nodes are anchored where the layout comes to rest.
+        this.anchorAtEnd = seed && !g;
+        if (!this.anchorAtEnd) anchorWhereMissing(nodes);
         giveCollisionRadius(nodes);
         if (!this.sim) {
             this.sim = createLayoutSimulation(nodes, links as any, this.center[0] * 2, this.center[1] * 2);
-            this.loop = new LayoutLoop(this.sim, this.scheduler, INLINE_BUDGET_MS, (t) => this.cb.onTick(t), () => this.cb.onEnd(), LAYOUT_SETTLE_MS);
+            this.loop = new LayoutLoop(this.sim, this.scheduler, INLINE_BUDGET_MS, (t) => this.cb.onTick(t), () => {
+                if (this.anchorAtEnd) {
+                    this.anchorAtEnd = false;
+                    anchorAtRest(this.sim!.nodes() as LayoutNode[], this.center[0] * 2, this.center[1] * 2);
+                }
+                this.cb.onEnd();
+            }, LAYOUT_SETTLE_MS);
         } else {
             this.sim.nodes(nodes as any);
             (this.sim.force("link") as any).links(links);

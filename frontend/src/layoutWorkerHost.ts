@@ -2,7 +2,7 @@
  * Worker-side message handling, kept separate from the worker entry so it can
  * be unit-tested with a fake `post`/scheduler.
  */
-import { anchorWhereMissing, giveCollisionRadius, createLayoutSimulation, LayoutLoop, LAYOUT_SETTLE_MS, type LayoutNode, type Scheduler } from "./layoutCore";
+import { anchorAtRest, anchorWhereMissing, giveCollisionRadius, createLayoutSimulation, LayoutLoop, LAYOUT_SETTLE_MS, type LayoutNode, type Scheduler } from "./layoutCore";
 import { applyStructuredSeed, clanRegions, SEED_USES_CLAN_REGIONS } from "./structuredLayout";
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from "./layoutProtocol";
 
@@ -67,6 +67,8 @@ export class LayoutWorkerHost {
         }
     }
 
+    private anchorAtEnd = false;
+
     private setGraph(msg: Extract<LayoutWorkerRequest, { type: "graph" }>) {
         this.loop?.stop();
         this.gen = msg.gen;
@@ -87,7 +89,10 @@ export class LayoutWorkerHost {
             const region = clanRegions(this.nodes.length, msg.links, groups);
             this.nodes.forEach((d, i) => (d.region = region[i]));
         }
-        anchorWhereMissing(this.nodes);
+        // A fresh star seed refines without anchors so long seed edges can shorten;
+        // nodes are anchored where the layout comes to rest (see onLayoutEnd).
+        this.anchorAtEnd = !!msg.seed && !groups;
+        if (!this.anchorAtEnd) anchorWhereMissing(this.nodes);
         giveCollisionRadius(this.nodes);
         const links = [];
         for (let i = 0; i < msg.links.length; i += 2) {
@@ -101,7 +106,14 @@ export class LayoutWorkerHost {
             this.scheduler,
             WORKER_BUDGET_MS,
             (ticks) => this.postPositions(gen, ticks),
-            () => this.post({ type: "end", gen }, []),
+            () => {
+                if (this.anchorAtEnd) {
+                    this.anchorAtEnd = false;
+                    anchorAtRest(this.nodes, msg.width, msg.height);
+                    this.postPositions(gen, 0, true);
+                }
+                this.post({ type: "end", gen }, []);
+            },
             LAYOUT_SETTLE_MS,
         );
         // show the seed straight away, before the first refine batch

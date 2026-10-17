@@ -92,6 +92,22 @@ export function anchorWhereMissing(nodes: LayoutNode[]) {
     }
 }
 
+/**
+ * Anchors for nodes that came to rest without one (a free refine after a star
+ * seed): there they were held by the centre pull, so the anchor is chosen to
+ * keep exactly that force — the next refine starts in equilibrium instead of
+ * spreading out (an anchor at the rest position alone drops the inward pull).
+ */
+export function anchorAtRest(nodes: LayoutNode[], width: number, height: number) {
+    const k = CENTER_STRENGTH / LAYOUT_ANCHOR_STRENGTH;
+    const cx = width * 0.5;
+    const cy = height * 0.5;
+    for (const d of nodes) {
+        if (d.ax == null || !Number.isFinite(d.ax)) d.ax = d.x + k * (cx - d.x);
+        if (d.ay == null || !Number.isFinite(d.ay)) d.ay = d.y + k * (cy - d.y);
+    }
+}
+
 export type LayoutLink = { source: string | LayoutNode; target: string | LayoutNode };
 
 /**

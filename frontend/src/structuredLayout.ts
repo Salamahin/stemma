@@ -757,9 +757,16 @@ export function applyStructuredSeed(
         d.vx = 0;
         d.vy = 0;
         d.region = region[i];
-        // the seed is where every node belongs: it becomes the anchor
-        d.ax = d.x;
-        d.ay = d.y;
+        if (groups) {
+            // clan regions: the seed is where every node belongs, it becomes the anchor
+            d.ax = d.x;
+            d.ay = d.y;
+        } else {
+            // star: refine freely first so long seed edges can shorten; the engines
+            // anchor nodes where the layout comes to rest
+            d.ax = undefined;
+            d.ay = undefined;
+        }
     });
 }
 

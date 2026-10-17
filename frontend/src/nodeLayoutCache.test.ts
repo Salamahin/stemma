@@ -34,7 +34,7 @@ describe("NodeLayoutCache", () => {
         const cache = new NodeLayoutCache("stemma-1");
         cache.load();
         cache.set("n1", 1, 2);
-        expect(localStorage.getItem("nodeLayout.stemma-1")).toBeNull();
+        expect(localStorage.getItem("nodeLayout.v2.stemma-1")).toBeNull();
 
         jest.advanceTimersByTime(500);
 
@@ -70,7 +70,7 @@ describe("NodeLayoutCache", () => {
 
     test("entries without numeric x/y are skipped on load", () => {
         localStorage.setItem(
-            "nodeLayout.stemma-1",
+            "nodeLayout.v2.stemma-1",
             JSON.stringify({ items: { n1: { x: "bad", y: 0 }, n2: { x: 5, y: 6 } } })
         );
         const cache = new NodeLayoutCache("stemma-1");
@@ -80,7 +80,7 @@ describe("NodeLayoutCache", () => {
     });
 
     test("ignores corrupted localStorage payload", () => {
-        localStorage.setItem("nodeLayout.stemma-1", "not-json");
+        localStorage.setItem("nodeLayout.v2.stemma-1", "not-json");
         const cache = new NodeLayoutCache("stemma-1");
         cache.load();
         expect(cache.has("n1")).toBe(false);
@@ -88,7 +88,7 @@ describe("NodeLayoutCache", () => {
 
     test("non-finite or absurd coordinates are dropped, bad velocities zeroed", () => {
         localStorage.setItem(
-            "nodeLayout.stemma-1",
+            "nodeLayout.v2.stemma-1",
             JSON.stringify({
                 items: {
                     nan: { x: null, y: 0 },
@@ -105,11 +105,11 @@ describe("NodeLayoutCache", () => {
     });
 
     test("payload of the wrong shape is ignored", () => {
-        localStorage.setItem("nodeLayout.stemma-1", JSON.stringify({ items: [1, 2, 3] }));
+        localStorage.setItem("nodeLayout.v2.stemma-1", JSON.stringify({ items: [1, 2, 3] }));
         const cache = new NodeLayoutCache("stemma-1");
         expect(() => cache.load()).not.toThrow();
         expect(cache.coverage(["0", "1"])).toBe(0);
-        localStorage.setItem("nodeLayout.stemma-1", JSON.stringify(null));
+        localStorage.setItem("nodeLayout.v2.stemma-1", JSON.stringify(null));
         expect(() => cache.load()).not.toThrow();
     });
 
@@ -171,8 +171,18 @@ describe("NodeLayoutCache", () => {
         expect(wider.get("n1")).toEqual({ x: 710, y: 420, vx: 0, vy: 0 });
 
         const legacy = new NodeLayoutCache("stemma-2");
-        localStorage.setItem("nodeLayout.stemma-2", JSON.stringify({ items: { n1: { x: 1, y: 2 } } }));
+        localStorage.setItem("nodeLayout.v2.stemma-2", JSON.stringify({ items: { n1: { x: 1, y: 2 } } }));
         legacy.load([700, 400]);
         expect(legacy.get("n1")).toEqual({ x: 1, y: 2, vx: 0, vy: 0 });
+    });
+});
+
+describe("NodeLayoutCache versioning", () => {
+    test("a v1 layout is dropped instead of reused", () => {
+        localStorage.setItem("nodeLayout.stemma-old", JSON.stringify({ items: { n1: { x: 1, y: 2 } } }));
+        const cache = new NodeLayoutCache("stemma-old");
+        cache.load();
+        expect(cache.get("n1")).toBeNull();
+        expect(localStorage.getItem("nodeLayout.stemma-old")).toBeNull();
     });
 });

@@ -30,8 +30,15 @@ export class NodeLayoutCache {
     private center: [number, number] | null = null;
 
     constructor(stemmaId: string) {
-        this.storageKey = `nodeLayout.${stemmaId}`;
+        this.storageKey = `nodeLayout.v2.${stemmaId}`;
         this.items = new Map();
+        // v1 layouts came from the anchored star refine (very long edges);
+        // dropping them lets every stemma get one fresh layout.
+        try {
+            localStorage.removeItem(`nodeLayout.${stemmaId}`);
+        } catch {
+            // storage unavailable: nothing to clean up
+        }
     }
 
     /**
