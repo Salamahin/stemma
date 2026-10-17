@@ -17,6 +17,7 @@
         saveLayoutCache,
     } from "../graphTools";
     import { LAYOUT_REHEAT_ALPHA, LAYOUT_REFINE_ALPHA } from "../layoutCore";
+    import { pushRegistryFor } from "../ghostPush";
     import { createLayoutEngine, type LayoutEngine } from "../layoutEngine";
     import layoutWorkerSource from "virtual:layout-worker";
     import { computeInitialLayout, seedFromKnown } from "../initialLayout";
@@ -206,6 +207,8 @@
         const wasActive = lastSimulationActive;
         lastSimulationActive = simulationActive;
         if (simulationActive) {
+            // people pushed aside by edit-mode ghosts go home before the layout runs
+            if (pushRegistryFor(chart).settle()) chart.positionsChanged();
             for (const d of chart.nodes) {
                 if (!d.fixed) {
                     d.fx = null;

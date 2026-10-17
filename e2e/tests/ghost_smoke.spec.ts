@@ -276,13 +276,15 @@ test("ghosts push nearby people aside while shown; they return on blur", async (
         for (const n of during.nodes) {
           if (n.id === m.id) continue;
           const [bx, by] = start.get(n.id)!;
-          expect(Math.hypot(m.x - n.x, m.y - n.y)).toBeGreaterThanOrEqual(Math.min(Math.hypot(ax - bx, ay - by), 45) - 1);
+          expect(Math.hypot(m.x - n.x, m.y - n.y)).toBeGreaterThanOrEqual(Math.min(Math.hypot(ax - bx, ay - by), 60) - 1);
         }
       }
     }
     await blur();
-    const after = await chartSnapshot(page);
-    for (const n of after.nodes) expect([n.x, n.y]).toEqual(start.get(n.id));
+    // they glide back to exactly where they were
+    await expect
+      .poll(async () => (await chartSnapshot(page)).nodes.filter((n) => n.x !== start.get(n.id)![0] || n.y !== start.get(n.id)![1]).length, { timeout: 3_000 })
+      .toBe(0);
     if (checked) break;
   }
   expect(checked).toBe(true);
