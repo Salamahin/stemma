@@ -120,6 +120,39 @@ function frameClock() {
     };
 }
 
+describe("star seed refine", () => {
+    test("a fresh star seed refines without anchors and is anchored to stay where it comes to rest", () => {
+        const { nodes, links } = syntheticGraph(80);
+        const m = manualScheduler(1);
+        let ended = 0;
+        const engine = new InlineLayoutEngine([500, 400], { onTick: () => {}, onEnd: () => ended++ }, m.scheduler);
+        engine.setGraph(nodes, links, 1, true, true);
+        expect(nodes.every((n: any) => n.ax == null)).toBe(true);
+        m.runAll();
+        expect(ended).toBe(1);
+        expect(nodes.every((n: any) => Number.isFinite(n.ax) && Number.isFinite(n.ay))).toBe(true);
+
+        // a later refine (reopen) starts in equilibrium: the layout stays put
+        const rest = nodes.map((n: any) => [n.x, n.y]);
+        engine.setGraph(nodes, links, LAYOUT_REFINE_ALPHA, true, false);
+        m.runAll();
+        const drift = nodes.map((n: any, i: number) => Math.hypot(n.x - rest[i][0], n.y - rest[i][1])).sort((a, b) => a - b);
+        expect(drift[Math.floor(drift.length / 2)]).toBeLessThan(10);
+    });
+
+    test("a reheat of a remembered layout keeps its anchors from the start", () => {
+        const { nodes, links } = syntheticGraph(40);
+        nodes.forEach((n: any, i: number) => {
+            n.x = i * 10;
+            n.y = i * 5;
+        });
+        const m = manualScheduler(1);
+        const engine = new InlineLayoutEngine([500, 400], { onTick: () => {}, onEnd: () => {} }, m.scheduler);
+        engine.setGraph(nodes, links, 0.3, false, false);
+        expect(nodes.every((n: any) => n.ax != null)).toBe(true);
+    });
+});
+
 describe("LayoutLoop", () => {
     test("a paced settle spreads the same ticks over about LAYOUT_SETTLE_MS instead of finishing at once (#307)", () => {
         const { nodes, links } = syntheticGraph(60);

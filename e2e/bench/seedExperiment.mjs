@@ -226,6 +226,7 @@ const VARIANTS = {
   starOrdered: () => ({ g: seedStructured({ mode: "star", starOrderPasses: 6 }, false), alpha: 0, anchored: true }),
   starLight: () => ({ g: seedStructured({ mode: "star" }, false), alpha: 0.05, anchored: true }),
   starRefined: () => ({ g: seedStructured({ mode: "star" }, false), alpha: 1, anchored: true }),
+  starFree: () => ({ g: seedStructured({ mode: "star" }, false), alpha: 1, anchored: false }),
   clansPacked: () => ({ g: seedStructured({ mode: "clans", regionStart: "pack" }), alpha: 1, anchored: true }),
 };
 
