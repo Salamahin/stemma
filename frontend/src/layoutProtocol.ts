@@ -30,6 +30,7 @@ export type LayoutWorkerRequest =
       }
     | { type: "fixed"; gen: number; fx: Float64Array; fy: Float64Array }
     | { type: "pin"; gen: number; index: number; fx: number | null; fy: number | null }
+    | { type: "move"; gen: number; index: number; x: number; y: number }
     | { type: "run"; gen: number; alpha: number | null; alphaTarget: number | null }
     | { type: "stop"; gen: number }
     | { type: "settle"; gen: number; ticks: number };

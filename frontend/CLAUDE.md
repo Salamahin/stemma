@@ -15,70 +15,30 @@ The family graph is drawn on `<canvas id="chart">` by `canvasChart.ts` (Canvas2D
 - The main sim's collide force only sees datums with an `r` (`forceCollideSized`); real nodes have none, ghosts and their focused neighbours get one. Do not go back to `forceCollide().radius(d => d.r * 20)` over all nodes — NaN radii disable quadtree pruning and made every tick O(n²).
 - The layout must end: no permanent `alphaTarget` (it kept the sim — and the CPU — busy forever). Tuning lives in `layoutCore.ts` (`LAYOUT_*`; ~200 ticks, velocityDecay 0.3, theta 1.2), chosen with `e2e/bench/layoutExperiment.mjs` to match the old equilibrium. `LayoutLoop` paces a settle so those ticks take about `LAYOUT_SETTLE_MS` (4 s) on screen instead of snapping into place (#307); when ticks are slower than the pace (big stemmas, slow machines) it runs batches back to back, so pacing never slows a layout down. Person-label placement on layout end is `labelLayout.ts` (grid-indexed greedy over 8 placements × 3 distances, avoiding other labels and person circles). It never hides a label — d3fc's removeOverlaps did, silently dropping names in dense families (#300); hiding is only a uniform zoom-level rule.
 - Cold start (no/too little remembered layout): the engine seeds unfixed nodes with `structuredLayout.ts` (in the worker) before the force refine. Default mode `star` (fewest crossings): stemmas are almost trees (real 11k stemma: 76 independent cycles over 16k nodes), so a BFS spanning tree rooted at its centroid is drawn as a radial tree — each subtree gets an angular wedge proportional to its leaf count, each depth a ring just large enough for `starSpacing` between neighbours; a greedy search over child orders shortens the chords of the few non-tree edges (they cause most remaining crossings). All real nodes collide during the refine (`giveCollisionRadius`). The seed rings are global per depth, so one crowded generation stretches every edge of it; a fresh star seed therefore refines **without anchors** (centre pull only) so those edges can shorten, and nodes get anchors only when that refine comes to rest (`anchorAtRest`: chosen so the anchor pull equals the centre pull they rested under — anchoring at the rest position itself drops that inward force and the next refine spreads the graph out). Real 11k stemma (`seedExperiment.mjs` `starFree` vs `starRefined`): p95 edge 2119 → 650, median edge 198 → 143, person overlaps 592 → 25, ~200k → 44k wide, at 1.25k crossings instead of 849 and surname-cloud overlap 0.26 instead of 0.22. Alternative mode `clans` keeps the clouds apart instead (overlap 0.004, ~5.6k crossings): every node joins its nearest surname clan (`clanRegions`, multi-source BFS from the clan members the main thread passes as `groups`); each clan region is laid out with generation rings (longest path over the family DAG, married-in spouses on their partner's generation, DFS + barycenter ordering with spouse blocks); regions start at their clan's centroid in a rings layout of the whole component and are pushed apart by a small region-graph layout (`regionGap`); components are packed with `d3.packSiblings`; the layout is re-centred on a person. The chart is `hold()`-ed until the seeded positions arrive, and a newly opened stemma pans to the nearest person if the view would be empty.
-- Refine physics: nodes are pulled to stable anchors (`ax`/`ay`: clans seed / end of a star refine / first position / drop position; remembered in the layout cache and the session) instead of the viewport centre — the centre pull is what squeezed clan regions into one disc. Anchors are not reset when the layout rests (that drops the spring tension balancing repulsion and the graph would grow on every refine). Links between different clan regions pull at 0.005 instead of 2, so related clans sit near each other without being dragged together. Real 11k stemma: surname-cloud overlap 0.80 (original) / 0.32 (rings seed) → 0.004, at ~1.5× the size and ~4× the rings seed's crossings (`e2e/bench/seedExperiment.mjs`).
+- Refine physics: nodes are pulled to stable anchors (`ax`/`ay`: clans seed / end of a star refine / first position / drop position; remembered in the layout cache and the session) instead of the viewport centre — the centre pull is what squeezed clan regions into one disc. Anchors are not reset when the layout rests (that drops the spring tension balancing repulsion and the graph would grow on every refine). d3's forceX/forceY cache their targets when initialised: after changing anchors on a running simulation call `refreshAnchors(sim)` (drop after a drag, `moveTo`, anchoring at rest), or the old anchors keep pulling. Links between different clan regions pull at 0.005 instead of 2, so related clans sit near each other without being dragged together. Real 11k stemma: surname-cloud overlap 0.80 (original) / 0.32 (rings seed) → 0.004, at ~1.5× the size and ~4× the rings seed's crossings (`e2e/bench/seedExperiment.mjs`).
 - Layout memory: `NodeLayoutCache` keeps positions per stemma in localStorage under `nodeLayout.v2.<id>` (per viewer; bump the version to force a fresh layout everywhere after a seed/physics change; best-effort — every storage access is guarded, corrupt/absurd entries are dropped, removed nodes pruned, positions shifted when the viewport centre changed). On (re)open, nodes with a remembered position keep it, newcomers are seeded next to their relatives (`seedFromKnown`), and the sim starts at alpha `LAYOUT_REFINE_ALPHA` + share of newcomers (capped at the 0.3 reheat); under 50% remembered → full layout.
 - Tests/debug: `window.__stemmaChart.snapshot()` returns drawn nodes, ghosts, edges (with arrow kind) and per-frame stats; e2e helpers in `e2e/tests/_chart.ts`. Perf scripts: `e2e/bench/` (`renderBench.mjs`, `profileBench.mjs`, synthetic stemmas, mocked backend). Perf budgets run in CI: `cd e2e && npx playwright test -c perf.config.ts` (`e2e/perf/`, synthetic 200/750/3000-person stemmas, mocked backend, no Docker) checks idle frames/CPU, draw time while panning and hover cost against `BUDGETS` and fails on a regression; results land in `e2e/perf-results/`.
 - Accessibility: the canvas is focusable — arrows move between people (`chartKeyboard.ts`), Enter opens, Escape stops; an aria-live region announces the focused person and a visually hidden list (`#chart-people`, out of the Tab order) exposes everyone to screen readers. The minimap is its own canvas (`drawMinimap`), and the menu exports PNG (`pngExport.ts`) as well as SVG.
 
-## Drag scenario matrix
+## Edit-mode gestures
 
-Edit-mode pointer drag on the chart canvas (`DragGestures.svelte`). The user presses mouse-down on a node (or empty canvas), drags, and releases on a node (or empty canvas). Source kind × target kind determines outcome.
+Edit-mode pointer handling on the chart canvas is `components/EditGestures.svelte`:
 
-Six valid gestures exist. Any other (FROM, TO) pair is a no-op.
+| Gesture | Outcome |
+|---|---|
+| drag a person or family | moves it — `FullStemma.placeNode` → `engine.moveTo` (position, pin and anchor, in the worker too), layout cache, pinned-people position; the focus is dropped while moving and set on the node again on drop, so its ghosts reappear where it now is |
+| long press (≥ `TAP_MAX_MS`, any pointer) on a node | opens the card |
+| click (mouse) on a node | opens the card (hover focuses) |
+| short tap (touch) on a node / empty canvas | focus / blur |
+| drag on empty canvas | pans (d3.zoom), as in view mode |
+| Escape | cancels a move (node goes back) and blurs |
 
-### The six gestures
-
-| #  | FROM    | TO      | Outcome                                                                                                    |
-|----|---------|---------|------------------------------------------------------------------------------------------------------------|
-| 1  | family  | empty   | Modal — create new Person as child of the dragged Family.                                                  |
-| 2  | empty   | family  | Modal — create new Person as spouse (parent) of the target Family.                                         |
-| 3  | person  | empty   | Silent — create pending Family with the dragged Person as the sole parent (front-end only, not yet sent). |
-| 4  | empty   | person  | Silent — create pending Family with the target Person as the sole child (front-end only, not yet sent).   |
-| 5  | person  | family  | Silent — attach dragged Person to target Family as spouse (parent). Promotes pending Family if target is pending. |
-| 6  | family  | person  | Silent — attach target Person to dragged Family as child. Promotes pending Family if source is pending.   |
-
-No-op gestures (explicitly): person→person, family→family, empty→empty.
+There are no linking drag gestures any more: relatives are added **and linked** through the ghosts. Creating from a ghost, the card's name field also lists matching people already in the tree (`existingMatches`, quick-search matcher) — only people the link is valid for (`ghostLink.ts` `linkCandidates`: editable, not pending, no second pair of parents, no cycle, not already the person's spouse); picking one attaches them (`attachPersonToFamily`) or creates the new family with them (`startBranchFromPerson`, through a transient pending family).
 
 ### Pending families
 
-- Gestures 3/4 create a front-end-only `PendingFamily` record (`pending-family-<uuid>`) merged into `displayedStemma`. No backend call.
-- Pending families render as readOnly family nodes. They are valid drop targets/sources for gestures 1/2/5/6.
-- When a second member is added (gestures 1/2 modal save, 5/6 attach), `promotePendingFamily` calls `controller.createFamily(parents, children)` with the combined member list and removes the pending entry on success. Backend rejects single-member families (`IncompleteFamily`), so promotion is required before backend sees the family.
-- Pending families do not survive stemma switch / sign-out: state lives in `pendingFamilies` in `App.svelte`.
-
-### Modal titles
-
-| Gesture            | i18n key                  | English          | Russian             |
-|--------------------|---------------------------|------------------|---------------------|
-| 1 family → empty   | `createChildTitleOf`      | Add child of {names} | Добавить ребёнка {names} |
-| 2 empty → family   | `createSpouseTitleOf`     | Add {name}'s spouse | Добавить супруга {name} |
-
-### Drag tooltip text (hover hint while dragging)
-
-| Source ↘ Hover     | Tip key                    |
-|--------------------|----------------------------|
-| person, family     | `tipIsSpouse`              |
-| person, no target  | `tipIsParent` *(pending family creation)* |
-| family, no target  | `tipIsChild` *(pending family creation)*  |
-| family, person     | `tipIsChild`               |
-| empty, family      | `tipIsSpouse` *(empty→family)* |
-| empty, person      | `tipIsChild` *(empty→person)* |
-
-### Notes
-
-- "Silent" means no modal — the link or pending family appears immediately. Pending visuals come from `pendingAdds` / `pendingFamilies` in `App.svelte`.
-- Disallowed links (cycle, duplicate spouse, too many parents, member already in pending family) are filtered via `StemmaIndex.canAddParent` / `canAddChild` and `findPendingFamily` membership checks. Hovering an invalid target shows the `drop-disallowed` state (faded, not hit-testable).
-
-### Code locations
-
-- Drag state machine: `components/DragGestures.svelte`.
-- Outcome dispatch: `onMouseUp` inside that component.
-- Tooltip text per gesture: `computeTipText`.
-- Compatibility check: `targetCompatibility` + `classifyForDrop`.
-- Silent attach: `attachPersonToFamily` (promotes pending family on second-member add).
-- Modal create + extend existing family: `createPersonInFamily` (gestures 1, 2; also promotes pending family).
-- Pending family creation: `createPendingFamilyForPerson` (gestures 3, 4).
-- Pending family promotion: `promotePendingFamily` + `clearPendingFamily` (in `mutationActions.ts`).
+- Ghost branches from a person (spouse, parent, child without an existing family) create a front-end-only `PendingFamily` (`pending-family-<uuid>`) merged into `displayedStemma` while `controller.createFamily` runs; it is promoted (`promotePendingFamily`) and cleared when the backend answers. Backend rejects single-member families (`IncompleteFamily`), so the family is only ever sent with both members.
+- State lives in `pendingFamilies` in `App.svelte` and does not survive stemma switch / sign-out.
 
 ## Ghost affordances
 
@@ -100,13 +60,13 @@ Clicking a ghost opens the create-person modal. On confirm, ghost materializes i
 
 - State: `focusedId: { kind: "person" | "family", id: string } | null`.
 - **Desktop**: hovering bounding box sets focus (~150 ms debounce on leave to prevent flicker). Click on real node = edit modal.
-- **Mobile**: short-tap (<500 ms) on real node = focus. Long-tap (≥500 ms) = edit modal. Tap elsewhere / pan = blur. ESC blurs on desktop.
+- **Mobile**: short-tap (<500 ms) on real node = focus. Long-tap (≥500 ms) = edit modal (a long mouse press too). Tap elsewhere = blur. ESC blurs on desktop.
 
 ### Physics
 
 - All non-focused real nodes frozen via `fx, fy = current`.
 - Focused real node also frozen (anchored at tap position — no jump).
-- Ghosts: unfrozen. Initial seed: spouse to right of person, parent above, child below family. d3 collision force pushes ghosts into empty space against frozen neighbors. Sim stops on blur, ghosts despawn.
+- Ghosts: pinned at their seeds close to the focus (`GHOST_FAMILY_GAP` / `GHOST_PERSON_GAP` / `GHOST_CHILD_DROP` in `ghostHelpers.ts`): spouse to the right, parent above, child below the family. The real nodes around make room for them instead (below); the burst simulation only drives that push. Sim stops on blur, ghosts despawn.
 - Real nodes near the ghosts make room (`ghostPush.ts`): while the burst runs, nodes within `GHOST_PUSH_REACH` of a ghost (except the focused node and viewer-pinned people) are pushed off the ghost circles and their labels (`GHOST_PUSH_CLEARANCE`), off the dashed ghost edges, and real edges running through a ghost are shifted aside with their ends — with a spring back home, never closer to anyone than they were (up to `NODE_SEPARATION`). They move on the chart itself (their frozen burst copies follow, so ghosts collide with them where they are) and glide home on blur; a focus that starts mid-glide pushes from home (`PushRegistry`, one per chart via `pushRegistryFor`), and leaving edit mode settles everyone home before the layout runs. A node something else moved meanwhile (drag, layout) stays put. Not unfrozen in the burst sim: edit mode leaves the graph pinned out of equilibrium, so the full forces would make them drift with no ghost near.
 
 ### Visual
@@ -115,6 +75,10 @@ Clicking a ghost opens the create-person modal. On confirm, ghost materializes i
 - Dashed edge from focused node to ghost.
 - Centered "+" icon + i18n label.
 - Fade-in/out 200 ms on focus change.
+
+## Person card
+
+`PersonDetailsModal.svelte` is the one card for viewing, editing and creating a person. It leads with photo, name and life years; other names, bio and attachments are folded under "More" (with a summary of what is there) when editing or creating. Viewing shows only what is filled in — no empty bio or attachment blocks. Dates are typed as a year, mm.yyyy or dd.mm.yyyy (`parseDateInput` still accepts the "c."/"~" approximate prefixes, but the UI does not ask for them).
 
 ## Known constraints
 
