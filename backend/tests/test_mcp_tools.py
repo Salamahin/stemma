@@ -36,3 +36,11 @@ def test_add_link_tool_builds_the_request_and_returns_only_the_owner_attachments
     }
     assert tool.transform_response is not None
     assert [a["id"] for a in tool.transform_response(args, response)["attachments"]] == ["1"]
+
+
+def test_person_name_schema_tells_the_assistant_how_to_write_unknown_people() -> None:
+    from stemma.services.mcp_tools import _person_write_schema
+
+    description = _person_write_schema({})["properties"]["name"]["description"]
+    assert "???" in description
+    assert "empty string" in description

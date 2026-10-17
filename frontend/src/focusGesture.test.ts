@@ -2,6 +2,7 @@ import {
     isShortTap,
     isLongPress,
     focusedIdFromG,
+    focusedIdFromNodeId,
     closestNodeG,
     cursorNearGhost,
     nearestNodeWithinRadius,
@@ -165,18 +166,10 @@ describe("cursorNearGhost", () => {
 });
 
 describe("nearestNodeWithinRadius hysteresis", () => {
-    const SVG_NS = "http://www.w3.org/2000/svg";
     const noPending = (_id: string) => false;
 
-    function makeMain(nodes: Array<{ kind: "person" | "family"; id: string; x: number; y: number }>): SVGGElement {
-        const main = document.createElementNS(SVG_NS, "g") as SVGGElement;
-        for (const n of nodes) {
-            const g = document.createElementNS(SVG_NS, "g") as SVGGElement;
-            g.setAttribute("id", `${n.kind}_${n.id}`);
-            (g as SVGGElement & { __data__?: { x: number; y: number } }).__data__ = { x: n.x, y: n.y };
-            main.appendChild(g);
-        }
-        return main;
+    function makeMain(nodes: Array<{ kind: "person" | "family"; id: string; x: number; y: number }>) {
+        return nodes.map((n) => ({ id: `${n.kind}_${n.id}`, x: n.x, y: n.y }));
     }
 
     it("acquires the nearest node within the acquire radius when no current focus", () => {
@@ -228,5 +221,23 @@ describe("nearestNodeWithinRadius hysteresis", () => {
         // Cursor at 151 (just past acquire, still well inside sticky) — still A.
         expect(nearestNodeWithinRadius(main, 151, 0, FOCUS_RADIUS_SVG, noPending, current, FOCUS_RADIUS_STICKY_SVG))
             .toEqual(current);
+    });
+});
+
+describe("focusedIdFromNodeId", () => {
+    it("maps chart node ids to focus ids and rejects pending ones", () => {
+        expect(focusedIdFromNodeId("person_a1", () => false)).toEqual({ kind: "person", id: "a1" });
+        expect(focusedIdFromNodeId("family_f1", () => false)).toEqual({ kind: "family", id: "f1" });
+        expect(focusedIdFromNodeId("person_pending-x", (id) => id.startsWith("pending-"))).toBeNull();
+    });
+});
+
+describe("nearestNodeWithinRadius ignores ghost datums", () => {
+    it("skips ids that are not real person/family nodes", () => {
+        const nodes = [
+            { id: "ghost-person-spouse", x: 0, y: 0 },
+            { id: "person_real", x: 100, y: 0 },
+        ];
+        expect(nearestNodeWithinRadius(nodes, 0, 0, FOCUS_RADIUS_SVG, () => false)).toEqual({ kind: "person", id: "real" });
     });
 });

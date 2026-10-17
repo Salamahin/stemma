@@ -11,8 +11,45 @@ import {
     less
 } from 'svelte-preprocess-less';
 import terser from "@rollup/plugin-terser";
+import { rollup } from "rollup";
 
 const production = !process.env.ROLLUP_WATCH;
+
+// The layout Web Worker is bundled on its own and embedded into the main
+// bundle as a string (`import workerSource from "virtual:layout-worker"`),
+// then started from a Blob URL. One deployable file, no cache-busting or
+// path concerns for a second script.
+const LAYOUT_WORKER_ID = "virtual:layout-worker";
+function inlineLayoutWorker() {
+    return {
+        name: "inline-layout-worker",
+        resolveId(id) {
+            return id === LAYOUT_WORKER_ID ? "\0" + LAYOUT_WORKER_ID : null;
+        },
+        async load(id) {
+            if (id !== "\0" + LAYOUT_WORKER_ID) return null;
+            const entry = "src/layout.worker.ts";
+            this.addWatchFile(entry);
+            const bundle = await rollup({
+                input: entry,
+                onwarn(warning, warn) {
+                    if (warning.code === "CIRCULAR_DEPENDENCY") return;
+                    warn(warning);
+                },
+                plugins: [
+                    resolve({ browser: true }),
+                    commonjs(),
+                    typescript({ sourceMap: false, inlineSources: false }),
+                    production && terser({ maxWorkers: 1 }),
+                ],
+            });
+            const { output } = await bundle.generate({ format: "iife", name: "stemmaLayoutWorker" });
+            await bundle.close();
+            for (const f of bundle.watchFiles ?? []) this.addWatchFile(f);
+            return `export default ${JSON.stringify(output[0].code)};`;
+        },
+    };
+}
 const livereloadEnabled = process.env.NO_LIVERELOAD !== '1';
 
 function isIgnoredWarning(warning) {
@@ -69,6 +106,7 @@ export default {
         file: 'public/build/bundle.js'
     },
     plugins: [
+        inlineLayoutWorker(),
         replace({
             GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
             STEMMA_BACKEND_URL: process.env.STEMMA_BACKEND_URL,
