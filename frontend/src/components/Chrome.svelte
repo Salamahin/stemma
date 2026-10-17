@@ -31,6 +31,7 @@
         onabout: () => void;
         onsettings: () => void;
         onexport: () => void;
+        onexportPng: () => void;
         onsignOut: () => void;
         oneditToggle: () => void;
         onpanToggle: () => void;
@@ -59,6 +60,7 @@
         onabout,
         onsettings,
         onexport,
+        onexportPng,
         onsignOut,
         oneditToggle,
         onpanToggle,
@@ -99,6 +101,7 @@
             {onabout}
             {onsettings}
             {onexport}
+            {onexportPng}
             {onsignOut}
         />
     </div>

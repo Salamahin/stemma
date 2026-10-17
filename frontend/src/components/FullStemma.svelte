@@ -23,6 +23,7 @@
     import { NodeLayoutCache } from "../nodeLayoutCache";
     import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
     import { exportChartSvg } from "../svgExport";
+    import { exportChartPng } from "../pngExport";
     import { personDisplayName } from "../personDisplayName";
     import { t } from "../i18n";
     import { computeClans, type Clan } from "../clans";
@@ -162,6 +163,11 @@
     export function exportSvg(filename: string) {
         if (!chart) return;
         exportChartSvg(chart.exportModel(), filename);
+    }
+
+    export function exportPng(filename: string): Promise<void> {
+        if (!chart) return Promise.resolve();
+        return exportChartPng(chart.exportModel(), filename);
     }
 
     export function getZoomTransform(): d3.ZoomTransform {
