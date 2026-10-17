@@ -44,7 +44,7 @@
     import { imask } from "@imask/svelte";
     import { t } from "../i18n";
     import { renderBioMarkdown } from "../bioMarkdown";
-    import { isUnknownPerson } from "../personDisplayName";
+    import { isUnknownPerson, personDisplayName } from "../personDisplayName";
     import type { CreateNewPerson } from "../model";
     import Modal from "./Modal.svelte";
 
@@ -113,7 +113,7 @@
 
     let bioTab = $state<"edit" | "preview">("preview");
     const bioHtml = $derived(renderBioMarkdown(bio));
-    const displayName = $derived(unknown ? $t("person.unknown") : name);
+    const displayName = $derived(unknown ? personDisplayName(null) : personDisplayName(name));
 
     const saveDisabled = $derived(birthDateErrString != null || deathDateErrString != null);
 

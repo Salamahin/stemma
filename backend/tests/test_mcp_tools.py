@@ -20,3 +20,11 @@ def test_search_honours_a_client_limit() -> None:
 def test_search_clamps_a_nonsense_limit() -> None:
     assert len(_search_people({"query": "Иван", "limit": 0}, _response(5))["people"]) == 1
     assert len(_search_people({"query": "Иван", "limit": 999}, _response(5))["people"]) == 5
+
+
+def test_person_name_schema_tells_the_assistant_how_to_write_unknown_people() -> None:
+    from stemma.services.mcp_tools import _person_write_schema
+
+    description = _person_write_schema({})["properties"]["name"]["description"]
+    assert "???" in description
+    assert "empty string" in description

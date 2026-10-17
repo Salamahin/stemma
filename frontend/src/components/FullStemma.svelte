@@ -102,7 +102,7 @@
             resetSessionPositions(currentStemmaId);
 
             const { people, families } = viewSlice;
-            const displayPeople = people.map((p) => ({ ...p, name: personDisplayName(p.name, $t) }));
+            const displayPeople = people.map((p) => ({ ...p, name: personDisplayName(p.name) }));
             const [nodes, relations] = makeNodesAndRelations(displayPeople, families);
             const initialPositions = computeInitialLayout(stemmaIndex, people, families, window.innerWidth, window.innerHeight);
             const clans = computeClans({ type: "Stemma", people, families });
