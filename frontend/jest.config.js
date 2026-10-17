@@ -26,5 +26,9 @@ module.exports = {
         "/node_modules/(?!svelte)/"
     ],
     moduleFileExtensions: ['js', 'ts', 'svelte'],
+    // jsdom has no Worker: the layout runs inline, the worker source is unused.
+    moduleNameMapper: {
+        "^virtual:layout-worker$": "<rootDir>/src/__mocks__/layoutWorkerSource.js",
+    },
     "testEnvironment": "jsdom"
 }

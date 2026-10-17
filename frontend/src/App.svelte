@@ -34,6 +34,7 @@
     import { capturePendingInvite, takePendingInvite } from "./inviteLinkBuilder";
     import { Circle2 } from "svelte-loading-spinners";
     import { normalizeId } from "./graphTools";
+    import type { CanvasChart } from "./canvasChart";
     import type { FocusedId } from "./focusGesture";
     import { isPendingId, pendingPersonDescription } from "./pendingState";
     import { MutationActions } from "./mutationActions";
@@ -64,7 +65,7 @@
     let highlightVersion = $state(0);
 
     let selectedFamilyId = $state<string | null>(null);
-    let selectedFamilyEl = $state<Element | null>(null);
+    let selectedFamilyEl = $state<{ getBoundingClientRect(): DOMRect } | null>(null);
     let familySheetOpen = $state(false);
     let focusedId = $state<FocusedId | null>(null);
     let ghostSimPositions = $state<Array<{ x: number; y: number }>>([]);
@@ -76,6 +77,7 @@
     let promptModal = $state<ReturnType<typeof PromptModal> | null>(null);
     let confirmModal = $state<ReturnType<typeof ConfirmModal> | null>(null);
     let stemmaChart = $state<ReturnType<typeof FullStemma> | null>(null);
+    let chart = $state<CanvasChart | null>(null);
     let minimap = $state<ReturnType<typeof Minimap> | null>(null);
 
     const controller = new AppController(untrack(() => stemma_backend_url));
@@ -218,7 +220,9 @@
 
     function handleFamilySelected(family: FamilyDescription) {
         if (pendingRemovedFamilyIds.has(family.id)) return;
-        selectedFamilyEl = document.getElementById(normalizeId("family", family.id));
+        const nodeId = normalizeId("family", family.id);
+        const c = chart;
+        selectedFamilyEl = c ? { getBoundingClientRect: () => c.nodeClientRect(nodeId) } : null;
         selectedFamilyId = family.id;
         familySheetOpen = true;
     }
@@ -305,6 +309,7 @@
                     onfamilySelected={handleFamilySelected}
                     onhighlightChanged={() => highlightVersion++}
                     onzoomChanged={() => minimap?.refresh()}
+                    onchartReady={(c) => (chart = c)}
                 />
             {/if}
 
@@ -315,7 +320,7 @@
 
         <FocusController
             {editMode}
-            stemmaChartReady={!!stemmaChart}
+            {chart}
             {ghostSimPositions}
             {focusedId}
             onfocusChange={(f) => (focusedId = f)}
@@ -323,9 +328,8 @@
         <GhostLayer
             {focusedId}
             stemmaIndex={displayedStemmaIndex}
-            stemmaChartReady={!!stemmaChart}
-            getSimulation={() => stemmaChart?.getSimulation() ?? null}
-            applyManualPositions={() => stemmaChart?.applyManualPositions()}
+            {chart}
+            getLayoutCenter={() => stemmaChart?.getLayoutCenter() ?? [window.innerWidth / 2, window.innerHeight / 2]}
             onghostClick={(kind, focused, pins, existingFamilyId) => actions.onGhostClick(kind, focused, pins, existingFamilyId)}
             onpositionsChange={(p) => (ghostSimPositions = p)}
         />
@@ -333,7 +337,7 @@
             {editMode}
             {panActive}
             {panMode}
-            stemmaChartReady={!!stemmaChart}
+            {chart}
             {displayedStemmaIndex}
             findPendingFamily={(id) => actions.findFamily(id)}
             popHover={() => stemmaChart?.popHover()}
@@ -352,14 +356,13 @@
             families={pendingFamilies}
             removedPersonIds={pendingRemovedPersonIds}
             removedFamilyIds={pendingRemovedFamilyIds}
-            stemmaChartReady={!!stemmaChart}
+            {chart}
         />
 
         <Minimap
             bind:this={minimap}
             {editMode}
-            stemmaChartReady={!!stemmaChart}
-            getSimulation={() => stemmaChart?.getSimulation() ?? null}
+            {chart}
             getZoomTransform={() => stemmaChart?.getZoomTransform() ?? null}
             applyZoomTranslate={(tx, ty) => stemmaChart?.applyZoomTranslate(tx, ty)}
         />
@@ -494,23 +497,14 @@
     }
 
     :global(.canvas-layer #chart) {
-        min-height: 100vh;
-        min-height: 100dvh;
-        padding: 0 !important;
-        user-select: none;
-        -webkit-user-select: none;
-        -webkit-user-drag: none;
-    }
-
-    :global(.edit-mode .canvas-layer #chart) {
+        height: 100vh;
+        height: 100dvh;
         touch-action: none;
-    }
-
-    :global(.canvas-layer #chart text) {
         user-select: none;
         -webkit-user-select: none;
         -webkit-user-drag: none;
     }
+
 
     .loading {
         position: absolute;

@@ -44,7 +44,7 @@
     import { locale, t } from "../i18n";
     import { formatPartialDate, isBefore, parseDateInput, toDateInput } from "../partialDate";
     import { renderBioMarkdown } from "../bioMarkdown";
-    import { isUnknownPerson } from "../personDisplayName";
+    import { isUnknownPerson, personDisplayName } from "../personDisplayName";
     import type { AltName, AltNameKind, CreateNewPerson } from "../model";
     import Modal from "./Modal.svelte";
 
@@ -118,7 +118,7 @@
 
     let bioTab = $state<"edit" | "preview">("preview");
     const bioHtml = $derived(renderBioMarkdown(bio));
-    const displayName = $derived(unknown ? $t("person.unknown") : name);
+    const displayName = $derived(unknown ? personDisplayName(null) : personDisplayName(name));
 
     const saveDisabled = $derived(birthDateErrString != null || deathDateErrString != null);
 
