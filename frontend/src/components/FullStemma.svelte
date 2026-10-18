@@ -625,7 +625,7 @@
         const c = new CanvasChart(canvasEl);
         engine = createLayoutEngine(
             [window.innerWidth / 2, window.innerHeight / 2],
-            { onTick: onSimTick, onEnd: onSimEnd },
+            { onTick: onSimTick, onEnd: onSimEnd, onGlide: () => chart?.positionsChanged() },
             layoutWorkerSource,
         );
         setupInteractions(c);

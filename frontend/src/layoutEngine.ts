@@ -21,6 +21,8 @@ export type LayoutCallbacks = {
     onTick: (ticks: number) => void;
     /** The layout came to rest. */
     onEnd: () => void;
+    /** Nodes moved between two worker updates (smoothing): just redraw. Defaults to `onTick(0)`. */
+    onGlide?: () => void;
 };
 
 export interface LayoutEngine {
@@ -375,7 +377,8 @@ export class WorkerLayoutEngine implements LayoutEngine {
             this.glideFrame = null;
             if (!this.smoother.gliding) return;
             const more = this.smoother.step(this.nodes, this.display!.now());
-            this.cb.onTick(0);
+            if (this.cb.onGlide) this.cb.onGlide();
+            else this.cb.onTick(0);
             if (more) this.scheduleGlide();
         });
     }
