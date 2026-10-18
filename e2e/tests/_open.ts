@@ -12,9 +12,3 @@ export async function openPersonCard(page: Page, name: string) {
   if (await editable.isVisible()) await expect(editable).toHaveValue(name);
   else await expect(viewed).toHaveText(name);
 }
-
-/** Unfolds "More" (other names, bio, attachments) of an editable card. */
-export async function openMore(page: Page) {
-  const more = page.getByTestId("person-more");
-  if ((await more.getAttribute("aria-expanded")) !== "true") await more.click();
-}

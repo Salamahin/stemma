@@ -78,7 +78,7 @@ Clicking a ghost opens the create-person modal. On confirm, ghost materializes i
 
 ## Person card
 
-`PersonDetailsModal.svelte` is the one card for viewing, editing and creating a person. It leads with photo, name and life years; other names, bio and attachments are folded under "More" (with a summary of what is there) when editing or creating. Viewing shows only what is filled in — no empty bio or attachment blocks. Dates are typed as a year, mm.yyyy or dd.mm.yyyy (`parseDateInput` still accepts the "c."/"~" approximate prefixes, but the UI does not ask for them).
+`PersonDetailsModal.svelte` is the one card for viewing, editing and creating a person, laid out as a centred profile: avatar (placeholder when there is no photo), name, other names, life years, then bio and attachments. Viewing shows only what is filled in — no empty bio or attachment blocks. Editing keeps the same order with fields; an empty bio is a "+ Bio" link until asked for. Dates are typed as a year, mm.yyyy or dd.mm.yyyy (`parseDateInput` still accepts the "c."/"~" approximate prefixes, but the UI does not ask for them).
 
 ## Known constraints
 

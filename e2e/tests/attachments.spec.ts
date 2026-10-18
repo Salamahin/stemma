@@ -1,6 +1,6 @@
 import { expect, test } from "./_fixtures";
 import type { Page } from "@playwright/test";
-import { openMore, openPersonCard } from "./_open";
+import { openPersonCard } from "./_open";
 
 async function createFreshStemma(page: Page) {
   const stemmaBtn = page.getByTestId("chip-stemma-btn");
@@ -25,7 +25,6 @@ test("a link attached to a person survives a reload and can be removed", async (
   await page.getByTestId("person-create").click();
 
   await openPersonCard(page, name);
-  await openMore(page);
   await page.getByTestId("attachment-add-link").click();
   await page.getByTestId("attachment-url").fill("https://obd-memorial.ru/html/info.htm?id=1");
   await page.getByTestId("attachment-title").fill("ОБД Мемориал");
@@ -35,7 +34,6 @@ test("a link attached to a person survives a reload and can be removed", async (
   await page.reload();
   await page.getByTestId("edit-fab").click();
   await openPersonCard(page, name);
-  await openMore(page);
   const link = page.getByTestId("attachment-link");
   await expect(link).toHaveText("ОБД Мемориал");
   await expect(link).toHaveAttribute("href", "https://obd-memorial.ru/html/info.htm?id=1");
