@@ -131,6 +131,16 @@
     const bioHtml = $derived(renderBioMarkdown(bio));
     const personAttachments = $derived(id ? (attachmentsOf?.(id) ?? []) : []);
     const viewLifespan = $derived(lifespanText(birthDate, deathDate));
+    /** The bio field grows with its text instead of scrolling inside the panel. */
+    function growWithContent(el: HTMLTextAreaElement, _value: string) {
+        const fit = () => {
+            el.style.height = "auto";
+            el.style.height = `${el.scrollHeight + 2}px`;
+        };
+        fit();
+        return { update: fit };
+    }
+
     function lifespanText(birth: string | null | undefined, death: string | null | undefined): string {
         const b = formatPartialDate(birth ?? null, $locale);
         const d = formatPartialDate(death ?? null, $locale);
@@ -654,6 +664,7 @@
                             class="form-control bio-textarea"
                             rows="5"
                             bind:value={bio}
+                            use:growWithContent={bio}
                             data-testid="person-bio"
                         ></textarea>
                         <div class="form-text">{$t("person.bioMarkdownHint")}</div>
@@ -927,6 +938,9 @@
     .bio-textarea {
         font-family: ui-monospace, SFMono-Regular, monospace;
         font-size: var(---fs-body);
+        overflow: hidden;
+        resize: none;
+        min-height: 8rem;
     }
 
     .bio-preview {
