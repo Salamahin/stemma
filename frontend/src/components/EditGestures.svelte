@@ -216,7 +216,7 @@
 
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.key !== "Escape") return;
-            if (document.querySelector(".modal-panel, .link-picker")) return;
+            if (document.querySelector(".modal-panel, .side-panel, .link-picker")) return;
             const busy = press != null;
             onCancel();
             onclearFocus();

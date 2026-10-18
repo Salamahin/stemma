@@ -46,7 +46,7 @@
     import { renderBioMarkdown } from "../bioMarkdown";
     import { isUnknownPerson, personDisplayName } from "../personDisplayName";
     import type { AltName, AltNameKind, CreateNewPerson } from "../model";
-    import Modal from "./Modal.svelte";
+    import SidePanel from "./SidePanel.svelte";
     import Attachments from "./Attachments.svelte";
     import type { Attachment } from "../model";
 
@@ -459,12 +459,9 @@
     }
 </script>
 
-<Modal
+<SidePanel
     {open}
     title={cropping ? $t("person.photoAdjustTitle") : isCreate ? (createTitle ?? $t("addPerson")) : $t("person.title")}
-    size="md"
-    scroll
-    dismissOnBackdrop={!cropping}
     onclose={close}
     testid="person-details-modal"
 >
@@ -748,7 +745,7 @@
             <button type="button" class="btn btn-secondary" onclick={close}>{$t("common.close")}</button>
         {/if}
     {/snippet}
-</Modal>
+</SidePanel>
 
 <style>
     .profile {
