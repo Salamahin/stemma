@@ -180,16 +180,14 @@
             if (d && d.r == null) d.r = GHOST_NEIGHBOUR_COLLIDE_R;
         }
 
-        // Pin ghost y to the seed value: the schema (spouse east of focus at
-        // same y, child below east family, parent above) is the affordance
-        // semantic and must not drift under the sim's forceY/link pull. Ghosts
-        // stay springy along x — collide + repel still push them rightward off
-        // the focus and away from neighbours.
-        // ghost-family is an invisible-ish anchor for spouse/child edges; pin
-        // both axes so it stays at its seed and the arrows do not drift.
+        // Ghosts stay exactly at their seeds, close to the focus: the schema
+        // (spouse east at the same height, child below the east family, parent
+        // above) is the affordance, and the real nodes around make room for
+        // them (NeighbourPush) instead of the ghosts drifting off. The burst
+        // simulation still runs: its ticks drive the push.
         for (const extra of injection.extraNodes) {
+            (extra as any).fx = extra.x;
             (extra as any).fy = extra.y;
-            if (extra.type === "ghost-family") (extra as any).fx = extra.x;
         }
 
         const [cx, cy] = getLayoutCenter();

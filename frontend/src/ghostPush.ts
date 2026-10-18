@@ -28,7 +28,7 @@ export type Segment = readonly [Pos, Pos];
 /** Real nodes within this distance of a ghost's seed position may be pushed. */
 export const GHOST_PUSH_REACH = 320;
 /** Distance a pushed node keeps from a ghost person (circle + its label + padding). */
-export const GHOST_PUSH_CLEARANCE = 150;
+export const GHOST_PUSH_CLEARANCE = 130;
 /** …from a ghost family (a small dot). */
 const GHOST_FAMILY_CLEARANCE = 60;
 /** …from a dashed ghost edge. */

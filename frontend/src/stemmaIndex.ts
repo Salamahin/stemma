@@ -111,6 +111,14 @@ export class StemmaIndex {
         return { ok: true }
     }
 
+    /** Whether `personId` descends from `ancestorId` (is a child, grandchild, … of theirs). */
+    isDescendant(ancestorId: string, personId: string): boolean {
+        for (const fid of this._descendantFamiliesOfPerson.get(ancestorId) ?? []) {
+            if (this._families.get(fid)?.children?.includes(personId)) return true
+        }
+        return false
+    }
+
     hasParentFamily(personId: string): boolean {
         return this._childToParents.has(personId)
     }

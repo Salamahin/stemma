@@ -309,4 +309,44 @@ describe("anchors and clan regions in the layout forces", () => {
         engine.pin(dragged);
         expect([dragged.ax, dragged.ay]).toEqual([777, 888]);
     });
+
+    test("a node the user moves in edit mode stays exactly there through an edit-mode settle", () => {
+        const m = manualScheduler(1);
+        const engine = new InlineLayoutEngine([0, 0], { onTick: () => {}, onEnd: () => {} }, m.scheduler);
+        const { nodes, links } = syntheticGraph(40);
+        engine.setGraph(nodes, links, 1);
+        m.runAll();
+        // edit mode: everything pinned where it is
+        for (const n of nodes as any[]) (n.fx = n.x), (n.fy = n.y);
+        engine.syncFixed();
+        const moved: any = nodes[3];
+        const target = { x: moved.x + 160, y: moved.y - 120 };
+        engine.moveTo(moved, target.x, target.y);
+        expect([moved.x, moved.y, moved.fx, moved.fy, moved.ax, moved.ay]).toEqual([target.x, target.y, target.x, target.y, target.x, target.y]);
+        engine.settle(80);
+        m.runAll();
+        expect([moved.x, moved.y]).toEqual([target.x, target.y]);
+    });
+
+    test("anchors changed on a running layout take effect (d3 caches force targets)", () => {
+        const m = manualScheduler(1);
+        const engine = new InlineLayoutEngine([0, 0], { onTick: () => {}, onEnd: () => {} }, m.scheduler);
+        // two unrelated people far apart: only their anchors hold them
+        const a: any = { id: "person_a", type: "person", x: 0, y: 0 };
+        const b: any = { id: "person_b", type: "person", x: 5000, y: 0 };
+        engine.setGraph([a, b], [], 1);
+        m.runAll();
+        engine.moveTo(a, 400, 300);
+        engine.run({ alpha: 0.3, alphaTarget: 0 });
+        m.runAll();
+        expect(Math.hypot(a.x - 400, a.y - 300)).toBeLessThan(20);
+        // the same for an anchor set by a drop after a view-mode drag
+        a.fx = a.x = -300;
+        a.fy = a.y = -300;
+        a.fx = a.fy = null;
+        engine.pin(a);
+        engine.run({ alpha: 0.3, alphaTarget: 0 });
+        m.runAll();
+        expect(Math.hypot(a.x + 300, a.y + 300)).toBeLessThan(20);
+    });
 });

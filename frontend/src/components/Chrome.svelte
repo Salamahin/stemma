@@ -19,7 +19,7 @@
         highlight: HighlightLineages | null;
         highlightVersion: number;
         editMode: boolean;
-        panMode: boolean;
+        linkMode: boolean;
         showSignOut: boolean;
         onstemmaSelect: (id: string) => void;
         onstemmaAddNew: () => void;
@@ -34,7 +34,7 @@
         onexportPng: () => void;
         onsignOut: () => void;
         oneditToggle: () => void;
-        onpanToggle: () => void;
+        onlinkToggle: () => void;
         onaddPerson: () => void;
     };
 
@@ -48,7 +48,7 @@
         highlight,
         highlightVersion,
         editMode,
-        panMode,
+        linkMode,
         showSignOut,
         onstemmaSelect,
         onstemmaAddNew,
@@ -63,7 +63,7 @@
         onexportPng,
         onsignOut,
         oneditToggle,
-        onpanToggle,
+        onlinkToggle,
         onaddPerson,
     }: Props = $props();
 </script>
@@ -109,10 +109,10 @@
     <div class="bottom-right">
         <Fab
             {editMode}
-            {panMode}
+            {linkMode}
             disabled={isWorking}
             {oneditToggle}
-            {onpanToggle}
+            {onlinkToggle}
             {onaddPerson}
         />
     </div>

@@ -16,6 +16,7 @@ import {
 } from "./pendingState";
 import type { FocusedId } from "./focusGesture";
 import type { GhostKind } from "./ghostHelpers";
+import type { LinkOption } from "./ghostLink";
 
 type CreatePersonArgs = {
     description: CreateNewPerson;
@@ -260,6 +261,18 @@ export class MutationActions {
                 );
             },
         });
+    }
+
+    /** Link mode: links two people already in the tree (see `linkOptions`). */
+    linkPeople(option: LinkOption): void {
+        const existing = (id: string): PersonDefinition => ({ type: "ExistingPerson", id });
+        if (option.kind === "spouses") {
+            this.deps.controller.createFamily([existing(option.a), existing(option.b)], [], { silent: true }).catch(() => {});
+        } else if (option.familyId) {
+            this.attachPersonToFamily(option.childId, option.familyId, "child");
+        } else {
+            this.deps.controller.createFamily([existing(option.parentId)], [existing(option.childId)], { silent: true }).catch(() => {});
+        }
     }
 
     runRemovePerson(personId: string): void {
