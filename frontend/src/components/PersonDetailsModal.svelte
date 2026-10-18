@@ -703,7 +703,6 @@
                 data-testid="person-crop-save"
             >{$t("common.save")}</button>
         {:else if isCreate}
-            <button type="button" class="btn btn-secondary" onclick={close}>{$t("common.cancel")}</button>
             <button
                 type="button"
                 class="btn btn-primary"
@@ -726,7 +725,6 @@
                     data-testid="share-access-btn"
                 >{$t("shareAccess")}</button>
             {/if}
-            <button type="button" class="btn btn-secondary" onclick={close}>{$t("common.cancel")}</button>
             <button
                 type="button"
                 class="btn btn-primary"
@@ -743,7 +741,6 @@
                     data-testid="share-access-btn"
                 >{$t("shareAccess")}</button>
             {/if}
-            <button type="button" class="btn btn-secondary" onclick={close}>{$t("common.close")}</button>
         {/if}
     {/snippet}
 </SidePanel>

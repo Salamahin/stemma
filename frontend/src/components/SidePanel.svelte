@@ -129,6 +129,11 @@
         border-top: 1px solid var(---border-subtle);
     }
 
+    /* nothing to show (a read-only person in view mode) */
+    .side-footer:empty {
+        display: none;
+    }
+
     @media (max-width: 767px) {
         .side-panel {
             width: 100vw;
