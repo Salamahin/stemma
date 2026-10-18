@@ -46,7 +46,7 @@
     import { renderBioMarkdown } from "../bioMarkdown";
     import { isUnknownPerson, personDisplayName } from "../personDisplayName";
     import type { AltName, AltNameKind, CreateNewPerson } from "../model";
-    import Modal from "./Modal.svelte";
+    import SidePanel from "./SidePanel.svelte";
     import Attachments from "./Attachments.svelte";
     import type { Attachment } from "../model";
 
@@ -83,6 +83,8 @@
     let createTitle = $state<string | null>(null);
     let activeCreateCallback: ((payload: CreatePersonPayload) => void) | null = null;
     const isCreate = $derived(mode === "create");
+    /** An empty bio is a link until asked for, so the card stays short. */
+    let bioOpen = $state(false);
     let birthInputEl = $state<HTMLInputElement | null>(null);
     let deathInputEl = $state<HTMLInputElement | null>(null);
     let photoFileInputEl = $state<HTMLInputElement | null>(null);
@@ -126,8 +128,16 @@
     let birthDateErrString = $state<string | null>(null);
     let deathDateErrString = $state<string | null>(null);
 
-    let bioTab = $state<"edit" | "preview">("preview");
     const bioHtml = $derived(renderBioMarkdown(bio));
+    const personAttachments = $derived(id ? (attachmentsOf?.(id) ?? []) : []);
+    const viewLifespan = $derived(lifespanText(birthDate, deathDate));
+    function lifespanText(birth: string | null | undefined, death: string | null | undefined): string {
+        const b = formatPartialDate(birth ?? null, $locale);
+        const d = formatPartialDate(death ?? null, $locale);
+        if (!b && !d) return "";
+        return d ? `${b || "?"} – ${d}` : b;
+    }
+
     const displayName = $derived(unknown ? personDisplayName(null) : personDisplayName(name));
 
     const saveDisabled = $derived(birthDateErrString != null || deathDateErrString != null);
@@ -179,7 +189,7 @@
         altNames = (p?.description.altNames ?? []).map((a) => ({ ...a }));
         pinned = p?.pin ?? false;
         personReadOnly = p?.description.readOnly ?? false;
-        bioTab = p ? "preview" : "edit";
+        bioOpen = !!p?.description.bio?.trim();
         originalPhotoUrl = p?.description.photoUrl ?? null;
         photoUrl = originalPhotoUrl;
         photoErrString = null;
@@ -197,7 +207,10 @@
         open = true;
     }
 
-    export function showCreatePerson(opts: { title?: string; oncreate: (payload: CreatePersonPayload) => void }) {
+    export function showCreatePerson(opts: {
+        title?: string;
+        oncreate: (payload: CreatePersonPayload) => void;
+    }) {
         mode = "create";
         createTitle = opts.title ?? null;
         activeCreateCallback = opts.oncreate;
@@ -446,12 +459,9 @@
     }
 </script>
 
-<Modal
+<SidePanel
     {open}
     title={cropping ? $t("person.photoAdjustTitle") : isCreate ? (createTitle ?? $t("addPerson")) : $t("person.title")}
-    size="lg"
-    scroll
-    dismissOnBackdrop={!cropping}
     onclose={close}
     testid="person-details-modal"
 >
@@ -496,210 +506,193 @@
                 <p class="hint">{$t("person.photoAdjustHint")}</p>
             </div>
         {:else}
-            <div class="grid">
-                <div class="col-photo">
-                    <div class="photo-frame">
-                        {#if photoUrl}
-                            <img src={photoUrl} alt={name} class="photo-image" />
-                        {:else}
-                            <div class="photo-empty">{$t("person.photo")}</div>
-                        {/if}
-                        {#if !readOnly}
-                            <button
-                                type="button"
-                                class="photo-upload-btn"
-                                onclick={pickPhoto}
-                                aria-label={photoUrl ? $t("person.photoReplace") : $t("person.photoUpload")}
-                                data-testid="person-photo-upload"
-                            >
-                                <span class="photo-upload-label">
-                                    {photoUrl ? $t("person.photoReplace") : $t("person.photoUpload")}
-                                </span>
-                            </button>
-                            <input
-                                bind:this={photoFileInputEl}
-                                type="file"
-                                accept="image/jpeg,image/png,image/webp"
-                                class="d-none"
-                                onchange={onPhotoFileChange}
-                            />
-                        {/if}
-                    </div>
-                    {#if !readOnly && photoUrl}
-                        <button type="button" class="btn btn-outline-danger btn-sm w-100 mt-2" onclick={removePhoto}>
-                            {$t("person.photoRemove")}
-                        </button>
+            <div class="profile">
+                <div class="avatar" class:editable={!readOnly}>
+                    {#if photoUrl}
+                        <img src={photoUrl} alt={name} class="photo-image" />
+                    {:else}
+                        <div class="photo-empty"><i class="bi bi-person"></i></div>
                     {/if}
-                    {#if photoErrString}
-                        <div class="text-danger mt-2 small">{photoErrString}</div>
+                    {#if !readOnly}
+                        <button
+                            type="button"
+                            class="photo-upload-btn"
+                            onclick={pickPhoto}
+                            aria-label={photoUrl ? $t("person.photoReplace") : $t("person.photoUpload")}
+                            data-testid="person-photo-upload"
+                        ><i class="bi bi-camera"></i></button>
+                        <input
+                            bind:this={photoFileInputEl}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            class="d-none"
+                            onchange={onPhotoFileChange}
+                        />
                     {/if}
                 </div>
+                {#if !readOnly && photoUrl}
+                    <button type="button" class="btn btn-link btn-sm text-danger p-0" onclick={removePhoto}>
+                        {$t("person.photoRemove")}
+                    </button>
+                {/if}
+                {#if photoErrString}
+                    <div class="text-danger small">{photoErrString}</div>
+                {/if}
 
-                <div class="col-fields">
-                    <div class="field-row">
-                        <label for="person-name" class="field-label">{$t("person.name")}</label>
-                        <input
-                            id="person-name"
-                            class="form-control"
-                            bind:value={name}
-                            readonly={readOnly}
-                            disabled={unknown}
-                            data-testid="person-name-input"
-                        />
-                        {#if !readOnly}
-                            <div class="form-check form-switch mt-2">
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    id="person-unknown"
-                                    bind:checked={unknown}
-                                    onchange={() => { if (unknown) name = ""; }}
-                                />
-                                <label class="form-check-label" for="person-unknown">
-                                    {$t("person.unknownToggle")}
-                                </label>
-                            </div>
-                        {/if}
-                    </div>
+                {#if readOnly}
+                    <div class="view-name" data-testid="person-view-name">{displayName}</div>
+                    {#if altNames.length > 0}
+                        <div class="view-alt-names" data-testid="person-alt-names">
+                            {#each altNames as alt, i}
+                                {#if i > 0}<span class="sep">·</span>{/if}
+                                <span><span class="alt-kind">{$t(`person.altKind.${alt.kind}`)}</span> {alt.name}</span>
+                            {/each}
+                        </div>
+                    {/if}
+                    {#if viewLifespan}
+                        <div class="view-dates">{viewLifespan}</div>
+                    {/if}
+                {:else}
+                    <input
+                        id="person-name"
+                        class="form-control name-input"
+                        bind:value={name}
+                        disabled={unknown}
+                        placeholder={$t("person.namePlaceholder")}
+                        aria-label={$t("person.name")}
+                        autocomplete="off"
+                        data-testid="person-name-input"
+                    />
+                    <label class="unknown-check">
+                        <input type="checkbox" id="person-unknown" bind:checked={unknown} onchange={() => { if (unknown) name = ""; }} />
+                        {$t("person.unknownToggle")}
+                    </label>
 
-                    {#if !readOnly || altNames.length > 0}
-                        <div class="field-row" data-testid="person-alt-names">
-                            <span class="field-label">{$t("person.altNames")}</span>
-                            {#if readOnly}
-                                <ul class="alt-names-view">
-                                    {#each altNames as alt}
-                                        <li><span class="alt-kind">{$t(`person.altKind.${alt.kind}`)}</span> {alt.name}</li>
+                    <div class="alt-names-edit" data-testid="person-alt-names">
+                        {#each altNames as alt, i}
+                            <div class="alt-name-row">
+                                <select class="form-select alt-kind-select" bind:value={alt.kind} data-testid="person-alt-kind">
+                                    {#each ALT_NAME_KINDS as kind}
+                                        <option value={kind}>{$t(`person.altKind.${kind}`)}</option>
                                     {/each}
-                                </ul>
-                            {:else}
-                                {#each altNames as alt, i}
-                                    <div class="alt-name-row">
-                                        <select class="form-select alt-kind-select" bind:value={alt.kind} data-testid="person-alt-kind">
-                                            {#each ALT_NAME_KINDS as kind}
-                                                <option value={kind}>{$t(`person.altKind.${kind}`)}</option>
-                                            {/each}
-                                        </select>
-                                        <input
-                                            class="form-control"
-                                            bind:value={alt.name}
-                                            placeholder={$t("namePlaceholder")}
-                                            data-testid="person-alt-name-input"
-                                        />
-                                        <button
-                                            type="button"
-                                            class="btn btn-outline-secondary"
-                                            aria-label={$t("person.removeAltName")}
-                                            onclick={() => removeAltName(i)}
-                                        ><i class="bi bi-x"></i></button>
-                                    </div>
-                                {/each}
+                                </select>
+                                <input
+                                    class="form-control"
+                                    bind:value={alt.name}
+                                    placeholder={$t("namePlaceholder")}
+                                    data-testid="person-alt-name-input"
+                                />
                                 <button
                                     type="button"
-                                    class="btn btn-link btn-sm p-0"
-                                    onclick={addAltName}
-                                    data-testid="person-add-alt-name"
-                                >{$t("person.addAltName")}</button>
+                                    class="btn btn-outline-secondary"
+                                    aria-label={$t("person.removeAltName")}
+                                    onclick={() => removeAltName(i)}
+                                ><i class="bi bi-x"></i></button>
+                            </div>
+                        {/each}
+                        <button
+                            type="button"
+                            class="btn btn-link btn-sm p-0"
+                            onclick={addAltName}
+                            data-testid="person-add-alt-name"
+                        >{$t("person.addAltName")}</button>
+                    </div>
+
+                    <div class="dates-row">
+                        <div class="date-cell">
+                            <label class="mini-label" for="person-birth-input">{$t("person.born")}</label>
+                            <input
+                                id="person-birth-input"
+                                bind:this={birthInputEl}
+                                value={birthText}
+                                oninput={(e) => onDateInput("birth", e.currentTarget.value)}
+                                class="form-control {birthDateErrString ? 'is-invalid' : ''}"
+                                placeholder={$t("person.dateExample")}
+                                data-testid="person-birth"
+                            />
+                            {#if birthDateErrString}
+                                <div class="invalid-feedback">{birthDateErrString}</div>
                             {/if}
                         </div>
-                    {/if}
-
-                    <div class="field-row">
-                        <span class="field-label">{$t("person.lifeYears")}</span>
-                        <div class="dates-row">
-                            <div class="date-cell">
-                                <input
-                                    bind:this={birthInputEl}
-                                    value={readOnly ? formatPartialDate(birthDate, $locale) : birthText}
-                                    oninput={(e) => onDateInput("birth", e.currentTarget.value)}
-                                    class="form-control {birthDateErrString ? 'is-invalid' : ''}"
-                                    readonly={readOnly}
-                                    placeholder={$t("person.datePlaceholder")}
-                                    data-testid="person-birth"
-                                />
-                                {#if birthDateErrString}
-                                    <div class="invalid-feedback">{birthDateErrString}</div>
-                                {/if}
-                            </div>
-                            <div class="date-cell">
-                                <input
-                                    bind:this={deathInputEl}
-                                    value={readOnly ? formatPartialDate(deathDate, $locale) : deathText}
-                                    oninput={(e) => onDateInput("death", e.currentTarget.value)}
-                                    class="form-control {deathDateErrString ? 'is-invalid' : ''}"
-                                    readonly={readOnly}
-                                    placeholder={$t("person.datePlaceholder")}
-                                    data-testid="person-death"
-                                />
-                                {#if deathDateErrString}
-                                    <div class="invalid-feedback">{deathDateErrString}</div>
-                                {/if}
-                            </div>
+                        <span class="dash">–</span>
+                        <div class="date-cell">
+                            <label class="mini-label" for="person-death-input">{$t("person.died")}</label>
+                            <input
+                                id="person-death-input"
+                                bind:this={deathInputEl}
+                                value={deathText}
+                                oninput={(e) => onDateInput("death", e.currentTarget.value)}
+                                class="form-control {deathDateErrString ? 'is-invalid' : ''}"
+                                placeholder={$t("person.dateExample")}
+                                data-testid="person-death"
+                            />
+                            {#if deathDateErrString}
+                                <div class="invalid-feedback">{deathDateErrString}</div>
+                            {/if}
                         </div>
                     </div>
-                </div>
+                    <div class="date-hint">{$t("person.datePlaceholder")}</div>
+                {/if}
+            </div>
 
-                <div class="col-bio">
-                    <div class="bio-header">
-                        <span class="field-label">{$t("person.bio")}</span>
-                        {#if !readOnly}
-                            <div class="bio-tabs">
-                                <button
-                                    type="button"
-                                    class="bio-tab {bioTab === 'edit' ? 'active' : ''}"
-                                    onclick={() => (bioTab = "edit")}
-                                >{$t("person.bioEdit")}</button>
-                                <button
-                                    type="button"
-                                    class="bio-tab {bioTab === 'preview' ? 'active' : ''}"
-                                    onclick={() => (bioTab = "preview")}
-                                >{$t("person.bioPreview")}</button>
-                            </div>
-                        {/if}
+            {#if readOnly}
+                {#if bioHtml}
+                    <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                    <div class="bio-preview" data-testid="person-bio-view">{@html bioHtml}</div>
+                {/if}
+                {#if id && personAttachments.length > 0}
+                    <div class="section">
+                        <Attachments attachments={personAttachments} editable={false} />
                     </div>
-                    {#if !readOnly && bioTab === "edit"}
+                {/if}
+            {:else}
+                <div class="section bio-section" class:grow={bioOpen}>
+                    {#if bioOpen}
+                        <label class="field-label" for="person-bio-input">{$t("person.bio")}</label>
                         <textarea
+                            id="person-bio-input"
                             class="form-control bio-textarea"
-                            rows="6"
+                            rows="5"
                             bind:value={bio}
                             data-testid="person-bio"
                         ></textarea>
                         <div class="form-text">{$t("person.bioMarkdownHint")}</div>
-                    {:else if bioHtml}
-                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                        <div class="bio-preview">{@html bioHtml}</div>
                     {:else}
-                        <div class="bio-preview text-muted fst-italic">{$t("person.bioEmpty")}</div>
+                        <button type="button" class="btn btn-link btn-sm p-0" onclick={() => (bioOpen = true)} data-testid="person-add-bio">
+                            {$t("person.addBio")}
+                        </button>
                     {/if}
-                    {#if !isCreate && id}
+                </div>
+                {#if id}
+                    <div class="section">
                         <Attachments
-                            attachments={attachmentsOf?.(id) ?? []}
+                            attachments={personAttachments}
                             editable={editingAllowed}
                             onaddLink={(p) => onattachLink?.({ personId: id, ...p })}
                             onaddFile={(p) => onattachFile?.({ personId: id, ...p })}
                             onremove={(aid) => onremoveAttachment?.(aid)}
                         />
-                    {/if}
-                </div>
-
-                {#if pinningAllowed}
-                    <div class="col-pin">
-                        <div class="form-check form-switch">
-                            <input
-                                class="form-check-input"
-                                type="checkbox"
-                                id="person-pin"
-                                bind:checked={pinned}
-                                onchange={!editingAllowed ? savePinOnly : undefined}
-                            />
-                            <label class="form-check-label" for="person-pin">{$t("person.pin")}</label>
-                        </div>
                     </div>
                 {/if}
-            </div>
+            {/if}
+
         {/if}
     {/snippet}
 
     {#snippet footer()}
+        {#if pinningAllowed && !cropping}
+            <!-- with the buttons, so a long bio never pushes it out of sight -->
+            <div class="form-check form-switch pin-row">
+                <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="person-pin"
+                    bind:checked={pinned}
+                    onchange={!editingAllowed ? savePinOnly : undefined}
+                />
+                <label class="form-check-label" for="person-pin">{$t("person.pin")}</label>
+            </div>
+        {/if}
         {#if cropping}
             <button type="button" class="btn btn-secondary" onclick={cancelCrop}>{$t("common.cancel")}</button>
             <button
@@ -710,14 +703,13 @@
                 data-testid="person-crop-save"
             >{$t("common.save")}</button>
         {:else if isCreate}
-            <button type="button" class="btn btn-secondary" onclick={close}>{$t("common.cancel")}</button>
             <button
                 type="button"
                 class="btn btn-primary"
                 disabled={saveDisabled}
                 onclick={save}
                 data-testid="person-create"
-            >{$t("common.create")}</button>
+            >{$t("person.add")}</button>
         {:else if editingAllowed}
             <button
                 type="button"
@@ -733,7 +725,6 @@
                     data-testid="share-access-btn"
                 >{$t("shareAccess")}</button>
             {/if}
-            <button type="button" class="btn btn-secondary" onclick={close}>{$t("common.cancel")}</button>
             <button
                 type="button"
                 class="btn btn-primary"
@@ -750,81 +741,28 @@
                     data-testid="share-access-btn"
                 >{$t("shareAccess")}</button>
             {/if}
-            <button type="button" class="btn btn-secondary" onclick={close}>{$t("common.close")}</button>
         {/if}
     {/snippet}
-</Modal>
+</SidePanel>
 
 <style>
-    .grid {
-        display: grid;
-        grid-template-columns: 200px 1fr;
-        gap: 16px;
-    }
-
-    .col-photo { grid-column: 1; grid-row: 1; }
-    .col-fields { grid-column: 2; grid-row: 1; }
-    .col-bio { grid-column: 1 / -1; }
-    .col-pin { grid-column: 1 / -1; }
-
-    @media (max-width: 560px) {
-        .grid {
-            grid-template-columns: 1fr;
-        }
-        .col-photo, .col-fields { grid-column: 1; grid-row: auto; }
-    }
-
-    .field-row + .field-row {
-        margin-top: 12px;
-    }
-
-    .field-label {
-        display: block;
-        margin: 4px 0 6px;
-        font-size: var(---fs-label);
-        color: var(---text-secondary);
-        font-weight: var(---fw-label);
-    }
-
-    .alt-name-row {
+    .profile {
         display: flex;
-        gap: 6px;
-        margin-bottom: 6px;
-    }
-
-    .alt-kind-select {
-        flex: 0 0 auto;
-        width: auto;
-    }
-
-    .alt-names-view {
-        margin: 0;
-        padding-left: 0;
-        list-style: none;
-    }
-
-    .alt-kind {
-        color: var(---text-muted);
-    }
-
-    .dates-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
+        flex-direction: column;
+        align-items: center;
         gap: 8px;
+        text-align: center;
     }
 
-    .date-cell {
+    .avatar {
         position: relative;
-    }
-
-    .photo-frame {
-        position: relative;
-        width: 100%;
-        aspect-ratio: 1 / 1;
-        border-radius: 12px;
+        width: 112px;
+        height: 112px;
+        border-radius: 50%;
         overflow: hidden;
+        background-color: #f1f3f5;
         border: 1px solid #e9ecef;
-        background-color: #f8f9fa;
+        margin-bottom: 4px;
     }
 
     .photo-image {
@@ -840,86 +778,172 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        color: var(---text-muted);
-        font-size: var(---fs-label);
+        color: #adb5bd;
+        font-size: 3rem;
     }
 
     .photo-upload-btn {
         position: absolute;
         inset: 0;
-        width: 100%;
-        height: 100%;
-        background: transparent;
         border: none;
-        padding: 0;
-        cursor: pointer;
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-        transition: background-color 0.15s ease;
-    }
-
-    .photo-upload-btn:hover,
-    .photo-upload-btn:focus-visible {
-        background-color: rgba(0, 0, 0, 0.35);
-    }
-
-    .photo-upload-label {
-        width: 100%;
-        padding: 0.5rem;
-        background-color: rgba(0, 0, 0, 0.55);
+        background: transparent;
         color: #fff;
-        font-size: var(---fs-label);
-        text-align: center;
+        font-size: 1.4rem;
         opacity: 0;
-        transition: opacity 0.15s ease;
+        cursor: pointer;
+        transition: opacity 0.15s ease, background-color 0.15s ease;
     }
 
-    .photo-frame:has(.photo-empty) .photo-upload-label,
-    .photo-upload-btn:hover .photo-upload-label,
-    .photo-upload-btn:focus-visible .photo-upload-label {
+    .avatar.editable:hover .photo-upload-btn,
+    .photo-upload-btn:focus-visible {
         opacity: 1;
+        background-color: rgba(0, 0, 0, 0.4);
     }
 
-    .bio-header {
+    .avatar.editable:not(:has(.photo-image)) .photo-upload-btn {
+        opacity: 1;
+        color: #6c757d;
+        align-items: flex-end;
+        display: flex;
+        justify-content: flex-end;
+        padding: 10px 14px;
+        font-size: 1rem;
+    }
+
+    .view-name {
+        font-size: 1.3rem;
+        font-weight: 600;
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+    }
+
+    .view-alt-names {
+        color: var(---text-secondary);
+        font-size: 0.95rem;
+    }
+
+    .view-alt-names .sep {
+        margin: 0 6px;
+        color: var(---text-muted);
+    }
+
+    .view-dates {
+        color: var(---text-secondary);
+    }
+
+    .name-input {
+        text-align: center;
+        font-size: 1.1rem;
+        font-weight: 500;
+    }
+
+    .unknown-check {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 4px;
-    }
-
-    .bio-tabs {
-        display: inline-flex;
-        background: #f1f3f5;
-        border-radius: 8px;
-        padding: 2px;
-    }
-
-    .bio-tab {
-        padding: 4px 10px;
-        background: none;
-        border: none;
+        gap: 6px;
         font-size: var(---fs-hint);
         color: var(---text-muted);
-        border-radius: 6px;
         cursor: pointer;
+    }
+
+    .alt-names-edit {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .dates-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+        width: 100%;
+        max-width: 340px;
+        margin-top: 4px;
+    }
+
+    .date-cell {
+        flex: 1;
+        min-width: 0;
+        position: relative;
+        text-align: left;
+    }
+
+    .dash {
+        padding-bottom: 7px;
+        color: var(---text-muted);
+    }
+
+    .mini-label {
+        display: block;
+        font-size: var(---fs-hint);
+        color: var(---text-muted);
+        margin-bottom: 2px;
+    }
+
+    .date-hint {
+        font-size: var(---fs-hint);
+        color: var(---text-muted);
+    }
+
+    .section {
+        margin-top: 16px;
+    }
+
+    .profile + .bio-preview {
+        margin-top: 16px;
+    }
+
+    .pin-row {
+        width: 100%;
+        margin: 0 0 4px;
+    }
+
+    .field-label {
+        display: block;
+        margin: 4px 0 6px;
+        font-size: var(---fs-label);
+        color: var(---text-secondary);
         font-weight: var(---fw-label);
     }
 
-    .bio-tab.active {
-        background: var(---bg-surface);
-        color: var(---text-primary);
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    .alt-name-row {
+        width: 100%;
+        display: flex;
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+
+    .alt-kind-select {
+        flex: 0 0 auto;
+        width: auto;
+    }
+
+    .alt-kind {
+        color: var(---text-muted);
     }
 
     .bio-textarea {
         font-family: ui-monospace, SFMono-Regular, monospace;
         font-size: var(---fs-body);
+        resize: none;
+        min-height: 8rem;
+    }
+
+    /* an open bio takes all the room the panel has left; longer text scrolls inside */
+    .bio-section.grow {
+        flex: 1 0 auto;
+        display: flex;
+        flex-direction: column;
+        min-height: 12rem;
+    }
+
+    .bio-section.grow .bio-textarea {
+        flex: 1;
+        overflow-y: auto;
     }
 
     .bio-preview {
-        min-height: 6rem;
         padding: 0.5rem 0.75rem;
         border: 1px solid #e9ecef;
         border-radius: 10px;

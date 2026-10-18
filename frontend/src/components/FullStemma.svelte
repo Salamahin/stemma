@@ -239,6 +239,24 @@
         setSessionPosition(nodeId, x, y);
     }
 
+    /** The user put a node here (edit-mode drag): it stays and is remembered there. */
+    export function placeNode(nodeId: string, x: number, y: number) {
+        const node = chart?.node(nodeId);
+        if (!chart || !node) return;
+        if (engine) engine.moveTo(node, x, y);
+        else {
+            node.x = x;
+            node.y = y;
+        }
+        if (pinnedPeople && node.type === "person") {
+            const personId = denormalizeId(node.id);
+            if (pinnedPeople.isPinned(personId)) pinnedPeople.updatePosition(personId, x, y);
+        }
+        recordPositions([node]);
+        saveLayoutCache();
+        chart.positionsChanged();
+    }
+
     export function popHover() {
         clearHover();
     }
@@ -363,7 +381,7 @@
 
     function updateHover(clientX: number, clientY: number) {
         if (!chart || isDragging) return;
-        if (document.body.classList.contains("linking")) return;
+        if (document.body.classList.contains("chart-gesture")) return;
         if (!hoverHighlight) return;
         const hit = chart.hitNode(clientX, clientY);
         const hitId = hit?.id ?? null;
@@ -591,7 +609,7 @@
             lastPointer = null;
             c.setHoveredGhost(null);
             if (isDragging) return;
-            if (document.body.classList.contains("linking")) return;
+            if (document.body.classList.contains("chart-gesture")) return;
             if (!hoverHighlight) return;
             clearHover();
         });

@@ -113,6 +113,14 @@ export function immediateNeighborIds(
     return refs;
 }
 
+/**
+ * Ghost offsets from the focused node: close to it, since real nodes around
+ * make room for the ghosts (ghostPush.ts) instead of the ghosts drifting off.
+ */
+const GHOST_FAMILY_GAP = 60;
+const GHOST_PERSON_GAP = 130;
+const GHOST_CHILD_DROP = 90;
+
 export function deriveGhostLayout(
     focusedId: FocusedId | null,
     stemmaIndex: StemmaIndex,
@@ -128,7 +136,7 @@ export function deriveGhostLayout(
         // "add child". Click on the child slot creates a new family with the
         // focused person as the sole parent; users wanting to extend an
         // existing spouse-family use the drag gesture or the family card.
-        const eastFamily: GhostFamilyPlan = { id: "ghost-family-east", dx: 100, dy: 0 };
+        const eastFamily: GhostFamilyPlan = { id: "ghost-family-east", dx: GHOST_FAMILY_GAP, dy: 0 };
         families.push(eastFamily);
         anchorEdges.push({ familyId: eastFamily.id, focusedRole: "parent" });
         persons.push({
@@ -137,7 +145,7 @@ export function deriveGhostLayout(
             labelKey: LABEL_KEYS.spouse,
             familyId: eastFamily.id,
             role: "parent",
-            dx: 200,
+            dx: GHOST_PERSON_GAP,
             dy: 0,
         });
         persons.push({
@@ -146,12 +154,12 @@ export function deriveGhostLayout(
             labelKey: LABEL_KEYS.child,
             familyId: eastFamily.id,
             role: "child",
-            dx: 100,
-            dy: 100,
+            dx: GHOST_FAMILY_GAP,
+            dy: GHOST_CHILD_DROP,
         });
 
         if (!stemmaIndex.hasParentFamily(focusedId.id)) {
-            const parentFamily: GhostFamilyPlan = { id: "ghost-family-parent", dx: 0, dy: -100 };
+            const parentFamily: GhostFamilyPlan = { id: "ghost-family-parent", dx: 0, dy: -GHOST_FAMILY_GAP };
             families.push(parentFamily);
             anchorEdges.push({ familyId: parentFamily.id, focusedRole: "child" });
             persons.push({
@@ -161,7 +169,7 @@ export function deriveGhostLayout(
                 familyId: parentFamily.id,
                 role: "parent",
                 dx: 0,
-                dy: -200,
+                dy: -GHOST_PERSON_GAP,
             });
         }
 
@@ -179,7 +187,7 @@ export function deriveGhostLayout(
                     familyId: FOCUSED_FAMILY_REF,
                     role: "child",
                     dx: 0,
-                    dy: 100,
+                    dy: GHOST_CHILD_DROP,
                 },
             ],
             anchorEdges: [],
