@@ -8,6 +8,7 @@
  * writes positions into them as the layout progresses, except for nodes the
  * main thread holds fixed (fx/fy), which stay main-thread authoritative.
  */
+import { PositionSmoother } from "./positionSmoothing";
 import { anchorAtRest, anchorWhereMissing, moveNodeTo, refreshAnchors, giveCollisionRadius, createLayoutSimulation, LayoutLoop, LAYOUT_SETTLE_MS, type LayoutNode, type Scheduler } from "./layoutCore";
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from "./layoutProtocol";
 import { applyStructuredSeed, clanRegions, SEED_USES_CLAN_REGIONS } from "./structuredLayout";
@@ -156,8 +157,20 @@ export class WorkerLayoutEngine implements LayoutEngine {
     private alpha = 1;
     private fallback: InlineLayoutEngine | null = null;
     private groups: Int32Array | undefined;
+    /** Worker updates glide on screen instead of jumping (see PositionSmoother). */
+    private smoother = new PositionSmoother();
+    private glideFrame: number | null = null;
+    /** The reply to a one-shot settle (edit mode) lands at once. */
+    private landNext = false;
 
-    constructor(readonly center: [number, number], private cb: LayoutCallbacks, private worker: Worker) {
+    constructor(
+        readonly center: [number, number],
+        private cb: LayoutCallbacks,
+        private worker: Worker,
+        private display: { frame: (fn: () => void) => unknown; now: () => number } | null = typeof requestAnimationFrame === "function"
+            ? { frame: (fn) => requestAnimationFrame(fn), now: () => performance.now() }
+            : null,
+    ) {
         worker.onmessage = (e: MessageEvent<LayoutWorkerResponse>) => this.receive(e.data);
         worker.onerror = (e) => {
             e.preventDefault?.();
@@ -206,6 +219,7 @@ export class WorkerLayoutEngine implements LayoutEngine {
     }
 
     setGraph(nodes: EngineNode[], links: EngineLink[], alpha: number, start = true, seed = false, groups?: Int32Array) {
+        this.smoother.finish(this.nodes);
         this.nodes = nodes;
         this.links = links;
         this.alpha = alpha;
@@ -299,6 +313,7 @@ export class WorkerLayoutEngine implements LayoutEngine {
     settle(ticks: number) {
         this.running = false;
         if (this.fallback) return this.fallback.settle(ticks);
+        this.landNext = true;
         this.post({ type: "settle", gen: this.gen, ticks });
     }
 
@@ -316,15 +331,20 @@ export class WorkerLayoutEngine implements LayoutEngine {
         if (msg.type === "positions") {
             const { x, y, vx, vy } = msg;
             const nodes = this.nodes;
+            // a seed, a settle (or no display loop) lands at once; ordinary updates glide
+            const glide = this.display != null && !msg.ax && !this.landNext;
+            this.landNext = false;
+            if (glide) this.smoother.target(nodes, x, y, this.display!.now());
+            else this.smoother.finish(nodes);
             for (let i = 0; i < nodes.length && i < x.length; i++) {
                 const d = nodes[i];
                 // Main-thread pins (drag, edit mode) win over in-flight worker positions.
                 if (d.fx == null) {
-                    d.x = x[i];
+                    if (!glide) d.x = x[i];
                     d.vx = vx[i];
                 }
                 if (d.fy == null) {
-                    d.y = y[i];
+                    if (!glide) d.y = y[i];
                     d.vy = vy[i];
                 }
             }
@@ -336,11 +356,35 @@ export class WorkerLayoutEngine implements LayoutEngine {
                 }
             }
             this.alpha = msg.alpha;
+            if (glide) {
+                this.smoother.step(nodes, this.display!.now());
+                this.scheduleGlide();
+            }
             this.cb.onTick(msg.ticks);
         } else if (msg.type === "end") {
+            this.landGlide();
             this.running = false;
             this.cb.onEnd();
         }
+    }
+
+    private scheduleGlide() {
+        if (this.glideFrame != null || !this.display) return;
+        this.glideFrame = 1;
+        this.display.frame(() => {
+            this.glideFrame = null;
+            if (!this.smoother.gliding) return;
+            const more = this.smoother.step(this.nodes, this.display!.now());
+            this.cb.onTick(0);
+            if (more) this.scheduleGlide();
+        });
+    }
+
+    /** Put nodes where the worker last said (layout end, new graph). */
+    private landGlide() {
+        if (!this.smoother.gliding) return;
+        this.smoother.finish(this.nodes);
+        this.cb.onTick(0);
     }
 
     destroy() {

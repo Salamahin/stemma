@@ -131,6 +131,11 @@ const PENDING_REMOVE_COLOR = "#dc3545";
 const PIN_PATH =
     "M4.146.146A.5.5 0 0 1 4.5 0h7a.5.5 0 0 1 .5.5c0 .68-.342 1.174-.646 1.479-.126.125-.25.224-.354.298v4.431l.078.048c.203.127.476.314.751.555C12.36 7.775 13 8.527 13 9.5a.5.5 0 0 1-.5.5h-4v4.5c0 .276-.224 1.5-.5 1.5s-.5-1.224-.5-1.5V10h-4a.5.5 0 0 1-.5-.5c0-.973.64-1.725 1.17-2.189A5.921 5.921 0 0 1 5 6.708V2.277a2.77 2.77 0 0 1-.354-.298C4.342 1.674 4 1.179 4 .5a.5.5 0 0 1 .146-.354z";
 
+/** Gesture snapshot: margin around the view (share of its size per side), max density, max zoom drift before a redraw. */
+const SNAPSHOT_MARGIN = 0.25;
+const SNAPSHOT_MAX_DPR = 2;
+const SNAPSHOT_MAX_SCALE_DRIFT = 1.6;
+
 /** Max side (device px) of the offscreen bitmap holding the blurred clan clouds. */
 const CLAN_BITMAP_MAX = 2048;
 /** Below this on-screen font size labels are unreadable; skip drawing them. */
@@ -667,7 +672,18 @@ export class CanvasChart {
         this.requestRender();
     }
 
+    /** Something on the chart changed: the next frame draws the scene. */
     requestRender() {
+        this.contentDirty = true;
+        this.scheduleFrame();
+    }
+
+    /** Only the view (pan/zoom) changed: during a gesture the next frame may just move the snapshot. */
+    transformChanged() {
+        this.scheduleFrame();
+    }
+
+    private scheduleFrame() {
         if (this.frameRequested || this.destroyed) return;
         this.frameRequested = true;
         requestAnimationFrame(() => {
@@ -676,7 +692,114 @@ export class CanvasChart {
         });
     }
 
+    // ------------------------------------------------- gesture snapshot
+
+    /**
+     * While a pan/pinch/wheel gesture runs, frames do not redraw the scene —
+     * thousands of strokes and fills per frame is what made big stemmas lag on
+     * phones. The scene is drawn once into an offscreen snapshot with a margin
+     * around the view, and each frame just draws that bitmap moved/scaled.
+     * It is redrawn when the view leaves the margin or the scale drifts too
+     * far (blur), and a frame in which the chart itself changed (layout tick,
+     * hover, animation) is drawn normally. The gesture end draws crisply.
+     */
+    private interacting = false;
+    private contentDirty = true;
+    private snap: { canvas: HTMLCanvasElement; t: d3.ZoomTransform; scale: number; mx: number; my: number; w: number; h: number } | null = null;
+
+    beginInteraction() {
+        this.interacting = true;
+    }
+
+    endInteraction() {
+        if (!this.interacting) return;
+        this.interacting = false;
+        this.snap = null;
+        this.requestRender();
+    }
+
+    private snapshotCovers(): boolean {
+        const s = this.snap;
+        if (!s) return false;
+        const t = this.transform;
+        const r = t.k / s.t.k;
+        if (r < 1 / SNAPSHOT_MAX_SCALE_DRIFT || r > SNAPSHOT_MAX_SCALE_DRIFT) return false;
+        // the view's corners in snapshot css coordinates
+        const toSnap = (sx: number, sy: number) => [s.t.k * ((sx - t.x) / t.k) + s.t.x + s.mx, s.t.k * ((sy - t.y) / t.k) + s.t.y + s.my];
+        const [x0, y0] = toSnap(0, 0);
+        const [x1, y1] = toSnap(this.cssWidth, this.cssHeight);
+        return x0 >= 0 && y0 >= 0 && x1 <= s.w && y1 <= s.h;
+    }
+
+    private captureSnapshot() {
+        const scale = Math.min(this.dpr, SNAPSHOT_MAX_DPR);
+        const mx = Math.round(this.cssWidth * SNAPSHOT_MARGIN);
+        const my = Math.round(this.cssHeight * SNAPSHOT_MARGIN);
+        const w = this.cssWidth + 2 * mx;
+        const h = this.cssHeight + 2 * my;
+        let canvas = this.snap?.canvas ?? this.spareSnapCanvas;
+        if (!canvas) canvas = document.createElement("canvas");
+        const pw = Math.round(w * scale);
+        const ph = Math.round(h * scale);
+        if (canvas.width !== pw || canvas.height !== ph) {
+            canvas.width = pw;
+            canvas.height = ph;
+        }
+        const sctx = canvas.getContext("2d");
+        if (!sctx) {
+            this.snap = null;
+            return;
+        }
+        const saved = { ctx: this.ctx, t: this.transform, dpr: this.dpr, w: this.cssWidth, h: this.cssHeight };
+        this.ctx = sctx;
+        this.transform = d3.zoomIdentity.translate(saved.t.x + mx, saved.t.y + my).scale(saved.t.k);
+        this.dpr = scale;
+        this.cssWidth = w;
+        this.cssHeight = h;
+        try {
+            this.drawScene();
+        } finally {
+            this.ctx = saved.ctx;
+            this.transform = saved.t;
+            this.dpr = saved.dpr;
+            this.cssWidth = saved.w;
+            this.cssHeight = saved.h;
+        }
+        this.spareSnapCanvas = canvas;
+        this.snap = { canvas, t: saved.t, scale, mx, my, w, h };
+    }
+
+    private spareSnapCanvas: HTMLCanvasElement | null = null;
+
+    private blitSnapshot() {
+        const s = this.snap!;
+        const ctx = this.ctx;
+        const t = this.transform;
+        const r = t.k / s.t.k;
+        // snapshot px p = scale·(k0·x + t0 + m); screen device px = dpr·(k·x + t)
+        const a = (this.dpr * r) / s.scale;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.setTransform(a, 0, 0, a, this.dpr * (t.x - r * (s.t.x + s.mx)), this.dpr * (t.y - r * (s.t.y + s.my)));
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(s.canvas, 0, 0);
+        this.renderTiming.blits++;
+    }
+
     render() {
+        if (this.interacting && !this.held && !this.contentDirty && typeof document !== "undefined") {
+            if (!this.snapshotCovers()) this.captureSnapshot();
+            if (this.snap) {
+                this.blitSnapshot();
+                return;
+            }
+        }
+        this.snap = null;
+        this.contentDirty = false;
+        this.drawScene();
+    }
+
+    private drawScene() {
         const now = performance.now();
         const ctx = this.ctx;
         const t = this.transform;
@@ -684,7 +807,7 @@ export class CanvasChart {
         let animating = false;
 
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
         if (this.held) return;
         ctx.setTransform(dpr * t.k, 0, 0, dpr * t.k, dpr * t.x, dpr * t.y);
 
@@ -905,7 +1028,7 @@ export class CanvasChart {
     }
 
     /** CPU time spent in render() (benchmarks). */
-    renderTiming = { frames: 0, totalMs: 0, maxMs: 0 };
+    renderTiming = { frames: 0, totalMs: 0, maxMs: 0, blits: 0 };
 
     private highlightedFamilyEnd(n: ChartNode): boolean {
         return n.type === "family" && this.highlightedIds.has(n.id);

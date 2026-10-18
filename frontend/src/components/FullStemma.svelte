@@ -152,12 +152,15 @@
 
     const zoomHandler = d3
         .zoom<HTMLCanvasElement, unknown>()
+        // during the gesture frames only move a snapshot of the scene (CanvasChart)
+        .on("start", () => chart?.beginInteraction())
         .on("zoom", (e) => {
             if (!chart) return;
             chart.transform = e.transform;
-            chart.requestRender();
+            chart.transformChanged();
             onzoomChanged?.();
-        });
+        })
+        .on("end", () => chart?.endInteraction());
 
     export function getChart(): CanvasChart | null {
         return chart;
@@ -634,7 +637,7 @@
             layout: () => ({ ...layoutStats, firstDrawAt: c.firstDrawAt, engine: engine?.kind ?? null, running: engine?.isRunning() ?? false }),
             renderTiming: (reset = false) => {
                 const r = { ...c.renderTiming };
-                if (reset) c.renderTiming = { frames: 0, totalMs: 0, maxMs: 0 };
+                if (reset) c.renderTiming = { frames: 0, totalMs: 0, maxMs: 0, blits: 0 };
                 return r;
             },
             /** Set the pan/zoom directly (benchmarks, debugging). */

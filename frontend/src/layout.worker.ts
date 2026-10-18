@@ -17,12 +17,22 @@ const channel = new MessageChannel();
 const queue: Array<() => void> = [];
 channel.port1.onmessage = () => queue.shift()?.();
 
+let lastFrameAt = 0;
+
 const scheduler: Scheduler = {
     soon: (fn) => {
         queue.push(fn);
         channel.port2.postMessage(0);
     },
-    frame: (fn) => setTimeout(fn, 16),
+    // A frame starts 16 ms after the previous one started, not after it ended:
+    // a slow tick (big graph, phone) no longer adds 16 ms of waiting on top.
+    frame: (fn) => {
+        const delay = Math.max(0, lastFrameAt + 16 - performance.now());
+        setTimeout(() => {
+            lastFrameAt = performance.now();
+            fn();
+        }, delay);
+    },
     now: () => performance.now(),
 };
 
