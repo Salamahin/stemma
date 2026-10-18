@@ -50,7 +50,7 @@ async function window_(label, ms, during) {
   const rt = await page.evaluate(() => window.__stemmaChart.renderTiming?.(true) ?? {});
   console.log(label, JSON.stringify({
     fps: r1(gaps.length / sec), frameP50: p(0.5), frameP95: p(0.95), busyPct: r1(((b.TaskDuration - a.TaskDuration) / sec) * 100),
-    fullDraws: rt.frames, drawAvgMs: rt.frames ? r1(rt.totalMs / rt.frames) : 0, drawMaxMs: r1(rt.maxMs ?? 0), blits: rt.blits ?? 0,
+    fullDraws: rt.frames, drawAvgMs: rt.frames ? r1(rt.totalMs / rt.frames) : 0, drawMaxMs: r1(rt.maxMs ?? 0),
     renderMsPerSec: r1((rt.totalMs ?? 0) / sec),
   }));
 }

@@ -19,8 +19,7 @@ const IDLE_MAX_BUSY_PCT = 5;
 
 type ChartApi = {
   layout(): { ends: number; running: boolean; engine: string | null };
-  /** frames: full scene draws; blits: gesture frames that only moved the snapshot */
-  renderTiming(reset?: boolean): { frames: number; totalMs: number; maxMs: number; blits?: number };
+  renderTiming(reset?: boolean): { frames: number; totalMs: number; maxMs: number };
   snapshot(): { nodes: Array<{ type: string; drawn: boolean; clientX: number; clientY: number }> };
 };
 declare global {
@@ -99,8 +98,7 @@ for (const size of Object.keys(BUDGETS).map(Number)) {
     const measured = {
       idleFrames: idle.frames,
       idleBusyPct: Math.round(idleBusy * 10) / 10,
-      // frames shown while panning: full draws plus snapshot moves (CanvasChart gesture snapshot)
-      panFrames: pan.frames + (pan.blits ?? 0),
+      panFrames: pan.frames,
       panDrawAvgMs: Math.round((pan.totalMs / Math.max(pan.frames, 1)) * 100) / 100,
       panDrawMaxMs: Math.round(pan.maxMs * 100) / 100,
       hoverMedianMs: Math.round(hover * 100) / 100,
