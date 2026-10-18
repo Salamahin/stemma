@@ -337,6 +337,11 @@ export class CanvasChart {
     }
 
     /** Recompute per-node fill/highlight after the highlight set changed. */
+    /** A person the viewer pinned in place (never moved by layouts or ghosts). */
+    isPinned(n: ChartNode): boolean {
+        return n.type === "person" && this.pinnedPersonIds.has(denormalizeId(n.id));
+    }
+
     restyle() {
         this.fillById.clear();
         this.highlightedIds.clear();
@@ -776,7 +781,7 @@ export class CanvasChart {
                 !this.pendingRemove.has(n.id) &&
                 n.id !== this.gestureSourceId &&
                 n.id !== this.dropTargetId &&
-                !(n.type === "person" && this.pinnedPersonIds.has(denormalizeId(n.id)));
+                !this.isPinned(n);
             if (!plain) {
                 special.push(n);
                 continue;

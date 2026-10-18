@@ -9,6 +9,7 @@ import {
   hoverNode,
   nodeById,
 } from "./_chart";
+import { waitForFirstLoginSeeded } from "./_seeded";
 
 async function createFreshStemma(page: Page) {
   const stemmaBtn = page.getByTestId("chip-stemma-btn");
@@ -217,4 +218,74 @@ test("no ghosts in view mode", async ({ page }) => {
   // In view mode no ghosts should ever appear.
   await expect.poll(() => ghostPersonCount(page), { timeout: 2_000 }).toBe(0);
   expect(await ghostPersonCount(page)).toBe(0);
+});
+
+test("ghosts push nearby people aside while shown; they return on blur", async ({ page }) => {
+  await page.goto("/");
+  await waitForFirstLoginSeeded(page);
+  await enterEditMode(page);
+  await page.waitForTimeout(1_000);
+
+  const before = await chartSnapshot(page);
+  const start = new Map(before.nodes.map((n) => [n.id, [n.x, n.y] as const]));
+  const vp = page.viewportSize()!;
+  // on screen, clear of the toolbars/minimap at the edges
+  const persons = before.nodes.filter(
+    (n) =>
+      n.type === "person" &&
+      n.clientX > 150 && n.clientX < vp.width - 250 && n.clientY > 120 && n.clientY < vp.height - 150 &&
+      // nobody overlapping it, so the hover focuses exactly this person
+      !before.nodes.some((o) => o.id !== n.id && Math.hypot(o.clientX - n.clientX, o.clientY - n.clientY) < 40),
+  );
+  const crowd = (p: (typeof persons)[number]) =>
+    before.nodes.filter((n) => n.id !== p.id && Math.hypot(n.x - p.x, n.y - p.y) < 200).length;
+  const candidates = [...persons].sort((a, b) => crowd(b) - crowd(a)).slice(0, 10);
+
+  const blur = async () => {
+    // off the canvas (a corner may hold another node)
+    const box = (await page.getByPlaceholder(/search|поиск/i).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await expect.poll(() => ghostPersonCount(page), { timeout: 3_000 }).toBe(0);
+  };
+
+  // Hover the most crowded people until one has someone where its ghosts land.
+  let checked = false;
+  for (const focus of candidates) {
+    await hoverNode(page, focus.id);
+    await expect.poll(() => ghostPersonCount(page), { timeout: 5_000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(1_500); // burst settles
+    const during = await chartSnapshot(page);
+    const ghosts = during.ghosts.filter((g) => g.id.startsWith("ghost-person"));
+    const inTheWay = before.nodes.filter(
+      (n) => n.id !== focus.id && ghosts.some((g) => Math.hypot(n.x - g.x, n.y - g.y) < 90),
+    );
+    if (inTheWay.length > 0) {
+      checked = true;
+      const now = new Map(during.nodes.map((n) => [n.id, n]));
+      // people that were in the ghosts' way stepped aside…
+      for (const n of inTheWay) {
+        const m = now.get(n.id)!;
+        expect(Math.hypot(m.x - n.x, m.y - n.y)).toBeGreaterThan(5);
+      }
+      // …the hovered one stays under the pointer…
+      expect([now.get(focus.id)!.x, now.get(focus.id)!.y]).toEqual(start.get(focus.id));
+      // …and nobody got piled onto anyone
+      for (const m of during.nodes) {
+        const [ax, ay] = start.get(m.id)!;
+        if (m.x === ax && m.y === ay) continue;
+        for (const n of during.nodes) {
+          if (n.id === m.id) continue;
+          const [bx, by] = start.get(n.id)!;
+          expect(Math.hypot(m.x - n.x, m.y - n.y)).toBeGreaterThanOrEqual(Math.min(Math.hypot(ax - bx, ay - by), 60) - 1);
+        }
+      }
+    }
+    await blur();
+    // they glide back to exactly where they were
+    await expect
+      .poll(async () => (await chartSnapshot(page)).nodes.filter((n) => n.x !== start.get(n.id)![0] || n.y !== start.get(n.id)![1]).length, { timeout: 3_000 })
+      .toBe(0);
+    if (checked) break;
+  }
+  expect(checked).toBe(true);
 });

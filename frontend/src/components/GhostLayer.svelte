@@ -12,6 +12,7 @@
         realFamilyIdFromRef,
         type GhostKind,
     } from "../ghostHelpers";
+    import { NeighbourPush, pushRegistryFor, type Segment } from "../ghostPush";
     import {
         buildGhostInjection,
         ghostSimNeighborDomIds,
@@ -59,6 +60,28 @@
     const GHOST_ALPHA_KICK = 0.6;
     const GHOST_ALPHA_DECAY = 0.12;
     const GHOST_VELOCITY_DECAY = 0.6;
+
+    // The glide that takes pushed neighbours home after a blur (see ghostPush.ts).
+    let returnFrame: number | null = null;
+    function glideHome(c: CanvasChart) {
+        if (returnFrame != null) return;
+        const registry = pushRegistryFor(c);
+        const frame = () => {
+            returnFrame = null;
+            if (registry.returnStep()) c.positionsChanged();
+            if (registry.returning()) returnFrame = requestAnimationFrame(frame);
+        };
+        returnFrame = requestAnimationFrame(frame);
+    }
+    $effect(() => {
+        const c = chart;
+        return () => {
+            // chart replaced or gone: everyone home at once
+            if (returnFrame != null) cancelAnimationFrame(returnFrame);
+            returnFrame = null;
+            if (c && pushRegistryFor(c).settle()) c.positionsChanged();
+        };
+    });
 
     $effect(() => {
         if (!chart || !focusedId || !stemmaIndex) return;
@@ -148,6 +171,15 @@
         const focusedDatum = datumById.get(focusDomId);
         if (focusedDatum) focusedDatum.r = GHOST_NEIGHBOUR_COLLIDE_R;
 
+        // Real nodes around the ghosts make room for them while they are shown
+        // (moved on the chart itself, glide back on blur; see ghostPush.ts),
+        // and the ghosts keep off them in turn, so both give way.
+        const push = new NeighbourPush(c.nodes, c.links, datumById, focusDomId, injection.extraNodes, pushRegistryFor(c), (n) => c.isPinned(n));
+        for (const id of push.pushedIds) {
+            const d = datumById.get(id);
+            if (d && d.r == null) d.r = GHOST_NEIGHBOUR_COLLIDE_R;
+        }
+
         // Pin ghost y to the seed value: the schema (spouse east of focus at
         // same y, child below east family, parent above) is the affordance
         // semantic and must not drift under the sim's forceY/link pull. Ghosts
@@ -208,6 +240,14 @@
 
         const hideGhosts = c.showGhosts({ nodes: views, edges });
 
+        // dashed ghost edges, as live endpoints, so people get off them too
+        const ghostSegments: Segment[] = [];
+        for (const e of edges) {
+            const a = ghostNodeById.get(e.sourceId) ?? c.node(e.sourceId);
+            const b = ghostNodeById.get(e.targetId) ?? c.node(e.targetId);
+            if (a && b) ghostSegments.push([a, b]);
+        }
+
         const capturedFocused = focusedId;
         // Ghost click: pointerup over a ghost person. Stopping propagation keeps
         // the window-level gesture handler from treating it as a canvas tap.
@@ -233,7 +273,10 @@
         };
         emitPositions();
 
-        sim.on("tick.ghost", () => c.requestRender());
+        sim.on("tick.ghost", () => {
+            if (push.step(injection.extraNodes, ghostSegments)) c.positionsChanged();
+            else c.requestRender();
+        });
         sim.on("end.ghost", emitPositions);
 
         return () => {
@@ -241,6 +284,8 @@
             sim.on("tick.ghost", null);
             sim.on("end.ghost", null);
             sim.stop();
+            push.release();
+            glideHome(c);
             onpositionsChange([]);
             hideGhosts();
         };
