@@ -131,16 +131,6 @@
     const bioHtml = $derived(renderBioMarkdown(bio));
     const personAttachments = $derived(id ? (attachmentsOf?.(id) ?? []) : []);
     const viewLifespan = $derived(lifespanText(birthDate, deathDate));
-    /** The bio field grows with its text instead of scrolling inside the panel. */
-    function growWithContent(el: HTMLTextAreaElement, _value: string) {
-        const fit = () => {
-            el.style.height = "auto";
-            el.style.height = `${el.scrollHeight + 2}px`;
-        };
-        fit();
-        return { update: fit };
-    }
-
     function lifespanText(birth: string | null | undefined, death: string | null | undefined): string {
         const b = formatPartialDate(birth ?? null, $locale);
         const d = formatPartialDate(death ?? null, $locale);
@@ -656,7 +646,7 @@
                     </div>
                 {/if}
             {:else}
-                <div class="section">
+                <div class="section bio-section" class:grow={bioOpen}>
                     {#if bioOpen}
                         <label class="field-label" for="person-bio-input">{$t("person.bio")}</label>
                         <textarea
@@ -664,7 +654,6 @@
                             class="form-control bio-textarea"
                             rows="5"
                             bind:value={bio}
-                            use:growWithContent={bio}
                             data-testid="person-bio"
                         ></textarea>
                         <div class="form-text">{$t("person.bioMarkdownHint")}</div>
@@ -687,22 +676,23 @@
                 {/if}
             {/if}
 
-            {#if pinningAllowed}
-                <div class="form-check form-switch pin-row">
-                    <input
-                        class="form-check-input"
-                        type="checkbox"
-                        id="person-pin"
-                        bind:checked={pinned}
-                        onchange={!editingAllowed ? savePinOnly : undefined}
-                    />
-                    <label class="form-check-label" for="person-pin">{$t("person.pin")}</label>
-                </div>
-            {/if}
         {/if}
     {/snippet}
 
     {#snippet footer()}
+        {#if pinningAllowed && !cropping}
+            <!-- with the buttons, so a long bio never pushes it out of sight -->
+            <div class="form-check form-switch pin-row">
+                <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="person-pin"
+                    bind:checked={pinned}
+                    onchange={!editingAllowed ? savePinOnly : undefined}
+                />
+                <label class="form-check-label" for="person-pin">{$t("person.pin")}</label>
+            </div>
+        {/if}
         {#if cropping}
             <button type="button" class="btn btn-secondary" onclick={cancelCrop}>{$t("common.cancel")}</button>
             <button
@@ -908,7 +898,8 @@
     }
 
     .pin-row {
-        margin-top: 16px;
+        width: 100%;
+        margin: 0 0 4px;
     }
 
     .field-label {
@@ -938,9 +929,21 @@
     .bio-textarea {
         font-family: ui-monospace, SFMono-Regular, monospace;
         font-size: var(---fs-body);
-        overflow: hidden;
         resize: none;
         min-height: 8rem;
+    }
+
+    /* an open bio takes all the room the panel has left; longer text scrolls inside */
+    .bio-section.grow {
+        flex: 1 0 auto;
+        display: flex;
+        flex-direction: column;
+        min-height: 12rem;
+    }
+
+    .bio-section.grow .bio-textarea {
+        flex: 1;
+        overflow-y: auto;
     }
 
     .bio-preview {

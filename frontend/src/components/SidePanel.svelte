@@ -111,6 +111,13 @@
         min-height: 0;
         overflow-y: auto;
         padding: 4px 20px 16px;
+        /* a section may grow into the room left (the bio) */
+        display: flex;
+        flex-direction: column;
+    }
+
+    .side-body > :global(*) {
+        flex-shrink: 0;
     }
 
     .side-footer {
