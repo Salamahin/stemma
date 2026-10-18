@@ -37,6 +37,29 @@ function makeEngine() {
     return { fake, engine, events };
 }
 
+describe("WorkerLayoutEngine smoothing", () => {
+    test("worker updates glide on screen; the layout end lands exactly", () => {
+        const fake = new FakeWorker();
+        const frames: Array<() => void> = [];
+        let t = 0;
+        const display = { frame: (fn: () => void) => frames.push(fn), now: () => t };
+        const engine = new WorkerLayoutEngine([500, 400], { onTick: () => {}, onEnd: () => {} }, fake as unknown as Worker, display);
+        const { nodes, links } = syntheticGraph(40);
+        engine.setGraph(nodes, links, 1);
+        const workerNodes = () => (fake.host as any).nodes as Array<{ x: number; y: number }>;
+        const drawnVsWorker = () => Math.max(...nodes.map((n: any, i: number) => Math.hypot(n.x - workerNodes()[i].x, n.y - workerNodes()[i].y)));
+
+        fake.sched.runAll(1); // one worker batch → one positions message
+        expect(drawnVsWorker()).toBeGreaterThan(1); // not jumped there yet
+        t += 200;
+        while (frames.length) frames.shift()!();
+        expect(drawnVsWorker()).toBeLessThan(1e-9); // glided all the way
+
+        fake.sched.runAll();
+        expect(drawnVsWorker()).toBeLessThan(1e-9); // end: exactly the worker's layout
+    });
+});
+
 describe("WorkerLayoutEngine", () => {
     test("lays the graph out in the worker and writes positions into the caller's nodes", () => {
         const { fake, engine, events } = makeEngine();
