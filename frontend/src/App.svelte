@@ -358,7 +358,7 @@
         />
         {#if editMode && linkMode}
             <div class="link-hint" aria-live="polite" data-testid="link-hint">
-                <i class="bi bi-share"></i> {$t("link.hint")}
+                <i class="bi bi-link-45deg"></i> {$t("link.hint")}
             </div>
         {/if}
         {#if linkPick && displayedStemmaIndex}

@@ -26,7 +26,7 @@
             onclick={() => onlinkToggle?.()}
             data-testid="link-fab"
         >
-            <i class="bi bi-share"></i>
+            <i class="bi bi-link-45deg"></i>
         </button>
         <button
             type="button"
