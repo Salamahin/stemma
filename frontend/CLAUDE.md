@@ -31,9 +31,10 @@ Edit-mode pointer handling on the chart canvas is `components/EditGestures.svelt
 | click (mouse) on a node | opens the card (hover focuses) |
 | short tap (touch) on a node / empty canvas | focus / blur |
 | drag on empty canvas | pans (d3.zoom), as in view mode |
-| Escape | cancels a move (node goes back) and blurs |
+| **link mode** (`link-fab`): drag a person onto another | a line follows the pointer, valid targets light up; on drop `LinkPicker.svelte` offers the valid links (`ghostLink.ts` `linkOptions`: spouses, or one the other's child — in each of the parent's families that can take them, or a new family with that parent alone) → `MutationActions.linkPeople`. No ghosts in link mode |
+| Escape | cancels a move (node goes back) and blurs; with nothing in progress it leaves link mode |
 
-There are no linking drag gestures any more: relatives are added **and linked** through the ghosts. Creating from a ghost, the card's name field also lists matching people already in the tree (`existingMatches`, quick-search matcher) — only people the link is valid for (`ghostLink.ts` `linkCandidates`: editable, not pending, no second pair of parents, no cycle, not already the person's spouse); picking one attaches them (`attachPersonToFamily`) or creates the new family with them (`startBranchFromPerson`, through a transient pending family).
+Outside link mode a drag only moves; ghosts add new relatives, link mode links people already in the tree.
 
 ### Pending families
 

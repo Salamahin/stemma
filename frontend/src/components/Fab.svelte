@@ -3,14 +3,14 @@
 
     type Props = {
         editMode: boolean;
-        panMode: boolean;
+        linkMode: boolean;
         disabled: boolean;
         oneditToggle?: () => void;
-        onpanToggle?: () => void;
+        onlinkToggle?: () => void;
         onaddPerson?: () => void;
     };
 
-    let { editMode, panMode, disabled, oneditToggle, onpanToggle, onaddPerson }: Props = $props();
+    let { editMode, linkMode, disabled, oneditToggle, onlinkToggle, onaddPerson }: Props = $props();
 </script>
 
 <div class="fab-cluster">
@@ -18,14 +18,15 @@
         <button
             type="button"
             class="fab fab-secondary"
-            class:active={panMode}
-            aria-label={panMode ? $t("panModeOff") : $t("panModeOn")}
-            aria-pressed={panMode}
+            class:active={linkMode}
+            aria-label={linkMode ? $t("linkModeOff") : $t("linkModeOn")}
+            title={linkMode ? $t("linkModeOff") : $t("linkModeOn")}
+            aria-pressed={linkMode}
             disabled={disabled}
-            onclick={() => onpanToggle?.()}
-            data-testid="pan-fab"
+            onclick={() => onlinkToggle?.()}
+            data-testid="link-fab"
         >
-            <i class="bi bi-arrows-move"></i>
+            <i class="bi bi-share"></i>
         </button>
         <button
             type="button"

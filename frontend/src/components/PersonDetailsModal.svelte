@@ -48,7 +48,6 @@
     import type { AltName, AltNameKind, CreateNewPerson } from "../model";
     import Modal from "./Modal.svelte";
     import Attachments from "./Attachments.svelte";
-    import { searchPeople } from "../personSearch";
     import type { Attachment } from "../model";
 
     export type CreatePersonPayload = {
@@ -83,8 +82,6 @@
     let mode = $state<"view" | "create">("view");
     let createTitle = $state<string | null>(null);
     let activeCreateCallback: ((payload: CreatePersonPayload) => void) | null = null;
-    /** Create mode from a ghost: someone already in the tree can be picked instead. */
-    let existingPick = $state<{ candidates: PersonDescription[]; onpick: (personId: string) => void } | null>(null);
     const isCreate = $derived(mode === "create");
     /** An empty bio is a link until asked for, so the card stays short. */
     let bioOpen = $state(false);
@@ -133,8 +130,6 @@
 
     const bioHtml = $derived(renderBioMarkdown(bio));
     const personAttachments = $derived(id ? (attachmentsOf?.(id) ?? []) : []);
-    /** Creating from a ghost: people already in the tree that fit, as the name is typed. */
-    const existingMatches = $derived(isCreate && existingPick && !unknown ? searchPeople(name, existingPick.candidates, 5) : []);
     const viewLifespan = $derived(lifespanText(birthDate, deathDate));
     function lifespanText(birth: string | null | undefined, death: string | null | undefined): string {
         const b = formatPartialDate(birth ?? null, $locale);
@@ -143,9 +138,6 @@
         return d ? `${b || "?"} – ${d}` : b;
     }
 
-    function lifespanOf(p: PersonDescription): string {
-        return lifespanText(p.birthDate, p.deathDate);
-    }
     const displayName = $derived(unknown ? personDisplayName(null) : personDisplayName(name));
 
     const saveDisabled = $derived(birthDateErrString != null || deathDateErrString != null);
@@ -218,29 +210,17 @@
     export function showCreatePerson(opts: {
         title?: string;
         oncreate: (payload: CreatePersonPayload) => void;
-        existing?: { candidates: PersonDescription[]; onpick: (personId: string) => void };
     }) {
         mode = "create";
         createTitle = opts.title ?? null;
         activeCreateCallback = opts.oncreate;
-        existingPick = opts.existing && opts.existing.candidates.length > 0 ? opts.existing : null;
         resetFormState(null);
         open = true;
-    }
-
-    function pickExisting(personId: string) {
-        const pick = existingPick;
-        activeCreateCallback = null;
-        existingPick = null;
-        open = false;
-        resetPendingPhoto();
-        pick?.onpick(personId);
     }
 
     function close() {
         open = false;
         activeCreateCallback = null;
-        existingPick = null;
         resetPendingPhoto();
     }
 
@@ -586,18 +566,6 @@
                         autocomplete="off"
                         data-testid="person-name-input"
                     />
-                    {#if existingMatches.length > 0}
-                        <div class="matches" data-testid="existing-person-matches">
-                            <div class="matches-title">{$t("person.alreadyInTree")}</div>
-                            {#each existingMatches as m (m.item.id)}
-                                <button type="button" class="match" onclick={() => pickExisting(m.item.id)} data-testid="existing-person-option">
-                                    <i class="bi bi-link-45deg"></i>
-                                    <span class="match-name">{m.item.name}</span>
-                                    {#if lifespanOf(m.item)}<span class="match-meta">{lifespanOf(m.item)}</span>{/if}
-                                </button>
-                            {/each}
-                        </div>
-                    {/if}
                     <label class="unknown-check">
                         <input type="checkbox" id="person-unknown" bind:checked={unknown} onchange={() => { if (unknown) name = ""; }} />
                         {$t("person.unknownToggle")}
@@ -881,49 +849,6 @@
         font-size: var(---fs-hint);
         color: var(---text-muted);
         cursor: pointer;
-    }
-
-    .matches {
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        border: 1px solid #dee2e6;
-        border-radius: 10px;
-        padding: 4px;
-        text-align: left;
-    }
-
-    .matches-title {
-        font-size: var(---fs-hint);
-        color: var(---text-muted);
-        padding: 2px 8px;
-    }
-
-    .match {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        width: 100%;
-        padding: 6px 8px;
-        border: none;
-        border-radius: 8px;
-        background: none;
-        text-align: left;
-        cursor: pointer;
-    }
-
-    .match:hover,
-    .match:focus-visible {
-        background: #eef4ff;
-    }
-
-    .match .bi { color: #0d6efd; }
-    .match-name { flex: 1; }
-
-    .match-meta {
-        color: var(---text-muted);
-        font-size: var(---fs-hint);
-        white-space: nowrap;
     }
 
     .alt-names-edit {

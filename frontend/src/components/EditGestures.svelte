@@ -11,42 +11,43 @@
      * - short tap (touch): focus — the ghost affordances appear; tap on empty canvas blurs
      * - click (mouse): open the card (hover focuses)
      * - drag on empty canvas: pan, as in view mode
-     * Relatives are added and linked through the ghosts (GhostLayer).
+     * In link mode a drag from one person onto another links them instead
+     * (`onlinkDrop` offers the valid links, see ghostLink.linkOptions).
+     * Relatives are added through the ghosts (GhostLayer).
      */
     type Props = {
         editMode: boolean;
-        panActive: boolean;
-        panMode: boolean;
+        linkMode: boolean;
         chart: CanvasChart | null;
+        /** Whether dropping `fromId` onto `toId` (chart ids) can link them at all. */
+        canLink: (fromId: string, toId: string) => boolean;
         popHover: () => void;
         onshortTapFocus: (f: FocusedId | null) => void;
         onlongPress: (f: FocusedId) => void;
         ondesktopNodeClick: (f: FocusedId) => void;
         onclearFocus: () => void;
         onnodeMoved: (nodeId: string, x: number, y: number) => void;
-        onclosePanMode: () => void;
-        onspacePanChange: (v: boolean) => void;
+        onlinkDrop: (fromId: string, toId: string, clientX: number, clientY: number) => void;
+        onexitLinkMode: () => void;
     };
 
     let {
         editMode,
-        panActive,
-        panMode,
+        linkMode,
         chart,
+        canLink,
         popHover,
         onshortTapFocus,
         onlongPress,
         ondesktopNodeClick,
         onclearFocus,
         onnodeMoved,
-        onclosePanMode,
-        onspacePanChange,
+        onlinkDrop,
+        onexitLinkMode,
     }: Props = $props();
 
     /** Pointer travel (px) before a press on a node becomes a move. */
     const MOVE_START_PX = 6;
-
-    let moving = $state(false);
 
     $effect(() => {
         if (!editMode || !chart) return;
@@ -66,6 +67,9 @@
             from: { x: number; y: number };
             moving: boolean;
             longPressed: boolean;
+            /** link mode: a drag draws a line to another person instead of moving */
+            linking: boolean;
+            linkTarget: ChartNode | null;
         } | null = null;
         /** A touch press on empty canvas (pans; a short one blurs). */
         let emptyPress: { x: number; y: number; startMs: number } | null = null;
@@ -88,9 +92,13 @@
 
         const endPress = () => {
             cancelLongPress();
+            if (press?.linking) {
+                c.setOverlay({ line: null, sourceMarker: null, preview: null });
+                c.setDropTarget(null);
+                c.setGestureSource(null);
+            }
             press = null;
-            moving = false;
-            document.body.classList.remove("chart-gesture");
+            document.body.classList.remove("chart-gesture", "chart-linking");
         };
 
         const moveTo = (node: ChartNode, x: number, y: number) => {
@@ -103,7 +111,6 @@
         };
 
         const onPointerDownCapture = (e: PointerEvent) => {
-            if (panActive) return;
             if (e.pointerType === "mouse" && e.button !== 0) return;
             const node = grabbable(e.clientX, e.clientY);
             if (!node) {
@@ -126,8 +133,10 @@
                 from: { x: node.x, y: node.y },
                 moving: false,
                 longPressed: false,
+                linking: linkMode && node.type === "person",
+                linkTarget: null,
             };
-            document.body.classList.add("chart-gesture");
+            document.body.classList.add(press.linking ? "chart-linking" : "chart-gesture");
             const nodeId = node.id;
             longPressTimer = setTimeout(() => {
                 longPressTimer = null;
@@ -145,12 +154,23 @@
             if (!press.moving) {
                 if (press.longPressed || travelled <= MOVE_START_PX) return;
                 press.moving = true;
-                moving = true;
                 cancelLongPress();
                 // the ghosts belong to where the node was; they come back on drop
                 onclearFocus();
+                if (press.linking) c.setGestureSource(press.node.id);
             }
             const p = c.clientToWorld(e.clientX, e.clientY);
+            if (press.linking) {
+                const over = c.hitNode(e.clientX, e.clientY);
+                const target = over && over.type === "person" && over !== press.node && canLink(press.node.id, over.id) ? over : null;
+                if (target !== press.linkTarget) {
+                    press.linkTarget = target;
+                    c.setDropTarget(target?.id ?? null);
+                }
+                const end = target ? { x: target.x, y: target.y } : p;
+                c.setOverlay({ line: { x1: press.node.x, y1: press.node.y, x2: end.x, y2: end.y }, sourceMarker: null, preview: null });
+                return;
+            }
             moveTo(press.node, p.x - press.grabDx, p.y - press.grabDy);
         };
 
@@ -166,6 +186,10 @@
             const p = press;
             endPress();
             const focused = focusedIdFromNodeId(p.node.id, isPendingId);
+            if (p.moving && p.linking) {
+                if (p.linkTarget) onlinkDrop(p.node.id, p.linkTarget.id, e.clientX, e.clientY);
+                return;
+            }
             if (p.moving) {
                 onnodeMoved(p.node.id, p.node.x, p.node.y);
                 // show the ghosts where the node now is
@@ -186,21 +210,24 @@
             emptyPress = null;
             if (!press) return;
             // an interrupted move puts the node back
-            if (press.moving) moveTo(press.node, press.from.x, press.from.y);
+            if (press.moving && !press.linking) moveTo(press.node, press.from.x, press.from.y);
             endPress();
         };
 
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.key !== "Escape") return;
+            if (document.querySelector(".modal-panel, .link-picker")) return;
+            const busy = press != null;
             onCancel();
             onclearFocus();
+            if (!busy && linkMode) onexitLinkMode();
         };
 
         // touchstart fires before pointerdown: on a node, swallow it so d3.zoom
         // does not start a pan in parallel and no synthetic mouse events or click
         // follow. Elsewhere it is a pan (or pinch) and passes through.
         const onTouchStartCapture = (e: TouchEvent) => {
-            if (panActive || e.touches.length !== 1) return;
+            if (e.touches.length !== 1) return;
             const t = e.touches[0];
             if (!grabbable(t.clientX, t.clientY)) return;
             e.stopImmediatePropagation();
@@ -208,14 +235,13 @@
         };
         // d3.drag (view mode) and d3.zoom listen to mousedown: not on a node.
         const onMouseDownCapture = (e: MouseEvent) => {
-            if (panActive || e.button !== 0) return;
+            if (e.button !== 0) return;
             if (!grabbable(e.clientX, e.clientY)) return;
             e.stopImmediatePropagation();
         };
         // Clicks are handled here (pointerup), not by the chart's view-mode click
         // handler that opens the card.
         const onClickCapture = (e: MouseEvent) => {
-            if (panActive) return;
             e.stopImmediatePropagation();
         };
 
@@ -244,55 +270,6 @@
         };
     });
 
-    $effect(() => {
-        if (!panActive) {
-            document.body.classList.remove("pan-armed", "pan-dragging");
-            return;
-        }
-        document.body.classList.add("pan-armed");
-        const onDown = () => document.body.classList.add("pan-dragging");
-        const onUp = () => document.body.classList.remove("pan-dragging");
-        window.addEventListener("mousedown", onDown);
-        window.addEventListener("mouseup", onUp);
-        return () => {
-            window.removeEventListener("mousedown", onDown);
-            window.removeEventListener("mouseup", onUp);
-            document.body.classList.remove("pan-armed", "pan-dragging");
-        };
-    });
-
-    $effect(() => {
-        if (!editMode) return;
-        const isTypingTarget = (target: EventTarget | null): boolean => {
-            if (!(target instanceof HTMLElement)) return false;
-            const tag = target.tagName;
-            return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable;
-        };
-        const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                if (isTypingTarget(e.target)) return;
-                if (panMode && !moving && !document.querySelector(".modal-panel")) {
-                    onclosePanMode();
-                }
-                return;
-            }
-            if (e.code !== "Space" || e.repeat) return;
-            if (isTypingTarget(e.target)) return;
-            onspacePanChange(true);
-            e.preventDefault();
-        };
-        const onKeyUp = (e: KeyboardEvent) => {
-            if (e.code !== "Space") return;
-            onspacePanChange(false);
-        };
-        window.addEventListener("keydown", onKeyDown);
-        window.addEventListener("keyup", onKeyUp);
-        return () => {
-            window.removeEventListener("keydown", onKeyDown);
-            window.removeEventListener("keyup", onKeyUp);
-            onspacePanChange(false);
-        };
-    });
 </script>
 
 <style>
@@ -303,13 +280,10 @@
         -webkit-user-select: none !important;
     }
 
-    :global(body.pan-armed),
-    :global(body.pan-armed *) {
-        cursor: grab !important;
-    }
-
-    :global(body.pan-dragging),
-    :global(body.pan-dragging *) {
-        cursor: grabbing !important;
+    :global(body.chart-linking),
+    :global(body.chart-linking *) {
+        cursor: crosshair !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
     }
 </style>

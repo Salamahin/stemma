@@ -1,7 +1,7 @@
 import { expect, test } from "./_fixtures";
 import type { Page } from "@playwright/test";
-import { chartSnapshot, expectPersonVisible, ghostPersons, hoverNode } from "./_chart";
-import { addOrphan, clickGhost, createFreshStemma, enterEditMode, leaveEditMode, nodeByName } from "./_edit";
+import { chartSnapshot, expectPersonVisible, ghostPersons } from "./_chart";
+import { addOrphan, createFreshStemma, enterEditMode, leaveEditMode, nodeByName } from "./_edit";
 
 const transform = async (page: Page) => (await chartSnapshot(page)).transform as { x: number; y: number; k: number };
 
@@ -88,27 +88,35 @@ test("dragging empty canvas in edit mode pans", async ({ page }) => {
   for (const n of (await chartSnapshot(page)).nodes) expect([n.x, n.y]).toEqual(positions.get(n.id));
 });
 
-test("a ghost links someone already in the tree instead of creating a namesake", async ({ page }) => {
-  const child = `Child${Date.now()}`;
-  const mother = `Mother${Date.now()}`;
-  await freshStemmaWith(page, [child, mother]);
-  const people = (await chartSnapshot(page)).nodes.filter((n) => n.type === "person").length;
-  const kid = (await expectPersonVisible(page, child))!;
-  await hoverNode(page, kid.id);
-  // the parent ghost sits above: the way there crosses nobody else
-  await clickGhost(page, "ghost-person-parent");
+test("link mode: a drag from one person onto another links them the chosen way", async ({ page }) => {
+  const parent = `Parent${Date.now()}`;
+  const child = `Kid${Date.now()}`;
+  await freshStemmaWith(page, [parent, child]);
+  await page.getByTestId("link-fab").click();
+  await expect(page.getByTestId("link-hint")).toBeVisible();
 
-  // typing the name offers the people already in the tree that fit
-  await page.getByTestId("person-name-input").fill(mother.slice(0, 8));
-  const option = page.getByTestId("existing-person-option").filter({ hasText: mother });
-  await expect(option).toHaveCount(1);
-  // the person themself is never offered
-  await expect(page.getByTestId("existing-person-option").filter({ hasText: child })).toHaveCount(0);
-  await option.click();
-  await expect(page.getByTestId("person-details-modal")).toBeHidden();
+  const from = (await nodeByName(page, parent))!;
+  const to = (await nodeByName(page, child))!;
+  await page.mouse.move(from.clientX, from.clientY);
+  await page.mouse.down();
+  await page.mouse.move((from.clientX + to.clientX) / 2, (from.clientY + to.clientY) / 2, { steps: 6 });
+  await page.mouse.move(to.clientX, to.clientY, { steps: 6 });
+  await page.mouse.up();
 
-  // one family: the existing mother as parent, the kid as child; nobody new
-  const motherId = (await nodeByName(page, mother))!.id;
+  // a drag in link mode does not move anyone
+  const fromNow = (await nodeByName(page, parent))!;
+  expect([fromNow.x, fromNow.y]).toEqual([from.x, from.y]);
+
+  // spouses, or either one the other's child
+  const options = page.getByTestId("link-option");
+  await expect(options).toHaveCount(3);
+  // [spouses, the target as the dragged one's child, the other way round]
+  const asChild = options.nth(1);
+  await expect(asChild).toContainText(child);
+  await expect(asChild).toContainText(parent);
+  await asChild.click();
+  await expect(page.getByTestId("link-picker")).toBeHidden();
+
   await expect
     .poll(
       async () => {
@@ -121,6 +129,9 @@ test("a ghost links someone already in the tree instead of creating a namesake",
       },
       { timeout: 15_000 },
     )
-    .toBe(JSON.stringify({ parents: [motherId], children: [kid.id] }));
-  expect((await chartSnapshot(page)).nodes.filter((n) => n.type === "person").length).toBe(people);
+    .toBe(JSON.stringify({ parents: [from.id], children: [to.id] }));
+
+  // Escape leaves link mode
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("link-hint")).toBeHidden();
 });

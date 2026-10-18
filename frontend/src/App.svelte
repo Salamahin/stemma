@@ -27,6 +27,8 @@
     import FocusController from "./components/FocusController.svelte";
     import GhostLayer from "./components/GhostLayer.svelte";
     import EditGestures from "./components/EditGestures.svelte";
+    import LinkPicker from "./components/LinkPicker.svelte";
+    import { linkOptions, type LinkOption } from "./ghostLink";
     import EditModeOverlay from "./components/EditModeOverlay.svelte";
     import Chrome from "./components/Chrome.svelte";
     import PendingVisuals from "./components/PendingVisuals.svelte";
@@ -34,7 +36,7 @@
     import { capturePendingInvite, takePendingInvite } from "./inviteLinkBuilder";
     import { attachmentsOf } from "./attachments";
     import { Circle2 } from "svelte-loading-spinners";
-    import { normalizeId } from "./graphTools";
+    import { denormalizeId, normalizeId } from "./graphTools";
     import type { CanvasChart } from "./canvasChart";
     import type { FocusedId } from "./focusGesture";
     import { isPendingId, pendingPersonDescription } from "./pendingState";
@@ -48,9 +50,9 @@
     let { google_client_id, stemma_backend_url }: Props = $props();
 
     let editMode = $state(false);
-    let panMode = $state(false);
-    let spacePan = $state(false);
-    const panActive = $derived(editMode && (panMode || spacePan));
+    /** Edit mode: a drag from one person onto another links them (LinkPicker). */
+    let linkMode = $state(false);
+    let linkPick = $state<{ options: LinkOption[]; x: number; y: number } | null>(null);
 
     let ownedStemmas = $state<StemmaDescription[]>([]);
     let currentStemmaId = $state<string | null>(null);
@@ -194,16 +196,22 @@
 
     $effect(() => {
         if (editMode) return;
-        panMode = false;
-        spacePan = false;
+        linkMode = false;
+        linkPick = null;
         focusedId = null;
         untrack(() => actions.cleanupIncompletePendingFamiliesOnExitEdit());
     });
 
-    // Pan activation clears focus so ghosts dismiss before canvas drag.
+    // Link mode has no ghosts: entering it clears the focus.
     $effect(() => {
-        if (panActive) focusedId = null;
+        if (linkMode) focusedId = null;
     });
+
+    function linkDrop(fromId: string, toId: string, clientX: number, clientY: number) {
+        if (!displayedStemmaIndex) return;
+        const options = linkOptions(displayedStemmaIndex, denormalizeId(fromId), denormalizeId(toId));
+        if (options.length > 0) linkPick = { options, x: clientX, y: clientY };
+    }
 
     function errorMessage(err: Error): string {
         if (err instanceof LocalizedError) return $t(err.key, err.params);
@@ -327,7 +335,7 @@
             onfocusChange={(f) => (focusedId = f)}
         />
         <GhostLayer
-            {focusedId}
+            focusedId={linkMode ? null : focusedId}
             stemmaIndex={displayedStemmaIndex}
             {chart}
             getLayoutCenter={() => stemmaChart?.getLayoutCenter() ?? [window.innerWidth / 2, window.innerHeight / 2]}
@@ -336,18 +344,33 @@
         />
         <EditGestures
             {editMode}
-            {panActive}
-            {panMode}
+            {linkMode}
             {chart}
+            canLink={(a, b) => !!displayedStemmaIndex && linkOptions(displayedStemmaIndex, denormalizeId(a), denormalizeId(b)).length > 0}
             popHover={() => stemmaChart?.popHover()}
             onshortTapFocus={(f) => (focusedId = f)}
             onlongPress={handleNodeActivation}
             ondesktopNodeClick={handleNodeActivation}
             onclearFocus={() => (focusedId = null)}
             onnodeMoved={(nodeId, x, y) => stemmaChart?.placeNode(nodeId, x, y)}
-            onclosePanMode={() => (panMode = false)}
-            onspacePanChange={(v) => (spacePan = v)}
+            onlinkDrop={linkDrop}
+            onexitLinkMode={() => (linkMode = false)}
         />
+        {#if editMode && linkMode}
+            <div class="link-hint" aria-live="polite" data-testid="link-hint">
+                <i class="bi bi-share"></i> {$t("link.hint")}
+            </div>
+        {/if}
+        {#if linkPick && displayedStemmaIndex}
+            <LinkPicker
+                options={linkPick.options}
+                index={displayedStemmaIndex}
+                x={linkPick.x}
+                y={linkPick.y}
+                onpick={(o) => { linkPick = null; actions.linkPeople(o); }}
+                oncancel={() => (linkPick = null)}
+            />
+        {/if}
         <PendingVisuals
             adds={pendingAdds}
             families={pendingFamilies}
@@ -374,7 +397,7 @@
             {highlight}
             {highlightVersion}
             {editMode}
-            {panMode}
+            {linkMode}
             showSignOut={!session.e2eAutoLoginEnabled}
             onstemmaSelect={(id) => controller.selectStemma(id)}
             onstemmaAddNew={() => modals.addStemma()}
@@ -389,7 +412,7 @@
             onexportPng={() => stemmaChart?.exportPng($t("nav.exportDefaultName")).catch((e) => console.error("PNG export failed", e))}
             onsignOut={() => session.signOut()}
             oneditToggle={() => { editMode = !editMode; }}
-            onpanToggle={() => { panMode = !panMode; }}
+            onlinkToggle={() => { linkMode = !linkMode; }}
             onaddPerson={() => modals.addPerson()}
         />
 
@@ -558,4 +581,20 @@
         background: #f8f9fa;
     }
 
+    .link-hint {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        transform: translateX(-50%);
+        z-index: 900;
+        background: rgba(13, 110, 253, 0.95);
+        color: #fff;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        pointer-events: none;
+        max-width: calc(100vw - 32px);
+        text-align: center;
+    }
 </style>

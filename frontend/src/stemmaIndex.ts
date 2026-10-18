@@ -222,10 +222,6 @@ export class StemmaIndex {
         return this._namesakes.has(personName) ? this._namesakes.get(personName).map(p => this._people.get(p)) : []
     }
 
-    people(): PersonDescription[] {
-        return [...this._people.values()]
-    }
-
     person(personId: string) {
         return this._people.get(personId)
     }
