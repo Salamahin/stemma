@@ -27,7 +27,7 @@
     import { exportChartPng } from "../pngExport";
     import { personDisplayName } from "../personDisplayName";
     import { locale, t } from "../i18n";
-    import { formatPartialDate } from "../partialDate";
+    import { formatLifespan } from "../partialDate";
     import { nearestTo, nextInDirection, type Direction, type Point } from "../chartKeyboard";
     import { computeClans, type Clan } from "../clans";
     import { CanvasChart, type ChartNode, type ChartLink } from "../canvasChart";
@@ -44,6 +44,8 @@
         hoverHighlight?: boolean;
         onpersonSelected?: (person: any) => void;
         onfamilySelected?: (family: any) => void;
+        /** A click on the chart that hit no node (a pan does not count). */
+        onbackgroundClicked?: () => void;
         onhighlightChanged?: () => void;
         onzoomChanged?: () => void;
         onchartReady?: (chart: CanvasChart | null) => void;
@@ -61,6 +63,7 @@
         hoverHighlight = true,
         onpersonSelected,
         onfamilySelected,
+        onbackgroundClicked,
         onhighlightChanged,
         onzoomChanged,
         onchartReady,
@@ -317,9 +320,7 @@
     function describePerson(personId: string): string {
         const p = stemmaIndex.person(personId);
         if (!p) return "";
-        const birth = formatPartialDate(p.birthDate, $locale);
-        const death = formatPartialDate(p.deathDate, $locale);
-        const span = birth || death ? `${birth || "?"} – ${death}`.trim().replace(/ –$/, "") : "";
+        const span = formatLifespan(p.birthDate, p.deathDate, $locale);
         return span ? `${personDisplayName(p.name)}, ${span}` : personDisplayName(p.name);
     }
 
@@ -615,7 +616,10 @@
         });
         canvasEl.addEventListener("click", (e) => {
             const node = c.hitNode(e.clientX, e.clientY);
-            if (!node) return;
+            if (!node) {
+                if (!c.hitGhost(e.clientX, e.clientY)) onbackgroundClicked?.();
+                return;
+            }
             if (node.type == "person") onpersonSelected?.(stemmaIndex.person(denormalizeId(node.id)));
             else onfamilySelected?.(stemmaIndex.family(denormalizeId(node.id)));
         });

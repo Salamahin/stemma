@@ -316,6 +316,7 @@
                     hoverHighlight={!editMode}
                     onpersonSelected={handlePersonSelected}
                     onfamilySelected={handleFamilySelected}
+                    onbackgroundClicked={() => personEditModal?.dismissIfViewing()}
                     onhighlightChanged={() => highlightVersion++}
                     onzoomChanged={() => minimap?.refresh()}
                     onchartReady={(c) => (chart = c)}

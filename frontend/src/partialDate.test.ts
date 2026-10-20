@@ -1,4 +1,4 @@
-import { formatPartialDate, isBefore, parseDateInput, toDateInput } from "./partialDate";
+import { formatLifespan, formatPartialDate, isBefore, parseDateInput, toDateInput } from "./partialDate";
 
 describe("parseDateInput", () => {
     test.each([
@@ -69,5 +69,23 @@ describe("isBefore", () => {
         expect(isBefore("1899-05", "1899-03-16")).toBe(false);
         expect(isBefore("1899-03-01", "1899-03-16")).toBe(true);
         expect(isBefore("~1900", "1899")).toBe(false);
+    });
+});
+
+describe("formatLifespan", () => {
+    test("both dates", () => {
+        expect(formatLifespan("1899", "1950", "en")).toBe("1899 – 1950");
+    });
+
+    test("only a birth date says the death is unknown", () => {
+        expect(formatLifespan("1899", null, "en")).toBe("1899 – ?");
+    });
+
+    test("only a death date says the birth is unknown", () => {
+        expect(formatLifespan(undefined, "1950", "en")).toBe("? – 1950");
+    });
+
+    test("no dates", () => {
+        expect(formatLifespan(null, "", "en")).toBe("");
     });
 });

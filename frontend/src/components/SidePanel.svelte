@@ -20,8 +20,8 @@
 
     function handleKeydown(e: KeyboardEvent) {
         if (!open || e.key !== "Escape") return;
-        // a dialog on top (confirm, prompt) handles its own Escape
-        if (document.querySelector(".modal-panel")) return;
+        // a dialog on top (confirm, prompt, photo viewer) handles its own Escape
+        if (document.querySelector('[aria-modal="true"]')) return;
         onclose?.();
     }
 </script>

@@ -109,6 +109,18 @@ export function formatPartialDate(value: string | null | undefined, locale: stri
     return p.approx ? `${APPROX_LABEL[locale] ?? "~"} ${text}` : text;
 }
 
+/** "1899 – 1950"; a missing end is "?" so a lone date never reads as the other one. */
+export function formatLifespan(
+    birth: string | null | undefined,
+    death: string | null | undefined,
+    locale: string,
+): string {
+    const b = formatPartialDate(birth, locale);
+    const d = formatPartialDate(death, locale);
+    if (!b && !d) return "";
+    return `${b || "?"} – ${d || "?"}`;
+}
+
 /** True only when `a` is certainly earlier than `b` at the precision both know. */
 export function isBefore(a: string, b: string): boolean {
     const pa = parseIso(a);
