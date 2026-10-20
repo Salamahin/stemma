@@ -24,6 +24,8 @@ async function positions(page: Page): Promise<Map<string, [number, number]>> {
 }
 
 test("a reopened stemma starts from its remembered layout", async ({ page }) => {
+  // Lays out ~400 people from scratch; a busy CI runner needs more than the default 60s.
+  test.slow();
   await page.goto("/");
   await waitForFirstLoginSeeded(page);
   await waitForSettledLayout(page);
@@ -54,6 +56,8 @@ test("a reopened stemma starts from its remembered layout", async ({ page }) => 
 });
 
 test("a corrupt stored layout never breaks rendering", async ({ page }) => {
+  // Lays out ~400 people from scratch; a busy CI runner needs more than the default 60s.
+  test.slow();
   await page.goto("/");
   await waitForFirstLoginSeeded(page);
   await waitForSettledLayout(page);
@@ -75,7 +79,8 @@ test("a corrupt stored layout never breaks rendering", async ({ page }) => {
     }, payload);
     await page.reload();
     await expect.poll(async () => (await chartSnapshot(page)).nodes.length, { timeout: 30_000 }).toBe(count);
-    await expect.poll(async () => (await chartSnapshot(page)).stats.nodes, { timeout: 10_000 }).toBeGreaterThan(0);
+    // A layout from scratch keeps the page busy; on a slow CI runner one snapshot alone took 14s.
+    await expect.poll(async () => (await chartSnapshot(page)).stats.nodes, { timeout: 30_000 }).toBeGreaterThan(0);
     const snap = await chartSnapshot(page);
     expect(snap.nodes.every((n) => Number.isFinite(n.x) && Number.isFinite(n.y))).toBe(true);
     await waitForSettledLayout(page);
