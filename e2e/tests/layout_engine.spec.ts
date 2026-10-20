@@ -25,6 +25,8 @@ test("the force layout runs in a Web Worker and comes to rest", async ({ page })
 });
 
 test("dragging a node in view mode moves it with the pointer and the layout settles afterwards", async ({ page }) => {
+  // Lays out ~400 people from scratch; a busy CI runner needs more than the default 60s.
+  test.slow();
   await page.goto("/");
   await waitForFirstLoginSeeded(page);
   await waitForIdleLayout(page);

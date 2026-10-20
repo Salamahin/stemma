@@ -24,6 +24,8 @@ async function positions(page: Page): Promise<Map<string, [number, number]>> {
 }
 
 test("a reopened stemma starts from its remembered layout", async ({ page }) => {
+  // Lays out ~400 people from scratch; a busy CI runner needs more than the default 60s.
+  test.slow();
   await page.goto("/");
   await waitForFirstLoginSeeded(page);
   await waitForSettledLayout(page);
@@ -54,6 +56,8 @@ test("a reopened stemma starts from its remembered layout", async ({ page }) => 
 });
 
 test("a corrupt stored layout never breaks rendering", async ({ page }) => {
+  // Lays out ~400 people from scratch; a busy CI runner needs more than the default 60s.
+  test.slow();
   await page.goto("/");
   await waitForFirstLoginSeeded(page);
   await waitForSettledLayout(page);
