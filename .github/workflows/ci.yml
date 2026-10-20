@@ -119,8 +119,6 @@ jobs:
       if: steps.playwright-cache.outputs.cache-hit == 'true'
       run: npx playwright install-deps chromium
       working-directory: e2e
-    - name: Runner hardware
-      run: nproc; lscpu | grep -E "Model name|^CPU\(s\)|Thread"; free -m; uname -r
     - name: Run e2e tests
       run: npm test
       working-directory: e2e
