@@ -42,7 +42,7 @@
 
 <script lang="ts">
     import { locale, t } from "../i18n";
-    import { formatPartialDate, isBefore, parseDateInput, toDateInput } from "../partialDate";
+    import { formatLifespan, isBefore, parseDateInput, toDateInput } from "../partialDate";
     import { renderBioMarkdown } from "../bioMarkdown";
     import { isUnknownPerson, personDisplayName } from "../personDisplayName";
     import type { AltName, AltNameKind, CreateNewPerson } from "../model";
@@ -111,6 +111,8 @@
     let pendingPhotoBlob = $state<Blob | null>(null);
     let pendingPhotoPreviewUrl = $state<string | null>(null);
     let pendingPhotoRemove = $state(false);
+    /** The photo shown full size over everything, in view mode. */
+    let photoZoomed = $state(false);
 
     let cropImageEl = $state<HTMLImageElement | null>(null);
     let cropContainerEl = $state<HTMLElement | null>(null);
@@ -130,13 +132,7 @@
 
     const bioHtml = $derived(renderBioMarkdown(bio));
     const personAttachments = $derived(id ? (attachmentsOf?.(id) ?? []) : []);
-    const viewLifespan = $derived(lifespanText(birthDate, deathDate));
-    function lifespanText(birth: string | null | undefined, death: string | null | undefined): string {
-        const b = formatPartialDate(birth ?? null, $locale);
-        const d = formatPartialDate(death ?? null, $locale);
-        if (!b && !d) return "";
-        return d ? `${b || "?"} – ${d}` : b;
-    }
+    const viewLifespan = $derived(formatLifespan(birthDate, deathDate, $locale));
 
     const displayName = $derived(unknown ? personDisplayName(null) : personDisplayName(name));
 
@@ -193,6 +189,7 @@
         originalPhotoUrl = p?.description.photoUrl ?? null;
         photoUrl = originalPhotoUrl;
         photoErrString = null;
+        photoZoomed = false;
         if (photoFileInputEl) photoFileInputEl.value = "";
         resetCropState();
         resetPendingPhoto();
@@ -220,12 +217,18 @@
 
     function close() {
         open = false;
+        photoZoomed = false;
         activeCreateCallback = null;
         resetPendingPhoto();
     }
 
     export function dismiss() {
         close();
+    }
+
+    /** Closes a card that is only being looked at; a form being filled in stays open. */
+    export function dismissIfViewing() {
+        if (open && readOnly) close();
     }
 
     let pinDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -443,6 +446,13 @@
         );
     }
 
+    function handlePhotoZoomKeydown(e: KeyboardEvent) {
+        if (!photoZoomed || e.key !== "Escape") return;
+        // the card under the photo must not take this Escape too
+        e.stopImmediatePropagation();
+        photoZoomed = false;
+    }
+
     function removePhoto() {
         photoErrString = null;
         if (pendingPhotoBlob) {
@@ -508,7 +518,15 @@
         {:else}
             <div class="profile">
                 <div class="avatar" class:editable={!readOnly}>
-                    {#if photoUrl}
+                    {#if photoUrl && readOnly}
+                        <button
+                            type="button"
+                            class="photo-zoom-btn"
+                            onclick={() => (photoZoomed = true)}
+                            aria-label={$t("person.photoOpen")}
+                            data-testid="person-photo-open"
+                        ><img src={photoUrl} alt={name} class="photo-image" /></button>
+                    {:else if photoUrl}
                         <img src={photoUrl} alt={name} class="photo-image" />
                     {:else}
                         <div class="photo-empty"><i class="bi bi-person"></i></div>
@@ -610,9 +628,6 @@
                                 placeholder={$t("person.dateExample")}
                                 data-testid="person-birth"
                             />
-                            {#if birthDateErrString}
-                                <div class="invalid-feedback">{birthDateErrString}</div>
-                            {/if}
                         </div>
                         <span class="dash">–</span>
                         <div class="date-cell">
@@ -626,12 +641,14 @@
                                 placeholder={$t("person.dateExample")}
                                 data-testid="person-death"
                             />
-                            {#if deathDateErrString}
-                                <div class="invalid-feedback">{deathDateErrString}</div>
-                            {/if}
                         </div>
                     </div>
-                    <div class="date-hint">{$t("person.datePlaceholder")}</div>
+                    <!-- below both fields, so an error never pushes one field out of line -->
+                    {#if birthDateErrString ?? deathDateErrString}
+                        <div class="date-hint date-error" data-testid="person-date-error">{birthDateErrString ?? deathDateErrString}</div>
+                    {:else}
+                        <div class="date-hint">{$t("person.datePlaceholder")}</div>
+                    {/if}
                 {/if}
             </div>
 
@@ -745,6 +762,27 @@
     {/snippet}
 </SidePanel>
 
+<svelte:window onkeydown={handlePhotoZoomKeydown} />
+
+{#if photoZoomed && photoUrl}
+    <!-- Escape is handled on the window; a click anywhere closes it -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <div
+        class="photo-lightbox"
+        role="dialog"
+        aria-modal="true"
+        aria-label={displayName}
+        tabindex="-1"
+        data-testid="person-photo-lightbox"
+        onclick={() => (photoZoomed = false)}
+    >
+        <img src={photoUrl} alt={name} class="photo-lightbox-image" />
+        <button type="button" class="photo-lightbox-close" aria-label={$t("common.close")}>
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+{/if}
+
 <style>
     .profile {
         display: flex;
@@ -770,6 +808,51 @@
         height: 100%;
         object-fit: cover;
         display: block;
+    }
+
+    .photo-zoom-btn {
+        display: block;
+        width: 100%;
+        height: 100%;
+        padding: 0;
+        border: none;
+        background: none;
+        cursor: zoom-in;
+    }
+
+    .photo-lightbox {
+        position: fixed;
+        inset: 0;
+        z-index: 2000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background-color: rgba(0, 0, 0, 0.85);
+        cursor: zoom-out;
+    }
+
+    .photo-lightbox-image {
+        width: min(100%, 90vh, 640px);
+        height: auto;
+        aspect-ratio: 1;
+        object-fit: contain;
+        border-radius: 8px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .photo-lightbox-close {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 40px;
+        height: 40px;
+        border: none;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.15);
+        color: #fff;
+        font-size: 1.1rem;
+        cursor: pointer;
     }
 
     .photo-empty {
@@ -884,6 +967,11 @@
     .date-hint {
         font-size: var(---fs-hint);
         color: var(---text-muted);
+    }
+
+    .date-hint.date-error {
+        max-width: 340px;
+        color: var(--bs-form-invalid-color, #dc3545);
     }
 
     .section {

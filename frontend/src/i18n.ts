@@ -167,6 +167,7 @@ export const en: Record<string, string> = {
     'person.photoUploadFailed': 'Photo upload failed. Try again',
     'person.photoAdjustTitle': 'Adjust photo',
     'person.photoAdjustHint': 'Drag to position, use the slider to zoom',
+    'person.photoOpen': 'Open photo',
     'person.unknownToggle': 'Name unknown',
 
     // Settings modal
@@ -404,6 +405,7 @@ export const ru: Record<string, string> = {
     'person.photoUploadFailed': 'Не удалось загрузить фото. Попробуйте еще раз',
     'person.photoAdjustTitle': 'Подгонка фото',
     'person.photoAdjustHint': 'Двигайте мышью, масштабируйте ползунком',
+    'person.photoOpen': 'Открыть фото',
     'person.unknownToggle': 'Имя неизвестно',
 
     // Settings modal
