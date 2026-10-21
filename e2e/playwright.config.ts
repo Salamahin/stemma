@@ -7,7 +7,9 @@ export default defineConfig({
     timeout: 20_000
   },
   fullyParallel: true,
-  workers: process.env.CI ? 4 : undefined,
+  // 4 vCPU runners: on the kernel 7.0 image (ubuntu-24.04 20261018) 4 Chromes
+  // starved each other ~3x and timed out the layout tests; 2 run at full speed.
+  workers: process.env.CI ? 2 : undefined,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
