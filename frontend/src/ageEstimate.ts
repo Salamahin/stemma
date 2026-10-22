@@ -21,10 +21,8 @@ export type BirthYear = { year: number; known: boolean };
 export type AgeIndex = {
     /** Known or estimated birth year; null when nobody near them has a date. */
     birthYear(personId: string): BirthYear | null;
-    /** 0 = the oldest in the tree, 1 = the youngest: the share of people born earlier. */
-    ratio(personId: string): number;
-    /** Birth years at the given ratios (0 = oldest, 0.5 = median, 1 = youngest); null when the tree has no dates. */
-    yearAt(ratio: number): number | null;
+    /** Every known or estimated birth year, one per dated person. */
+    years(): number[];
     /** The years the generation length was taken to be. */
     generationYears: number;
 };
@@ -46,7 +44,7 @@ type Edge = { to: number; generations: number };
  * the tree. The estimate then balances every relative at once — a parent one
  * generation earlier, a spouse the same year, a death year ~60 years later — with
  * the generation length learned from the tree's own dated parent–child pairs, and
- * is kept within the bounds. Branches with no dates at all are ordered by generation.
+ * is kept within the bounds. People in branches with no dates at all get no year.
  */
 export function estimateAges(stemma: Stemma, now = new Date().getFullYear()): AgeIndex {
     const ids = stemma.people.map((p) => p.id);
@@ -166,50 +164,7 @@ export function estimateAges(stemma: Stemma, now = new Date().getFullYear()): Ag
     }
 
     const dated: number[] = [];
-    for (let i = 0; i < n; i++) if (!Number.isNaN(year[i])) dated.push(i);
-    const sortedYears = dated.map((i) => year[i]).sort((a, b) => a - b);
-
-    // Rank, not distance in years: the colours spread evenly over the people, so
-    // a crowded century does not end up as one shade.
-    const rank = new Float64Array(n).fill(NaN);
-    if (sortedYears.length) {
-        const below = (y: number) => {
-            let a = 0;
-            let b = sortedYears.length;
-            while (a < b) {
-                const m = (a + b) >> 1;
-                if (sortedYears[m] < y) a = m + 1;
-                else b = m;
-            }
-            return a;
-        };
-        const span = Math.max(1, sortedYears.length - 1);
-        for (const i of dated) {
-            const first = below(year[i]);
-            const last = below(year[i] + 1e-9) - 1;
-            rank[i] = (first + Math.max(first, last)) / 2 / span;
-        }
-    }
-
-    // Undated branches: generation levels within their own component.
-    const levelRatio = new Float64Array(n).fill(NaN);
-    for (let s = 0; s < n; s++) {
-        if (!Number.isNaN(year[s]) || !Number.isNaN(levelRatio[s])) continue;
-        const level = new Map<number, number>([[s, 0]]);
-        const queue = [s];
-        for (let q = 0; q < queue.length; q++) {
-            const i = queue[q];
-            for (const e of edges[i]) {
-                if (level.has(e.to)) continue;
-                level.set(e.to, level.get(i)! + e.generations);
-                queue.push(e.to);
-            }
-        }
-        const levels = [...level.values()];
-        const min = Math.min(...levels);
-        const max = Math.max(...levels);
-        for (const [i, l] of level) levelRatio[i] = max > min ? (l - min) / (max - min) : 0.5;
-    }
+    for (let i = 0; i < n; i++) if (!Number.isNaN(year[i])) dated.push(Math.round(year[i]));
 
     return {
         birthYear: (id) => {
@@ -217,14 +172,7 @@ export function estimateAges(stemma: Stemma, now = new Date().getFullYear()): Ag
             if (i == null || Number.isNaN(year[i])) return null;
             return { year: Math.round(year[i]), known: born[i] != null };
         },
-        ratio: (id) => {
-            const i = index.get(id);
-            if (i == null) return 0.5;
-            if (!Number.isNaN(rank[i])) return rank[i];
-            return Number.isNaN(levelRatio[i]) ? 0.5 : levelRatio[i];
-        },
-        yearAt: (ratio) =>
-            sortedYears.length ? Math.round(sortedYears[Math.round(ratio * (sortedYears.length - 1))]) : null,
+        years: () => dated,
         generationYears,
     };
 }

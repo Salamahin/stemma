@@ -95,19 +95,18 @@
         const layout = deriveGhostLayout(focusedId, stemmaIndex);
         if (layout.families.length === 0 && layout.persons.length === 0) return;
 
-        const baseGeneration = (() => {
-            if (focusedId.kind === "person") return stemmaIndex.lineage(focusedId.id).generation;
+        // A ghost is coloured as the relative it would be: a generation before or after the focus.
+        const baseYear = (() => {
+            if (focusedId.kind === "person") return stemmaIndex.birthYear(focusedId.id)?.year ?? null;
             const fam = stemmaIndex.family(focusedId.id);
-            if (!fam) return 0;
-            let g = 0;
-            for (const pid of fam.parents ?? []) g = Math.max(g, stemmaIndex.lineage(pid).generation);
-            return g;
+            const years = (fam?.parents ?? []).map((pid) => stemmaIndex.birthYear(pid)?.year).filter((y): y is number => y != null);
+            return years.length ? Math.max(...years) : null;
         })();
-        const maxGen = Math.max(stemmaIndex.maxGeneration(), 1);
+        const stepCount = stemmaIndex.ageSteps()?.count ?? 0;
         const ghostPersonColor = (kind: "spouse" | "parent" | "child"): string => {
-            const gen = kind === "parent" ? baseGeneration - 1 : kind === "child" ? baseGeneration + 1 : baseGeneration;
-            const ratio = Math.min(1, Math.max(0, gen / maxGen));
-            return personColor(ratio);
+            const offset = kind === "parent" ? -1 : kind === "child" ? 1 : 0;
+            const year = baseYear == null ? null : baseYear + offset * stemmaIndex.generationYears();
+            return personColor(stemmaIndex.ageStepOf(year), stepCount);
         };
 
         const labels = $t;

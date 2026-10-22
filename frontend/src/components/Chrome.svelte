@@ -8,6 +8,7 @@
     import Fab from "./Fab.svelte";
     import Search from "./Search.svelte";
     import StatsCard from "./StatsCard.svelte";
+    import AgeStrip from "./AgeStrip.svelte";
 
     type Props = {
         ownedStemmas: StemmaDescription[];
@@ -20,6 +21,10 @@
         highlightVersion: number;
         editMode: boolean;
         linkMode: boolean;
+        /** The age steps kept shown by clicks on the age strip. */
+        ageSelected: ReadonlySet<number>;
+        onageHover: (step: number | null) => void;
+        onageToggle: (step: number) => void;
         showSignOut: boolean;
         onstemmaSelect: (id: string) => void;
         onstemmaAddNew: () => void;
@@ -49,6 +54,9 @@
         highlightVersion,
         editMode,
         linkMode,
+        ageSelected,
+        onageHover,
+        onageToggle,
         showSignOut,
         onstemmaSelect,
         onstemmaAddNew,
@@ -66,9 +74,11 @@
         onlinkToggle,
         onaddPerson,
     }: Props = $props();
+
+    const showAgeStrip = $derived(!isWorking && !editMode && !!stemmaIndex?.ageSteps());
 </script>
 
-<div class="chrome" aria-hidden="false">
+<div class="chrome" class:with-age-strip={showAgeStrip} aria-hidden="false">
     <div class="top-left">
         <Chip
             {ownedStemmas}
@@ -116,6 +126,12 @@
             {onaddPerson}
         />
     </div>
+
+    {#if showAgeStrip && stemmaIndex?.ageSteps()}
+        <div class="bottom-center">
+            <AgeStrip steps={stemmaIndex.ageSteps()!} selected={ageSelected} onhover={onageHover} ontoggle={onageToggle} />
+        </div>
+    {/if}
 
     {#if !isWorking && stemma && stemmaIndex && highlight}
         <div class="bottom-left">
@@ -175,6 +191,30 @@
         right: calc(20px + env(safe-area-inset-right, 0px));
         pointer-events: auto;
         z-index: 100;
+    }
+
+    .bottom-center {
+        position: absolute;
+        bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+        left: 50%;
+        transform: translateX(-50%);
+        pointer-events: auto;
+        z-index: 100;
+    }
+
+    /* Phones: the strip runs along the very bottom, the stats card and the edit button sit above it. */
+    @media (max-width: 767.98px) {
+        .bottom-center {
+            bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        }
+
+        .with-age-strip .bottom-left {
+            bottom: calc(46px + env(safe-area-inset-bottom, 0px));
+        }
+
+        .with-age-strip .bottom-right {
+            bottom: calc(46px + env(safe-area-inset-bottom, 0px));
+        }
     }
 
     .bottom-left {

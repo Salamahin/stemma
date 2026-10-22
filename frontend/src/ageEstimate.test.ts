@@ -29,7 +29,7 @@ describe("estimateAges", () => {
         );
         expect(ages.birthYear("mum")!.known).toBe(false);
         expect(Math.abs(ages.birthYear("mum")!.year - 1910)).toBeLessThanOrEqual(5);
-        expect(ages.ratio("mum")).toBeGreaterThan(ages.ratio("grandpa"));
+        expect(ages.birthYear("mum")!.year).toBeGreaterThan(ages.birthYear("grandpa")!.year);
     });
 
     test("an undated person is placed a generation away from dated parents and children", () => {
@@ -47,24 +47,12 @@ describe("estimateAges", () => {
     test("a lone death date still dates a person", () => {
         const ages = estimateAges(stemma([person("a", undefined, "1943-10-28"), person("b", "1990")], []));
         expect(ages.birthYear("a")!.year).toBeLessThan(1943);
-        expect(ages.ratio("a")).toBeLessThan(ages.ratio("b"));
+        expect(ages.birthYear("a")!.known).toBe(false);
     });
 
-    test("the ratio is a rank: colours spread evenly over people, not over years", () => {
-        const ages = estimateAges(
-            stemma([person("a", "1700"), person("b", "1990"), person("c", "1995"), person("d", "2000")], []),
-        );
-        expect(ages.ratio("a")).toBe(0);
-        expect(ages.ratio("b")).toBeCloseTo(1 / 3);
-        expect(ages.ratio("c")).toBeCloseTo(2 / 3);
-        expect(ages.ratio("d")).toBe(1);
-        expect(ages.yearAt(0)).toBe(1700);
-        expect(ages.yearAt(1)).toBe(2000);
-    });
-
-    test("people born the same year share a colour", () => {
-        const ages = estimateAges(stemma([person("a", "1900"), person("b", "1900"), person("c", "2000")], []));
-        expect(ages.ratio("a")).toBe(ages.ratio("b"));
+    test("years lists every dated person once", () => {
+        const ages = estimateAges(stemma([person("a", "1700"), person("b", "1990"), person("c")], []));
+        expect(ages.years().sort()).toEqual([1700, 1990]);
     });
 
     test("the generation length is learned from the tree's own dated parents and children", () => {
@@ -101,22 +89,20 @@ describe("estimateAges", () => {
         expect(ages.birthYear("old")!.year).toBeGreaterThanOrEqual(1800);
     });
 
-    test("a family with no dates at all is still ordered by generation", () => {
+    test("a branch with no dates at all gets no years", () => {
         const ages = estimateAges(
             stemma(
-                [person("old"), person("mid"), person("young")],
-                [family("f1", ["old"], ["mid"]), family("f2", ["mid"], ["young"])],
+                [person("old"), person("mid"), person("dated", "1900"), person("loner")],
+                [family("f1", ["old"], ["mid"]), family("f2", ["dated"], [])],
             ),
         );
         expect(ages.birthYear("old")).toBeNull();
-        expect(ages.ratio("old")).toBeLessThan(ages.ratio("mid"));
-        expect(ages.ratio("mid")).toBeLessThan(ages.ratio("young"));
-        expect(ages.yearAt(0)).toBeNull();
+        expect(ages.birthYear("loner")).toBeNull();
+        expect(ages.years()).toEqual([1900]);
     });
 
-    test("an unknown person id gets the middle of the scale", () => {
+    test("an unknown person id has no year", () => {
         const ages = estimateAges(stemma([], []));
-        expect(ages.ratio("nobody")).toBe(0.5);
         expect(ages.birthYear("nobody")).toBeNull();
     });
 });

@@ -3,8 +3,8 @@
     import type { Stemma } from "../model";
     import { ViewMode } from "../model";
     import { StemmaIndex } from "../stemmaIndex";
-    import { onMount } from "svelte";
-    import { HighlightLineages } from "../highlight";
+    import { onMount, untrack } from "svelte";
+    import { HighlightLineages, effectiveHighlight } from "../highlight";
     import {
         assignInitialPositions,
         resetSessionPositions,
@@ -46,6 +46,8 @@
         onfamilySelected?: (family: any) => void;
         /** A click on the chart that hit no node (a pan does not count). */
         onbackgroundClicked?: () => void;
+        /** Show only the people of these age steps (pinned and hovered people still win). */
+        ageSteps?: ReadonlySet<number>;
         onhighlightChanged?: () => void;
         onzoomChanged?: () => void;
         onchartReady?: (chart: CanvasChart | null) => void;
@@ -64,6 +66,7 @@
         onpersonSelected,
         onfamilySelected,
         onbackgroundClicked,
+        ageSteps = new Set<number>(),
         onhighlightChanged,
         onzoomChanged,
         onchartReady,
@@ -124,8 +127,13 @@
     });
 
     function applyStyle() {
-        chart?.setStyleInputs(highlight, stemmaIndex, pinnedPeople.allPinned());
+        chart?.setStyleInputs(effectiveHighlight(highlight, stemmaIndex, ageSteps), stemmaIndex, pinnedPeople.allPinned());
     }
+
+    $effect(() => {
+        ageSteps;
+        untrack(applyStyle);
+    });
 
     /** Restyle + re-apply pins (pinned people are frozen at their position). */
     function renderFullStemma() {

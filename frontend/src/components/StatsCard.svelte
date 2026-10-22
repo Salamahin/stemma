@@ -3,10 +3,6 @@
     import { StemmaIndex } from "../stemmaIndex";
     import { HighlightLineages } from "../highlight";
     import { t } from "../i18n";
-    import { personColor } from "../graphStyles";
-
-    /** The node colours from the oldest to the youngest, as a CSS gradient. */
-    const AGE_GRADIENT = `linear-gradient(to right, ${[0, 0.25, 0.5, 0.75, 1].map((r) => personColor(r)).join(", ")})`;
 
     type Props = {
         stemma: Stemma;
@@ -55,13 +51,6 @@
         };
     }
 
-    /** Oldest, median and youngest birth years: the colour scale is a rank, so the middle is not the mean year. */
-    const years = $derived.by(() => {
-        if (!stemmaIndex) return null;
-        const ys = [0, 0.5, 1].map((r) => stemmaIndex.birthYearAt(r));
-        return ys[0] == null ? null : (ys as number[]);
-    });
-
     const stats = $derived(
         stemma && stemmaIndex && highlight && highlightVersion >= 0
             ? highlight.isActive()
@@ -80,12 +69,6 @@
                 <tr><td class="label">{$t("stats.depth")}</td><td class="value">{stats.depth}</td></tr>
             </tbody>
         </table>
-        {#if years}
-            <div class="age-legend" data-testid="age-legend" title={$t("stats.ageLegend")}>
-                <div class="age-bar" style:background={AGE_GRADIENT}></div>
-                <div class="age-years"><span>{years[0]}</span><span>{years[1]}</span><span>{years[2]}</span></div>
-            </div>
-        {/if}
     </aside>
 {/if}
 
@@ -129,22 +112,6 @@
     .label {
         color: rgba(255, 255, 255, 0.55);
         text-align: left;
-    }
-
-    .age-legend {
-        margin-top: 5px;
-    }
-
-    .age-bar {
-        height: 6px;
-        border-radius: 3px;
-    }
-
-    .age-years {
-        display: flex;
-        justify-content: space-between;
-        color: rgba(255, 255, 255, 0.55);
-        font-variant-numeric: tabular-nums;
     }
 
     .value {

@@ -111,3 +111,24 @@ export class HighlightLineages implements Highlight {
         this.remakeCaches()
     }
 }
+/** Everyone born in the given age steps (ageSteps.ts), and every family one of them is a parent or child in. */
+export class HighlightAgeStep implements Highlight {
+    constructor(private index: StemmaIndex, readonly steps: ReadonlySet<number>) {}
+
+    personIsHighlighted(personId: string): boolean {
+        const step = this.index.ageStep(personId)
+        return step != null && this.steps.has(step)
+    }
+
+    familyIsHighlighted(familyId: string): boolean {
+        const f = this.index.family(familyId)
+        if (!f) return false
+        return [...(f.parents ?? []), ...(f.children ?? [])].some(p => this.personIsHighlighted(p))
+    }
+}
+
+/** Pinned or hovered people (lineages) win; otherwise the chosen age steps, if any. */
+export function effectiveHighlight(lineages: HighlightLineages, index: StemmaIndex, ageSteps: ReadonlySet<number>): Highlight {
+    if (lineages.isActive() || !ageSteps.size) return lineages
+    return new HighlightAgeStep(index, ageSteps)
+}

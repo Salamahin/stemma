@@ -208,7 +208,7 @@ export const en: Record<string, string> = {
     'stats.people': 'people',
     'stats.families': 'families',
     'stats.depth': 'generations',
-    'stats.ageLegend': 'Node colour: year of birth, known or estimated from relatives',
+    'ageStrip.label': 'Show the people born in',
 
     // Editor UI
     'addPerson': 'Add person',
@@ -447,7 +447,7 @@ export const ru: Record<string, string> = {
     'stats.people': 'людей',
     'stats.families': 'семей',
     'stats.depth': 'поколений',
-    'stats.ageLegend': 'Цвет нод — год рождения, известный или оценённый по родственникам',
+    'ageStrip.label': 'Показать родившихся в',
 
     // Editor UI
     'addPerson': 'Добавить человека',
