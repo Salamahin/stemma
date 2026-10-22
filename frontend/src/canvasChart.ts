@@ -76,8 +76,9 @@ export type Highlighter = {
 };
 
 export type GenerationIndex = {
-    lineage(personId: string): { generation: number };
-    maxGeneration(): number;
+    /** 0 = the oldest age step; null = undated. */
+    ageStep(personId: string): number | null;
+    ageSteps(): { count: number } | null;
 };
 
 export type GhostNodeView = {
@@ -347,14 +348,14 @@ export class CanvasChart {
         this.highlightedIds.clear();
         const hl = this.highlight;
         const gen = this.generations;
-        const maxGen = gen ? gen.maxGeneration() : 0;
+        const stepCount = gen?.ageSteps()?.count ?? 0;
         for (const n of this.nodes) {
             const rawId = denormalizeId(n.id);
             if (n.type === "person") {
                 const on = hl ? hl.personIsHighlighted(rawId) : true;
                 if (on) this.highlightedIds.add(n.id);
-                const ratio = gen ? gen.lineage(rawId).generation / maxGen : 0;
-                this.fillById.set(n.id, on ? personColor(ratio) : shadedNodeColor);
+                const step = gen ? gen.ageStep(rawId) : null;
+                this.fillById.set(n.id, on ? personColor(step, stepCount) : shadedNodeColor);
             } else {
                 const on = hl ? hl.familyIsHighlighted(rawId) : true;
                 if (on) this.highlightedIds.add(n.id);

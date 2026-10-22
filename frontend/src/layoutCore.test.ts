@@ -154,6 +154,22 @@ describe("star seed refine", () => {
 });
 
 describe("LayoutLoop", () => {
+    test("edges stop pushing nodes while one is dragged, and push again once it is let go", () => {
+        const { nodes, links } = syntheticGraph(60);
+        const sim = createLayoutSimulation(nodes, links, 1000, 800);
+        const edgeRepel = sim.force("edgeRepel") as any;
+        const m = manualScheduler(1);
+        const loop = new LayoutLoop(sim, m.scheduler, 8, () => {}, () => {});
+        sim.alphaTarget(0.3);
+        loop.start();
+        m.runOne();
+        expect(edgeRepel.enabled()).toBe(false);
+        sim.alphaTarget(0);
+        m.runOne();
+        expect(edgeRepel.enabled()).toBe(true);
+        loop.stop();
+    });
+
     test("a paced settle spreads the same ticks over about LAYOUT_SETTLE_MS instead of finishing at once (#307)", () => {
         const { nodes, links } = syntheticGraph(60);
         const sim = createLayoutSimulation(nodes, links, 1000, 800);

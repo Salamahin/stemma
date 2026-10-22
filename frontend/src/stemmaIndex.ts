@@ -1,4 +1,6 @@
 import type { Stemma, FamilyDescription, PersonDescription } from "./model";
+import { estimateAges, type AgeIndex } from "./ageEstimate";
+import { ageSteps, type AgeSteps } from "./ageSteps";
 
 export type Generation = {
     generation: number,
@@ -38,6 +40,8 @@ export class StemmaIndex {
     private _maxGeneration: number
     private _descendantFamiliesOfPerson: Map<string, Set<string>>
     private _descendantPeopleOfFamily: Map<string, Set<string>>
+    private _ages: AgeIndex
+    private _ageSteps: AgeSteps | null
 
     private groupByKey<K, V>(array: Array<readonly [K, V]>) {
         return array.reduce((store, item) => {
@@ -71,6 +75,8 @@ export class StemmaIndex {
         this._people = new Map(stemma.people.map(p => [p.id, p]))
         this._lineage = new Map(stemma.people.map(p => [p.id, this.buildLineage(p)]))
         this._maxGeneration = Math.max(...[...this._lineage.values()].map(p => p.generation));
+        this._ages = estimateAges(stemma)
+        this._ageSteps = ageSteps(this._ages.years())
 
         const dependeesByPerson = new Map(
             stemma.people.map(p => [p.id, this.computeLineage(p.id, this._parentToChildren)])
@@ -228,5 +234,29 @@ export class StemmaIndex {
 
     maxGeneration() {
         return this._maxGeneration
+    }
+
+    /** Known or estimated birth year; null when nobody near them has a date. */
+    birthYear(personId: string) {
+        return this._ages.birthYear(personId)
+    }
+
+    /** The years between a parent's birth and a child's in this tree. */
+    generationYears() {
+        return this._ages.generationYears
+    }
+
+    /** The age steps the chart is coloured by; null when the tree has no dates. */
+    ageSteps() {
+        return this._ageSteps
+    }
+
+    /** The age step of a birth year, or of a person (null: undated, or a tree with no dates). */
+    ageStepOf(year: number | null | undefined): number | null {
+        return year == null || !this._ageSteps ? null : this._ageSteps.stepOf(year)
+    }
+
+    ageStep(personId: string): number | null {
+        return this.ageStepOf(this.birthYear(personId)?.year)
     }
 }

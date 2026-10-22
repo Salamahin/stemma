@@ -66,6 +66,12 @@
     let invitationLink = $state<string | null>(null);
     let invitationPending = $state(false);
     let highlightVersion = $state(0);
+    /** Age strip: the steps kept shown by clicks, plus the one under the mouse while it is there. */
+    let ageSelected = $state<ReadonlySet<number>>(new Set());
+    let ageHovered = $state<number | null>(null);
+    const ageShown = $derived<ReadonlySet<number>>(
+        editMode ? new Set() : ageHovered == null ? ageSelected : new Set([...ageSelected, ageHovered]),
+    );
 
     let selectedFamilyId = $state<string | null>(null);
     let selectedFamilyEl = $state<{ getBoundingClientRect(): DOMRect } | null>(null);
@@ -158,7 +164,11 @@
             const switchedStemma = currentStemmaId !== lastStemmaIdSeen;
             lastStemmaIdSeen = currentStemmaId;
             stemma = s;
-            if (s === null || switchedStemma) actions.reset();
+            if (s === null || switchedStemma) {
+                actions.reset();
+                ageSelected = new Set();
+                ageHovered = null;
+            }
         }),
         controller.ownedStemmas.subscribe((os) => (ownedStemmas = os)),
         controller.favouriteStemmaId.subscribe((id) => (favouriteStemmaId = id)),
@@ -316,6 +326,7 @@
                     hoverHighlight={!editMode}
                     onpersonSelected={handlePersonSelected}
                     onfamilySelected={handleFamilySelected}
+                    ageSteps={ageShown}
                     onbackgroundClicked={() => personEditModal?.dismissIfViewing()}
                     onhighlightChanged={() => highlightVersion++}
                     onzoomChanged={() => minimap?.refresh()}
@@ -399,6 +410,13 @@
             {highlightVersion}
             {editMode}
             {linkMode}
+            {ageSelected}
+            onageHover={(step) => (ageHovered = step)}
+            onageToggle={(step) => {
+                const next = new Set(ageSelected);
+                if (!next.delete(step)) next.add(step);
+                ageSelected = next;
+            }}
             showSignOut={!session.e2eAutoLoginEnabled}
             onstemmaSelect={(id) => controller.selectStemma(id)}
             onstemmaAddNew={() => modals.addStemma()}

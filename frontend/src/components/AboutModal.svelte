@@ -52,10 +52,10 @@
             .attr("stroke-width", childRelationWidth)
             .attr("marker-end", markers.person);
 
-        svg.append("circle").attr("cx", parentLeftX).attr("cy", parentsY).attr("r", personR).attr("fill", personColor(0));
-        svg.append("circle").attr("cx", parentRightX).attr("cy", parentsY).attr("r", personR).attr("fill", personColor(0));
+        svg.append("circle").attr("cx", parentLeftX).attr("cy", parentsY).attr("r", personR).attr("fill", personColor(0, 2));
+        svg.append("circle").attr("cx", parentRightX).attr("cy", parentsY).attr("r", personR).attr("fill", personColor(0, 2));
         svg.append("circle").attr("cx", familyX).attr("cy", familyY).attr("r", familyR).attr("fill", defaultFamilyColor);
-        svg.append("circle").attr("cx", childX).attr("cy", childY).attr("r", personR).attr("fill", personColor(1));
+        svg.append("circle").attr("cx", childX).attr("cy", childY).attr("r", personR).attr("fill", personColor(1, 2));
 
         const label = (text: string, x: number, y: number) => {
             svg.append("text").text(text).attr("x", x).attr("y", y)

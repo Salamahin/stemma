@@ -21,9 +21,18 @@ export const labelFontSize = "15px";
 // Arrow marker path
 export const arrowPath = "M 0 0 L 10 3 L 0 6 Z";
 
-// Person color by generation depth
-export function personColor(generationRatio) {
-    return d3.interpolatePlasma(generationRatio);
+// Person colour by age, in a few clearly different steps (ageSteps.ts) from
+// warm (oldest) to cool (youngest): on small nodes the eye tells another colour
+// apart, not a slightly different shade. Fewer steps take evenly spaced colours.
+const AGE_STEP_ANCHORS = ["#7f5539", "#c8782f", "#b8a12a", "#5f9a4b", "#2a9187", "#2f62c9"];
+const ageColor = d3.piecewise(d3.interpolateLab, AGE_STEP_ANCHORS);
+/** People with no date and no dated relative: no step to put them in. */
+export const undatedPersonColor = "#9aa5b1";
+
+/** Colour of age step `step` of `count` (0 = the oldest); null = undated. */
+export function personColor(step, count) {
+    if (step == null || !count) return undatedPersonColor;
+    return ageColor(count > 1 ? step / (count - 1) : 1);
 }
 
 // Marker IDs must be unique document-wide; `url(#id)` resolves to the
