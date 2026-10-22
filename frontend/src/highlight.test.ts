@@ -106,14 +106,30 @@ describe("HighlightAgeStep", () => {
         expect(h.personIsHighlighted("mid")).toBe(false);
     });
 
-    test("pinned or hovered people win over an age step", () => {
+    test("age steps alone show only their people", () => {
         const index = new StemmaIndex(dated);
         const lineages = new HighlightLineages(index, []);
-        const steps = new Set([index.ageStepOf(1810)!]);
-        expect(effectiveHighlight(lineages, index, steps)).toBeInstanceOf(HighlightAgeStep);
+        const h = effectiveHighlight(lineages, index, new Set([index.ageStepOf(1810)!]));
+        expect(h.personIsHighlighted("mid")).toBe(true);
+        expect(h.personIsHighlighted("other")).toBe(false);
+    });
+
+    test("a pinned or hovered branch is shown together with the chosen age steps", () => {
+        const index = new StemmaIndex(dated);
+        const lineages = new HighlightLineages(index, ["other"]);
+        const h = effectiveHighlight(lineages, index, new Set([index.ageStepOf(1720)!]));
+        expect(h.personIsHighlighted("other")).toBe(true); // the branch
+        expect(h.personIsHighlighted("old")).toBe(true); // the age step
+        expect(h.familyIsHighlighted("f1")).toBe(true); // old's family
+        expect(h.personIsHighlighted("young")).toBe(false); // neither
+        expect(h.familyIsHighlighted("f2")).toBe(false);
+    });
+
+    test("with no age step chosen, the lineages alone decide", () => {
+        const index = new StemmaIndex(dated);
+        const lineages = new HighlightLineages(index, []);
+        expect(effectiveHighlight(lineages, index, new Set())).toBe(lineages);
         lineages.pushPerson("other");
-        expect(effectiveHighlight(lineages, index, steps)).toBe(lineages);
-        lineages.pop();
         expect(effectiveHighlight(lineages, index, new Set())).toBe(lineages);
     });
 });

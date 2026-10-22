@@ -46,7 +46,7 @@
         onfamilySelected?: (family: any) => void;
         /** A click on the chart that hit no node (a pan does not count). */
         onbackgroundClicked?: () => void;
-        /** Show only the people of these age steps (pinned and hovered people still win). */
+        /** Show the people of these age steps (pinned and hovered branches on top of them). */
         ageSteps?: ReadonlySet<number>;
         onhighlightChanged?: () => void;
         onzoomChanged?: () => void;
