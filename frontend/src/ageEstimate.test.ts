@@ -50,13 +50,55 @@ describe("estimateAges", () => {
         expect(ages.ratio("a")).toBeLessThan(ages.ratio("b"));
     });
 
-    test("older is a lower ratio, younger a higher one, within 0..1", () => {
-        const ages = estimateAges(stemma([person("a", "1700"), person("b", "1850"), person("c", "2000")], []));
+    test("the ratio is a rank: colours spread evenly over people, not over years", () => {
+        const ages = estimateAges(
+            stemma([person("a", "1700"), person("b", "1990"), person("c", "1995"), person("d", "2000")], []),
+        );
         expect(ages.ratio("a")).toBe(0);
-        expect(ages.ratio("c")).toBe(1);
-        expect(ages.ratio("b")).toBeGreaterThan(0);
-        expect(ages.ratio("b")).toBeLessThan(1);
-        expect(ages.yearRange()).toEqual([1700, 2000]);
+        expect(ages.ratio("b")).toBeCloseTo(1 / 3);
+        expect(ages.ratio("c")).toBeCloseTo(2 / 3);
+        expect(ages.ratio("d")).toBe(1);
+        expect(ages.yearAt(0)).toBe(1700);
+        expect(ages.yearAt(1)).toBe(2000);
+    });
+
+    test("people born the same year share a colour", () => {
+        const ages = estimateAges(stemma([person("a", "1900"), person("b", "1900"), person("c", "2000")], []));
+        expect(ages.ratio("a")).toBe(ages.ratio("b"));
+    });
+
+    test("the generation length is learned from the tree's own dated parents and children", () => {
+        const ages = estimateAges(
+            stemma(
+                [person("p1", "1800"), person("c1", "1830"), person("p2", "1900"), person("c2", "1930"), person("p3", "1700"), person("c3")],
+                [family("f1", ["p1"], ["c1"]), family("f2", ["p2"], ["c2"]), family("f3", ["p3"], ["c3"])],
+            ),
+        );
+        expect(ages.generationYears).toBe(30);
+        expect(ages.birthYear("c3")!.year).toBe(1730);
+    });
+
+    test("an estimate stays within what the known dates allow", () => {
+        // An undated parent between a grandparent born 1850 and a child born 1900
+        // must be born 15+ years after the one and 15+ years before the other.
+        const ages = estimateAges(
+            stemma(
+                [person("gp", "1850"), person("p"), person("c", "1900")],
+                [family("f1", ["gp"], ["p"]), family("f2", ["p"], ["c"])],
+            ),
+        );
+        const y = ages.birthYear("p")!.year;
+        expect(y).toBeGreaterThanOrEqual(1850 + 15);
+        expect(y).toBeLessThanOrEqual(1900 - 15);
+    });
+
+    test("nobody is estimated to be born after today or more than 100 years before their death", () => {
+        const ages = estimateAges(
+            stemma([person("p", "2010"), person("kid"), person("old", undefined, "1900")], [family("f", ["p"], ["kid"])]),
+            2026,
+        );
+        expect(ages.birthYear("kid")!.year).toBeLessThanOrEqual(2026);
+        expect(ages.birthYear("old")!.year).toBeGreaterThanOrEqual(1800);
     });
 
     test("a family with no dates at all is still ordered by generation", () => {
@@ -69,7 +111,7 @@ describe("estimateAges", () => {
         expect(ages.birthYear("old")).toBeNull();
         expect(ages.ratio("old")).toBeLessThan(ages.ratio("mid"));
         expect(ages.ratio("mid")).toBeLessThan(ages.ratio("young"));
-        expect(ages.yearRange()).toBeNull();
+        expect(ages.yearAt(0)).toBeNull();
     });
 
     test("an unknown person id gets the middle of the scale", () => {

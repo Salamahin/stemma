@@ -238,7 +238,8 @@ export class StemmaIndex {
         return this._ages.ratio(personId)
     }
 
-    birthYearRange() {
-        return this._ages.yearRange()
+    /** The birth year at an age ratio (0 = the oldest, 0.5 = the median, 1 = the youngest); null with no dates. */
+    birthYearAt(ratio: number) {
+        return this._ages.yearAt(ratio)
     }
 }

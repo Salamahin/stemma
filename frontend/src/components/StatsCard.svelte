@@ -55,7 +55,12 @@
         };
     }
 
-    const years = $derived(stemmaIndex?.birthYearRange() ?? null);
+    /** Oldest, median and youngest birth years: the colour scale is a rank, so the middle is not the mean year. */
+    const years = $derived.by(() => {
+        if (!stemmaIndex) return null;
+        const ys = [0, 0.5, 1].map((r) => stemmaIndex.birthYearAt(r));
+        return ys[0] == null ? null : (ys as number[]);
+    });
 
     const stats = $derived(
         stemma && stemmaIndex && highlight && highlightVersion >= 0
@@ -78,7 +83,7 @@
         {#if years}
             <div class="age-legend" data-testid="age-legend" title={$t("stats.ageLegend")}>
                 <div class="age-bar" style:background={AGE_GRADIENT}></div>
-                <div class="age-years"><span>{years[0]}</span><span>{years[1]}</span></div>
+                <div class="age-years"><span>{years[0]}</span><span>{years[1]}</span><span>{years[2]}</span></div>
             </div>
         {/if}
     </aside>
