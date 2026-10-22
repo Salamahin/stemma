@@ -3,6 +3,7 @@
  * Web Worker (layout.worker.ts) and, as a fallback, on the main thread.
  */
 import * as d3 from "d3";
+import { forceEdgeRepel } from "./edgeRepel";
 
 /**
  * forceCollide restricted to datums that carry an explicit `r`.
@@ -179,7 +180,8 @@ export function applyLayoutForces(sim: d3.Simulation<any, any>, links: LayoutLin
         .force("x", d3.forceX<any>().x((d) => d.ax ?? cx).strength((d) => (d.ax != null ? LAYOUT_ANCHOR_STRENGTH : CENTER_STRENGTH)))
         .force("y", d3.forceY<any>().y((d) => d.ay ?? cy).strength((d) => (d.ay != null ? LAYOUT_ANCHOR_STRENGTH : CENTER_STRENGTH)))
         .force("collide", forceCollideSized((d: any) => d.r * 20) as any)
-        .force("repelForce", d3.forceManyBody().strength(-1500).distanceMin(85).theta(LAYOUT_THETA));
+        .force("repelForce", d3.forceManyBody().strength(-1500).distanceMin(85).theta(LAYOUT_THETA))
+        .force("edgeRepel", forceEdgeRepel(links as any) as any);
 }
 
 /** A stopped simulation with the stemma's forces and tuning; drive it with LayoutLoop. */
@@ -271,6 +273,8 @@ export class LayoutLoop {
         if (!this.running) return;
         const sim = this.sim;
         let ticks = 0;
+        // alphaTarget > 0 only while a node is dragged: keep edges from shoving people around the pointer.
+        (sim.force("edgeRepel") as ReturnType<typeof forceEdgeRepel> | undefined)?.enabled(sim.alphaTarget() === 0);
         if (sim.alphaTarget() > 0) {
             sim.tick();
             ticks = 1;
