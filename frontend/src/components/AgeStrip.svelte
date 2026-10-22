@@ -6,7 +6,7 @@
     /**
      * The age steps the chart is coloured by, as one thin continuous bar with the
      * labels above it. Hovering a segment shows its people as well; clicks pick
-     * any number of segments to keep shown. Pinned and hovered people still win.
+     * any number of segments to keep shown. Pinned and hovered branches are shown on top.
      */
     type Props = {
         steps: AgeSteps;

@@ -127,8 +127,26 @@ export class HighlightAgeStep implements Highlight {
     }
 }
 
-/** Pinned or hovered people (lineages) win; otherwise the chosen age steps, if any. */
+/** Shows what either shows. */
+class HighlightEither implements Highlight {
+    constructor(private a: Highlight, private b: Highlight) {}
+
+    personIsHighlighted(personId: string): boolean {
+        return this.a.personIsHighlighted(personId) || this.b.personIsHighlighted(personId)
+    }
+
+    familyIsHighlighted(familyId: string): boolean {
+        return this.a.familyIsHighlighted(familyId) || this.b.familyIsHighlighted(familyId)
+    }
+}
+
+/**
+ * The chosen age steps and the pinned or hovered branches (lineages) together:
+ * a branch is shown on top of the steps, not instead of them.
+ */
 export function effectiveHighlight(lineages: HighlightLineages, index: StemmaIndex, ageSteps: ReadonlySet<number>): Highlight {
-    if (lineages.isActive() || !ageSteps.size) return lineages
-    return new HighlightAgeStep(index, ageSteps)
+    if (!ageSteps.size) return lineages
+    const steps = new HighlightAgeStep(index, ageSteps)
+    // With no branch, lineages "highlight everything": only the steps count then.
+    return lineages.isActive() ? new HighlightEither(lineages, steps) : steps
 }
