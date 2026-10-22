@@ -21,9 +21,14 @@ export const labelFontSize = "15px";
 // Arrow marker path
 export const arrowPath = "M 0 0 L 10 3 L 0 6 Z";
 
-// Person color by generation depth
-export function personColor(generationRatio) {
-    return d3.interpolatePlasma(generationRatio);
+// Person colour by age, like old photos next to new ones: the oldest people in
+// the tree are sepia, then a dusty grey, the youngest a saturated blue. Lab
+// keeps the middle grey; HCL from brown to blue passes through pinks.
+const ageColor = d3.piecewise(d3.interpolateLab, ["#b0946c", "#8fa3a8", "#1668d9"]);
+
+/** `ageRatio`: 0 = the oldest person in the tree, 1 = the youngest. */
+export function personColor(ageRatio) {
+    return ageColor(ageRatio);
 }
 
 // Marker IDs must be unique document-wide; `url(#id)` resolves to the

@@ -1,4 +1,5 @@
 import type { Stemma, FamilyDescription, PersonDescription } from "./model";
+import { estimateAges, type AgeIndex } from "./ageEstimate";
 
 export type Generation = {
     generation: number,
@@ -38,6 +39,7 @@ export class StemmaIndex {
     private _maxGeneration: number
     private _descendantFamiliesOfPerson: Map<string, Set<string>>
     private _descendantPeopleOfFamily: Map<string, Set<string>>
+    private _ages: AgeIndex
 
     private groupByKey<K, V>(array: Array<readonly [K, V]>) {
         return array.reduce((store, item) => {
@@ -71,6 +73,7 @@ export class StemmaIndex {
         this._people = new Map(stemma.people.map(p => [p.id, p]))
         this._lineage = new Map(stemma.people.map(p => [p.id, this.buildLineage(p)]))
         this._maxGeneration = Math.max(...[...this._lineage.values()].map(p => p.generation));
+        this._ages = estimateAges(stemma)
 
         const dependeesByPerson = new Map(
             stemma.people.map(p => [p.id, this.computeLineage(p.id, this._parentToChildren)])
@@ -228,5 +231,14 @@ export class StemmaIndex {
 
     maxGeneration() {
         return this._maxGeneration
+    }
+
+    /** How old a person is next to everyone else: 0 = the oldest, 1 = the youngest. */
+    ageRatio(personId: string) {
+        return this._ages.ratio(personId)
+    }
+
+    birthYearRange() {
+        return this._ages.yearRange()
     }
 }
