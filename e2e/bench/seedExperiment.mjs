@@ -19,8 +19,8 @@ const tmp = mkdtempSync(join(tmpdir(), "seed-exp-"));
 const entry = join(tmp, "entry.ts");
 const src = (f) => JSON.stringify(join(frontend, "src", f));
 writeFileSync(entry, `export { structuredLayout } from ${src("structuredLayout.ts")};
-export { createLayoutSimulation, setCrossRegionLinkStrength } from ${src("layoutCore.ts")};
-export { computeInitialLayout } from ${src("initialLayout.ts")};
+export { createLayoutSimulation, setCrossRegionLinkStrength, anchorAtRest, anchorWhereMissing, giveCollisionRadius, LAYOUT_REFINE_ALPHA, LAYOUT_REHEAT_ALPHA } from ${src("layoutCore.ts")};
+export { computeInitialLayout, seedFromKnown, strandedKnown } from ${src("initialLayout.ts")};
 export { StemmaIndex } from ${src("stemmaIndex.ts")};
 export { makeNodesAndRelations } from ${src("graphTools.js")};
 export { computeClans } from ${src("clans.ts")};
@@ -35,7 +35,7 @@ const out = join(tmp, "bundle.mjs");
 await bundle.write({ file: out, format: "es" });
 const lib = await import(out);
 
-const stemma = loadStemma(process.argv[2] ?? "1000");
+let stemma = loadStemma(process.argv[2] ?? "1000");
 const only = process.argv[3] ? process.argv[3].split(",") : null;
 const pngPrefix = process.argv[4] ?? null;
 const W = 1440, H = 900;
@@ -45,6 +45,53 @@ if (process.env.CROSS) lib.setCrossRegionLinkStrength(Number(process.env.CROSS))
 function graph() {
   const [nodes, links] = lib.makeNodesAndRelations(stemma.people, stemma.families);
   return { nodes, links };
+}
+
+/**
+ * Reopening an edited stemma (WARM_FROM=<older.json>[,<newer.json>…]): the
+ * oldest version is laid out like a fresh open (star seed, free refine,
+ * anchored at rest); every later one, and finally this stemma, is reopened
+ * from the previous layout as FullStemma does: newcomers seeded next to their
+ * relatives (or parked aside when they have none), anchored where seeded, and
+ * the whole graph refined from the warm-start alpha. Remembered nodes stranded
+ * away from their relatives are re-seeded as in the app (KEEP_STRANDED=1: not).
+ */
+function warmStart() {
+  const versions = process.env.WARM_FROM.split(",");
+  const target = stemma;
+  stemma = loadStemma(versions[0]);
+  const first = seedStructured({ mode: "star" }, false);
+  lib.giveCollisionRadius(first.nodes);
+  refine(first.nodes, first.links, 1, false);
+  lib.anchorAtRest(first.nodes, W, H);
+  let prev = first.nodes;
+  let last;
+  for (const v of [...versions.slice(1), null]) {
+    stemma = v ? loadStemma(v) : target;
+    last = reopen(prev);
+    if (v) refine(last.g.nodes, last.g.links, last.alpha, false);
+    prev = last.g.nodes;
+  }
+  return last;
+}
+
+function reopen(prevNodes) {
+  const known = new Map(prevNodes.map((n) => [n.id, n]));
+  const g = graph();
+  if (!process.env.KEEP_STRANDED) for (const id of lib.strandedKnown(g.nodes.map((n) => n.id), g.links, new Set(g.nodes.filter((n) => known.has(n.id)).map((n) => n.id)))) known.delete(id);
+  for (const n of g.nodes) {
+    const k = known.get(n.id);
+    if (k) Object.assign(n, { x: k.x, y: k.y, ax: k.ax, ay: k.ay });
+  }
+  const t0 = performance.now();
+  const index = new lib.StemmaIndex({ type: "Stemma", people: stemma.people, families: stemma.families });
+  const fallback = lib.computeInitialLayout(index, stemma.people, stemma.families, W, H);
+  const seeds = lib.seedFromKnown(g.nodes, g.links, new Map([...known].map(([id, k]) => [id, [k.x, k.y]])), fallback);
+  for (const n of g.nodes) if (!known.has(n.id)) [n.x, n.y] = seeds.get(n.id);
+  lib.giveCollisionRadius(g.nodes);
+  lib.anchorWhereMissing(g.nodes);
+  const knownFrac = g.nodes.filter((n) => known.has(n.id)).length / g.nodes.length;
+  return { g: { ...g, seedMs: Math.round(performance.now() - t0) }, alpha: Math.min(lib.LAYOUT_REHEAT_ALPHA, lib.LAYOUT_REFINE_ALPHA + (1 - knownFrac)), anchored: false };
 }
 
 function inPoly(px, py, poly) {
@@ -129,7 +176,8 @@ function quality(nodes, links) {
     if (orient(p.x1, p.y1, p.x2, p.y2, q.x1, q.y1) * orient(p.x1, p.y1, p.x2, p.y2, q.x2, q.y2) < 0 && orient(q.x1, q.y1, q.x2, q.y2, p.x1, p.y1) * orient(q.x1, q.y1, q.x2, q.y2, p.x2, p.y2) < 0) { crossings++; if (p.inter || q.inter) interCrossings++; if (p.extra || q.extra) nonTreeCrossings++; }
   }
   const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
-  return { ...cloudOverlap(nodes), crossings, nonTreeEdges: segs.filter((g) => g.extra).length, nonTreeCrossings, interCrossings, interEdges: segs.filter((g) => g.inter).length, overlaps, medianLink: Math.round(lens[lens.length >> 1]), p95Link: Math.round(lens[Math.floor(lens.length * 0.95)]), w: Math.round(Math.max(...xs) - Math.min(...xs)), h: Math.round(Math.max(...ys) - Math.min(...ys)) };
+  const interLens = segs.filter((g) => g.inter).map((g) => Math.hypot(g.x2 - g.x1, g.y2 - g.y1)).sort((a, b) => a - b);
+  return { ...cloudOverlap(nodes), medianInterLink: Math.round(interLens[interLens.length >> 1] ?? 0), maxInterLink: Math.round(interLens[interLens.length - 1] ?? 0), crossings, nonTreeEdges: segs.filter((g) => g.extra).length, nonTreeCrossings, interCrossings, interEdges: segs.filter((g) => g.inter).length, overlaps, medianLink: Math.round(lens[lens.length >> 1]), p95Link: Math.round(lens[Math.floor(lens.length * 0.95)]), w: Math.round(Math.max(...xs) - Math.min(...xs)), h: Math.round(Math.max(...ys) - Math.min(...ys)) };
 }
 
 function refine(nodes, links, alpha, anchored) {
@@ -227,6 +275,7 @@ const VARIANTS = {
   starLight: () => ({ g: seedStructured({ mode: "star" }, false), alpha: 0.05, anchored: true }),
   starRefined: () => ({ g: seedStructured({ mode: "star" }, false), alpha: 1, anchored: true }),
   starFree: () => ({ g: seedStructured({ mode: "star" }, false), alpha: 1, anchored: false }),
+  warm: () => warmStart(),
   clansPacked: () => ({ g: seedStructured({ mode: "clans", regionStart: "pack" }), alpha: 1, anchored: true }),
 };
 
