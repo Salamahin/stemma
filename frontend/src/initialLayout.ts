@@ -116,6 +116,61 @@ function stableHash(s: string): number {
 }
 
 /**
+ * Remembered nodes whose remembered place no longer means anything: groups of
+ * known nodes that were laid out apart from the rest (a person added with no
+ * relatives is parked to the side by `seedFromKnown`, and that spot is
+ * remembered with its anchor) and are now joined to a larger known group by
+ * new links. Kept, they stay anchored where they were parked and the links to
+ * their relatives stretch across the chart; returned here, the caller seeds
+ * them next to their relatives like newcomers. Per connected component the
+ * largest known group stays; groups holding a node `keep` accepts (placed by
+ * the viewer) are never returned.
+ */
+export function strandedKnown(
+    ids: ReadonlyArray<string>,
+    links: ReadonlyArray<SeedLink>,
+    known: ReadonlySet<string>,
+    keep: (id: string) => boolean = () => false,
+): Set<string> {
+    const idOf = (e: string | { id: string }) => (typeof e === "string" ? e : e.id);
+    const index = new Map(ids.map((id, i) => [id, i]));
+    const makeSets = () => Int32Array.from(ids, (_, i) => i);
+    const find = (p: Int32Array, i: number): number => {
+        while (p[i] !== i) i = p[i] = p[p[i]];
+        return i;
+    };
+    const all = makeSets();
+    const knownOnly = makeSets();
+    for (const l of links) {
+        const s = index.get(idOf(l.source));
+        const t = index.get(idOf(l.target));
+        if (s == null || t == null) continue;
+        all[find(all, s)] = find(all, t);
+        if (known.has(ids[s]) && known.has(ids[t])) knownOnly[find(knownOnly, s)] = find(knownOnly, t);
+    }
+    const groups = new Map<number, { members: number[]; component: number; kept: boolean }>();
+    ids.forEach((id, i) => {
+        if (!known.has(id)) return;
+        const g = find(knownOnly, i);
+        let group = groups.get(g);
+        if (!group) groups.set(g, (group = { members: [], component: find(all, i), kept: false }));
+        group.members.push(i);
+        if (keep(id)) group.kept = true;
+    });
+    const largest = new Map<number, number>();
+    for (const [g, group] of groups) {
+        const best = largest.get(group.component);
+        if (best == null || group.members.length > groups.get(best)!.members.length) largest.set(group.component, g);
+    }
+    const out = new Set<string>();
+    for (const [g, group] of groups) {
+        if (largest.get(group.component) === g || group.kept) continue;
+        for (const i of group.members) out.add(ids[i]);
+    }
+    return out;
+}
+
+/**
  * Starting positions for nodes that have no remembered position, placed next
  * to relatives that do (a reopened stemma with a few new people). Grows
  * outward from the known nodes: a node below its source relative (child under

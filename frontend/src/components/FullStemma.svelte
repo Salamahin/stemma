@@ -20,7 +20,7 @@
     import { pushRegistryFor } from "../ghostPush";
     import { createLayoutEngine, type LayoutEngine } from "../layoutEngine";
     import layoutWorkerSource from "virtual:layout-worker";
-    import { computeInitialLayout, seedFromKnown } from "../initialLayout";
+    import { computeInitialLayout, seedFromKnown, strandedKnown } from "../initialLayout";
     import { NodeLayoutCache } from "../nodeLayoutCache";
     import { PinnedPeopleStorage } from "../pinnedPeopleStorage";
     import { exportChartSvg } from "../svgExport";
@@ -495,6 +495,18 @@
         // have nothing to do with the remembered layout.
         const known = new Map<string, [number, number]>();
         for (const n of nodes) if (n.hadKnownPosition) known.set(n.id, [n.x, n.y]);
+        // Remembered while cut off from their relatives (e.g. added before being
+        // linked, so parked aside): now linked, they start next to the relatives
+        // like newcomers, with a fresh anchor, instead of stretching links across.
+        const isPinned = (id: string) => id.startsWith("person_") && !!pinnedPeople.getPosition(denormalizeId(id));
+        const stranded = strandedKnown(nodes.map((n) => n.id), relations, new Set(known.keys()), isPinned);
+        for (const n of nodes) {
+            if (!stranded.has(n.id)) continue;
+            known.delete(n.id);
+            n.hadKnownPosition = false;
+            n.ax = undefined;
+            n.ay = undefined;
+        }
         const knownFrac = nodes.length ? known.size / nodes.length : 0;
         const warm = knownFrac >= WARM_START_MIN_KNOWN;
         if (warm && known.size < nodes.length) {

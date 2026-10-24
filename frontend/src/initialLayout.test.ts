@@ -1,6 +1,6 @@
 import { StemmaIndex } from "./stemmaIndex";
 import type { FamilyDescription, PersonDescription, Stemma } from "./model";
-import { computeInitialLayout } from "./initialLayout";
+import { computeInitialLayout, strandedKnown } from "./initialLayout";
 import { normalizeId } from "./graphTools";
 
 const person = (o: Omit<PersonDescription, "type">): PersonDescription => ({ type: "PersonDescription", ...o });
@@ -130,4 +130,40 @@ test("empty stemma returns empty layout", () => {
     const idx = new StemmaIndex(data);
     const layout = computeInitialLayout(idx, data.people, data.families, W, H);
     expect(layout.size).toBe(0);
+});
+
+describe("strandedKnown", () => {
+    const link = (source: string, target: string) => ({ source, target });
+
+    test("a person remembered alone (parked aside) is stranded once linked to the main layout", () => {
+        // a, fam, b were laid out together; p was remembered while it had no relatives
+        const links = [link("a", "fam"), link("fam", "b"), link("b", "fam2"), link("fam2", "p")];
+        const known = new Set(["a", "fam", "b", "p"]);
+        expect([...strandedKnown(["a", "fam", "b", "fam2", "p"], links, known)]).toEqual(["p"]);
+    });
+
+    test("remembered groups that are still apart keep their places", () => {
+        const links = [link("a", "fam"), link("fam", "b"), link("c", "fam3"), link("fam3", "d")];
+        const known = new Set(["a", "fam", "b", "c", "fam3", "d"]);
+        expect(strandedKnown(["a", "fam", "b", "c", "fam3", "d"], links, known).size).toBe(0);
+    });
+
+    test("when two remembered groups get linked, the smaller one is stranded and the larger stays", () => {
+        const links = [link("a", "f1"), link("f1", "b"), link("b", "f2"), link("f2", "c"), link("x", "f3"), link("f3", "y"), link("c", "new"), link("new", "x")];
+        const known = new Set(["a", "f1", "b", "f2", "c", "x", "f3", "y"]);
+        expect([...strandedKnown(["a", "f1", "b", "f2", "c", "x", "f3", "y", "new"], links, known)].sort()).toEqual(["f3", "x", "y"]);
+    });
+
+    test("a group holding a node the viewer placed is never stranded", () => {
+        const links = [link("a", "fam"), link("fam", "b"), link("b", "fam2"), link("fam2", "p")];
+        const known = new Set(["a", "fam", "b", "p"]);
+        expect(strandedKnown(["a", "fam", "b", "fam2", "p"], links, known, (id) => id === "p").size).toBe(0);
+    });
+
+    test("links given as resolved nodes are understood too", () => {
+        const a = { id: "a" }, f = { id: "fam" }, p = { id: "p" };
+        const known = new Set(["a", "fam", "p"]);
+        const links = [{ source: a, target: f }, { source: f, target: { id: "x" } }, { source: { id: "x" }, target: p }];
+        expect([...strandedKnown(["a", "fam", "x", "p"], links, known)]).toEqual(["p"]);
+    });
 });
