@@ -73,6 +73,13 @@ class Stemma:
 
 
 @dataclass(frozen=True, config=DOMAIN_CONFIG)
+class PersonCreated:
+    person: PersonDescription
+    stemma: Stemma
+    type: Literal["PersonCreated"] = "PersonCreated"
+
+
+@dataclass(frozen=True, config=DOMAIN_CONFIG)
 class AttachmentUploadUrl:
     upload_url: str
     upload_fields: dict[str, str]
@@ -133,6 +140,7 @@ class AuthLogoutResponse:
 Response = Annotated[
     OwnedStemmas
     | Stemma
+    | PersonCreated
     | StemmaDescription
     | FamilyDescription
     | PersonDescription

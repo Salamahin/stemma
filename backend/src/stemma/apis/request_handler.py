@@ -44,6 +44,7 @@ from stemma.domain.responses import (
     FavouriteStemma,
     InviteToken,
     OwnedStemmas,
+    PersonCreated,
     PhotoUploadUrl,
     Response,
     Stemma,
@@ -196,10 +197,11 @@ class RequestHandler:
         )
         return self._storage.stemma(user.user_id, request.stemma_id)
 
-    def _create_orphan_person(self, user: User, request: CreateOrphanPersonRequest) -> Stemma:
-        return self._storage.create_orphan_person(
+    def _create_orphan_person(self, user: User, request: CreateOrphanPersonRequest) -> PersonCreated:
+        stemma, person = self._storage.create_orphan_person(
             user.user_id, request.stemma_id, request.person_descr
         )
+        return PersonCreated(person=person, stemma=stemma)
 
     def _link_persons(self, user: User, request: LinkPersonsRequest) -> Stemma:
         return self._storage.link_persons(

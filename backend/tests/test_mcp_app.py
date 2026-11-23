@@ -276,6 +276,21 @@ def _caller(client: TestClient):
     return call
 
 
+def test_create_person_returns_only_the_new_person(client: TestClient) -> None:
+    call = _caller(client)
+    sid = call("create_stemma", {"name": "Brief"})["id"]
+    call("create_person", {"stemma_id": sid, "name": "Арсений"})
+
+    created = call("create_person", {"stemma_id": sid, "name": "Анна", "birth_date": "1975-12-03"})
+
+    assert created["type"] == "PersonCreated"
+    assert created["person"]["name"] == "Анна"
+    assert created["person"]["birthDate"] == "1975-12-03"
+    assert "people" not in created and "families" not in created
+    [found] = call("search_people", {"stemma_id": sid, "query": "Анна"})["people"]
+    assert found["id"] == created["person"]["id"]
+
+
 def test_alt_names_and_partial_dates_round_trip_over_mcp(client: TestClient) -> None:
     call = _caller(client)
     sid = call("create_stemma", {"name": "Names"})["id"]
