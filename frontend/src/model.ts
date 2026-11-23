@@ -85,6 +85,7 @@ export type FavouriteStemma = { type: "FavouriteStemma", stemmaId: string | null
 export type AttachmentOwnerKind = "person" | "family"
 export type Attachment = { type: "AttachmentDescription", id: string, ownerKind: AttachmentOwnerKind, ownerId: string, kind: "link" | "file", title: string, url: string | null, contentType?: string | null, note?: string | null }
 export type Stemma = { type: "Stemma", people: Array<PersonDescription>, families: Array<FamilyDescription>, attachments?: Array<Attachment> }
+export type PersonCreated = { type: "PersonCreated", person: PersonDescription, stemma: Stemma }
 export type AttachmentUploadUrl = { type: "AttachmentUploadUrl", uploadUrl: string, uploadFields: Record<string, string>, fileKey: string, expiresInSeconds: number }
 export type StemmaDescription = { type: "StemmaDescription", id: string, name: string, removable: Boolean }
 export type PersonDescription = { type: "PersonDescription", id: string, name: string, birthDate?: string, deathDate?: string, bio?: string, altNames?: AltName[], readOnly: boolean, photoUrl?: string | null }
@@ -121,6 +122,7 @@ export type StemmaResponse =
     | InviteToken
     | OwnedStemmas
     | Stemma
+    | PersonCreated
     | StemmaDescription
     | PersonDescription
     | TokenAccepted
@@ -262,10 +264,11 @@ export class Model {
     }
 
     async createOrphanPerson(stemmaId: string, descr: CreateNewPerson): Promise<Stemma> {
-        return this.send<Stemma>(
+        const created = await this.send<PersonCreated>(
             { type: "CreateOrphanPersonRequest", stemmaId, personDescr: sanitizeRequestPayload(descr, PERSON_PRESERVE_KEYS) as CreateNewPerson },
             null,
         )
+        return created.stemma
     }
 
     async linkPersons(stemmaId: string, fromPersonId: string, toPersonId: string, role: LinkRole, stemmaIndex: StemmaIndex): Promise<Stemma> {

@@ -33,6 +33,12 @@ def _stemma_list_only(_args: dict, response: dict) -> dict:
     return {k: v for k, v in response.items() if k != "firstStemma"}
 
 
+def _created_person_only(_args: dict, response: dict) -> dict:
+    """The web app re-renders from the stemma that comes back; the MCP client only needs
+    the new person's id, so don't send it the whole tree."""
+    return {"type": "PersonCreated", "person": response["person"]}
+
+
 def _brief(person: dict) -> dict:
     brief = {k: person.get(k) for k in ("id", "name", "birthDate", "deathDate")}
     if person.get("altNames"):
@@ -375,6 +381,7 @@ def tool_specs() -> tuple[ToolSpec, ...]:
                 "stemma_id": args["stemma_id"],
                 "person_descr": _person_descr(args),
             },
+            transform_response=_created_person_only,
         ),
         ToolSpec(
             name="update_person",

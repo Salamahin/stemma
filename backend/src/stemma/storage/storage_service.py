@@ -499,7 +499,7 @@ class StorageService:
 
     def create_orphan_person(
         self, user_id: str, stemma_id: str, description: CreateNewPerson
-    ) -> Stemma:
+    ) -> tuple[Stemma, PersonDescription]:
         snapshot = self._load_snapshot(stemma_id)
         self._require_stemma_access(snapshot, user_id)
         new_pid = uuid.uuid4().hex
@@ -514,7 +514,8 @@ class StorageService:
             people={**snapshot.people, new_pid: row},
             person_owners=snapshot.person_owners | {(new_pid, user_id)},
         )
-        return _describe_stemma(planned, user_id, self._photo_store)
+        stemma = _describe_stemma(planned, user_id, self._photo_store)
+        return stemma, next(p for p in stemma.people if p.id == new_pid)
 
     def update_person(
         self, user_id: str, stemma_id: str, person_id: str, description: CreateNewPerson

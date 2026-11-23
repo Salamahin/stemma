@@ -68,8 +68,18 @@ describe("Model", () => {
     const unknownPerson: CreateNewPerson = { type: "CreateNewPerson", name: "" };
     const noIndex = null as unknown as StemmaIndex;
 
+    test("createOrphanPerson returns the stemma from PersonCreated", async () => {
+        const person = { type: "PersonDescription", id: "p1", name: "Anna", readOnly: false };
+        const stemma = { type: "Stemma", people: [person], families: [] };
+        (globalThis as any).fetch = jest.fn().mockResolvedValue(fakeResponse(200, { type: "PersonCreated", person, stemma }));
+
+        const model = new Model("http://example");
+
+        expect(await model.createOrphanPerson("s", unknownPerson)).toEqual(stemma);
+    });
+
     test("createOrphanPerson keeps empty name in payload (Unknown toggle)", async () => {
-        const fetchMock = jest.fn().mockResolvedValue(fakeResponse(200, okStemma));
+        const fetchMock = jest.fn().mockResolvedValue(fakeResponse(200, { type: "PersonCreated", person: {}, stemma: okStemma }));
         (globalThis as any).fetch = fetchMock;
 
         const model = new Model("http://example");

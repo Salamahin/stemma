@@ -24,14 +24,7 @@ from tests.factories import (
 
 
 def _orphan_ids(storage: StorageService, user_id: str, sid: str, *definitions) -> list[str]:
-    ids: list[str] = []
-    for definition in definitions:
-        before = {p.id for p in storage.stemma(user_id, sid).people}
-        stemma = storage.create_orphan_person(user_id, sid, definition)
-        new_ids = [p.id for p in stemma.people if p.id not in before]
-        assert len(new_ids) == 1
-        ids.append(new_ids[0])
-    return ids
+    return [storage.create_orphan_person(user_id, sid, definition)[1].id for definition in definitions]
 
 
 def test_link_spouse_creates_new_family(storage: StorageService) -> None:
