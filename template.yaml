@@ -167,6 +167,19 @@ Resources:
             AllowedHeaders: ["*"]
             ExposedHeaders: [ETag]
             MaxAge: 600
+      # Photos and attachments are not in the DynamoDB backups (the table holds only their
+      # keys), so keep overwritten/deleted objects for as long as the table's backups last.
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 35
+            ExpiredObjectDeleteMarker: true
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
 
   AppBucketPolicy:
     Type: AWS::S3::BucketPolicy
